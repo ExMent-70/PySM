@@ -1,0 +1,44 @@
+{
+  "description": "Показывает диалоговое окно, в котором пользователь может выбрать одно значение из предопределенного списка. Результат сохраняется в переменную контекста.",
+  "category": "Интерфейс пользователя",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.0.0",
+  "command_line_args_meta": {
+    "dlg_choice_var": {
+      "type": "string",
+      "description": "Имя переменной, в которую будет сохранен выбор пользователя.",
+      "required": true,
+      "default": "dlg_choice_user_var"
+    },
+    "dlg_choice_title": {
+      "type": "string",
+      "description": "Заголовок, который будет отображаться в верхней части диалогового окна.",
+      "required": false,
+      "default": "Выбор опции"
+    },
+    "dlg_choice_message": {
+      "type": "string_multiline",
+      "description": "Текст-приглашение для ввода, который будет показан пользователю над списком.",
+      "required": false,
+      "default": "Выберите один из вариантов в выпадающем списке."
+    },
+    "dlg_choice_list": {
+      "type": "list",
+      "description": "Список вариантов для выбора, каждый с новой строки.",
+      "required": true,
+      "default": [
+        "PORTRAIT",
+        "SCHOOL",
+        "SEPTEMBER1",
+        "STREET",
+        "STUDIO"
+      ]
+    },
+    "dlg_choice_dvalue": {
+      "type": "string",
+      "description": "Значение по умолчанию. Используется, если в контексте нет значения для переменной. Должно точно совпадать с одним из вариантов в списке.",
+      "required": false,
+      "default": ""
+    }
+  }
+}

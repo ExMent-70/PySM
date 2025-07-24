@@ -1,0 +1,42 @@
+{
+  "description": "Выполняет одиночные операции с ФАЙЛАМИ: копирование, перемещение, переименование, удаление. Поддерживает динамические пути.",
+  "category": "Файловые операции",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "fo_operation": {
+      "type": "choice",
+      "description": "Выберите операцию для выполнения над файлом.",
+      "required": true,
+      "default": "copy",
+      "choices": [
+        "copy",
+        "move",
+        "rename",
+        "delete"
+      ]
+    },
+    "fo_source_path": {
+      "type": "file_path",
+      "description": "Исходный файл. Будет показан диалог выбора файла. Также можно использовать шаблоны вида {переменная}.",
+      "required": false
+    },
+    "fo_destination_path": {
+      "type": "file_path",
+      "description": "Путь назначения (требуется для copy/move/rename). Будет показан диалог выбора файла/ввода имени.",
+      "required": false
+    },
+    "fo_overwrite": {
+      "type": "bool",
+      "description": "Если флаг установлен, существующий файл в месте назначения будет перезаписан.",
+      "required": false,
+      "default": true
+    },
+    "fo_create_parents": {
+      "type": "bool",
+      "description": "Если флаг установлен, будут созданы все родительские папки для пути назначения, если они не существуют.",
+      "required": false,
+      "default": true
+    }
+  }
+}

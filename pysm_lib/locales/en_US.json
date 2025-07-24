@@ -1,0 +1,699 @@
+{
+  "_meta": {
+    "language_name": "English (en_US)"
+  },
+  "general": {
+    "error_title": "Error",
+    "info_title": "Information",
+    "confirm_title": "Confirmation",
+    "passport_error_prefix": "PASSPORT ERROR",
+    "passport_error_format": "[PASSPORT ERROR] {description}",
+    "setup_required": "SETUP REQUIRED",
+    "setup_required_format": "[SETUP REQUIRED]",
+    "not_found": "NOT FOUND",
+    "not_available_short": "N/A",
+    "unknown": "Unknown",
+    "id_format": "ID {id}",
+    "not_applicable": "N/A",
+    "seconds_unit_short": "sec",
+    "bullet_point_prefix": "  - {text}"
+  },
+  "main": {
+    "log_info": {
+      "app_starting": "PyScriptManager application is starting...",
+      "showing_main_window": "Showing main window and starting event loop.",
+      "app_exit": "Application exited with code: {code}"
+    }
+  },
+  "tooltips": {
+    "script": {
+      "no_info_available": "Script information is not available.",
+      "label_script": "Base Script:",
+      "label_warning": "WARNING:",
+      "label_error": "ERROR:",
+      "label_name": "Script:",
+      "label_description": "Description:",
+      "label_author": "Author:",
+      "label_version": "Version:",
+      "label_id": "ID:",
+      "label_path": "Script Folder:",
+      "raw_text": "Script is not configured (passport is missing).",
+      "invalid_passport_text": "Passport is invalid.",
+      "label_format_bold": "<b>{label}</b> {value}",
+      "label_format_bold_orange": "<b style='color:orange;'>{label}</b> {value}",
+      "label_format_bold_red": "<b style='color:red;'>{label}</b> {value}",
+      "description_format": "<b>{label}</b><p style='margin-top:0px; margin-bottom:0px; padding-left: 10px;'>{value}</p>",
+      "double_click_hint": "Double-click to edit script passport"
+    },
+    "instance": {
+      "label_instance_id": "Instance ID:",
+      "script_not_found": "Original script (ID: {id}) not found.",
+      "double_click_hint": "Double-click to configure instance parameters",
+      "params_header": "Command-line Arguments:",
+      "flag_present_text": "(flag)",
+      "param_format": "--{name}: {value}",
+      "label_instance_name": "Instance Name:",
+      "label_overridden_params": "Overridden Parameters:"
+    }
+  },
+  "main_window": {
+    "base_title": "PySM - Python Script Manager",
+    "dirty_indicator": "*",
+    "toolbar": {
+      "main_toolbar_title": "Main Toolbar",
+      "new_collection": "New Collection...",
+      "open_collection": "Open Collection...",
+      "save_collection": "Save Collection",
+      "save_collection_as": "Save As...",
+      "save_collection_tooltip": "Save the current collection",
+      "collection_passport": "Collection Passport...",
+      "refresh_scripts": "Refresh Scripts List",
+      "toggle_console": "Show/Hide Console",
+      "settings": "Settings...",
+      "exit": "Exit"
+    },
+    "status": {
+      "ready": "Application is ready.",
+      "settings_saved": "Settings saved.",
+      "settings_saved_restart_required": "Settings saved. Please restart the application to change the language."
+    },
+    "unsaved_dialog": {
+      "title": "Unsaved Changes",
+      "text": "There are unsaved changes in the current collection. Do you want to save them?"
+    },
+    "file_dialog": {
+      "open_title": "Open Collection",
+      "save_as_title": "Save Collection As...",
+      "filter": "PySM Collections (*{extension})"
+    }
+  },
+  "available_scripts_widget": {
+    "log_debug": {
+      "init": "AvailableScriptsWidget initialized.",
+      "update_tree": "Widget: update_scripts_tree slot. Received {count} nodes."
+    },
+    "group_title": "Available Scripts",
+    "header": {
+      "script_name": "Category/Script",
+      "description": "Description"
+    },
+    "no_scripts_placeholder": "No available scripts or directory not selected.",
+    "add_to_set_button": "Add to Set",
+    "add_warning": {
+      "title": "Add",
+      "text": "Select a valid script to add."
+    },
+    "context_menu": {
+      "configure": "Configure Passport..."
+    }
+  },
+  "collection_widget": {
+    "log_debug": {
+      "active_set_changed": "WIDGET: on_active_set_node_changed slot received model: {name}"
+    },
+    "continue_on_error_checkbox": "Execute the next script if the current one fails",
+    "group_title": "Sets Collection",
+    "header_collection": "Collection",
+    "unsaved_suffix": "- UNSAVED",
+    "run_mode_label": "Mode:",
+    "run_mode_full": "Full Set (Auto)",
+    "run_mode_step": "Full Set (Step-by-step)",
+    "run_mode_conditional_full": "Conditional (Auto)",
+    "run_mode_conditional_step": "Conditional (Step-by-step)",
+    "run_mode_single": "Only Selected from Set",
+    "run_button_run": "Run",
+    "run_button_stop": "Stop",
+    "run_button_next_step": "Next Step",
+    "run_tooltip_save_first": "Save the collection before running",
+    "script_not_found_format": "NOT FOUND: {id}",
+    "run_error": {
+      "title": "Cannot Run",
+      "no_set_selected": "Select a set or a script within a set to run.",
+      "no_script_in_set": "For this mode, you must select a specific script in the set."
+    },
+    "context_menu": {
+      "create_folder": "Create Folder Here",
+      "create_set": "Create Set Here",
+      "rename": "Rename",
+      "delete": "Delete",
+      "configure_params": "Configure Parameters...",
+      "delete_from_set": "Remove from Set",
+      "copy_instance": "Copy Instance",
+      "duplicate_instance": "Duplicate",
+      "paste_instance": "Paste Instance"
+    },
+    "create_folder": {
+      "title": "Create Folder",
+      "label": "Folder name:"
+    },
+    "create_set": {
+      "title": "Create Set",
+      "label": "Set name:"
+    },
+    "rename": {
+      "title": "Rename",
+      "label": "New name:"
+    },
+    "delete_node": {
+      "confirm_title": "Confirm Deletion",
+      "confirm_text": "Are you sure you want to delete '{name}'?"
+    },
+    "delete_entry": {
+      "title": "Remove Instance",
+      "text": "Remove script instance '{script_name}' from set '{set_name}'?"
+    },
+    "error": {
+      "script_info_not_found": "Could not find info for script ID: {id}"
+    }
+  },
+  "console_widget": {
+    "group_title": "Output Console",
+    "progress_bar": {
+      "default_format": "%p% - %t",
+      "active_format": "{text} - %p%"
+    }
+  },
+  "path_list_editor": {
+    "buttons": {
+      "add": "Add...",
+      "edit": "Edit...",
+      "remove": "Remove"
+    },
+    "duplicate_dialog": {
+      "title": "Duplicate",
+      "text": "Path '{path}' is already in the list."
+    },
+    "edit_dialog": {
+      "title": "Edit Path",
+      "label": "Edit the path:"
+    }
+  },
+  "dialogs": {
+    "script_properties": {
+      "title_passport": "Script Properties: {name}",
+      "title_instance": "Instance Parameters: {name}",
+      "instance_description_label": "Notes for this Instance",
+      "no_description_text": "No description available.",
+      "instance_name_label": "Instance Name:",
+      "silent_mode_label": "Silent mode (suppress verbose run info)",
+      "base_script_description_label": "Base Script Description",
+      "tabs": {
+        "general": "General",
+        "arguments": "Arguments",
+        "advanced": "Advanced"
+      },
+      "general_tab": {
+        "name_label": "Script Name:",
+        "description_label": "Description:",
+        "author_label": "Author:",
+        "version_label": "Version:"
+      },
+      "advanced_tab": {
+        "interpreter_label": "Specific Python Interpreter:"
+      },
+      "scan_button": "Scan File...",
+      "reset_button": "Reset",
+      "select_file_title": "Select File",
+      "select_dir_title": "Select Directory",
+      "scan_error": {
+        "not_found": "File to scan was not found: {file}"
+      },
+      "scan_confirm": {
+        "title": "Scan for Arguments",
+        "text": "This action will replace all existing arguments in the passport with arguments found in the file. Continue?"
+      },
+      "scan_result": {
+        "success_title": "Success",
+        "success_text": "Scan complete. Found {count} arguments.",
+        "info_title": "Information",
+        "info_text": "Could not find any arguments in the file. Make sure standard `argparse` is used."
+      },
+      "args_tab": {
+        "header_name": "Name",
+        "header_type": "Type",
+        "header_required": "Req.",
+        "header_default": "Default",
+        "header_value": "Value",
+        "header_enable": "On",
+        "header_actions": "Actions",
+        "header_description": "Description"
+      },
+      "add_arg_dialog": {
+        "title": "New Argument",
+        "label": "Argument name (without --):"
+      },
+      "delete_arg_dialog": {
+        "title": "Confirm Deletion",
+        "text": "Are you sure you want to delete argument '{name}'?"
+      },
+      "duplicate_arg_warning": {
+        "title": "Duplicate",
+        "text": "An argument named '{name}' already exists."
+      }
+    },
+    "arg_inspector": {
+      "group_title": "Properties for '{name}'",
+      "min_val_label": "Min Value (int/float):",
+      "max_val_label": "Max Value (int/float):",
+      "decimals_label": "Decimals (float):",
+      "choices_label": "Choices (string):",
+      "choices_placeholder": "One choice per line",
+      "filter_label": "File Filter (file):"
+    },
+    "arg_meta_editor": {
+      "title_new": "New Argument",
+      "title_edit": "Edit Argument",
+      "name_label": "Name (without --):",
+      "type_label": "Data Type:",
+      "description_label": "Description (help):",
+      "required_label": "Required:",
+      "default_label": "Default Value:",
+      "error_name_empty": "Argument name cannot be empty.",
+      "error_default_conversion": "Failed to convert default value '{value}' to type {type}"
+    },
+    "settings": {
+      "title": "Application Settings",
+      "tabs": {
+        "main": "General",
+        "appearance": "Appearance"
+      },
+      "buttons": {
+        "change": "Change...",
+        "add": "Add...",
+        "edit": "Edit...",
+        "remove": "Remove",
+        "view": "View...",
+        "save_as": "Save As...",
+        "delete": "Delete"
+      },
+      "interpreter_group": "Python Interpreter Path",
+      "interpreter_select_title": "Select Python Interpreter",
+      "interpreter_filter_win": "Python Interpreter (python.exe);;All files (*)",
+      "interpreter_filter_unix": "Python Interpreter (python python3);;All files (*)",
+      "path_group": "Additional paths for system PATH variable",
+      "pythonpath_group": "Additional paths for PYTHONPATH (module imports)",
+      "path_dialog_title": "Select directory for PATH",
+      "env_vars": {
+        "group_title": "Custom Environment Variables",
+        "header_key": "Variable",
+        "header_value": "Value",
+        "add_key_title": "Add Variable",
+        "add_key_label": "Variable name:",
+        "add_value_title": "Add Value",
+        "add_value_label": "Value for '{key}':",
+        "edit_value_title": "Edit Value",
+        "edit_value_label": "New value for '{key}':",
+        "duplicate_title": "Duplicate",
+        "duplicate_warning": "A variable named '{key}' already exists."
+      },
+      "logging_group": "Logging Level",
+      "logging_label": "Log detail level:",
+      "language_group": "Interface Language",
+      "language_label": "Language:",
+      "restart_note": "(Language and some path changes will take effect after application restart)",
+      "styles_group": "Style Settings",
+      "styles_preview_text": "Sample Text",
+      "themes": {
+        "group_title": "Console Appearance Themes",
+        "current_theme_label": "Current theme:",
+        "save_as_title": "Save Theme",
+        "save_as_label": "New theme name:",
+        "delete_confirm_title": "Delete Theme",
+        "delete_confirm_text": "Are you sure you want to delete theme '{name}'?"
+      },
+      "styles": {
+        "set_header": "Set Header:",
+        "set_info": "Set Info:",
+        "script_header_block": "Script Header (Block):",
+        "script_success_block": "Success (Block):",
+        "script_error_block": "Error (Block):",
+        "script_info": "Script Info:",
+        "script_stdout": "Output (stdout):",
+        "script_stderr": "Errors (stderr):",
+        "runner_info": "Runner Info:",
+        "console_background": "Console Background:",
+        "status_running": "Status: Running:",
+        "status_success": "Status: Success:",
+        "status_error": "Status: Error:",
+        "status_pending": "Status: Pending:",
+        "status_skipped": "Status: Skipped:",
+        "script_arg_value": "Launch Parameters:"
+      },
+      "color_picker_tooltip": "Double-click to choose a color",
+      "view_dialog": {
+        "path_title": "Resulting PATH Variable",
+        "pythonpath_title": "Resulting PYTHONPATH Variable",
+        "env_title": "Resulting Environment Variables",
+        "empty_variable": "(Variable is not set)"
+      }
+    },
+    "collection_passport": {
+      "title": "Collection Passport",
+      "properties_group": "Collection Properties",
+      "name_label": "Collection name:",
+      "description_label": "Description:",
+      "roots_group": "Script Root Directories",
+      "select_dir_dialog_title": "Select root directory",
+      "context_group": "Collection Context"
+    },
+    "context_editor": {
+      "header_name": "Name",
+      "header_type": "Type",
+      "header_value": "Value",
+      "header_readonly": "Read-only",
+      "header_description": "Description",
+      "add_variable": "Add Variable",
+      "create_variable": "Create Variable",
+      "remove_variable": "Remove Variable",
+      "move_up": "Up",
+      "move_down": "Down",
+      "add_title": "Add Context Variable from Script",
+      "add_label": "Variable name:",
+      "add_duplicate_error": "A variable named '{name}' already exists.",
+      "add_invalid_name_error": "Invalid variable name: '{name}'.\nNames must start with a letter or underscore and contain only letters, numbers, and underscores.",
+      "json_editor_title": "Editor for '{name}'",
+      "json_invalid_error": "The entered text is not valid JSON.",
+      "edit_choices_tooltip": "Edit choice list",
+      "edit_choices_title": "Choice Editor",
+      "edit_choices_label": "Enter one choice per line:",
+      "create_title": "Create New Context Variable",
+      "search_placeholder": "Search by name...",
+      "view_title": "View Context Variable"
+    }
+  },
+  "user_actions": {
+    "collection_opened": "Opened collection '{name}'",
+    "config_saved": "Application configuration saved.",
+    "config_save_error": "ERROR: Could not save application configuration.",
+    "collection_renamed": "Collection '{old_name}' renamed to '{new_name}'.",
+    "collection_props_updated": "Collection properties updated.",
+    "collection_saved": "Collection saved to '{path}'",
+    "folder_created": "Folder '{name}' added to collection.",
+    "set_created": "Set '{name}' added to collection.",
+    "node_deleted": "Node '{name}' deleted from collection.",
+    "node_renamed": "Node '{old_name}' renamed to '{new_name}'.",
+    "node_moved": "Node '{name}' has been moved.",
+    "passport_saved": "Passport saved for script '{name}'.",
+    "run_mode_changed": "Run mode changed to: {mode}",
+    "script_added_to_set": "Script '{script_name}' added to set '{set_name}'.",
+    "script_removed_from_set": "Script instance '{script_name}' removed from set '{set_name}'.",
+    "script_params_updated": "Parameters updated for instance '{script_name}' in set '{set_name}'.",
+    "script_reordered": "Script order changed in set '{set_name}'.",
+    "script_root_added": "Added script root directory: {path}",
+    "script_root_removed": "Removed script root directory.",
+    "script_root_updated": "Updated script root directory."
+  },
+  "app_controller": {
+    "log_info": {
+      "init_start": "Initializing AppController...",
+      "init_done": "AppController initialized successfully.",
+      "loading_initial_state": "Controller: Loading initial state...",
+      "initial_state_loaded": "Controller: Initial state loaded.",
+      "context_file_created": "Created context file for set run: {path}",
+      "deleting_context_file": "Deleting context file: {path}",
+      "set_run_finished": "Set run finished. State reset to {state}",
+      "using_persistent_context": "Using persistent context file: {path}",
+      "run_finished_context_kept": "Run finished. Context file kept at: {path}"
+    },
+    "log_debug": {
+      "state_change": "State change: {old} -> {new}",
+      "scan_finished_signal": "Controller: Received scan finished signal.",
+      "cache_rebuilt": "AppController scripts cache rebuilt. Found scripts: {count}",
+      "initial_context": "Initial context: {context}"
+    },
+    "log_warning": {
+      "scan_while_busy": "Attempted to start scan while application is busy. Aborting.",
+      "delete_context_file_failed": "Failed to delete context file '{path}': {error}",
+      "run_with_unsaved_changes": "Attempted to run with unsaved changes. Please save the collection."
+    },
+    "log_error": {
+      "async_scan_error": "Async scan error: {error}",
+      "context_file_failed": "Failed to create context file: {error}",
+      "run_unsaved_collection": "Cannot run: the collection has never been saved.",
+      "context_path_error": "Could not determine context file path: {error}"
+    },
+    "path_update": {
+      "log_info": {
+        "updating_path": "Updating PATH for current process...",
+        "no_new_paths": "No new paths to add to PATH.",
+        "path_updated": "Current process PATH updated."
+      },
+      "log_debug": {
+        "added_interpreter_path": "Added interpreter path: {path}",
+        "added_additional_path": "Added additional path: {path}"
+      },
+      "log_error": {
+        "get_interpreter_path_failed": "Error getting interpreter path: {error}",
+        "get_additional_paths_failed": "Error getting additional paths: {error}"
+      }
+    },
+    "status_config_save_error": "Error saving configuration.",
+    "status_scanning": "Scanning {count} directories...",
+    "status_scan_complete": "Scan complete.",
+    "status_scan_error": "Error during scan.",
+    "status_scan_busy": "Waiting for scan to complete...",
+    "status_new_collection": "New collection created.",
+    "status_collection_loaded": "Collection '{name}' loaded.",
+    "status_collection_load_error": "Error loading collection '{name}'.",
+    "status_collection_saved": "Collection saved to '{name}'.",
+    "status_step_complete": "Step finished. Press 'Next Step'.",
+    "console_log": {
+      "collection_properties_header": "Collection Properties:",
+      "collection_description": "  Description: {description}",
+      "collection_roots_header": "  Script Root Directories:",
+      "stopping_on_error": "<b>=== Script failed or was stopped by user ===</b><br>"
+    },
+    "console_error": {
+      "context_file_critical_error": "CRITICAL ERROR: Failed to create context file: {error}",
+      "skipping_script_no_info": "Skipping script: info not found for ID {id}"
+    },
+    "console_set_start_header": "☰ STARTING SET: {set_name} ☰",
+    "console_set_time_label": "<b>Time:</b>",
+    "console_set_mode_label": "<b>Mode:</b>",
+    "console_set_queued_label": "<b>Scripts in queue:</b>",
+    "console_set_context_file_label": "<b>Context File:</b>",
+    "console_set_context_usage_info": "To share data: <code>import pysm_context</code>. Read: <code>get()</code>, Write: <code>set()</code>.",
+    "console_set_queue_header": "<b>Execution Queue:</b>",
+    "console_set_unknown_script": "Unknown script",
+    "console_set": {
+      "queue_item_format": "  [{current}/{total}] {name} (ID: {id})",
+      "total_time_format": "<b>{label}</b> {duration} {unit}"
+    },
+    "console_script_start_header": "► [{current}/{total}] Running script: {script_name}",
+    "console_script_interpreter_label": "<b>Interpreter:</b>",
+    "console_script_cwd_label": "<b>Working directory:</b>",
+    "console_script_params_label": "<b>Launch Parameters:</b>",
+    "console_set_finalize_header": "☰ FINISHING SET: {set_name} ☰",
+    "console_set_finalize_summary_label": "<b>Summary:</b>",
+    "console_set_finalize_total_time_label": "<b>Total time:</b>",
+    "console_set_finalize_status_stopped": "Stopped by user",
+    "console_set_finalize_status_success": "All scripts completed successfully",
+    "console_set_finalize_status_errors": "Completed with errors",
+    "console_script_status_success_text": "✓ Status: {status} (return code: {return_code}). Time: {duration} {unit}",
+    "console_script_status_error_text": "✗ Status: {status} (return code: {return_code}). Time: {duration} {unit}",
+    "console_script_status_label_success": "Success",
+    "console_script_status_label_error": "With error",
+    "console_script_critical_error_header": "✗ Status: CRITICAL LAUNCH ERROR",
+    "console_script_details": "Details: {error_message}",
+    "busy_process_script": "script '{name}'",
+    "busy_process_set": "set '{name}'",
+    "busy_process_fallback": "active process",
+    "busy_process_scanning": "scanning for scripts"
+  },
+  "script_scanner": {
+    "log_debug": {
+      "reading_category_passport": "Reading category passport from: {path}",
+      "recursive_scan_start": "Recursive scan: {path} (Root ID: {root_id})",
+      "folder_is_script": "  Folder '{folder_name}' is treated as a SCRIPT (run-file found).",
+      "folder_is_category": "  Folder '{folder_name}' is treated as a CATEGORY (no run-file)."
+    },
+    "log_info": {
+      "scan_start": "Starting scan for {count} root directories.",
+      "scanning_root": "  Scanning '{path}' (Root ID: {id})...",
+      "scan_root_finished": "  ...Finished scanning '{path}'. Found child nodes: {count}.",
+      "scan_all_finished": "Total scan finished. Found root nodes: {count}.",
+      "worker_started": "ScriptScannerWorker: Starting scan in worker thread...",
+      "worker_finished": "ScriptScannerWorker: Scan in worker thread finished."
+    },
+    "log_warning": {
+      "empty_root_list": "List of root directories to scan is empty."
+    },
+    "log_error": {
+      "access_denied": "Failed to access '{path}': {error}",
+      "id_generation_failed": "ID generation error for '{path}' relative to '{base_path}'. Skipping.",
+      "pydantic_script_error": "    Pydantic error creating ScriptInfoModel for '{name}': {error}",
+      "pydantic_category_error": "    Pydantic error creating CategoryNodeModel for '{name}': {error}",
+      "path_not_found_or_not_dir": "  Path '{path}' not found or not a directory. Skipping.",
+      "path_processing_error": "  Error processing path '{path}': {error}",
+      "worker_error": "ScriptScannerWorker: Error in scan thread: {error}"
+    },
+    "error": {
+      "category_passport_not_dict": "Category passport content '{filename}' is not a dictionary.",
+      "read_category_passport_failed": "Failed to read category passport '{filename}': {error}",
+      "read_script_passport_failed": "Failed to read script passport '{filename}': {error}",
+      "script_passport_not_dict": "Script passport content '{filename}' is not a dictionary.",
+      "missing_description": "Passport is missing required field 'description' or it is not a string.",
+      "invalid_path_in_list": "Path {index} in 'script_specific_env_paths' is not a non-empty string.",
+      "env_paths_not_list": "'script_specific_env_paths' must be a list or null.",
+      "passport_missing": "Script passport is missing.",
+      "critical_model_error": "Critical model creation error: {error}",
+      "worker_runtime_error": "An error occurred during scanning: {error}"
+    },
+    "error_node": {
+      "name": "[NOT FOUND] {name}",
+      "description": "Directory not found at path: {path}"
+    },
+    "category_node": {
+      "root_description": "Root Directory: {path}"
+    }
+  },
+  "set_manager": {
+    "log_info": {
+      "init": "Initializing SetManager. Default collections directory: {path}",
+      "creating_new_collection": "SetManager: Creating new empty collection in memory.",
+      "loading_from_file": "SetManager: Attempting to load collection from file: {path}",
+      "collection_loaded": "Collection '{name}' loaded successfully. is_dirty = {dirty}",
+      "loading_context_file": "SetManager: Loading context file: {path}",
+      "saving_context_file": "SetManager: Saving context file: {path}",
+      "deleting_empty_context_file": "SetManager: Deleting empty context file: {path}",
+      "context_reloaded": "SetManager: Context successfully reloaded from file: {path}"
+    },
+    "log_debug": {
+      "cache_rebuilt": "SetManager node cache rebuilt. Nodes found: {count}",
+      "dirty_flag_set": "SetManager: 'is_dirty' flag set to {state}."
+    },
+    "log_warning": {
+      "adapting_structure": "Collection structure in '{path}' has no main folder node. Adapting...",
+      "reload_context_no_path": "SetManager: Cannot reload context, collection path is not defined."
+    },
+    "log_error": {
+      "file_not_found": "Collection file '{path}' not found. Creating a new empty collection.",
+      "load_failed": "Error loading or validating collection from '{path}': {error}",
+      "save_failed": "Error saving collection to file '{path}': {error}",
+      "context_file_invalid_format": "SetManager: Context file '{path}' has invalid format (not a dictionary).",
+      "context_reload_failed": "SetManager: Error reloading context from '{path}': {error}"
+    },
+    "log_critical": {
+      "create_default_dirs_failed": "Could not create default directories: {error}"
+    },
+    "default_folder_name": "Main Folder",
+    "new_collection_name": "New Collection"
+  },
+  "config_manager": {
+    "log_info": {
+      "config_loaded": "Configuration loaded successfully from '{path}'.",
+      "config_not_found": "Configuration file not found at '{path}'. Creating a new one.",
+      "config_saved": "Configuration saved successfully to '{path}'."
+    },
+    "log_warning": {
+      "creating_default_config": "Creating default configuration."
+    },
+    "log_error": {
+      "load_failed": "Error loading or validating configuration from '{path}': {error}",
+      "save_failed": "Failed to save configuration to '{path}': {error}"
+    },
+    "model_descriptions": {
+      "additional_env_paths": "Paths to add to the system PATH variable.",
+      "python_paths": "Paths to add to the PYTHONPATH variable for module lookups.",
+      "script_header_block": "Style for the script run header block.",
+      "script_success_block": "Style for the script success block.",
+      "script_error_block": "Style for the script error block.",
+      "console_background": "Console background color (HEX)",
+      "status_running": "Background color for a running script in the list",
+      "status_success": "Background color for a successfully completed script",
+      "status_error": "Background color for a script with an error",
+      "status_pending": "Background color for a pending script",
+      "status_skipped": "Background color for a skipped script",
+      "language": "Language code for UI localization (e.g., en_US, ru_RU).",
+      "active_theme_name": "Name of the active console appearance theme.",
+      "environment_variables": "Custom environment variables for launched scripts."
+    }
+  },
+  "pysm_context": {
+    "error": {
+      "context_file_not_found": "PyScriptManager context file not found."
+    }
+  },
+  "context_loader": {
+    "error": {
+      "script_path_missing": "FATAL: context_loader.py expects a script path to run."
+    }
+  },
+  "script_runner": {
+    "log_debug": {
+      "preparing_env": "Preparing environment for script: {id}",
+      "applying_global_vars": "Applying global environment variables: {vars}",
+      "pysm_active_set": "  Set environment variable PY_SCRIPT_MANAGER_ACTIVE=1",
+      "pythonpath_set": "  Set PYTHONPATH for subprocess: {path}",
+      "final_path": "Final PATH for script '{id}': {path}",
+      "stream_reader_started": "Stream reader '{stream}' for '{id}' started.",
+      "stream_reader_finished": "Stream reader '{stream}' for '{id}' definitely finished.",
+      "stream_threads_joined": "stdout/stderr threads for '{id}' are guaranteed to have finished."
+    },
+    "log_info": {
+      "console_output_blocked": "Console output for '{id}' BLOCKED.",
+      "console_output_unblocked": "Console output for '{id}' UNBLOCKED.",
+      "starting_script": "Starting script '{name}' (instance: {id})",
+      "process_finished": "Process for '{id}' finished with code: {code}.",
+      "stop_requested": "Stop requested for instance '{id}'.",
+      "terminating_process": "Attempting to terminate process PID {pid} for '{id}'."
+    },
+    "log_warning": {
+      "stream_reader_stopped": "Stream reader '{stream}' for '{id}' forcibly stopped.",
+      "terminate_failed_killing": "Process PID {pid} for '{id}' did not terminate. Attempting to kill."
+    },
+    "log_error": {
+      "unexpected_progress_error": "Unexpected error while processing progress JSON for '{id}' from line '{line}': {error}",
+      "stream_read_error": "Error reading stream '{stream}' for '{id}': {error}",
+      "generic_run_error": "Generic error when starting script '{name}': {error}",
+      "stop_process_error": "Error while trying to stop process PID {pid}: {error}"
+    },
+    "error": {
+      "progress_fields_not_numbers": "'current' and 'total' fields must be numbers.",
+      "progress_text_not_string": "'text' field must be a string if present.",
+      "stream_read_runtime_error": "Error reading stream {stream}: {error}",
+      "run_file_path_missing": "Absolute path to the executable file is not specified.",
+      "run_file_not_found": "Script file '{path}' not found.",
+      "generic_run_runtime_error": "Error when starting script '{name}': {error}"
+    },
+    "console_message": {
+      "output_blocked": "[Console output blocked by script]",
+      "output_unblocked": "[Console output unblocked by script]"
+    }
+  },
+  "argument_parser": {
+    "log_info": {
+      "scan_started": "Starting argument scan in file: {path}",
+      "scan_finished": "Scan finished. Found arguments: {count}"
+    },
+    "log_error": {
+      "file_not_found": "File for argument scanning not found: {path}",
+      "syntax_error": "Syntax error in file '{path}': {error}",
+      "unexpected_error": "Unexpected error while scanning for arguments in '{path}': {error}"
+    }
+  },
+  "models": {
+    "script_info": {
+      "default_category": "Uncategorized",
+      "default_author": "Unknown"
+    },
+    "collection": {
+      "default_name": "New Collection",
+      "description": "Description of what this collection is for.",
+      "script_roots_description": "List of root directories where scripts for this collection are searched."
+    },
+    "errors": {
+      "must_be_dict": "{field} must be a dictionary",
+      "invalid_type_for_meta": "Invalid type for parameter metadata: {type}",
+      "invalid_type_for_arg_value": "Invalid type for argument value '{key}': {type}. Expected a dictionary or ScriptSetEntryValueEnabled."
+    },
+    "log_errors": {
+      "validation_failed_meta": "Errors validating command_line_args_meta: {errors}",
+      "validation_failed_entry": "Errors validating command_line_args for ScriptSetEntryModel (ID: {id}): {errors}"
+    }
+  },
+  "progress_reporter": {
+    "default_description": "Processing",
+    "unit_of": "of"
+  }
+}

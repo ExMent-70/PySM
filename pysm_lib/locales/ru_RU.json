@@ -1,0 +1,700 @@
+{
+  "_meta": {
+    "language_name": "Русский (ru_RU)"
+  },
+  "general": {
+    "error_title": "Ошибка",
+    "info_title": "Информация",
+    "confirm_title": "Подтверждение",
+    "passport_error_prefix": "ОШИБКА ПАСПОРТА",
+    "passport_error_format": "[ОШИБКА ПАСПОРТА] {description}",
+    "setup_required": "ТРЕБУЕТСЯ НАСТРОЙКА",
+    "setup_required_format": "[ТРЕБУЕТСЯ НАСТРОЙКА]",
+    "not_found": "НЕ НАЙДЕН",
+    "not_available_short": "н/д",
+    "unknown": "Неизвестно",
+    "id_format": "ID {id}",
+    "not_applicable": "Н/П",
+    "seconds_unit_short": "сек",
+    "bullet_point_prefix": "  - {text}"
+  },
+  "main": {
+    "log_info": {
+      "app_starting": "Приложение PyScriptManager запускается...",
+      "showing_main_window": "Отображение главного окна и запуск цикла событий.",
+      "app_exit": "Приложение завершило работу с кодом: {code}"
+    }
+  },
+  "tooltips": {
+    "script": {
+      "no_info_available": "Информация о скрипте отсутствует.",
+      "label_script": "Базовый скрипт:",
+      "label_warning": "ПРЕДУПРЕЖДЕНИЕ:",
+      "label_error": "ОШИБКА:",
+      "label_name": "Скрипт:",
+      "label_description": "Описание:",
+      "label_author": "Автор:",
+      "label_version": "Версия:",
+      "label_id": "ID:",
+      "label_path": "Папка скрипта:",
+      "raw_text": "Скрипт не настроен (отсутствует паспорт).",
+      "invalid_passport_text": "Паспорт невалиден",
+      "label_format_bold": "<b>{label}</b> {value}",
+      "label_format_bold_orange": "<b style='color:orange;'>{label}</b> {value}",
+      "label_format_bold_red": "<b style='color:red;'>{label}</b> {value}",
+      "description_format": "<b>{label}</b><p style='margin-top:0px; margin-bottom:0px; padding-left: 10px;'>{value}</p>",
+      "double_click_hint": "Двойной щелчок для редактирования паспорта скрипта"
+    },
+    "instance": {
+      "label_instance_id": "ID экземпляра скрипта:",
+      "script_not_found": "Исходный скрипт (ID: {id}) не найден.",
+      "double_click_hint": "Двойной щелчок для настройки параметров экземпляра скрипта",
+      "params_header": "Аргументы командной строки:",
+      "flag_present_text": "(флаг)",
+      "param_format": "--{name}: {value}",
+      "label_instance_name": "Имя экземпляра скрипта:",
+      "label_overridden_params": "Переопределенные параметры:"
+    }
+  },
+  "main_window": {
+    "base_title": "PySM - Менеджер Python-скриптов",
+    "dirty_indicator": "*",
+    "toolbar": {
+      "main_toolbar_title": "Главная панель инструментов",
+      "new_collection": "Новая коллекция...",
+      "open_collection": "Открыть коллекцию...",
+      "save_collection": "Сохранить коллекцию",
+	  "save_collection_as": "Сохранить как...",
+	  "save_collection_tooltip": "Сохранить текущую коллекцию",
+      "collection_passport": "Паспорт коллекции...",
+      "refresh_scripts": "Обновить список скриптов",
+      "toggle_console": "Показать/скрыть консоль",
+      "settings": "Настройки...",
+      "exit": "Выход"
+    },
+    "status": {
+      "ready": "Приложение готово.",
+      "settings_saved": "Настройки сохранены.",
+      "settings_saved_restart_required": "Настройки сохранены. Для смены языка перезапустите приложение."
+    },
+    "unsaved_dialog": {
+      "title": "Несохраненные изменения",
+      "text": "В текущей коллекции есть несохраненные изменения. Хотите сохранить их?"
+    },
+    "file_dialog": {
+      "open_title": "Открыть коллекцию",
+      "save_as_title": "Сохранить коллекцию как...",
+      "filter": "Коллекции PySM (*{extension})"
+    }
+  },
+  "available_scripts_widget": {
+    "log_debug": {
+      "init": "AvailableScriptsWidget инициализирован.",
+      "update_tree": "Widget: Слот update_scripts_tree. Получено {count} узлов."
+    },
+    "group_title": "Доступные скрипты",
+    "header": {
+      "script_name": "Категория/Скрипт",
+      "description": "Описание"
+    },
+    "no_scripts_placeholder": "Нет доступных скриптов или директория не выбрана.",
+    "add_to_set_button": "Добавить в набор",
+    "add_warning": {
+      "title": "Добавление",
+      "text": "Выберите валидный скрипт для добавления."
+    },
+    "context_menu": {
+      "configure": "Настроить паспорт..."
+    }
+  },
+  "collection_widget": {
+    "log_debug": {
+      "active_set_changed": "WIDGET: Слот on_active_set_node_changed получил модель: {name}"
+    },
+    "continue_on_error_checkbox": "Выполнить следующий скрипт, если текущий завершен с ошибкой",
+    "group_title": "Активная коллекция",
+    "header_collection": "Коллекция",
+    "unsaved_suffix": "- НЕ СОХРАНЕНА",
+    "run_mode_label": "Режим:",
+    "run_mode_full": "Весь набор (авто)",
+    "run_mode_step": "Весь набор (пошагово)",
+    "run_mode_conditional_full": "Условный (авто)",
+    "run_mode_conditional_step": "Условный (пошагово)",
+    "run_mode_single": "Только выбранный из набора",
+    "run_button_run": "Выполнить",
+    "run_button_stop": "Остановить",
+    "run_button_next_step": "Следующий шаг",
+    "run_tooltip_save_first": "Сохраните коллекцию перед запуском",
+    "script_not_found_format": "НЕ НАЙДЕН: {id}",
+    "run_error": {
+      "title": "Запуск невозможен",
+      "no_set_selected": "Выберите набор или отдельный скрипт в наборе для запуска.",
+      "no_script_in_set": "Для этого режима нужно выбрать конкретный скрипт в наборе."
+    },
+    "context_menu": {
+          "create_folder": "Создать папку здесь",
+          "create_set": "Создать набор здесь",
+          "rename": "Переименовать",
+          "delete": "Удалить",
+          "configure_params": "Настроить параметры...",
+          "delete_from_set": "Удалить из набора",
+          "copy_instance": "Копировать Экземпляр",
+          "duplicate_instance": "Создать дубликат",
+          "paste_instance": "Вставить Экземпляр"
+    },
+    "create_folder": {
+      "title": "Создание папки",
+      "label": "Имя папки:"
+    },
+    "create_set": {
+      "title": "Создание набора",
+      "label": "Имя набора:"
+    },
+    "rename": {
+      "title": "Переименование",
+      "label": "Новое имя:"
+    },
+    "delete_node": {
+      "confirm_title": "Подтверждение удаления",
+      "confirm_text": "Вы уверены, что хотите удалить '{name}'?"
+    },
+    "delete_entry": {
+      "title": "Удаление экземпляра",
+      "text": "Удалить экземпляр скрипта '{script_name}' из набора '{set_name}'?"
+    },
+    "error": {
+      "script_info_not_found": "Не удалось найти информацию для скрипта ID: {id}"
+    }
+  },
+  "console_widget": {
+    "group_title": "Консоль вывода",
+    "progress_bar": {
+      "default_format": "%p% - %t",
+      "active_format": "{text} - %p%"
+    }
+  },
+  "path_list_editor": {
+    "buttons": {
+      "add": "Добавить...",
+      "edit": "Изменить...",
+      "remove": "Удалить"
+    },
+    "duplicate_dialog": {
+      "title": "Дубликат",
+      "text": "Путь '{path}' уже есть в списке."
+    },
+    "edit_dialog": {
+      "title": "Изменить путь",
+      "label": "Отредактируйте путь:"
+    }
+  },
+  "dialogs": {
+    "script_properties": {
+      "title_passport": "Свойства скрипта: {name}",
+      "title_instance": "Параметры экземпляра: {name}",
+      "instance_description_label": "Описание скрипта",
+      "no_description_text": "Описание отсутствует.",
+      "instance_name_label": "Имя экземпляра:",
+	  "silent_mode_label": "Отключить вывод служебной информации в консоль при запуске экземпляра скрипта",
+      "base_script_description_label": "Описание базового скрипта",
+      "instance_description_label": "Описание этого экземпляра (заметки)",	  
+      "tabs": {
+        "general": "Общие",
+        "arguments": "Аргументы",
+        "advanced": "Дополнительно"
+      },
+      "general_tab": {
+        "name_label": "Имя скрипта:",
+        "description_label": "Описание:",
+        "author_label": "Автор:",
+        "version_label": "Версия:"
+      },
+      "advanced_tab": {
+        "interpreter_label": "Особый интерпретатор Python:"
+      },
+      "scan_button": "Сканировать файл...",
+      "reset_button": "Сбросить",
+      "select_file_title": "Выберите файл",
+      "select_dir_title": "Выберите директорию",
+      "scan_error": {
+        "not_found": "Файл для сканирования не найден: {file}"
+      },
+      "scan_confirm": {
+        "title": "Сканирование аргументов",
+        "text": "Это действие заменит все существующие аргументы в паспорте на найденные в файле. Продолжить?"
+      },
+      "scan_result": {
+        "success_title": "Успех",
+        "success_text": "Сканирование завершено. Найдено {count} аргументов.",
+        "info_title": "Информация",
+        "info_text": "Не удалось найти аргументы в файле. Убедитесь, что используется стандартный `argparse`."
+      },
+      "args_tab": {
+        "header_name": "Имя",
+        "header_type": "Тип",
+        "header_required": "Обяз.",
+        "header_default": "По умолч.",
+        "header_value": "Значение",
+        "header_enable": "Вкл.",
+        "header_actions": "Действия",
+        "header_description": "Описание"
+      },
+      "add_arg_dialog": {
+        "title": "Новый аргумент",
+        "label": "Имя аргумента (без --):"
+      },
+      "delete_arg_dialog": {
+        "title": "Подтверждение удаления",
+        "text": "Вы уверены, что хотите удалить аргумент '{name}'?"
+      },
+      "duplicate_arg_warning": {
+        "title": "Дубликат",
+        "text": "Аргумент с именем '{name}' уже существует."
+      }
+    },
+    "arg_inspector": {
+      "group_title": "Свойства для '{name}'",
+      "min_val_label": "Мин. значение (int/float):",
+      "max_val_label": "Макс. значение (int/float):",
+      "decimals_label": "Знаков после запятой (float):",
+      "choices_label": "Варианты выбора (string):",
+      "choices_placeholder": "Один вариант на строку",
+      "filter_label": "Фильтр файлов (file):"
+    },
+    "arg_meta_editor": {
+      "title_new": "Новый аргумент",
+      "title_edit": "Редактировать аргумент",
+      "name_label": "Имя (без --):",
+      "type_label": "Тип данных:",
+      "description_label": "Описание (help):",
+      "required_label": "Обязательный:",
+      "default_label": "Значение по умолчанию:",
+      "error_name_empty": "Имя аргумента не может быть пустым.",
+      "error_default_conversion": "Не удалось преобразовать значение по умолчанию '{value}' к типу {type}"
+    },
+    "settings": {
+      "title": "Настройки приложения",
+      "tabs": {
+        "main": "Основные",
+        "appearance": "Оформление"
+      },
+      "buttons": {
+        "change": "Изменить...",
+        "add": "Добавить...",
+        "edit": "Изменить...",
+        "remove": "Удалить",
+        "view": "Просмотреть...",
+        "save_as": "Сохранить как...",
+        "delete": "Удалить"
+      },
+      "interpreter_group": "Путь к интерпретатору Python",
+      "interpreter_select_title": "Выберите интерпретатор Python",
+      "interpreter_filter_win": "Интерпретатор Python (python.exe);;Все файлы (*)",
+      "interpreter_filter_unix": "Интерпретатор Python (python python3);;Все файлы (*)",
+      "path_group": "Дополнительные пути для системной переменной PATH",
+      "pythonpath_group": "Дополнительные пути для PYTHONPATH (импорт модулей)",
+      "path_dialog_title": "Выберите директорию для PATH",
+      "env_vars": {
+        "group_title": "Пользовательские переменные окружения",
+        "header_key": "Переменная",
+        "header_value": "Значение",
+        "add_key_title": "Добавить переменную",
+        "add_key_label": "Имя переменной:",
+        "add_value_title": "Добавить значение",
+        "add_value_label": "Значение для '{key}':",
+        "edit_value_title": "Изменить значение",
+        "edit_value_label": "Новое значение для '{key}':",
+        "duplicate_title": "Дубликат",
+        "duplicate_warning": "Переменная с именем '{key}' уже существует."
+      },
+      "logging_group": "Уровень логирования",
+      "logging_label": "Уровень детализации логов:",
+      "language_group": "Язык интерфейса",
+      "language_label": "Язык:",
+      "restart_note": "(Изменения языка и некоторых путей вступят в силу после перезапуска приложения)",
+      "styles_group": "Настройки стилей",
+      "styles_preview_text": "Пример текста",
+      "themes": {
+        "group_title": "Темы оформления консоли",
+        "current_theme_label": "Текущая тема:",
+        "save_as_title": "Сохранить тему",
+        "save_as_label": "Имя новой темы:",
+        "delete_confirm_title": "Удаление темы",
+        "delete_confirm_text": "Вы уверены, что хотите удалить тему '{name}'?"
+      },
+      "styles": {
+        "set_header": "Заголовок набора:",
+        "set_info": "Инфо о наборе:",
+        "script_header_block": "Заголовок скрипта (блок):",
+        "script_success_block": "Успех (блок):",
+        "script_error_block": "Ошибка (блок):",
+        "script_info": "Инфо о скрипте:",
+        "script_stdout": "Вывод (stdout):",
+        "script_stderr": "Ошибки (stderr):",
+        "runner_info": "Служебная информация:",
+        "console_background": "Фон консоли:",
+        "status_running": "Статус: Выполняется:",
+        "status_success": "Статус: Успех:",
+        "status_error": "Статус: Ошибка:",
+        "status_pending": "Статус: В очереди:",
+        "status_skipped": "Статус: Пропущен:",
+		"script_arg_value": "Параметры запуска:"
+      },
+      "color_picker_tooltip": "Двойной щелчок для выбора цвета",
+      "view_dialog": {
+        "path_title": "Итоговая переменная PATH",
+        "pythonpath_title": "Итоговая переменная PYTHONPATH",
+        "env_title": "Итоговые переменные окружения",
+        "empty_variable": "(Переменная не задана)"
+      }
+    },
+    "collection_passport": {
+      "title": "Паспорт коллекции",
+      "properties_group": "Свойства коллекции",
+      "name_label": "Имя коллекции:",
+      "description_label": "Описание:",
+      "roots_group": "Корневые директории скриптов",
+      "select_dir_dialog_title": "Выберите корневую директорию",
+      "context_group": "Контекст коллекции"
+    },
+    "context_editor": {
+      "header_name": "Имя",
+      "header_type": "Тип",
+      "header_value": "Значение",
+      "header_readonly": "Только чтение",
+      "header_description": "Описание",
+      "add_variable": " Добавить переменную ",
+	  "create_variable": " Создать переменную ",
+      "remove_variable": " Удалить переменную" ,
+      "move_up": "Вверх",
+      "move_down": "Вниз",
+      "add_title": "Добавить переменную контекста",
+      "add_label": "Имя переменной:",
+      "add_duplicate_error": "Переменная с именем '{name}' уже существует.",
+	  "add_invalid_name_error": "Некорректное имя переменной: '{name}'.\nИмя должно начинаться с буквы или знака подчеркивания и содержать только буквы, цифры и знаки подчеркивания.",	  
+      "json_editor_title": "Редактор для '{name}'",
+      "json_invalid_error": "Введенный текст не является валидным JSON.",
+      "edit_choices_tooltip": "Редактировать список вариантов",
+      "edit_choices_title": "Редактор вариантов",
+      "edit_choices_label": "Введите по одному варианту на строку:",
+	  "create_title": "Создать новую переменную контекста",
+      "search_placeholder": "Поиск по имени...",
+      "view_title": "Просмотр переменной контекста"	  
+    }
+  },
+  "user_actions": {
+    "collection_opened": "Открыта коллекция '{name}'",
+    "config_saved": "Конфигурация приложения сохранена.",
+    "config_save_error": "ОШИБКА: Не удалось сохранить конфигурацию приложения.",
+    "collection_renamed": "Коллекция '{old_name}' переименована в '{new_name}'.",
+    "collection_props_updated": "Свойства коллекции обновлены.",
+	"collection_saved": "Коллекция сохранена в '{path}'",
+    "folder_created": "В коллекцию добавлена папка '{name}'.",
+    "set_created": "В коллекцию добавлен набор '{name}'.",
+    "node_deleted": "Из коллекции удален узел '{name}'.",
+    "node_renamed": "Узел '{old_name}' переименован в '{new_name}'.",
+    "node_moved": "Узел '{name}' перемещен.",
+    "passport_saved": "Сохранен паспорт для скрипта '{name}'.",
+    "run_mode_changed": "Режим запуска изменен на: {mode}",
+    "script_added_to_set": "Скрипт '{script_name}' добавлен в набор '{set_name}'.",
+    "script_removed_from_set": "Экземпляр скрипта '{script_name}' удален из набора '{set_name}'.",
+    "script_params_updated": "Обновлены параметры для экземпляра '{script_name}' в наборе '{set_name}'.",
+    "script_reordered": "Изменен порядок скриптов в наборе '{set_name}'.",
+    "script_root_added": "Добавлена корневая директория: {path}",
+    "script_root_removed": "Удалена корневая директория.",
+    "script_root_updated": "Обновлена корневая директория."
+  },
+  "app_controller": {
+    "log_info": {
+      "init_start": "Инициализация AppController...",
+      "init_done": "AppController успешно инициализирован.",
+      "loading_initial_state": "Controller: Загрузка начального состояния...",
+      "initial_state_loaded": "Controller: Начальное состояние загружено.",
+      "context_file_created": "Создан файл контекста для запуска набора: {path}",
+      "deleting_context_file": "Удаление файла контекста: {path}",
+      "set_run_finished": "Выполнение набора завершено. Состояние сброшено в {state}",
+      "using_persistent_context": "Использование постоянного файла контекста: {path}",
+      "run_finished_context_kept": "Выполнение завершено. Файл контекста сохранен: {path}"
+    },
+    "log_debug": {
+      "state_change": "Смена состояния: {old} -> {new}",
+      "scan_finished_signal": "Controller: Получен сигнал об успешном завершении сканирования.",
+      "cache_rebuilt": "Кэш скриптов AppController перестроен. Найдено скриптов: {count}",
+      "initial_context": "Начальный контекст: {context}"
+    },
+    "log_warning": {
+      "scan_while_busy": "Попытка запустить сканирование, пока приложение занято. Отмена.",
+      "delete_context_file_failed": "Не удалось удалить файл контекста '{path}': {error}",
+      "run_with_unsaved_changes": "Попытка запуска с несохраненными изменениями. Сохраните коллекцию."
+    },
+    "log_error": {
+      "async_scan_error": "Ошибка асинхронного сканирования: {error}",
+      "context_file_failed": "Не удалось создать файл контекста: {error}",
+      "run_unsaved_collection": "Запуск невозможен: коллекция ни разу не была сохранена.",
+      "context_path_error": "Не удалось определить путь к файлу контекста: {error}"
+    },
+    "path_update": {
+      "log_info": {
+        "updating_path": "Обновление PATH для текущего процесса...",
+        "no_new_paths": "Нет новых путей для добавления в PATH.",
+        "path_updated": "PATH текущего процесса обновлен."
+      },
+      "log_debug": {
+        "added_interpreter_path": "Добавлен путь к интерпретатору: {path}",
+        "added_additional_path": "Добавлен доп. путь: {path}"
+      },
+      "log_error": {
+        "get_interpreter_path_failed": "Ошибка при получении пути к интерпретатору: {error}",
+        "get_additional_paths_failed": "Ошибка при получении доп. путей: {error}"
+      }
+    },
+    "status_config_save_error": "Ошибка сохранения конфигурации.",
+    "status_scanning": "Сканирование {count} директорий...",
+    "status_scan_complete": "Сканирование завершено.",
+    "status_scan_error": "Ошибка при сканировании.",
+    "status_scan_busy": "Дождитесь окончания сканирования...",
+    "status_new_collection": "Создана новая коллекция.",
+    "status_collection_loaded": "Коллекция '{name}' загружена.",
+    "status_collection_load_error": "Ошибка загрузки коллекции '{name}'.",
+    "status_collection_saved": "Коллекция сохранена в '{name}'.",
+    "status_step_complete": "Шаг завершен. Нажмите 'Следующий шаг'.",
+    "console_log": {
+      "collection_properties_header": "Параметры коллекции:",
+      "collection_description": "  Описание коллекции",
+      "collection_roots_header": "  Корневые директории скриптов:",
+      "stopping_on_error": "<b>=== Скрипт завершен с ошибкой или остановлен пользователем ===</b><br>"
+    },
+    "console_error": {
+      "context_file_critical_error": "КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать файл контекста: {error}",
+      "skipping_script_no_info": "Пропуск скрипта: не найдена информация для ID {id}"
+    },
+    "console_set_start_header": "☰ ЗАПУСК НАБОРА: {set_name} ☰",
+    "console_set_time_label": "<b>Время:</b>",
+    "console_set_mode_label": "<b>Режим:</b>",
+    "console_set_queued_label": "<b>Скриптов в очереди:</b>",
+    "console_set_context_file_label": "<b>Файл контекста:</b>",
+    "console_set_context_usage_info": "Для обмена данными: <code>import pysm_context</code>. Чтение: <code>get_data()</code>, Запись: <code>set_data()</code>.",
+    "console_set_queue_header": "<b>Очередь выполнения:</b>",
+    "console_set_unknown_script": "Неизвестный скрипт",
+    "console_set": {
+      "queue_item_format": "  [{current}/{total}] {name} (ID: {id})",
+      "total_time_format": "<b>{label}</b> {duration} {unit}"
+    },
+    "console_script_start_header": "► [{current}/{total}] Запуск скрипта: {script_name}",
+    "console_script_interpreter_label": "<b>Интерпретатор:</b>",
+    "console_script_cwd_label": "<b>Рабочая папка:</b>",
+    "console_script_params_label": "<b>Параметры запуска:</b>",
+    "console_set_finalize_header": "☰ ЗАВЕРШЕНИЕ НАБОРА: {set_name} ☰",
+    "console_set_finalize_summary_label": "<b>Итог:</b>",
+    "console_set_finalize_total_time_label": "<b>Общее время:</b>",
+    "console_set_finalize_status_stopped": "Остановлено пользователем",
+    "console_set_finalize_status_success": "Все скрипты выполнены успешно",
+    "console_set_finalize_status_errors": "Выполнено с ошибками",
+    "console_script_status_success_text": "✓ Статус: {status} (код возврата: {return_code}). Время: {duration} {unit}",
+    "console_script_status_error_text": "✗ Статус: {status} (код возврата: {return_code}). Время: {duration} {unit}",
+    "console_script_status_label_success": "Успешно",
+    "console_script_status_label_error": "С ошибкой",
+    "console_script_critical_error_header": "✗ Статус: КРИТИЧЕСКАЯ ОШИБКА ЗАПУСКА",
+    "console_script_details": "Детали: {error_message}",
+    "busy_process_script": "скрипт '{name}'",
+    "busy_process_set": "набор '{name}'",
+    "busy_process_fallback": "активный процесс",
+    "busy_process_scanning": "сканирование скриптов"
+  },
+  "script_scanner": {
+    "log_debug": {
+      "reading_category_passport": "Чтение паспорта категории из: {path}",
+      "recursive_scan_start": "Рекурсивное сканирование: {path} (ID корня: {root_id})",
+      "folder_is_script": "  Папка '{folder_name}' обрабатывается как СКРИПТ (найден run-файл).",
+      "folder_is_category": "  Папка '{folder_name}' обрабатывается как КАТЕГОРИЯ (нет run-файла)."
+    },
+    "log_info": {
+      "scan_start": "Начало сканирования для {count} корневых директорий.",
+      "scanning_root": "  Сканирование '{path}' (ID корня: {id})...",
+      "scan_root_finished": "  ...Завершено сканирование '{path}'. Найдено дочерних узлов: {count}.",
+      "scan_all_finished": "Общее сканирование завершено. Всего найдено корневых узлов: {count}.",
+      "worker_started": "ScriptScannerWorker: Запуск сканирования в рабочем потоке...",
+      "worker_finished": "ScriptScannerWorker: Сканирование в рабочем потоке завершено."
+    },
+    "log_warning": {
+      "empty_root_list": "Список корневых директорий для сканирования пуст."
+    },
+    "log_error": {
+      "access_denied": "Не удалось получить доступ к '{path}': {error}",
+      "id_generation_failed": "Ошибка ID для '{path}' относительно '{base_path}'. Пропуск.",
+      "pydantic_script_error": "    Ошибка Pydantic при создании ScriptInfoModel для '{name}': {error}",
+      "pydantic_category_error": "    Ошибка Pydantic при создании CategoryNodeModel для '{name}': {error}",
+      "path_not_found_or_not_dir": "  Путь '{path}' не найден или не является директорией. Пропуск.",
+      "path_processing_error": "  Ошибка при обработке пути '{path}': {error}",
+      "worker_error": "ScriptScannerWorker: Ошибка в потоке сканирования: {error}"
+    },
+    "error": {
+      "category_passport_not_dict": "Содержимое паспорта категории '{filename}' не является словарем.",
+      "read_category_passport_failed": "Не удалось прочитать паспорт категории '{filename}': {error}",
+      "read_script_passport_failed": "Не удалось прочитать паспорт скрипта '{filename}': {error}",
+      "script_passport_not_dict": "Содержимое паспорта скрипта '{filename}' не является словарем.",
+      "missing_description": "В паспорте отсутствует или не является строкой обязательное поле 'description'.",
+      "invalid_path_in_list": "Путь {index} в 'script_specific_env_paths' не является непустой строкой.",
+      "env_paths_not_list": "'script_specific_env_paths' должен быть списком или null.",
+      "passport_missing": "Паспорт скрипта отсутствует.",
+      "critical_model_error": "Критическая ошибка создания модели: {error}",
+      "worker_runtime_error": "Произошла ошибка во время сканирования: {error}"
+    },
+    "error_node": {
+      "name": "[НЕ НАЙДЕНО] {name}",
+      "description": "Директория не найдена по пути: {path}"
+    },
+    "category_node": {
+      "root_description": "Корневая директория: {path}"
+    }
+  },
+  "set_manager": {
+    "log_info": {
+      "init": "Инициализация SetManager. Директория коллекций по умолчанию: {path}",
+      "creating_new_collection": "SetManager: Создание новой пустой коллекции в памяти.",
+      "loading_from_file": "SetManager: Попытка загрузки коллекции из файла: {path}",
+      "collection_loaded": "Коллекция '{name}' успешно загружена. is_dirty = {dirty}",
+      "loading_context_file": "SetManager: Загрузка файла контекста: {path}",
+      "saving_context_file": "SetManager: Сохранение файла контекста: {path}",
+      "deleting_empty_context_file": "SetManager: Удаление пустого файла контекста: {path}",
+      "context_reloaded": "SetManager: Контекст успешно перезагружен из файла: {path}"
+    },
+    "log_debug": {
+      "cache_rebuilt": "Кэш узлов SetManager перестроен. Найдено узлов: {count}",
+      "dirty_flag_set": "SetManager: Флаг 'is_dirty' установлен в {state}."
+    },
+    "log_warning": {
+      "adapting_structure": "Структура коллекции в '{path}' не имеет главного узла-папки. Адаптация...",
+      "reload_context_no_path": "SetManager: Невозможно перезагрузить контекст, путь к коллекции не определен."
+    },
+    "log_error": {
+      "file_not_found": "Файл коллекции '{path}' не найден. Создается новая пустая коллекция.",
+      "load_failed": "Ошибка при загрузке или валидации коллекции из '{path}': {error}",
+      "save_failed": "Ошибка сохранения коллекции в файл '{path}': {error}",
+      "context_file_invalid_format": "SetManager: Файл контекста '{path}' имеет неверный формат (не является словарем).",
+      "context_reload_failed": "SetManager: Ошибка при перезагрузке контекста из '{path}': {error}"
+    },
+    "log_critical": {
+      "create_default_dirs_failed": "Не удалось создать директории по умолчанию: {error}"
+    },
+    "default_folder_name": "Основная папка",
+    "new_collection_name": "Новая коллекция"
+  },
+  "config_manager": {
+    "log_info": {
+      "config_loaded": "Конфигурация успешно загружена из '{path}'.",
+      "config_not_found": "Файл конфигурации не найден в '{path}'. Создается новый.",
+      "config_saved": "Конфигурация успешно сохранена в '{path}'."
+    },
+    "log_warning": {
+      "creating_default_config": "Создается конфигурация по умолчанию."
+    },
+    "log_error": {
+      "load_failed": "Ошибка загрузки или валидации конфигурации из '{path}': {error}",
+      "save_failed": "Не удалось сохранить конфигурацию в '{path}': {error}"
+    },
+    "model_descriptions": {
+      "additional_env_paths": "Пути для добавления в системную переменную PATH.",
+      "python_paths": "Пути для добавления в переменную PYTHONPATH для поиска модулей.",
+      "script_header_block": "Стиль для заголовка-плашки запуска скрипта.",
+      "script_success_block": "Стиль для плашки успешного завершения скрипта.",
+      "script_error_block": "Стиль для плашки ошибочного завершения скрипта.",
+      "console_background": "Цвет фона консоли (HEX)",
+      "status_running": "Цвет фона для выполняемого скрипта в списке",
+      "status_success": "Цвет фона для успешно выполненного скрипта",
+      "status_error": "Цвет фона для скрипта с ошибкой",
+      "status_pending": "Цвет фона для скрипта в очереди",
+      "status_skipped": "Цвет фона для пропущенного скрипта",
+      "language": "Код языка для локализации интерфейса (напр., en_US, ru_RU).",
+      "active_theme_name": "Имя активной темы оформления консоли.",
+      "environment_variables": "Пользовательские переменные окружения для запускаемых скриптов."
+    }
+  },
+  "pysm_context": {
+    "error": {
+      "context_file_not_found": "Контекстный файл PyScriptManager не найден."
+    }
+  },
+  "context_loader": {
+    "error": {
+      "script_path_missing": "FATAL: context_loader.py ожидает путь к скрипту для запуска."
+    }
+  },
+  "script_runner": {
+    "log_debug": {
+      "preparing_env": "Подготовка окружения для скрипта: {id}",
+      "applying_global_vars": "Применение глобальных переменных окружения: {vars}",
+      "pysm_active_set": "  Установлена переменная окружения PY_SCRIPT_MANAGER_ACTIVE=1",
+      "pythonpath_set": "  Установлен PYTHONPATH для подпроцесса: {path}",
+      "final_path": "Финальный PATH для скрипта '{id}': {path}",
+      "stream_reader_started": "Поток чтения '{stream}' для '{id}' запущен.",
+      "stream_reader_finished": "Поток чтения '{stream}' для '{id}' окончательно завершен.",
+      "stream_threads_joined": "Потоки stdout/stderr для '{id}' гарантированно завершены."
+    },
+    "log_info": {
+      "console_output_blocked": "Вывод консоли для '{id}' ЗАБЛОКИРОВАН.",
+      "console_output_unblocked": "Вывод консоли для '{id}' РАЗБЛОКИРОВАН.",
+      "starting_script": "Запуск скрипта '{name}' (экземпляр: {id})",
+      "process_finished": "Процесс для '{id}' завершен с кодом: {code}.",
+      "stop_requested": "Запрос на остановку для экземпляра '{id}'.",
+      "terminating_process": "Попытка терминировать процесс PID {pid} для '{id}'."
+    },
+    "log_warning": {
+      "stream_reader_stopped": "Поток '{stream}' для '{id}' принудительно остановлен.",
+      "terminate_failed_killing": "Процесс PID {pid} для '{id}' не терминировался. Попытка kill."
+    },
+    "log_error": {
+      "unexpected_progress_error": "Неожиданная ошибка при обработке JSON прогресса для '{id}' из строки '{line}': {error}",
+      "stream_read_error": "Ошибка чтения потока '{stream}' для '{id}': {error}",
+      "generic_run_error": "Общая ошибка при запуске скрипта '{name}': {error}",
+      "stop_process_error": "Ошибка при попытке остановить процесс PID {pid}: {error}"
+    },
+    "error": {
+      "progress_fields_not_numbers": "Поля 'current' и 'total' должны быть числами.",
+      "progress_text_not_string": "Поле 'text' должно быть строкой, если присутствует.",
+      "stream_read_runtime_error": "Ошибка чтения потока {stream}: {error}",
+      "run_file_path_missing": "Абсолютный путь к исполняемому файлу не указан.",
+      "run_file_not_found": "Файл скрипта '{path}' не найден.",
+      "generic_run_runtime_error": "Ошибка при запуске скрипта '{name}': {error}"
+    },
+    "console_message": {
+      "output_blocked": "[Консольный вывод заблокирован скриптом]",
+      "output_unblocked": "[Консольный вывод разблокирован скриптом]"
+    }
+  },
+  "argument_parser": {
+    "log_info": {
+      "scan_started": "Начало сканирования аргументов в файле: {path}",
+      "scan_finished": "Сканирование завершено. Найдено аргументов: {count}"
+    },
+    "log_error": {
+      "file_not_found": "Файл для сканирования аргументов не найден: {path}",
+      "syntax_error": "Синтаксическая ошибка в файле '{path}': {error}",
+      "unexpected_error": "Неожиданная ошибка при сканировании аргументов в '{path}': {error}"
+    }
+  },
+  "models": {
+    "script_info": {
+      "default_category": "Без категории",
+      "default_author": "Не указан"
+    },
+    "collection": {
+      "default_name": "Новая коллекция",
+      "description": "Описание того, для чего предназначена эта коллекция.",
+      "script_roots_description": "Список корневых директорий, в которых ищутся скрипты для этой коллекции."
+    },
+    "errors": {
+      "must_be_dict": "{field} должен быть словарем",
+      "invalid_type_for_meta": "Некорректный тип для метаданных параметра: {type}",
+      "invalid_type_for_arg_value": "Некорректный тип для значения аргумента '{key}': {type}. Ожидался словарь или ScriptSetEntryValueEnabled."
+    },
+    "log_errors": {
+      "validation_failed_meta": "Ошибки при валидации command_line_args_meta: {errors}",
+      "validation_failed_entry": "Ошибки при валидации command_line_args для ScriptSetEntryModel (ID: {id}): {errors}"
+    }
+  },
+  "progress_reporter": {
+    "default_description": "Обработка",
+    "unit_of": "из"
+  }
+}
