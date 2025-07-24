@@ -1,0 +1,14 @@
+{
+  "description": "Загружает набор экшенов из .atn файла. Если путь не указан, открывает диалог выбора файла.",
+  "category": "Photoshop",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "ps_atn_file_path": {
+      "type": "file_path",
+      "description": "Путь к .atn файлу для загрузки. Если оставить пустым, появится диалог выбора файла.",
+      "required": false,
+      "filter": "Action Set (*.atn)"
+    }
+  }
+}
