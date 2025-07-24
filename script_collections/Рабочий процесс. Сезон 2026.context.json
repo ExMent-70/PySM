@@ -1,0 +1,58 @@
+{
+  "wf_session_path": {
+    "type": "dir_path",
+    "value": "G:/2026_Capture_One_Session",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_psd_path": {
+    "type": "dir_path",
+    "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_raw_path": {
+    "type": "dir_path",
+    "value": "G:/2025/222",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_session_name": {
+    "type": "string",
+    "value": "Ш56_1класс",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_children_file_name": {
+    "type": "string",
+    "value": "children.txt",
+    "description": null,
+    "read_only": false,
+    "choices": null
+  },
+  "var_Hello": {
+    "type": "string",
+    "value": "Андрей",
+    "description": null,
+    "read_only": false,
+    "choices": null
+  },
+  "var_user_choice": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_photo_session": {
+    "type": "string",
+    "value": "PORTRAIT",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  }
+}
