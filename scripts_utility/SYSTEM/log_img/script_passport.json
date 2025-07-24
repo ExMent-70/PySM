@@ -1,0 +1,47 @@
+{
+  "description": "Простой скрипт для демонстрации вывода изображения в консоль PySM. Принимает путь к картинке и параметры отображения.",
+  "category": "Демонстрация API",
+  "author": "PySM-Developer",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "img_source_path": {
+      "type": "file_path",
+      "description": "Путь к файлу изображения (JPG, PNG, GIF), которое нужно отобразить в консоли.",
+      "required": true,
+      "default": "{img_source_path}"
+    },
+    "img_width": {
+      "type": "int",
+      "description": "Ширина, до которой будет отмасштабировано изображение в пикселях.",
+      "required": false,
+      "default": 300,
+      "min_val": 50,
+      "max_val": 1000
+    },
+    "img_align": {
+      "type": "choice",
+      "description": "Выравнивание изображения в консоли.",
+      "required": false,
+      "default": "left",
+      "choices": [
+        "left",
+        "center",
+        "right"
+      ]
+    },
+    "img_margin": {
+      "type": "int",
+      "description": "Вертикальный отступ (сверху и снизу) для изображения в пикселях.",
+      "required": false,
+      "default": 5,
+      "min_val": 0,
+      "max_val": 50
+    },
+    "img_desc": {
+      "type": "string",
+      "description": "Опциональная текстовая подпись, которая будет отображена под изображением.",
+      "required": false,
+      "default": null
+    }
+  }
+}
