@@ -1,0 +1,24 @@
+{
+  "description": "Скрипт извлекает из произвольного текста 4-значные номера, которые входят в имена файлов, ищет соответствующие файлы в указанной папке и копирует/перемещает их в подпапку 'Select'.",
+  "category": "Файловые операции",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "__fs_source_dir": {
+      "type": "dir_path",
+      "description": "Путь к исходной папке с фотографиями и другими файлами.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Capture"
+    },
+    "__fs_mode": {
+      "type": "choice",
+      "description": "Режим операции: 'copy' (копировать) или 'move' (переместить).",
+      "required": false,
+      "default": "copy",
+      "choices": [
+        "copy",
+        "move"
+      ]
+    }
+  }
+}

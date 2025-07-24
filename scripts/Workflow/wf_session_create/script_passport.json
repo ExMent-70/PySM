@@ -1,0 +1,34 @@
+{
+  "description": "Создает новую сессию Capture One из шаблона",
+  "category": "Рабочий процесс",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "wf_session_name": {
+      "type": "string",
+      "description": "Имя для новой сессии. Обычно это имя класса или уникальный идентификатор съемки. Не должно содержать спецсимволов.",
+      "required": true,
+      "default": "{wf_session_name}"
+    },
+    "wf_raw_path": {
+      "type": "dir_path",
+      "description": "Путь к папке, содержащей исходные RAW-файлы для импорта.",
+      "required": true,
+      "default": "{wf_raw_path}"
+    },
+    "wf_session_path": {
+      "type": "dir_path",
+      "description": "Путь к родительской папке, в которой будет создана папка новой сессии (например, D:\\Photos\\2025).",
+      "required": true,
+      "default": "{wf_session_path}"
+    },
+    "wf_copy_threads": {
+      "type": "int",
+      "description": "Количество потоков для параллельного копирования файлов.",
+      "required": false,
+      "default": 8,
+      "min_val": 1,
+      "max_val": 16
+    }
+  }
+}

@@ -1,0 +1,47 @@
+<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="XMP Core 5.5.0">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about=""
+    xmlns:dc="http://purl.org/dc/elements/1.1/"
+    xmlns:photoshop="http://ns.adobe.com/photoshop/1.0/"
+    xmlns:xmpRights="http://ns.adobe.com/xap/1.0/rights/"
+    xmlns:lightroom="http://ns.adobe.com/lightroom/1.0/"
+    xmlns:Iptc4xmpCore="http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/">
+   <dc:rights>
+    <rdf:Alt>
+     <rdf:li xml:lang="x-default">PugachevA</rdf:li>
+    </rdf:Alt>
+   </dc:rights>
+   <dc:title>
+    <rdf:Alt>
+     <rdf:li xml:lang="x-default"></rdf:li>
+    </rdf:Alt>
+   </dc:title>
+   <dc:creator>
+    <rdf:Seq>
+     <rdf:li></rdf:li>
+    </rdf:Seq>
+   </dc:creator>
+   <Iptc4xmpCore:IntellectualGenre></Iptc4xmpCore:IntellectualGenre>
+   <dc:subject>
+    <rdf:Bag>
+	 <!-- Пусто -->
+    </rdf:Bag>
+   </dc:subject>
+   <photoshop:Headline></photoshop:Headline>
+   <photoshop:Source></photoshop:Source>
+   <photoshop:Instructions></photoshop:Instructions>
+   <photoshop:TransmissionReference></photoshop:TransmissionReference>
+   <photoshop:Credit></photoshop:Credit>
+   <xmpRights:UsageTerms>
+    <rdf:Alt>
+     <rdf:li xml:lang="x-default"></rdf:li>
+    </rdf:Alt>
+   </xmpRights:UsageTerms>
+   <lightroom:hierarchicalSubject>
+    <rdf:Bag>
+     <!-- Пусто -->
+    </rdf:Bag>
+   </lightroom:hierarchicalSubject>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>

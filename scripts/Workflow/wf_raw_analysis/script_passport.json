@@ -1,0 +1,45 @@
+{
+  "description": "Запускает комплексный анализ изображений: поиск лиц, анализ эмоций, возраста, пола, схожести, и генерацию HTML-отчета. Является ядром рабочего процесса.",
+  "category": "Анализ и AI",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "__wf_config": {
+      "type": "file_path",
+      "description": "Путь к файлу конфигурации .toml. Обычно устанавливается автоматически. По умолчанию используется 'face_config.toml' из папки скрипта.",
+      "required": false,
+      "default": ""
+    },
+    "__wf_folder_path": {
+      "type": "dir_path",
+      "description": "Путь к папке с исходниками. Устанавливается предыдущим скриптом через контекст (например, переменной 'capture_path').",
+      "required": false,
+      "default": ""
+    },
+    "__wf_output_path": {
+      "type": "dir_path",
+      "description": "Путь для сохранения результатов. Устанавливается предыдущим скриптом через контекст (например, переменной 'session_path').",
+      "required": false,
+      "default": ""
+    },
+    "__wf_children_file": {
+      "type": "file_path",
+      "description": "Путь к файлу со списком детей для сопоставления. Устанавливается через контекст, если требуется.",
+      "required": false,
+      "default": ""
+    },
+    "__wf_log_level": {
+      "type": "choice",
+      "description": "Уровень детализации логов. Позволяет динамически изменять настройку из .toml файла.",
+      "required": false,
+      "default": "INFO",
+      "choices": [
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR",
+        "CRITICAL"
+      ]
+    }
+  }
+}
