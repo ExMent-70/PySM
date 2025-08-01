@@ -36,6 +36,7 @@
       "choices": [
         "none",
         "not_empty",
+		"filename_txt",
         "integer",
         "positive_integer",
         "float",
