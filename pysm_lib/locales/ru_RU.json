@@ -658,8 +658,8 @@
       "generic_run_runtime_error": "Ошибка при запуске скрипта '{name}': {error}"
     },
     "console_message": {
-      "output_blocked": "[Консольный вывод заблокирован скриптом]",
-      "output_unblocked": "[Консольный вывод разблокирован скриптом]"
+      "output_blocked": "[<i style='font-size: 9pt;'>Консольный вывод заблокирован</i>]",
+      "output_unblocked": "[<i style='font-size: 9pt;'>Консольный вывод разблокирован</i>]"
     }
   },
   "argument_parser": {

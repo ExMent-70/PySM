@@ -657,8 +657,8 @@
       "generic_run_runtime_error": "Error when starting script '{name}': {error}"
     },
     "console_message": {
-      "output_blocked": "[Console output blocked by script]",
-      "output_unblocked": "[Console output unblocked by script]"
+	  "output_blocked": "[<i>Console output blocked</i>]",
+      "output_unblocked": "[<i>Console output unblocked</i>]"
     }
   },
   "argument_parser": {
