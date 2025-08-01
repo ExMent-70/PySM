@@ -809,6 +809,10 @@ class AppController(QObject):
             self.script_instance_updated.emit(self.selected_set_node_id, updated_entry)
             self.collection_dirty_state_changed.emit(self.set_manager.is_dirty)
 
+
+
+
+
     def run_script_set(
         self,
         set_node_id: str,
@@ -861,6 +865,17 @@ class AppController(QObject):
             if context_file_path.is_file():
                 with open(context_file_path, "r", encoding="utf-8") as f:
                     context_data = json.load(f)
+
+            current_log_level = logging.getLevelName(logger.getEffectiveLevel())
+            
+            # 2. Добавляем или обновляем переменную sys_log_level в контексте
+            context_data["sys_log_level"] = {
+                "type": "string",
+                "value": current_log_level,
+                "description": "System: Log level inherited from PyScriptManager.",
+                "read_only": True, # Дочерние скрипты должны только читать это значение
+            }
+
             context_data["pysm_set_instance_ids"] = {
                 "type": "json",
                 "value": all_instances_data,
