@@ -1,5 +1,5 @@
 [paths]
-python_interpreter = "_BIN/python3.11.9/python.exe"
+python_interpreter = "../../envs/pysm/python.exe"
 additional_env_paths = [ "_BIN/TensorRT/lib", "_ENV/CUDA/bin", "_ENV/CUDA/lib", "_ENV/CUDA/lib/x64", "_ENV/CUDA/nvml/bin", "_ENV/CUDA/nvml/lib", "_ENV/CUDA/nvvm/bin", "_ENV/CUDA/nvvm/lib",]
 python_paths = []
 
