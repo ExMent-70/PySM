@@ -1,0 +1,20 @@
+{
+  "description": "Основной этап анализа: находит лица на JPEG-изображениях, извлекает их атрибуты и эмбеддинги. Автоматически определяет папки на основе контекста рабочего процесса.\n<div style=\" {theme.tooltip_instance_args_block}\">\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>output_dir</b> = <i>{base_dir} / Output / Analysis_{photo_session}</i>\n<b>input_dir</b> = <i>{output_dir} / JPG</i>\n</div>",
+  "category": "Анализ и AI",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2.1.0",
+  "command_line_args_meta": {
+    "a_af_config_file": {
+      "type": "file_path",
+      "description": "Путь к файлу конфигурации (config.toml) для этапа анализа. Обычно устанавливается автоматически.",
+      "required": false,
+      "default": "config.toml"
+    },
+    "all_threads": {
+      "type": "int",
+      "description": "Количество потоков для параллельной обработки изображений. 0 - авто (по числу ядер CPU).",
+      "required": false,
+      "default": 0
+    }
+  }
+}

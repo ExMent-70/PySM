@@ -1,0 +1,7 @@
+{
+  "description": "Интерактивный GUI-редактор для визуальной проверки и исправления результатов кластеризации. Позволяет перемещать фото между кластерами и переименовывать их.\n<div style=\" {theme.tooltip_instance_args_block}\">\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>base_dir} / Output / Analysis_{wf_photo_session}</i>\n<b>images_dir</b> = <i>{data_dir} / JPG</i>\n<b>sorted_dir</b> = <i>{base_dir} / Output / Claster_{photo_session}\n</div>",
+  "category": "Утилиты",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.1.0",
+  "command_line_args_meta": {}
+}

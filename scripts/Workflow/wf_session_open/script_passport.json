@@ -1,0 +1,14 @@
+{
+  "description": "Запускает Capture One и открывает файл сессии (.cosessiondb), путь к которому был передан через параметры командной строки\n\n<b>Рецепты экспорта в Capture One</b>\nJPG (для выбора) - [Headline]\\Выбор_Фото_[Session Sub Path]\\[Job Identifier]\nPSD 8 bit - [Headline]\\Альбом\\Фото\\[Session Sub Path]\\[Intellectual Genre][Rating]",
+  "category": "Действия",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "__wf_session_file_path": {
+      "type": "file_path",
+      "description": "Полный путь к файлу сессии, который необходимо открыть. Обычно формируется автоматически.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/{wf_session_name}.cosessiondb"
+    }
+  }
+}

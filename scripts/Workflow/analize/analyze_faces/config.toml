@@ -1,0 +1,51 @@
+# ==============================================================================
+# Конфигурационный файл для этапа анализа лиц (run_analyze_faces.py)
+# ==============================================================================
+
+# --- Настройки путей ---
+# Эти пути являются относительными от местоположения этого config.toml
+[paths]
+# Корневая папка, где лежат подпапки с моделями (insightface, FACEONNX)
+model_root = "../../../../_BIN"
+
+
+# --- Настройки ONNX Runtime Provider ---
+[provider]
+# Имя провайдера. Оставьте пустым для автовыбора.
+# Варианты: "TensorrtExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"
+provider_name = ""
+# ID видеокарты (для CUDA/TensorRT)
+device_id = 0
+# Путь для кэша TensorRT (относительно этого файла)
+tensorRT_cache_path = "../../../../_BIN/TensorRT_cache"
+
+
+# --- Настройки моделей ---
+[model]
+# Имя набора моделей insightface (например, "antelopev2")
+name = "antelopev2"
+# Порог уверенности для детектора лиц (от 0.0 до 1.0)
+det_thresh = 0.25
+# Размер изображения, до которого оно будет уменьшено для детекции
+det_size = [1280, 1280]
+
+# --- Пути к моделям анализа атрибутов (относительно 'paths.model_root') ---
+gender_model = "models/FACEONNX/gender_efficientnet_b2.onnx"
+emotion_model = "models/FACEONNX/emotion_cnn.onnx"
+age_model = "models/FACEONNX/age_efficientnet_b2.onnx"
+beauty_model = "models/FACEONNX/beauty_resnet18.onnx"
+eyeblink_model = "models/FACEONNX/eye_blink_cnn.onnx"
+
+# Метки для модели эмоций
+emotion_labels = ["Neutral", "Happiness", "Surprise", "Sadness", "Anger", "Disgust", "Fear"]
+
+
+# --- Флаги для включения/отключения задач ---
+[task_flags]
+analyze_gender = true
+analyze_emotion = true
+analyze_age = true
+analyze_beauty = false
+analyze_eyeblink = true
+# Сохранять ли отладочные изображения с нанесенными ключевыми точками
+save_debug_kps = true

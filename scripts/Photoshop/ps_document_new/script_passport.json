@@ -1,0 +1,38 @@
+{
+  "description": "Создает новый пустой документ в Adobe Photoshop с заданными размерами, разрешением и именем.",
+  "category": "Photoshop",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "ps_width": {
+      "type": "int",
+      "description": "Ширина нового документа в пикселях.",
+      "required": false,
+      "default": 1920,
+      "min_val": 1,
+      "max_val": 300000
+    },
+    "ps_height": {
+      "type": "int",
+      "description": "Высота нового документа в пикселях.",
+      "required": false,
+      "default": 1080,
+      "min_val": 1,
+      "max_val": 300000
+    },
+    "ps_resolution": {
+      "type": "int",
+      "description": "Разрешение документа в пикселях на дюйм (DPI).",
+      "required": false,
+      "default": 300,
+      "min_val": 1,
+      "max_val": 2400
+    },
+    "ps_name": {
+      "type": "string",
+      "description": "Имя, которое будет присвоено новому документу.",
+      "required": false,
+      "default": "Новый документ"
+    }
+  }
+}

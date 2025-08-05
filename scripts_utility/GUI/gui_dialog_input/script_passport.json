@@ -1,0 +1,58 @@
+{
+  "description": "Показывает диалоговое окно для ввода текстового значения с возможностью гибкой валидации. Может использовать значение из контекста как значение по умолчанию.",
+  "category": "Интерфейс пользователя",
+  "author": "Ваше Имя (адаптация)",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "dlg_input_var": {
+      "type": "string",
+      "description": "Имя переменной для сохранения результата. Также используется для получения начального значения из контекста.",
+      "required": true,
+      "default": "dlg_input_user_var"
+    },
+    "dlg_input_title": {
+      "type": "string",
+      "description": "Заголовок, который будет отображаться в верхней части диалогового окна.",
+      "required": false,
+      "default": "Ввод значения"
+    },
+    "dlg_input_msg": {
+      "type": "string_multiline",
+      "description": "Текст-приглашение для ввода, который будет показан пользователю над полем ввода.",
+      "required": true,
+      "default": "Введите значение:"
+    },
+    "dlg_input_dvalue": {
+      "type": "string_multiline",
+      "description": "Значение, которое будет в поле ввода по умолчанию, ЕСЛИ в контексте нет значения для переменной, указанной выше.",
+      "required": false,
+      "default": ""
+    },
+    "dlg_input_valid_type": {
+      "type": "choice",
+      "description": "Тип проверки для вводимого значения. Выбор 'custom' активирует поля для ввода своего шаблона.",
+      "required": true,
+      "default": "not_empty",
+      "choices": [
+        "none",
+        "not_empty",
+		"filename_txt",
+        "integer",
+        "positive_integer",
+        "float",
+        "email",
+        "custom"
+      ]
+    },
+    "dlg_input_custom_regexp": {
+      "type": "string",
+      "description": "Ваш шаблон регулярного выражения. Активно только если тип валидации - 'custom'.",
+      "required": false
+    },
+    "dlg_input_custom_regexp_desc": {
+      "type": "string_multiline",
+      "description": "Ваше описание формата для сообщения об ошибке. Активно только если тип валидации - 'custom'.",
+      "required": false
+    }
+  }
+}

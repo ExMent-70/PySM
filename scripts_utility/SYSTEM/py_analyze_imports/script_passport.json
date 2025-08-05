@@ -1,0 +1,26 @@
+{
+  "description": "Анализирует Python-файлы в указанной директории, классифицирует все импорты и генерирует отчеты, включая файл requirements.txt.",
+  "category": "Утилиты",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "ai_scan_directory": {
+      "type": "dir_path",
+      "description": "Путь к директории с Python-файлами, которую необходимо проанализировать.",
+      "required": true,
+      "default": "../../../pysm_lib"
+    },
+    "ai_output_directory": {
+      "type": "dir_path",
+      "description": "Папка для сохранения сгенерированных файлов отчета. Если не указана, файлы сохраняются в текущую рабочую директорию.",
+      "required": true,
+      "default": "../../../_Analize"
+    },
+    "ai_generate_requirements_only": {
+      "type": "bool",
+      "description": "Если флаг установлен, будет сгенерирован только файл requirements.txt, без полного отчета.",
+      "required": false,
+      "default": false
+    }
+  }
+}

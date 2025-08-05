@@ -1,0 +1,89 @@
+{
+  "var_Hello": {
+    "type": "string",
+    "value": "Андрей",
+    "description": null,
+    "read_only": false,
+    "choices": null
+  },
+  "wf_session_path": {
+    "type": "dir_path",
+    "value": "G:/2026_Capture_One_Session",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_psd_path": {
+    "type": "dir_path",
+    "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_session_name": {
+    "type": "string",
+    "value": "Школа256_11а_класс",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_raw_path": {
+    "type": "dir_path",
+    "value": "G:/2025/TEST",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_user_choice": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_photo_session": {
+    "type": "choice",
+    "value": "PORTRAIT",
+    "description": "Имя текущей сессии для записи в метаданные. Обычно устанавливается автоматически.",
+    "read_only": false,
+    "choices": [
+      "",
+      "PORTRAIT",
+      "SCHOOL",
+      "SEPTEMBER1",
+      "STREET",
+      "STUDIO"
+    ]
+  },
+  "dlg_msg_user_var": {
+    "type": "string",
+    "value": "yes",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "sys_log_level": {
+    "type": "string",
+    "value": "INFO",
+    "description": "System: Log level inherited from PyScriptManager.",
+    "read_only": true
+  },
+  "wf_children_file_name": {
+    "type": "string",
+    "value": "children.txt",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "enhancer_settings": {
+    "type": "json",
+    "value": {
+      "contrast": 1.1,
+      "color": 1.1,
+      "sharpness": 1.2
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  }
+}

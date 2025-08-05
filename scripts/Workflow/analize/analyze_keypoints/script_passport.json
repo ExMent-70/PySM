@@ -1,0 +1,14 @@
+{
+  "description": "Анализирует ключевые точки лиц для определения состояния глаз, рта и позы. Автоматически находит папку с данными на основе контекста. Обогащает существующие JSON-файлы.\n<div style=\" {theme.tooltip_instance_args_block}\">\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output / Analysis_{wf_photo_session}</i>\n</div>",
+  "category": "Анализ и AI",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2.1.0",
+  "command_line_args_meta": {
+    "a_ak_config_file": {
+      "type": "file_path",
+      "description": "Путь к файлу конфигурации (config.toml) с численными порогами для анализа.",
+      "required": false,
+      "default": "config.toml"
+    }
+  }
+}

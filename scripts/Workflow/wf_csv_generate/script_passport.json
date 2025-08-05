@@ -1,0 +1,30 @@
+{
+  "description": "Анализирует структуру папок с фотографиями (Портрет0, Портрет1 и т.д.) и генерирует на их основе CSV-файл для дальнейшего использования.",
+  "category": "Генераторы",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "__wf_psd_path": {
+      "type": "dir_path",
+      "description": "Путь к корневой папке сессии, в которой находится папка 'Альбом'. Обычно устанавливается автоматически.",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото"
+    },
+    "wf_csv_file_name": {
+      "type": "string",
+      "description": "Имя, которое будет присвоено сгенерированному CSV-файлу.",
+      "required": false,
+      "default": ""
+    },
+    "wf_portrait_folders": {
+      "type": "list",
+      "description": "Список папок с портретами, которые необходимо проанализировать (каждая папка с новой строки).",
+      "required": false,
+      "default": [
+        "Портрет0",
+        "Портрет1",
+        "Портрет2"
+      ]
+    }
+  }
+}

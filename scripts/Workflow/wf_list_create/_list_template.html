@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Список класса {{ class_name }}</title>
+    <style>
+        /* Стили для отображения в браузере */
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 14pt;
+            width: 210mm; /* Для примерного вида в браузере */
+            margin: auto;
+        }
+        .header, .footer {
+            margin-bottom: 5px;
+            text-align: center;
+
+        }
+        .class-name {
+            font-size: 16pt;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid black;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            text-align: center;
+        }
+        /* Центрирование для номеров и цены. Порядок не меняется, так как он соответствует визуальному порядку столбцов */
+        td:nth-child(1), td:nth-child(2), td:nth-child(5) {
+            text-align: center;
+        }
+        .total-row td {
+            font-weight: bold;
+        }
+        .signatures {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .signer {
+            display: inline-block;
+            text-align: center;
+        }
+        .signer-name {
+             margin-right: 150px;
+        }
+        .signature-line {
+            border-bottom: 1px solid black;
+            width: 200px;
+            margin-top: 30px;
+        }
+        .signature-caption {
+            font-size: 10pt;
+        }
+
+        /* СТИЛИ СПЕЦИАЛЬНО ДЛЯ ПЕЧАТИ */
+        @media print {
+            @page {
+                size: A4;
+                margin: 15mm;
+            }
+
+            body {
+                margin: 0;
+                font-size: 12pt;
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact;
+            }
+            
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <p>Приложение №1 к договору №______-25/26 от «_____» __________ 202__ г.</p>
+        <p>Количество и вид заказываемой фотопродукции</p>
+    </div>
+
+    <div class="class-name">{{ class_name }}</div>
+
+    <table>
+        <thead>
+            <!-- --- ИЗМЕНЕНИЕ 1: Меняем местами заголовки столбцов --- -->
+            <tr>
+                <th>№ съемки</th>
+                <th>№</th>
+                <th>Фамилия, имя</th>
+                <th>Вид фотопродукции</th>
+                <th>Цена (руб)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <!-- --- ИЗМЕНЕНИЕ 2: Меняем местами данные в ячейках --- -->
+                <td>{{ student.get('shoot_order', '') }}</td>
+                <td>{{ student.alpha_order }}</td>
+                <td>{{ student.surname }} {{ student.name }}</td>
+                <td>{{ student.service_type }}</td>
+                <td>{{ student.service_cost }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td colspan="4" style="text-align: right; border: none;">Итого</td>
+                <td style="text-align: center;">{{ total_cost }}</td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <div class="footer">
+        <p>Стоимость аренды фотостудии _________________________________</p>
+    </div>
+
+    <div class="signatures">
+        <div class="signer">
+            ЗАКАЗЧИК
+            <div class="signature-line"></div>
+            <div class="signature-caption">(подпись)</div>
+        </div>
+        <div class="signer signer-name">
+             ИСПОЛНИТЕЛЬ
+            <div class="signature-line"></div>
+            <div class="signature-caption">(подпись)</div>
+        </div>
+    </div>
+
+</body>
+</html>

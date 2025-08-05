@@ -1,0 +1,36 @@
+{
+  "description": "Показывает системное диалоговое окно для выбора файла или папки. Сохраняет выбранный пользователем путь в Контекст. Запоминает последний выбор.",
+  "category": "Интерфейс пользователя",
+  "author": "Ваше Имя (адаптация)",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "dlg_open_var": {
+      "type": "string",
+      "description": "Имя переменной для сохранения пути. Также используется для получения начального пути из контекста.",
+      "required": true,
+      "default": "dlg_open_user_var"
+    },
+    "dlg_open_type": {
+      "type": "choice",
+      "description": "Тип диалога: 'file' для выбора файла, 'directory' для выбора папки.",
+      "required": true,
+      "default": "directory",
+      "choices": [
+        "file",
+        "directory"
+      ]
+    },
+    "dlg_open_title": {
+      "type": "string",
+      "description": "Текст заголовка, который будет отображаться в верхней части диалогового окна.",
+      "required": false,
+      "default": "Выберите путь"
+    },
+    "dlg_open_filter": {
+      "type": "string",
+      "description": "Фильтр файлов для диалога (например, 'Изображения (*.png *.jpg)'). Актуально только для выбора файла.",
+      "required": false,
+      "default": "Все файлы (*.*)"
+    }
+  }
+}

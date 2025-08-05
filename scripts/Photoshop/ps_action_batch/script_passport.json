@@ -1,0 +1,43 @@
+{
+  "description": "Применяет экшен к файлам в одном из 4 режимов, используя либо активный документ, либо указанный файл как источник.",
+  "category": "Photoshop",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "ps_mode": {
+      "type": "choice",
+      "description": "Режим работы: определяет, что будет обработано.",
+      "required": true,
+      "default": "active_document",
+      "choices": [
+        "active_document",
+        "active_document_folder",
+        "selected_file",
+        "selected_file_folder"
+      ]
+    },
+    "ps_action_set": {
+      "type": "string",
+      "description": "Имя набора экшенов для выполнения.",
+      "required": true,
+      "default": "PySM Actions"
+    },
+    "ps_action_name": {
+      "type": "string",
+      "description": "Имя самого экшена для выполнения.",
+      "required": true
+    },
+    "ps_file_path": {
+      "type": "file_path",
+      "description": "Путь к файлу. Обязателен для режимов 'selected_file' и 'selected_file_folder'.",
+      "required": false,
+      "filter": "Photoshop Document (*.psd)"
+    },
+    "ps_recursive": {
+      "type": "bool",
+      "description": "Искать файлы рекурсивно. Актуально для режимов, работающих с папкой.",
+      "required": false,
+      "default": true
+    }
+  }
+}

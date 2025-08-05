@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Отчет по кластеризации лиц</title>
+    <link rel="stylesheet" href="report_style.css">
+    <style>:root { --thumbnail-size: {{ thumbnail_size }}px; }</style>
+</head>
+<body>
+    <h1>Отчет по кластеризации лиц</h1>
+
+    <div class="toc">
+        <h3>Оглавление</h3>
+        <ul>
+            <li><a href="#summary-section">Сводка</a></li>
+            <li><a href="#portrait-section-header">Портретные кластеры</a></li>
+            {% if "-1" in portrait_clusters %}
+                <li><a href="#noise-section-header" class="noise-link">Шум (Не кластеризовано)</a></li>
+            {% endif %}
+            {% if matches %}
+                <li><a href="#match-section-header">Совпадения в группах</a></li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <div class="summary" id="summary-section">
+       <h2>Сводка</h2>
+        <p><strong>Портретных фото:</strong> {{ summary.total_portraits }}</p>
+        <p><strong>Групповых фото:</strong> {{ summary.total_group_photos }}</p>
+        <p><strong>Найдено кластеров (без шума):</strong> {{ summary.total_clusters }}</p>
+        <p><strong>Портретов помечено как шум:</strong> {{ summary.noise_count }}</p>
+        <p><strong>Кластеров с совпадениями:</strong> {{ summary.total_matches }}</p>
+        <p><strong>Дата отчета:</strong> {{ summary.report_date }}</p>
+        <p><strong>Папка с данными:</strong> <code>{{ summary.data_path }}</code></p>
+        <p><strong>Папка с фото:</strong> <code>{{ summary.images_path }}</code></p>
+    </div>
+
+    <div class="section">
+        <div class="section-header" id="portrait-section-header" onclick="toggleSection('portrait-section')">
+             <span class="arrow">►</span> Портретные кластеры ({{ summary.total_clusters }})
+        </div>
+        <div id="portrait-section" class="section-content">
+            {% if summary.total_clusters > 0 %}
+            <table class="cluster-table">
+                <thead><tr><th>Кластер / Инфо</th><th>Фотографии</th></tr></thead>
+                <tbody>
+                    {% for label, cluster_data in portrait_clusters.items() if label != "-1" %}
+                        <tr class="portrait-row" id="cluster-row-{{label}}">
+                            <td>
+                                <div class="thumbnail-container">
+                                    {% if cluster_data.files %}
+                                    <a href="javascript:void(0);"
+                                       onclick="openModal('{{ label }}', 'portrait', 0)"
+                                       title="{{ cluster_data.child_name }}" class="thumbnail-link">
+                                        <img data-src="{{ cluster_data.files[0].rel_path }}" alt="Кластер {{ label }}" class="thumbnail lazy">
+                                    </a>
+                                    {% endif %}
+                                </div>
+                                <div class="cluster-info">
+                                    <strong>{{ cluster_data.child_name }}</strong><br>
+                                    <span class="metadata">ID: {{ label }}<br>Фото: {{ cluster_data.files | length }}</span>
+                                </div>
+                                <button class="toggle-button" id="portrait-{{ label }}-button" onclick="toggleRow('portrait-{{ label }}')">Развернуть</button>
+                            </td>
+                            <td id="portrait-{{ label }}-content" class="cluster-content">
+                                <div class="image-container">
+                                {% for file in cluster_data.files %}
+                                    <div class="image-item">
+                                        <div class="thumbnail-container">
+                                            <a href="javascript:void(0);"
+                                               onclick="openModal('{{ label }}', 'portrait', {{ loop.index0 }})"
+                                               title="{{ file.filename }}\nПол(O): {{ file.gender_onnx | default('N/A') }}, Возр(O): {{ file.age_onnx | default('N/A') }}\nЭмоция: {{ file.emotion_onnx | default('N/A') }}, Глаза: {{ file.eye_state_combined | default('N/A') }}\nПривл.: {{ file.beauty_onnx | default('N/A') }}, Det: {{ file.det_score }}"
+                                               class="thumbnail-link">
+                                                <img data-src="{{ file.rel_path }}" alt="{{ file.filename }}" class="thumbnail lazy">
+                                            </a>
+                                        </div>
+                                        <span class="metadata">Det: {{ file.det_score }}</span>
+                                    </div>
+                                {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}<p>Нет валидных портретных кластеров.</p>{% endif %}
+        </div>
+    </div>
+
+    {% if "-1" in portrait_clusters %}
+    <div class="section">
+        <div class="section-header" id="noise-section-header" onclick="toggleSection('noise-section')">
+             <span class="arrow">►</span> Шум ({{ summary.noise_count }} фото)
+        </div>
+        <div id="noise-section" class="section-content">
+             <div class="image-container">
+              {% for file in portrait_clusters["-1"].files %}
+                  <div class="image-item">
+                      <div class="thumbnail-container">
+                          <a href="javascript:void(0);"
+                             onclick="openModal('-1', 'portrait', {{ loop.index0 }})"
+                             title="{{ file.filename }}\nПол(O): {{ file.gender_onnx | default('N/A') }}, Возр(O): {{ file.age_onnx | default('N/A') }}\nЭмоция: {{ file.emotion_onnx | default('N/A') }}, Глаза: {{ file.eye_state_combined | default('N/A') }}\nПривл.: {{ file.beauty_onnx | default('N/A') }}, Det: {{ file.det_score }}"
+                             class="thumbnail-link">
+                              <img data-src="{{ file.rel_path }}" alt="{{ file.filename }}" class="thumbnail lazy">
+                          </a>
+                      </div>
+                       <span class="metadata">Det: {{ file.det_score }}</span>
+                  </div>
+              {% endfor %}
+              </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if matches %}
+    <div class="section">
+        <div class="section-header" id="match-section-header" onclick="toggleSection('match-section')">
+            <span class="arrow">►</span> Совпадения в группах ({{ summary.total_matches }})
+        </div>
+        <div id="match-section" class="section-content">
+            <table class="match-table">
+                 <thead><tr><th>Портретный кластер</th><th>Найденные групповые фотографии</th></tr></thead>
+                 <tbody>
+                    {% for label, match in matches.items() %}
+                        <tr class="match-row">
+                            <td>
+                                <div class="thumbnail-container">
+                                    {% if portrait_clusters[label] and portrait_clusters[label].files %}
+                                        <a href="javascript:void(0);"
+                                           onclick="openSingleImageModal('{{ portrait_clusters[label].files[0].rel_path }}', '{{ match.child_name }}')"
+                                           title="{{ match.child_name }}" class="thumbnail-link">
+                                            <img data-src="{{ portrait_clusters[label].files[0].rel_path }}" alt="Портрет кластера {{ label }}" class="thumbnail lazy">
+                                        </a>
+                                    {% endif %}
+                                </div>
+                                <div class="cluster-info">
+                                    <strong>{{ match.child_name }}</strong><br>
+                                    <span class="metadata">ID: {{ label }}</span>
+                                </div>
+                                <button class="toggle-button" id="match-{{ label }}-button" onclick="toggleRow('match-{{ label }}')">Развернуть</button>
+                            </td>
+                            <td id="match-{{ label }}-content" class="cluster-content">
+                                 <div class="image-container">
+                                {% for photo in match.group_photos %}
+                                    <div class="image-item">
+                                        <div class="thumbnail-container">
+                                            <a href="javascript:void(0);"
+                                               onclick="openModal('{{ label }}', 'group', {{ loop.index0 }})"
+                                               title="{{ photo.filename }}\nЛиц: {{ photo.num_faces }}, Мин.Расст: {{ '%.4f'|format(photo.confidence) if photo.confidence is not none else 'N/A' }}"
+                                               class="thumbnail-link">
+                                                <img data-src="{{ photo.rel_path }}" alt="{{ photo.filename }}" class="thumbnail lazy">
+                                            </a>
+                                        </div>
+                                         <span class="metadata">Лиц: {{ photo.num_faces }}, Расст: {{ "%.4f"|format(photo.confidence) if photo.confidence is not none else "N/A" }}</span>
+                                    </div>
+                                {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                 </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <div id="imageModal" class="modal">
+        <span class="modal-close" onclick="closeModal()">×</span>
+        <div class="modal-content">
+            <img id="modalImage" src="" alt="Увеличенное изображение">
+            <pre id="modalCaption"></pre>
+        </div>
+        <a class="modal-prev" onclick="changeImage(-1)">❮</a>
+        <a class="modal-next" onclick="changeImage(1)">❯</a>
+    </div>
+
+    <script>
+        var portraitData = {{ portrait_clusters | tojson | safe }};
+        var matchData = {{ matches | tojson | safe }};
+    </script>
+    <script src="lazyload.min.js"></script>
+    <script src="report_script.js"></script>
+
+</body>
+</html>

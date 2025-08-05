@@ -1,0 +1,38 @@
+{
+  "description": "Архивирует PSD файлы: для каждого файла запускает экшен, сохраняет результат как JPG в отдельную папку и пересохраняет исходный PSD.",
+  "category": "Photoshop.Пакетная обработка",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "ps_source_folder": {
+      "type": "dir_path",
+      "description": "Папка с исходными PSD файлами. Если не указана, появится диалог выбора.",
+      "required": false,
+      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото"
+    },
+    "ps_output_folder": {
+      "type": "dir_path",
+      "description": "Папка для сохранения итоговых JPG файлов. Если не указана, появится диалог выбора.",
+      "required": false,
+      "default": "{wf_psd_path}/{wf_session_name}/Выпускникам"
+    },
+    "ps_action_set": {
+      "type": "string",
+      "description": "Имя набора экшенов для выполнения перед сохранением.",
+      "required": false,
+      "default": "PySM_Actions"
+    },
+    "ps_action_name": {
+      "type": "string",
+      "description": "Имя экшена для выполнения.",
+      "required": false,
+      "default": "PySM_RETUCHE_ARCHIVE"
+    },
+    "ps_recursive": {
+      "type": "bool",
+      "description": "Включить рекурсивный поиск файлов в исходной папке.",
+      "required": false,
+      "default": true
+    }
+  }
+}

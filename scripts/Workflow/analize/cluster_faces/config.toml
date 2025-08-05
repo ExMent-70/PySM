@@ -1,0 +1,29 @@
+# ==============================================================================
+# Конфигурационный файл для этапа кластеризации (run_cluster_faces.py)
+# ==============================================================================
+
+# Секция для настроек кластеризации портретных фотографий
+[clustering.portrait]
+  
+  # Параметры для алгоритма DBSCAN
+  [clustering.portrait.dbscan]
+  eps = 0.25
+  min_samples = 1
+  metric = "cosine"
+
+  # Параметры для алгоритма HDBSCAN
+  [clustering.portrait.hdbscan]
+  min_cluster_size = 1
+  # min_samples = null  # Если null или отсутствует, hdbscan выберет параметр автоматически
+  metric = "cosine"
+  cluster_selection_epsilon = 0.0
+  allow_single_cluster = false
+
+# Секция для настроек сопоставления (matching)
+[matching]
+# Порог (расстояние), ниже которого лицо с группового фото считается совпавшим с кластером.
+match_threshold = 0.25
+# Использовать ли автоматический расчет порога на основе данных.
+use_auto_threshold = false
+# Процентиль для автоматического расчета порога (если use_auto_threshold = true).
+percentile = 25

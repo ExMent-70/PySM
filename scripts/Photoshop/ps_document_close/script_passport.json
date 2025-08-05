@@ -1,0 +1,25 @@
+{
+  "description": "Закрывает документ в Photoshop. Позволяет указать документ по имени и управлять сохранением изменений.",
+  "category": "Photoshop",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.05.03",
+  "command_line_args_meta": {
+    "ps_document_name": {
+      "type": "string",
+      "description": "Имя документа, который нужно закрыть. Если оставить пустым, будет закрыт активный документ.",
+      "required": false
+    },
+    "ps_force_close": {
+      "type": "bool",
+      "description": "Закрыть документ, отменив все несохраненные изменения. Не может использоваться вместе с 'Сохранить'.",
+      "required": false,
+      "default": false
+    },
+    "ps_save_on_close": {
+      "type": "bool",
+      "description": "Сохранить все изменения перед закрытием. Не может использоваться вместе с 'Закрыть принудительно'.",
+      "required": false,
+      "default": false
+    }
+  }
+}
