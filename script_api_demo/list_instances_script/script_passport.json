@@ -1,7 +1,0 @@
-{
-  "description": "Получить список экземпляров скриптов в текущем наборе",
-  "category": "Без категории",
-  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "1.0.0",
-  "command_line_args_meta": {}
-}

@@ -1,7 +1,0 @@
-{
-  "description": "Мой первый скрипт, использующий API PySM. Он выводит приветствие и имя текущей коллекции.",
-  "category": "Без категории",
-  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "1.0.0",
-  "command_line_args_meta": {}
-}
