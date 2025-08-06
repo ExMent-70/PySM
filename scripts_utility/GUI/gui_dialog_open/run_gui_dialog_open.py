@@ -77,23 +77,7 @@ def get_config():
 # ==============================================================================
 def main():
     """Основная функция-оркестратор."""
-
-    # --- НАЧАЛО ИСПРАВЛЕНИЙ ---
-    # РЕШЕНИЕ ПРОБЛЕМЫ С "DESKTOP NOT AVAILABLE"
-    # Это обходной путь для ошибки, возникающей из-за того, что
-    # внешний скрипт переопределяет переменную окружения USERPROFILE.
-    # Мы создаем "фальшивую" папку Desktop до инициализации QApplication.
-    try:
-        user_profile = os.environ.get('USERPROFILE')
-        if user_profile:
-            desktop_path = pathlib.Path(user_profile) / 'Desktop'
-            desktop_path.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        # Игнорируем возможные ошибки (например, нет прав на запись),
-        # так как это не критично для основной логики.
-        print(f"Предупреждение: не удалось создать папку Desktop: {e}", file=sys.stderr)
-    # --- КОНЕЦ ИСПРАВЛЕНИЙ ---
-    
+  
     config = get_config()
     
     # Теперь эта строка не должна вызывать ошибку

@@ -60,6 +60,21 @@ def setup_logging(log_level_val: int, log_to_console: bool = True):
 
 # 3. Блок с изменениями (основная функция)
 if __name__ == "__main__":
+    # --- НАЧАЛО ИСПРАВЛЕНИЙ ---
+    # РЕШЕНИЕ ПРОБЛЕМЫ С "DESKTOP NOT AVAILABLE"
+    # Это обходной путь для ошибки, возникающей из-за того, что
+    # внешний скрипт переопределяет переменную окружения USERPROFILE.
+    # Мы создаем "фальшивую" папку Desktop до инициализации QApplication.
+    try:
+        user_profile = os.environ.get('USERPROFILE')
+        if user_profile:
+            desktop_path = pathlib.Path(user_profile) / 'Desktop'
+            desktop_path.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        # Игнорируем возможные ошибки (например, нет прав на запись),
+        # так как это не критично для основной логики.
+        print(f"Предупреждение: не удалось создать папку Desktop: {e}", file=sys.stderr)
+    # --- КОНЕЦ ИСПРАВЛЕНИЙ ---    
     #APP_ROOT = pathlib.Path(__file__).parent.resolve()
     APP_ROOT = pathlib.Path.cwd().resolve()
 
