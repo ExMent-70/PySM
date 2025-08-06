@@ -162,6 +162,9 @@ def main():
         logger.info(f"Используется автоматическое количество потоков: <b>{num_workers}</b>")
 
     # 5. Основной цикл обработки
+    logger.info(f"При первом запуске скрипта будет выполнено кеширование моделей ONNX")
+    logger.info(f"Кеширование может занять довольно много времени")
+    
     portrait_meta: Dict[str, Any] = {}
     group_meta: Dict[str, Any] = {}
     portrait_embeddings: List[np.ndarray] = []

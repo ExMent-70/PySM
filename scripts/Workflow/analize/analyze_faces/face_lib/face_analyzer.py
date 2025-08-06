@@ -51,7 +51,11 @@ class FaceAnalyzer:
 
     def _initialize_insightface(self) -> FaceAnalysis:
         """Изолирует инициализацию insightface.app.FaceAnalysis."""
-        logger.info("Инициализация модели Insightface.FaceAnalysis. Консоль будет временно заблокирована...")
+        logger.info(f"При первом запуске скрипта модель <b>Insightface.FaceAnalysis</b> будет загружена с сайта GitHub.")
+        logger.info(f"Загрузка модели с сайта может занять довольно много времени")
+
+        logger.info("Инициализация модели Insightface.FaceAnalysis. Консоль будет временно заблокирована...<br>")
+        
 
         provider_name = self.onnx_manager.provider_name
         provider_options = self.onnx_manager.provider_options
