@@ -78,8 +78,10 @@ class JsonDataManager:
             logger.info(f"<b>Сохранение результатов работы...</b>")
             self._save_single_file("портретных", self.portrait_json_path, self.portrait_data)
             self._save_single_file("групповых", self.group_json_path, self.group_data)
-            logger.info(f"  - портретные фотографии: <i>{self.portrait_json_path}</i>")
-            logger.info(f"  - групповые  фотографии: <i>{self.group_json_path}</i>")
+            logger.info(f"Рабочая папка:")
+            logger.info(f"<i>{self.portrait_json_path.parent}</i>")
+            logger.info(f"- портретные фотографии: <i>{self.portrait_json_path.name}</i>")
+            logger.info(f"- групповые  фотографии: <i>{self.group_json_path.name}</i>")
             return True
         except IOError as e:
             logger.error(f"Критическая ошибка при сохранении JSON-данных: {e}", exc_info=True)

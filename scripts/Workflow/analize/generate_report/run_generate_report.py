@@ -27,7 +27,7 @@ except ImportError:
     ConfigResolver = None
     pysm_context = None
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s", stream=sys.stdout)
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
@@ -37,10 +37,12 @@ class ReportGenerator:
         self.images_dir = images_dir
         self.sorted_dir = sorted_dir
         self.templates_dir = Path(__file__).parent / "templates"
-        logger.info(f"Папка с данными отчета (JSON): {self.data_dir}")
-        logger.info(f"Папка с JPEG (резерв): {self.images_dir}")
+        logger.info(f"Папка с файлами JPG:")
         if self.sorted_dir:
-            logger.info(f"Папка с отсортированными фото (приоритет): {self.sorted_dir}")
+            logger.info(f"<i>{self.sorted_dir}</i>")
+        else:
+            logger.info(f"<i>{self.images_dir}</i>")
+        
 
     def _get_image_rel_path(self, filename: str, cluster_info: Dict) -> str:
         child_name = cluster_info.get("child_name", "97-Unsorted")
@@ -73,7 +75,7 @@ class ReportGenerator:
             return image_path.as_posix()
 
     def _prepare_data(self) -> Optional[Dict[str, Any]]:
-        logger.info("Подготовка данных для отчета...")
+        logger.info("<br>Подготовка данных для отчета...")
         try:
             if not JsonDataManager:
                 logger.critical("JsonDataManager не был импортирован."); return None
@@ -168,7 +170,7 @@ class ReportGenerator:
             return None
 
     def _copy_assets(self):
-        logger.info("Копирование ассетов (css, js)...")
+        logger.info("Копирование дополнительных файлов (css, js)...")
         for asset in ["report_style.css", "report_script.js", "lazyload.min.js"]:
             source = self.templates_dir / asset
             if source.is_file():
@@ -188,14 +190,14 @@ class ReportGenerator:
             report_path = self.data_dir / "face_clustering_report.html"
             report_path.write_text(html_content, encoding="utf-8")
             self._copy_assets()
-            logger.info(f"HTML-отчет успешно сгенерирован: {report_path.resolve()}")
+            logger.info(f"HTML-отчет успешно сгенерирован.")
             if IS_MANAGED_RUN:
-                pysm_context.log_link(url_or_path=str(report_path), text="<br>Открыть сгенерированный HTML-отчет")
+                pysm_context.log_link(url_or_path=str(report_path), text="<br>Открыть HTML-отчет")
         except Exception as e:
             logger.error(f"Ошибка при рендеринге или сохранении HTML-отчета: {e}", exc_info=True)
 
 def main():
-    logger.info("="*10 + " ЗАПУСК ГЕНЕРАЦИИ HTML-ОТЧЕТА " + "="*10)
+    logger.info("<b>Генерация HTML-отчета</b>")
     
     if not IS_MANAGED_RUN:
         logger.critical("Этот скрипт требует запуска из среды PySM для доступа к контексту.")

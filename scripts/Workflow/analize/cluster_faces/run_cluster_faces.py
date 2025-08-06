@@ -40,7 +40,7 @@ except ImportError:
 
 # --- Блок 2: Настройка логирования и вспомогательные функции ---
 # ==============================================================================
-logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s", stream=sys.stdout)
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 def construct_clustering_paths() -> Dict[str, Optional[Path]]:
@@ -306,7 +306,7 @@ def get_config() -> argparse.Namespace:
 
 def main():
     cli_config = get_config()
-    
+  
     paths = construct_clustering_paths()
     data_dir = paths.get("data_dir")
     children_file_path = paths.get("children_file")

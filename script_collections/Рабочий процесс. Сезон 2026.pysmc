@@ -440,7 +440,7 @@
                 {
                   "id": "root_790d968b/Workflow/analize/cluster_faces",
                   "instance_id": "instance_a2870942d739",
-                  "name": "3. Группировать портретные фотографии",
+                  "name": "3.1. Группировать портретные фотографии",
                   "description": "<div style=\" {theme.script_description}\">\n<b>Третий скрипт в конвейере анализа изображений</b> \nСкрипт объединяет похожие портретные фотографии в кластеры и идентифицирует людей на групповых фотографиях.\nЕсли задан список фотографируемых, то присваивает кластерами имена в соответствии со списком.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output / Analysis_{wf_photo_session}</i>\n<b>children_file</b> = <i>{base_dir} / {wf_photo_session}_{wf_children_file_name}</i>\n\nДля работы необходимы эмбединги (векторные представления лиц), полученные предыдущим скриптом анализа.\n</div>\n",
                   "silent_mode": false,
                   "command_line_args": {
@@ -457,16 +457,16 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_msg",
                   "instance_id": "instance_391bf9ae1a37",
-                  "name": "Сообщение: Запустить редактор кластеров",
+                  "name": "3.2. Сообщение: Запустить редактор кластеров",
                   "description": null,
                   "silent_mode": true,
                   "command_line_args": {
                     "dlg_msg_var": {
-                      "value": "var_user_choice",
+                      "value": "var_use_claster_editor",
                       "enabled": true
                     },
                     "dlg_msg_type": {
-                      "value": "yes_no",
+                      "value": "yes_no_cancel",
                       "enabled": true
                     },
                     "dlg_msg_title": {
@@ -480,9 +480,42 @@
                   }
                 },
                 {
+                  "id": "root_7617c03c/SYSTEM/py_if_else",
+                  "instance_id": "instance_8ec22d769026",
+                  "name": "УСЛОВИЕ: запуск Редактора кластеров (да/нет/отмена)",
+                  "description": "<div style=\" {theme.status_error}\">\nЕсли выбран режим РУЧНОГО редактирования кластеров, то запускается соответствующий редактор, в противном случае продолжается анализ фотографий.\n</div>",
+                  "silent_mode": true,
+                  "command_line_args": {
+                    "if-variable-name": {
+                      "value": "var_use_claster_editor",
+                      "enabled": true
+                    },
+                    "if-operator": {
+                      "value": "равно",
+                      "enabled": true
+                    },
+                    "if-comparison-value": {
+                      "value": "yes",
+                      "enabled": true
+                    },
+                    "then-instance-id": {
+                      "value": "instance_0837486cee89",
+                      "enabled": true
+                    },
+                    "else-instance-id": {
+                      "value": "instance_d0e6162a820e",
+                      "enabled": true
+                    },
+                    "clear-variable": {
+                      "value": true,
+                      "enabled": true
+                    }
+                  }
+                },
+                {
                   "id": "root_790d968b/Workflow/analize/cluster_editor",
                   "instance_id": "instance_0837486cee89",
-                  "name": "3.1. Ручное редактирование кластеров",
+                  "name": "3.3. Ручное редактирование кластеров",
                   "description": "<div style=\" {theme.script_description}\">\n<b>Третий+ (<i>дополнительный, но НЕОБЯЗАТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт позволяет визуально, в ручном режиме, редактировать кластеры портретных фотографий (просматривать и удалять фотографии кластера, перемещать их из одного кластера в другой, изменять название кластера). \n\nДополнительно в скрипте реализован минимальный функционал редактирования изображение и его экспорта с водяными знаками. \n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output /  Analysis_{wf_photo_session}</i>\n<b>images_dir</b> = <i>{data_dir} / JPG</i>\n<b>sorted_dir</b> = <i>{base_dir} / Output /  Claster_{photo_session}</i>\n\nСкрипт не будет работать, если предварительно не отработал скирпт №3\n</div>",
                   "silent_mode": false,
                   "command_line_args": {}
@@ -490,8 +523,8 @@
                 {
                   "id": "root_7617c03c/SYSTEM/py_if_else",
                   "instance_id": "instance_d3bb090ca22f",
-                  "name": "3.2. Проверить наличие миниатюр с водяными знаками",
-                  "description": null,
+                  "name": "УСЛОВИЕ: Наличие миниатюр с водяными знаками (да/нет)",
+                  "description": "<div style=\" {theme.status_error}\">\nЕсли экспортированы портреты с водяными знаками, то переместить фотографии на Яндекс-диск, для отправки родителям\n</div>",
                   "silent_mode": true,
                   "command_line_args": {
                     "if-variable-name": {
@@ -507,11 +540,11 @@
                       "enabled": true
                     },
                     "then-instance-id": {
-                      "value": "instance_d0e6162a820e",
+                      "value": "instance_939e8771d8ae",
                       "enabled": true
                     },
                     "else-instance-id": {
-                      "value": "instance_939e8771d8ae",
+                      "value": "instance_d0e6162a820e",
                       "enabled": true
                     },
                     "clear-variable": {
@@ -523,7 +556,7 @@
                 {
                   "id": "root_7617c03c/SYSTEM/dir_operation",
                   "instance_id": "instance_939e8771d8ae",
-                  "name": "3.3. Перемещение файлов JPG в папку для отбора",
+                  "name": "3.4. Перемещение файлов JPG в папку для отбора",
                   "description": "<div style=\" {theme.script_description}\">\n<b>Третий++ (<i>дополнительный, но НЕОБЯЗАТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт перемещает/копирует отсортированные папки с потретными фотографиями на Яндекс-диск\n\nПри работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b>\n</div>",
                   "silent_mode": false,
                   "command_line_args": {

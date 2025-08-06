@@ -30,7 +30,7 @@ except ImportError:
 
 # --- Блок 2: Настройка логирования ---
 # ==============================================================================
-logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s", stream=sys.stdout)
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 # --- Блок 3: Класс FileSorter ---
@@ -43,10 +43,18 @@ class FileSorter:
         self.source_paths: List[Path] = [p for p in source_paths if p.is_dir()]
         self.output_root: Path = output_root
         
-        logger.info(f"Режим работы: {self.operation_name}")
-        logger.info(f"Обрабатываемые расширения: {sorted(list(self.extensions))}")
-        logger.info(f"Поиск исходных файлов в: {[str(p) for p in self.source_paths]}")
-        logger.info(f"Папка для результатов: {self.output_root}")
+        logger.info(f"Режим работы: <i>{self.operation_name}</i>")
+        logger.info(f"Обрабатываемые расширения: <i>{sorted(list(self.extensions))}</i>")
+        # 1. Преобразуем все пути в строки
+        paths_as_strings = [str(p) for p in self.source_paths]
+        # 2. Объединяем строки, вставляя между ними символ новой строки '\n'
+        formatted_paths = '\n'.join(paths_as_strings)
+        # 3. Добавляем заголовок и выводим итоговую многострочную строку.
+        logger.info(f"\nНайдено <b>{len(paths_as_strings)}</b> папки для обработки:\n<i>{formatted_paths}<i>")
+
+        logger.info(f"\nПапка для копирования/перемещения:")
+        logger.info(f"<i>{self.output_root}</i>")
+
 
     def _get_target_folder_name(self, file_data: Dict) -> str:
         if len(file_data.get("faces", [])) > 1:
@@ -134,7 +142,7 @@ def get_config() -> argparse.Namespace:
     return ConfigResolver(parser).resolve_all() if IS_MANAGED_RUN else parser.parse_args()
 
 def main():
-    logger.info("="*10 + " ЗАПУСК СОРТИРОВКИ ФАЙЛОВ " + "="*10)
+    logger.info("<b>Сортировка файлов по папкам кластеров</b>")
     
     if not IS_MANAGED_RUN:
         logger.critical("Этот скрипт требует запуска из среды PySM для доступа к контексту.")
@@ -181,8 +189,6 @@ def main():
         output_root=output_root
     )
     sorter.sort_all(json_manager, num_workers)
-
-    logger.info("="*10 + " СОРТИРОВКА ФАЙЛОВ ЗАВЕРШЕНА " + "="*10)
 
     if IS_MANAGED_RUN:
         pysm_context.log_link(url_or_path=str(output_root), text="<br>Открыть папку с отсортированными файлами")

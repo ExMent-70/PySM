@@ -563,7 +563,8 @@ class MainWindow(QWidget):
         if dialog.exec() != QDialog.Accepted: return
         
         enhancement_factors = dialog.get_enhancement_factors()
-        logger.info(f"Применение коэффициентов улучшения: {enhancement_factors}")
+        logger.info(f"Параметры обработки фотографий перед экспортом:")
+        logger.info(f"<i>{enhancement_factors}<i>")
         
         self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_ACTIVE)
         self.status_progress_bar.setRange(0, len(tasks))
@@ -705,6 +706,11 @@ if __name__ == "__main__":
         format="%(message)s",
         stream=sys.stdout
     )
+
+    # Запущен редактор кластеров
+    # Переменная для определения статуса экспорта. Экспорт не выполнялся
+    export_status = 0
+    pysm_context.set("var_jpg_move", export_status)
 
     if not IS_COMMON_AVAILABLE or not IS_MANAGED_RUN:
         msg = "Критическая ошибка: Скрипт требует запуска из среды PySM и наличия общих библиотек (_common)."

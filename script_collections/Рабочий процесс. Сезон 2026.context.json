@@ -22,14 +22,14 @@
   },
   "wf_session_name": {
     "type": "string",
-    "value": "Школа256_11а_класс",
+    "value": "Школа2_11а_класс",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
   },
   "wf_raw_path": {
     "type": "dir_path",
-    "value": "G:/2025/TEST",
+    "value": "G:/2025/222",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
@@ -79,18 +79,11 @@
   "enhancer_settings": {
     "type": "json",
     "value": {
+      "brightness": 1.07,
       "contrast": 1.02,
       "color": 1.1,
-      "sharpness": 1.11,
-      "brightness": 1.07
+      "sharpness": 1.11
     },
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
-  },
-  "var_jpg_move": {
-    "type": "int",
-    "value": 1,
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null

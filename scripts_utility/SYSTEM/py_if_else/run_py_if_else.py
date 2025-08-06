@@ -149,7 +149,7 @@ def main():
 
     print(
         f"Проверка условия: [<b>{config.if_variable_name}</b>] (значение: <i>{actual_value}</i>) "
-        f"<b>{config.if_operator}</b> [<i>{config.if_comparison_value}</i>] ?"
+        f"<b>{config.if_operator}</b> [<i>{config.if_comparison_value}</i>]"
     )
 
     # 2. Вычисляем результат условия
@@ -160,11 +160,11 @@ def main():
     if is_true:
         target_id = config.then_instance_id
         branch = "Then"
-        print("Результат: <b>ИСТИНА</b>. Выбран переход по ветке 'Then'.")
+        print("Результат: <b>ИСТИНА</b>. Выбран переход по ветке <b>ЕСЛИ</b>")
     else:
         target_id = config.else_instance_id
         branch = "Else"
-        print("Результат: <b>ЛОЖЬ</b>. Выбран переход по ветке 'Else'.")
+        print("Результат: <b>ЛОЖЬ</b>. Выбран переход по ветке <b>ИНАЧЕ</b>")
 
     # 3. Устанавливаем следующий скрипт или продолжаем по умолчанию
     if target_id:
@@ -174,7 +174,8 @@ def main():
             target_name = all_instances.get(target_id, "Неизвестное имя")
             
             pysm_context.set_next_script(target_id)
-            print(f"Переход установлен на скрипт: <b>{target_name}</b> (ID: <i>{target_id}</i>)")
+            print(f"\nСледующий скрипт:")
+            print(f"<b>{target_name}</b> (ID: <i>{target_id}</i>)")
         except Exception as e:
             tqdm.write(f"КРИТИЧЕСКАЯ ОШИБКА при установке следующего скрипта: {e}")
             sys.exit(1)
@@ -184,7 +185,7 @@ def main():
     
     # 4. Опционально очищаем переменную
     if config.clear_variable:
-        print(f"Очистка переменной контекста: <b>{config.if_variable_name}</b>.")
+        print(f"\nОчистка переменной контекста: <b>{config.if_variable_name}</b>.")
         pysm_context.remove(config.if_variable_name)
 
     sys.exit(0)

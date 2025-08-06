@@ -27,6 +27,16 @@ except ImportError:
     ImageEnhance = None # <-- Добавлена недостающая строка
 # --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
+IS_MANAGED_RUN = False
+
+try:
+    from pysm_lib import pysm_context
+    IS_MANAGED_RUN = True
+except ImportError as e:
+    print(f"Ошибка импорта: {e}", file=sys.stderr)
+
+
+
 # Импортируем стили только для тайп-хинтинга
 from .editor_styles import THUMBNAIL_SIZE
 
@@ -89,50 +99,23 @@ class MoveWorker(QObject):
     # 1. БЛОК: Метод run (ИЗМЕНЕН)
     # ==============================================================================
     def run(self):
-        """Запускает многопоточное перемещение и записывает результат в контекст."""
-        
-        # 1. Инициализируем локальный счетчик для общего числа ошибок
-        total_errors = 0
-        
+        """Запускает многопоточное перемещение."""
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_threads) as executor:
             future_to_task = {executor.submit(self._process_single_move, task): task for task in self.tasks}
 
-            progress_bar = tqdm(
-                concurrent.futures.as_completed(future_to_task),
-                total=len(self.tasks),
-                desc="Перемещение JPG файлов"
-            )
-
-            for future in progress_bar:
+            for future in concurrent.futures.as_completed(future_to_task):
                 try:
                     moved, errors = future.result()
-                    # 2. Накапливаем ошибки, если они были в потоке
-                    if errors > 0:
-                        total_errors += errors
                     self.task_finished.emit(moved, errors)
                 except Exception as e:
                     task = future_to_task[future]
+                    # --- ИЗМЕНЕНИЕ: Убран некорректный аргумент ---
                     logger.error(f"Критическая ошибка в потоке перемещения для {task['filename']}: {e}")
-                    # 3. Увеличиваем счетчик ошибок при критическом сбое потока
-                    total_errors += 1
                     self.task_finished.emit(0, 1)
-
-        # 4. БЛОК: Запись итогового статуса в контекст PySM
-        # Этот код выполняется после завершения ВСЕХ потоков.
-        if IS_MANAGED_RUN:
-            final_status = 1 if total_errors > 0 else 0
-            pysm_context.set("var_jpg_move", final_status)
-            
-            # Добавляем информативное сообщение в лог
-            if final_status == 0:
-                print("Перемещение файлов завершено успешно.")
-            else:
-                tqdm.write(f"Перемещение файлов завершено с ошибками. Общее число сбоев: {total_errors}")
-                
-            print(f"Переменная контекста <b>var_jpg_move</b> установлена в значение <b>{final_status}</b>.")
-
-        # 5. Сигнал о полном завершении всех операций
+        
         self.finished.emit()
+
+
 
 
 class GalleryLoadWorker(QObject):
@@ -322,6 +305,8 @@ class ExportWorker(QObject):
         total = len(self.tasks)
         processed_count = 0
 
+        logger.info(f"\nЭкспорт портретных фотографии(й) с водяными знаками...")
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_threads) as executor:
             future_to_task = {executor.submit(self._process_single_task, task): task for task in self.tasks}
 
@@ -335,5 +320,14 @@ class ExportWorker(QObject):
 
                 processed_count += 1
                 self.progress_updated.emit(processed_count)
+
+        logger.info(f"Экспорт завершен. Обработано {total} файла(ов).")
+        # Завершен экспорт портретов с водяными знаками
+        # Переменная для определения статуса экспорта. Экспорт выполнен
+        #if IS_MANAGED_RUN:
+        export_status = 1
+        pysm_context.set("var_jpg_move", export_status)
+                   
+        logger.info(f"\nПеременная контекста <b>var_jpg_move</b> установлена в значение <b>{export_status}</b>.")
 
         self.finished.emit(f"Экспорт завершен. Обработано {total} файлов.")

@@ -28,7 +28,7 @@ except ImportError:
     pysm_context = None
     tqdm = lambda x, **kwargs: x
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s", stream=sys.stdout)
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
@@ -321,7 +321,8 @@ class KeypointAnalyzer:
         rec_path = data_dir / filename
         try:
             rec_path.write_text("\n".join(recs), encoding="utf-8")
-            logger.info(f"Файл с рекомендациями сохранен: {rec_path}")
+            logger.info(f"Файл с рекомендациями сохранен:")
+            logger.info(f"<i>{rec_path}</i>")
         except Exception as e:
             logger.error(f"Не удалось сохранить файл с рекомендациями: {e}")
 
@@ -333,7 +334,7 @@ def get_cli_config() -> argparse.Namespace:
     return ConfigResolver(parser).resolve_all() if IS_MANAGED_RUN else parser.parse_args()
 
 def main():
-    logger.info("="*10 + " ЗАПУСК АНАЛИЗА КЛЮЧЕВЫХ ТОЧЕК " + "="*10)
+    logger.info("<b>Анализ ключевых точек лица</b>")
     cli_config = get_cli_config()
     
     data_dir = construct_keypoint_analysis_path()
@@ -362,7 +363,6 @@ def main():
     
     json_manager.save_data()
     
-    logger.info("="*10 + " АНАЛИЗ КЛЮЧЕВЫХ ТОЧЕК ЗАВЕРШЕН " + "="*10)
 
 if __name__ == "__main__":
     main()
