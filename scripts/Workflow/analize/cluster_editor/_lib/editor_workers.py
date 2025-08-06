@@ -86,21 +86,52 @@ class MoveWorker(QObject):
 
         return moved_count, error_count
 
+    # 1. БЛОК: Метод run (ИЗМЕНЕН)
+    # ==============================================================================
     def run(self):
-        """Запускает многопоточное перемещение."""
+        """Запускает многопоточное перемещение и записывает результат в контекст."""
+        
+        # 1. Инициализируем локальный счетчик для общего числа ошибок
+        total_errors = 0
+        
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_threads) as executor:
             future_to_task = {executor.submit(self._process_single_move, task): task for task in self.tasks}
 
-            for future in concurrent.futures.as_completed(future_to_task):
+            progress_bar = tqdm(
+                concurrent.futures.as_completed(future_to_task),
+                total=len(self.tasks),
+                desc="Перемещение JPG файлов"
+            )
+
+            for future in progress_bar:
                 try:
                     moved, errors = future.result()
+                    # 2. Накапливаем ошибки, если они были в потоке
+                    if errors > 0:
+                        total_errors += errors
                     self.task_finished.emit(moved, errors)
                 except Exception as e:
                     task = future_to_task[future]
-                    # --- ИЗМЕНЕНИЕ: Убран некорректный аргумент ---
                     logger.error(f"Критическая ошибка в потоке перемещения для {task['filename']}: {e}")
+                    # 3. Увеличиваем счетчик ошибок при критическом сбое потока
+                    total_errors += 1
                     self.task_finished.emit(0, 1)
-        
+
+        # 4. БЛОК: Запись итогового статуса в контекст PySM
+        # Этот код выполняется после завершения ВСЕХ потоков.
+        if IS_MANAGED_RUN:
+            final_status = 1 if total_errors > 0 else 0
+            pysm_context.set("var_jpg_move", final_status)
+            
+            # Добавляем информативное сообщение в лог
+            if final_status == 0:
+                print("Перемещение файлов завершено успешно.")
+            else:
+                tqdm.write(f"Перемещение файлов завершено с ошибками. Общее число сбоев: {total_errors}")
+                
+            print(f"Переменная контекста <b>var_jpg_move</b> установлена в значение <b>{final_status}</b>.")
+
+        # 5. Сигнал о полном завершении всех операций
         self.finished.emit()
 
 

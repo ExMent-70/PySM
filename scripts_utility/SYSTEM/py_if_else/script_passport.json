@@ -1,0 +1,52 @@
+{
+  "description": "Скрипт управляет  потоком выполнения в наборах PyScriptManager. Он работает как логический шлюз: проверяет условие и, в зависимости от результата, направляет выполнение по одной из двух веток (\"Then\" или \"Else\").",
+  "category": "Управление потоком",
+  "author": "AI Assistant",
+  "version": "1.1.0",
+  "command_line_args_meta": {
+    "if-variable-name": {
+      "type": "string",
+      "description": "Имя переменной в контексте. Для доступа к вложенным полям используйте точку (например, 'psd_meta.width').",
+      "required": true,
+      "default": ""
+    },
+    "if-operator": {
+      "type": "choice",
+      "description": "Логический оператор для выполнения сравнения.",
+      "required": true,
+      "default": "равно",
+      "choices": [
+        "равно",
+        "не равно",
+        "больше",
+        "меньше",
+        "содержит",
+        "не содержит"
+      ]
+    },
+    "if-comparison-value": {
+      "type": "string",
+      "description": "Эталонное значение, с которым будет сравниваться переменная.",
+      "required": true,
+      "default": ""
+    },
+    "then-instance-id": {
+      "type": "string",
+      "description": "ID экземпляра скрипта, на который нужно перейти, если условие выполняется.",
+      "required": true,
+      "default": ""
+    },
+    "else-instance-id": {
+      "type": "string",
+      "description": "ID экземпляра скрипта, если условие не выполняется. Если оставить пустым, выполнение пойдет дальше по списку.",
+      "required": false,
+      "default": ""
+    },
+    "clear-variable": {
+      "type": "bool",
+      "description": "Если флаг установлен, переменная будет удалена из контекста после выполнения скрипта.",
+      "required": false,
+      "default": false
+    }
+  }
+}

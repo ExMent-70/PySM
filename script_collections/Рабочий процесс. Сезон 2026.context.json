@@ -36,7 +36,7 @@
   },
   "var_user_choice": {
     "type": "string",
-    "value": "no",
+    "value": "yes",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
@@ -66,7 +66,8 @@
     "type": "string",
     "value": "INFO",
     "description": "System: Log level inherited from PyScriptManager.",
-    "read_only": true
+    "read_only": true,
+    "choices": null
   },
   "wf_children_file_name": {
     "type": "string",
@@ -78,10 +79,18 @@
   "enhancer_settings": {
     "type": "json",
     "value": {
-      "contrast": 1.1,
+      "contrast": 1.02,
       "color": 1.1,
-      "sharpness": 1.2
+      "sharpness": 1.11,
+      "brightness": 1.07
     },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_jpg_move": {
+    "type": "int",
+    "value": 1,
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null

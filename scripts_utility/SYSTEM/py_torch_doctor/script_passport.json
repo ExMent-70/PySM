@@ -1,7 +1,0 @@
-{
-  "description": "Диагностический скрипт для проверки корректности установки и работоспособности PyTorch с поддержкой CUDA (GPU NVIDIA).",
-  "category": "Без категории",
-  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "1.05.03",
-  "command_line_args_meta": {}
-}

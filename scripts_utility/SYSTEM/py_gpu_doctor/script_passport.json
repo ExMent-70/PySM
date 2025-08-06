@@ -1,7 +1,0 @@
-{
-  "description": "Генерирует полный отчет о конфигурации GPU, включая версии драйвера, CUDA, cuDNN, а также детальную информацию по каждой видеокарте.",
-  "category": "Без категории",
-  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "1.0",
-  "command_line_args_meta": {}
-}
