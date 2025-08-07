@@ -39,7 +39,7 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_open",
                   "instance_id": "instance_30ac56e9b595",
-                  "name": "Выбрать базовую папку для всех RAW-файлов/сессий Capture One",
+                  "name": "ВВОД: Выбрать базовую папку для всех RAW-файлов/сессий Capture One",
                   "description": "Скрипт создает переменную <i>wf_session_path</i> в Контексте Коллекции и записывает в неё путь к папке, в которой будут создаваться папки для RAW-файлов и/или сессии Capture One. \nДля каждого класса создается своя папка/сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. \nТакой подход к хранению RAW-файлов/организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
                   "silent_mode": false,
                   "command_line_args": {
@@ -64,7 +64,7 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_open",
                   "instance_id": "instance_2ab0c0f56d21",
-                  "name": "Выбрать базовую папку для PSD-файлов",
+                  "name": "ВВОД: Выбрать базовую папку для PSD-файлов",
                   "description": "Скрипт создает переменную wf_psd_path в Контексте Коллекции и записывает в неё путь к папке, в которой, следующие скрипты будут создавать сессии Capture One. Для каждой съемки обычно создается своя сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. Такой подход к организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
                   "silent_mode": false,
                   "command_line_args": {
@@ -89,7 +89,7 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_input",
                   "instance_id": "instance_40d66d7d01cf",
-                  "name": "Имя файла со списком для фотосессии",
+                  "name": "ВВОД: Имя файла со списком для фотосессии",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
@@ -134,7 +134,7 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_input",
                   "instance_id": "instance_63b97554f0f6",
-                  "name": "Указать школу/параллель/класс",
+                  "name": "ВВОД: Указать школу/параллель/класс",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
@@ -171,7 +171,7 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_open",
                   "instance_id": "instance_87604503d39c",
-                  "name": "Выбрать карту памяти с исходными RAW-файлами",
+                  "name": "СООБЩЕНИЕ: Выбрать карту памяти с исходными RAW-файлами",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
@@ -457,7 +457,7 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_msg",
                   "instance_id": "instance_391bf9ae1a37",
-                  "name": "3.2. Сообщение: Запустить редактор кластеров",
+                  "name": "СООБЩЕНИЕ: Запустить редактор кластеров",
                   "description": null,
                   "silent_mode": true,
                   "command_line_args": {
@@ -482,7 +482,7 @@
                 {
                   "id": "root_7617c03c/SYSTEM/py_if_else",
                   "instance_id": "instance_8ec22d769026",
-                  "name": "УСЛОВИЕ: запуск Редактора кластеров (да/нет/отмена)",
+                  "name": "УСЛОВИЕ: Запуск Редактора кластеров (да/нет/отмена)",
                   "description": "<div style=\" {theme.status_error}\">\nЕсли выбран режим РУЧНОГО редактирования кластеров, то запускается соответствующий редактор, в противном случае продолжается анализ фотографий.\n</div>",
                   "silent_mode": true,
                   "command_line_args": {
@@ -685,7 +685,7 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_msg",
                   "instance_id": "instance_c41a04b578c0",
-                  "name": "Завершение работы в Capture One",
+                  "name": "СООБЩЕНИЕ: Завершение работы в Capture One",
                   "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nПодтверждение экспорта из Capture One (с помощью рецепта <b>_PSD_8bit_</b>) фотографий выбранных для ретуши \n\nЕсли эта операция еще не выполнена, то не запускайте скрипт или нажмите кнопку <b>Нет</b>\nПереходить к следующему скрипту не рекомендуется!\n</div>",
                   "silent_mode": false,
                   "command_line_args": {
