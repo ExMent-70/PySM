@@ -22,14 +22,14 @@
   },
   "wf_session_name": {
     "type": "string",
-    "value": "Школа2_11а_класс",
+    "value": "Школа212_11а_класс",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
   },
   "wf_raw_path": {
     "type": "dir_path",
-    "value": "G:/2025/222",
+    "value": "G:/2025/TEST",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
@@ -43,7 +43,7 @@
   },
   "wf_photo_session": {
     "type": "choice",
-    "value": "PORTRAIT",
+    "value": "SEPTEMBER1",
     "description": "Имя текущей сессии для записи в метаданные. Обычно устанавливается автоматически.",
     "read_only": false,
     "choices": [
@@ -79,9 +79,9 @@
   "enhancer_settings": {
     "type": "json",
     "value": {
-      "brightness": 1.07,
-      "contrast": 1.02,
-      "color": 1.1,
+      "brightness": 0.99,
+      "contrast": 1.1,
+      "color": 1.12,
       "sharpness": 1.11
     },
     "description": "Auto-created by script",
