@@ -43,7 +43,7 @@
   },
   "wf_photo_session": {
     "type": "choice",
-    "value": "SEPTEMBER1",
+    "value": "STREET",
     "description": "Имя текущей сессии для записи в метаданные. Обычно устанавливается автоматически.",
     "read_only": false,
     "choices": [

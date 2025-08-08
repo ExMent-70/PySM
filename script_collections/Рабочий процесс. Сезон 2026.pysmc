@@ -629,8 +629,7 @@
                     },
                     "a_sf_extensions": {
                       "value": [
-                        ".jpg",
-                        ".xmp"
+                        ".jpg"
                       ],
                       "enabled": true
                     },
