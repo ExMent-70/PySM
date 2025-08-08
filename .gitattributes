@@ -1,0 +1,2 @@
+_BIN/models/antelopev2/*.onnx filter=lfs diff=lfs merge=lfs -text
+_BIN/models/buffalo_l/*.onnx filter=lfs diff=lfs merge=lfs -text
