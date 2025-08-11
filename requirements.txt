@@ -6,7 +6,7 @@ insightface
 ipymarkup
 Jinja2
 natasha
-numpy
+numpy==1.26.4
 onnxruntime-gpu
 opencv-python
 packaging
