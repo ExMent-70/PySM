@@ -1,4 +1,4 @@
-1# main.py
+# main.py
 
 import sys
 import os
@@ -108,6 +108,12 @@ if __name__ == "__main__":
         controller_kwargs["config_manager_instance"] = config_manager
 
     controller = AppController(**controller_kwargs)
+
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    # Применяем глобальную тему оформления ПЕРЕД показом окна.
+    # Это гарантирует, что окно появится сразу в правильном стиле.
+    controller.apply_application_theme()
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
     window = MainWindow(app_controller=controller, locale_manager=locale_manager)
 

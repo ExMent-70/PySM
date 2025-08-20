@@ -1,0 +1,379 @@
+/* -----------------------------------------------------------------------------
+ * themes/default/style.qss
+ *
+ * Базовая светлая тема для PyScriptManager.
+ * Служит основой и образцом для создания новых тем.
+ * -------------------------------------------------------------------------- */
+
+/* --- [1] ОБЩИЕ СТИЛИ ПРИЛОЖЕНИЯ --- */
+QWidget {
+    /* Основной фон для большинства виджетов и окон */
+    background-color: #f0f0f0;
+    /* Основной цвет текста */
+    color: #000000;
+    /* Системный шрифт для нативного вида */
+    font-family: "Segoe UI", Arial, sans-serif;
+    /* Стандартный размер шрифта */
+    font-size: 10pt;
+    /* Убираем рамки у базового виджета, чтобы избежать двойных границ */
+    border: none;
+}
+
+QLabel, QCheckBox {
+    /* Метки и чекбоксы должны иметь прозрачный фон, чтобы не перекрывать фон родителя */
+    background-color: transparent;
+}
+
+QStatusBar {
+    /* Фон для строки состояния внизу главного окна */
+    background-color: #e1e1e1;
+}
+
+QToolTip {
+    /* Стиль для всплывающих подсказок */
+    background-color: #fcfcfc;
+    color: #000000;
+    border: 1px solid #a0a0a0;
+    padding: 4px;
+    border-radius: 3px;
+    opacity: 240; /* Легкая прозрачность (0-255) */
+}
+
+
+/* --- [2] КОНТЕЙНЕРЫ: ГРУППЫ, ВКЛАДКИ --- */
+QGroupBox, QTabWidget::pane {
+    /* Общий стиль для контейнеров QGroupBox и панели QTabWidget */
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+}
+
+QGroupBox {
+    /* Отступ сверху, чтобы заголовок не "прилипал" к краю */
+    margin-top: 6px;
+}
+QGroupBox[isDirty="true"] {
+    /* Особый стиль для QGroupBox с динамическим свойством isDirty="true" */
+    border: 1px solid #d9534f; /* Красная рамка для индикации несохраненных изменений */
+}
+QGroupBox[isDirty="true"]::title {
+    color: #d9534f; /* Красный цвет для заголовка */
+}
+QGroupBox::title {
+    /* Позиционирование и стиль заголовка QGroupBox */
+    subcontrol-origin: margin;
+    subcontrol-position: top center;
+    padding: 0 5px;
+    top: -4px; /* Сдвиг вверх для "врезки" в рамку */
+    color: #888888; /* Серый цвет для второстепенной информации */
+}
+
+QTabWidget::pane {
+    /* Небольшой сдвиг панели вкладок вверх, чтобы она соединялась с табами */
+    margin-top: -1px;
+}
+QTabBar::tab {
+    /* Стиль для неактивной вкладки */
+    background: #e1e1e1;
+    color: #555555;
+    border: 1px solid #cccccc;
+    border-bottom: none; /* Убираем нижнюю рамку, чтобы вкладка "сливалась" с панелью */
+    padding: 7px 15px;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+}
+QTabBar::tab:selected {
+    /* Стиль для активной (выбранной) вкладки */
+    background: #ffffff;
+    color: #000000;
+    font-weight: bold;
+    margin-bottom: -1px; /* Компенсирует рамку панели, создавая эффект слияния */
+}
+QTabBar::tab:!selected:hover {
+    /* Стиль для неактивной вкладки при наведении */
+    background: #e5f1fb;
+    color: #000000;
+}
+
+QToolBox::tab {
+    /* Стиль для заголовков секций в QToolBox (используется в диалогах) */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f6f7fa, stop:1 #e8e9ec);
+    border: 1px solid #cccccc;
+    border-radius: 5px;
+    color: #333333;
+    padding: 6px;
+    font-weight: bold;
+}
+QToolBox::tab:selected, QToolBox::tab:hover {
+    /* Стиль при наведении или когда секция активна */
+    background: #e5f1fb;
+    border: 1px solid #0078d7;
+    color: #000000;
+}
+QToolBox QWidget, QToolBox QTextEdit {
+    /* Убираем лишний фон и рамки у виджетов внутри QToolBox */
+    background-color: #ffffff;
+    border: none;
+}
+
+
+/* --- [3] КНОПКИ --- */
+QPushButton {
+    /* Базовый стиль для всех кнопок */
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f6f7fa, stop:1 #e8e9ec);
+    border: 1px solid #cccccc;
+    padding: 6px 12px;
+    border-radius: 5px;
+}
+QPushButton:hover {
+    /* Стиль при наведении */
+    background-color: #e5f1fb;
+    border-color: #0078d7;
+}
+QPushButton:pressed {
+    /* Стиль при нажатии */
+    background-color: #cce4f7;
+}
+QPushButton:disabled {
+    /* Стиль для неактивной кнопки */
+    background-color: #f0f0f0;
+    color: #aaaaaa;
+}
+
+QToolBar {
+    /* Стиль для панели инструментов */
+    background-color: #f0f0f0;
+    border-bottom: 1px solid #cccccc;
+    padding: 2px;
+    spacing: 5px; /* Расстояние между элементами */
+}
+QToolBar QToolButton {
+    /* Стиль для кнопок на панели инструментов */
+    background-color: transparent;
+    border: 1px solid transparent;
+    padding: 5px;
+    border-radius: 5px;
+    margin: 2px;
+}
+QToolBar QToolButton:hover {
+    /* Стиль при наведении */
+    background-color: #e5f1fb;
+    border: 1px solid #cce4f7;
+}
+QToolBar QToolButton:pressed, QToolBar QToolButton:checked {
+    /* Стиль при нажатии или когда кнопка "включена" (checkable) */
+    background-color: #cce4f7;
+    border: 1px solid #a4c8eb;
+}
+QToolBar QToolButton[popupMode="1"] {
+    /* Добавляем отступ справа для кнопок с выпадающим меню, чтобы было место для стрелки */
+    padding-right: 20px;
+}
+QToolBar QToolButton::menu-button {
+    /* Стиль для области, в которой находится стрелка выпадающего меню */
+    border: none;
+    border-left: 1px solid #cccccc;
+    width: 16px;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+QToolBar QToolButton::menu-arrow {
+    /* Рисуем маленькую стрелку вниз с помощью "хака" с границами */
+    width: 0; height: 0;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-top: 2px solid #555555;
+}
+QToolBar QToolButton::menu-arrow:open {
+    /* Переворачиваем стрелку, когда меню открыто */
+    border-top: none;
+    border-bottom: 2px solid #555555;
+}
+
+
+/* --- [4] ПОЛЯ ВВОДА, СПИСКИ И ТАБЛИЦЫ --- */
+QLineEdit, QTextEdit, QPlainTextEdit, QTreeView, QListWidget, QComboBox {
+    /* Общий стиль для всех полей ввода и списков */
+    background-color: #ffffff;
+    border: 1px solid #cccccc;
+    border-radius: 5px;
+    padding: 4px;
+}
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus {
+    /* Акцентная рамка, когда виджет в фокусе */
+    border: 1px solid #0078d7;
+}
+QLineEdit:disabled, QLineEdit:read-only {
+    /* Стиль для неактивных или "только для чтения" полей */
+    background-color: #f0f0f0;
+    color: #777777;
+}
+
+QTreeView, QListWidget, QTableWidget {
+    /* Чередующийся цвет строк для лучшей читаемости */
+    alternate-background-color: #f6f6f6;
+}
+QTreeView::item:hover, QListWidget::item:hover {
+    /* Подсветка элемента при наведении */
+    background-color: #e5f1fb;
+}
+QTreeView::item:selected, QListWidget::item:selected {
+    /* Стиль для выделенного элемента */
+    background-color: #0078d7;
+    color: white;
+}
+
+QHeaderView::section {
+    /* Стиль для заголовков таблиц и деревьев */
+    background-color: #f0f0f0;
+    padding: 5px;
+    border: none;
+    border-bottom: 1px solid #cccccc;
+}
+QHeaderView::section:!last-of-type {
+    /* Вертикальный разделитель между заголовками */
+    border-right: 1px solid #e0e0e0;
+}
+
+QTableWidget {
+    border-radius: 5px;
+    gridline-color: #e0e0e0; /* Цвет сетки таблицы */
+}
+QTableWidget::item:selected {
+    background-color: #0078d7;
+    color: white;
+}
+/* Стили для виджетов ВНУТРИ ячеек таблицы, чтобы убрать у них лишние рамки */
+QTableWidget QWidget { background-color: transparent; padding: 0px; margin: 0px; }
+QTableWidget QPushButton { padding: 2px 5px; font-weight: normal; margin: 1px; }
+QTableWidget QLineEdit, QTableWidget QComboBox, QTableWidget QDateEdit, QTableWidget QDateTimeEdit {
+    border: none; background-color: transparent; border-radius: 0px;
+}
+QTableWidget QLineEdit:focus, QTableWidget QComboBox:focus, QTableWidget QDateEdit:focus, QTableWidget QDateTimeEdit:focus {
+    background-color: #ffffff; border: 1px solid #0078d7;
+}
+
+
+/* --- [5] ПРОЧИЕ ЭЛЕМЕНТЫ УПРАВЛЕНИЯ --- */
+QComboBox::drop-down {
+    /* Стиль для кнопки со стрелкой в QComboBox */
+    subcontrol-origin: padding; subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #cccccc;
+    border-top-right-radius: 5px; border-bottom-right-radius: 5px;
+}
+QComboBox::down-arrow {
+    /* Стрелка в QComboBox */
+    width: 0; height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid #555555;
+}
+QComboBox::down-arrow:on { border-top: none; border-bottom: 4px solid #555555; }
+QComboBox QAbstractItemView {
+    /* Стиль для выпадающего списка QComboBox */
+    background-color: white;
+    border: 1px solid #cccccc;
+    outline: none; /* Убираем системную рамку выделения */
+}
+QComboBox QAbstractItemView::item { padding: 6px 10px; }
+QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover {
+    background-color: #0078d7;
+    color: white;
+}
+
+QCheckBox::indicator {
+    /* Квадратик чекбокса */
+    width: 16px; height: 16px;
+    border: 1px solid #999999;
+    border-radius: 4px;
+}
+QCheckBox::indicator:unchecked { background-color: #ffffff; }
+QCheckBox::indicator:unchecked:hover { border-color: #0078d7; }
+QCheckBox::indicator:checked {
+    background-color: #0078d7;
+    border-color: #0078d7;
+    /* Встроенная SVG-иконка "галочки" */
+    image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="white" d="M4.2,9.6L1.4,6.8L0,8.2l4.2,4.2L12,4.6L10.6,3.2L4.2,9.6z"/></svg>');
+}
+QCheckBox::indicator:checked:hover { background-color: #008ae6; }
+
+QProgressBar {
+    border: 1px solid #cccccc; border-radius: 5px;
+    text-align: center; color: #000000;
+    background-color: #e0e0e0;
+}
+QProgressBar::chunk {
+    /* "Заполненная" часть прогресс-бара */
+    background-color: #0078d7;
+    border-radius: 4px;
+}
+
+
+/* --- [6] ПОЛОСЫ ПРОКРУТКИ --- */
+QScrollBar:vertical {
+    border: none; background: #f0f0f0; width: 10px; margin: 0;
+}
+QScrollBar::handle:vertical {
+    /* Ползунок вертикальной прокрутки */
+    background: #cccccc; min-height: 25px; border-radius: 5px;
+}
+QScrollBar::handle:vertical:hover { background: #bbbbbb; }
+QScrollBar::handle:vertical:pressed { background: #999999; }
+
+QScrollBar:horizontal {
+    border: none; background: #f0f0f0; height: 10px; margin: 0;
+}
+QScrollBar::handle:horizontal {
+    /* Ползунок горизонтальной прокрутки */
+    background: #cccccc; min-width: 25px; border-radius: 5px;
+}
+QScrollBar::handle:horizontal:hover { background: #bbbbbb; }
+QScrollBar::handle:horizontal:pressed { background: #999999; }
+
+QScrollBar::add-line, QScrollBar::sub-line {
+    /* Убираем стандартные кнопки-стрелки */
+    height: 0px; width: 0px;
+}
+QScrollBar::add-page, QScrollBar::sub-page {
+    /* "Дорожка" скроллбара (делаем ее прозрачной) */
+    background: none;
+}
+
+
+/* --- [7] МЕНЮ --- */
+QMenu {
+    background-color: #ffffff; border: 1px solid #cccccc; padding: 5px;
+}
+QMenu::item {
+    padding: 8px 25px; border-radius: 4px;
+}
+QMenu::item:selected {
+    background-color: #0078d7; color: white;
+}
+
+
+/* --- [8] ДИАЛОГОВЫЕ ОКНА --- */
+QDialog { background-color: #f0f0f0; }
+QMessageBox, QFileDialog { background-color: #f0f0f0; }
+QMessageBox QLabel { background-color: transparent; color: #000000; }
+QDialogButtonBox QPushButton {
+    /* Увеличиваем отступы для кнопок OK/Cancel */
+    padding: 6px 20px;
+}
+
+/* Стили для кастомных и стандартных диалогов-редакторов по их ID */
+QDialog#JsonEditorDialog, QDialog#MultilineTextDialog, QInputDialog {
+    background-color: #f0f0f0; color: #000000;
+}
+QDialog#JsonEditorDialog QPlainTextEdit, QDialog#MultilineTextDialog QPlainTextEdit,
+QInputDialog QPlainTextEdit, QInputDialog QLineEdit {
+    background-color: #ffffff; color: #000000; border: 1px solid #cccccc;
+    /* Моноширинный шрифт для удобства редактирования кода/текста */
+    font-family: "Consolas", "Courier New", monospace;
+}
+QDialog#JsonEditorDialog QPushButton, QDialog#MultilineTextDialog QPushButton,
+QInputDialog QPushButton {
+    /* Кнопки в этих диалогах наследуют основной стиль QPushButton */
+    /* Но если нужно их изменить, правила добавляются сюда */
+}

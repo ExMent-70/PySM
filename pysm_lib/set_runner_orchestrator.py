@@ -15,6 +15,10 @@ from .script_runner import ScriptRunner
 from .locale_manager import LocaleManager
 from .app_constants import APPLICATION_ROOT_DIR
 from .config_manager import ConfigManager
+
+# --- 1. Блок: Новый импорт ThemeManager ---
+from .theme_manager import ThemeManager
+
 from .app_enums import SetRunMode, ScriptRunStatus, AppState
 
 logger = logging.getLogger(f"PyScriptManager.{__name__}")
@@ -38,6 +42,8 @@ class SetRunnerOrchestrator(QObject):
         continue_on_error: bool,
         get_script_info_func: Callable[[str], Optional[ScriptInfoModel]],
         config_manager: ConfigManager,
+        # --- 2. Блок: Новый аргумент в конструкторе ---
+        theme_manager: ThemeManager,
         locale_manager: LocaleManager,
         context_file_path: pathlib.Path,
         selected_instance_id: Optional[str] = None,
@@ -49,6 +55,8 @@ class SetRunnerOrchestrator(QObject):
         self.continue_on_error = continue_on_error
         self.get_script_info_by_id = get_script_info_func
         self.config_manager = config_manager
+        # --- 3. Блок: Сохраняем экземпляр ThemeManager ---
+        self.theme_manager = theme_manager
         self.locale_manager = locale_manager
         self.context_file_path = context_file_path
         self.selected_instance_id = selected_instance_id
@@ -61,54 +69,79 @@ class SetRunnerOrchestrator(QObject):
         self.script_start_time: float = 0
         self._stop_requested: bool = False
 
+
+    def _prepare_context_file(self):
+        try:
+            context_data = {}
+            if self.context_file_path.is_file():
+                with open(self.context_file_path, "r", encoding="utf-8") as f:
+                    context_data = json.load(f)
+
+            active_theme_name = self.theme_manager.get_active_theme_name()
+            context_data["pysm_active_theme_name"] = {
+                "type": "string",
+                "value": active_theme_name,
+                "description": "System: Name of the active PyScriptManager theme.",
+                "read_only": True,
+            }
+
+            current_log_level = logging.getLevelName(logger.getEffectiveLevel())
+            context_data["sys_log_level"] = {
+                "type": "string", "value": current_log_level, "read_only": True
+            }
+
+            all_instances_data = []
+            for e in self.set_node.script_entries:
+                script_info = self.get_script_info_by_id(e.id)
+                name = e.name or (script_info.name if script_info else e.id)
+                all_instances_data.append({"id": e.instance_id, "name": name})
+
+            context_data["pysm_set_instance_ids"] = {
+                "type": "json", "value": all_instances_data, "read_only": True
+            }
+            context_data.pop("pysm_next_script", None)
+
+            with open(self.context_file_path, "w", encoding="utf-8") as f:
+                json.dump(context_data, f, indent=2, ensure_ascii=False)
+
+        except (IOError, json.JSONDecodeError) as e:
+            logger.error(f"Не удалось подготовить файл контекста: {e}", exc_info=True)
+            raise
+
+
+
     @Slot()
     def start(self):
         self.clear_console.emit()
-
-        if self.run_mode == SetRunMode.SINGLE_FROM_SET:
-            if not self.selected_instance_id:
-                return
-            entry = next(
-                (
-                    e
-                    for e in self.set_node.script_entries
-                    if e.instance_id == self.selected_instance_id
-                ),
-                None,
-            )
-            if not entry:
-                return
-            self.script_queue = [entry]
-        else:
-            self.script_queue = [
-                e
-                for e in self.set_node.script_entries
-                if self.get_script_info_by_id(e.id)
-                and self.get_script_info_by_id(e.id).passport_valid
-            ]
-
-        if not self.script_queue:
+        
+        try:
+            self._prepare_context_file()
+        except Exception:
+            self.log_message.emit("script_error_block", "КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать файл контекста.")
+            self._finalize_run(was_stopped=True)
             return
 
-        for entry in self.set_node.script_entries:
-            self.instance_status_changed.emit(entry.instance_id, None)
+        if self.run_mode == SetRunMode.SINGLE_FROM_SET:
+            if not self.selected_instance_id: return
+            entry = next((e for e in self.set_node.script_entries if e.instance_id == self.selected_instance_id), None)
+            if not entry: return
+            self.script_queue = [entry]
+        else:
+            self.script_queue = [e for e in self.set_node.script_entries if self.get_script_info_by_id(e.id) and self.get_script_info_by_id(e.id).passport_valid]
 
-        for entry in self.script_queue:
-            self.instance_status_changed.emit(
-                entry.instance_id, ScriptRunStatus.PENDING
-            )
+        if not self.script_queue: return
 
-        self.instance_id_to_index_map = {
-            entry.instance_id: i for i, entry in enumerate(self.script_queue)
-        }
+        for entry in self.set_node.script_entries: self.instance_status_changed.emit(entry.instance_id, None)
+        for entry in self.script_queue: self.instance_status_changed.emit(entry.instance_id, ScriptRunStatus.PENDING)
 
+        self.instance_id_to_index_map = {entry.instance_id: i for i, entry in enumerate(self.script_queue)}
         self.start_time = time.time()
         self._log_set_start_info()
         self.run_had_errors = False
         self.current_script_idx = -1
         self.run_started.emit(self.set_node.name)
-
         self._process_next_script()
+
 
     def stop(self):
         self._stop_requested = True
@@ -501,12 +534,10 @@ class SetRunnerOrchestrator(QObject):
         )
 
         if entry_info.description:
-            #self.log_message.emit("script_header_block", " ")
             formatted_description = entry_info.description.replace("\n", "<br>")
             self.log_message.emit("html_block", f"  {formatted_description}")
 
         self.log_message.emit("EMPTY_LINE", "")
-
         self.log_message.emit(
             "script_stdout",
             f"{self.locale_manager.get('app_controller.console_script_interpreter_label')} {runner.python_interpreter}",
@@ -518,7 +549,14 @@ class SetRunnerOrchestrator(QObject):
         self.log_message.emit("EMPTY_LINE", "")
 
         html_lines = []
-        info_style = self.config_manager.get_active_theme().script_info
+        
+        # --- НАЧАЛО ИСПРАВЛЕНИЯ ---
+        # Получаем словарь с динамическими стилями из ThemeManager, а не ConfigManager
+        dynamic_styles = self.theme_manager.get_active_theme_dynamic_styles()
+        info_style = dynamic_styles.get("script_info", "color: #555555;")
+        arg_value_style = dynamic_styles.get("script_arg_value", "color: #000080;")
+        # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+        
         html_lines.append(f"<div style='{info_style}'>")
         args_dict = runner.custom_command_args_dict or {}
         if args_dict:
@@ -528,7 +566,6 @@ class SetRunnerOrchestrator(QObject):
             html_lines.append(
                 "<table style='margin-left: 15px; border-collapse: collapse;'>"
             )
-            arg_value_style = self.config_manager.get_active_theme().script_arg_value
             for key, value in sorted(args_dict.items()):
                 formatted_value = ""
                 if isinstance(value, bool):

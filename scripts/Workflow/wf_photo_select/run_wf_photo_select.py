@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 try:
     from pysm_lib.pysm_context import ConfigResolver
     from pysm_lib import pysm_context
+    from pysm_lib import theme_api
     from pysm_lib.pysm_progress_reporter import tqdm
     IS_MANAGED_RUN = True
 except ImportError:
@@ -534,6 +535,8 @@ class FileSelectorWindow(QMainWindow):
 def main():
     config = get_config()
     app = QApplication.instance() or QApplication(sys.argv)
+    theme_api.apply_theme_to_app(app)
+    
     window = FileSelectorWindow(config)
     window.show()
     exit_code = app.exec()

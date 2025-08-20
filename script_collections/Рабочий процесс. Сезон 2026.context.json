@@ -36,7 +36,7 @@
   },
   "var_user_choice": {
     "type": "string",
-    "value": "yes",
+    "value": "no",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
@@ -65,9 +65,7 @@
   "sys_log_level": {
     "type": "string",
     "value": "INFO",
-    "description": "System: Log level inherited from PyScriptManager.",
-    "read_only": true,
-    "choices": null
+    "read_only": true
   },
   "wf_children_file_name": {
     "type": "string",
@@ -87,5 +85,18 @@
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
+  },
+  "var_jpg_move": {
+    "type": "int",
+    "value": 0,
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "pysm_active_theme_name": {
+    "type": "string",
+    "value": "default",
+    "description": "System: Name of the active PyScriptManager theme.",
+    "read_only": true
   }
 }

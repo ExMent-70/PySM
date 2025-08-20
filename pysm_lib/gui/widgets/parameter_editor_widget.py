@@ -4,7 +4,7 @@ from typing import Dict, Optional, Any, List, Union
 from enum import Enum
 
 from PySide6.QtCore import Qt, Slot, QSignalBlocker, QTimer, QEvent, QObject, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QPushButton,
+    
 )
 
 from ...models import (
@@ -212,6 +213,7 @@ class ParameterEditorWidget(QWidget):
             ]
         )
 
+
     # 1. БЛОК: Метод _create_context_row (ПЕРЕРАБОТАН)
     def _create_context_row(self, row: int, name: str, var: ContextVariableModel):
         prefix = name.split("_", 1)[0] if "_" in name else None
@@ -255,6 +257,7 @@ class ParameterEditorWidget(QWidget):
         # 5. Описание (ячейка красится, виджет - нет)
         self.table.setItem(row, 4, create_and_paint_item())
         self._create_description_editor(row, var)
+
 
     def _create_instance_row(self, row: int, name: str, meta: ScriptArgMetaDetailModel):
         current_entry = self._args_values.get(name)

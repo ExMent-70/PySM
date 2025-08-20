@@ -8,6 +8,7 @@ from typing import Dict, Any
 IS_MANAGED_RUN = False
 try:
     from pysm_lib import pysm_context
+    from pysm_lib import theme_api    
     from pysm_lib.pysm_context import ConfigResolver
     IS_MANAGED_RUN = True
 except ImportError:
@@ -173,6 +174,8 @@ def main():
     # 4.3. Получение данных и запуск диалога
     initial_context = pysm_context.get_all()
     q_app = QApplication.instance() or QApplication(sys.argv)
+    theme_api.apply_theme_to_app(q_app)
+    
     dialog = ContextEditorDialog(initial_context, mode_string, config.__title)
     dialog_result = dialog.exec()
     

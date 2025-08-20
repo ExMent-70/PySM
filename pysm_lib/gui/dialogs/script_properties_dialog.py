@@ -166,39 +166,7 @@ class ScriptPropertiesDialog(QDialog):
 
         args_tab = QWidget()
         args_layout = QVBoxLayout(args_tab)
-        self.tabs.setStyleSheet(
-            """
-            /* Стиль для неактивной вкладки */
-            QTabBar::tab:!selected {
-                background-color: #ffc300;
-                color: #000000;
-                border-bottom: none;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                padding: 6px 12px;
-                margin-right: 2px;
-            }
-
-            /* Стиль для неактивной вкладки при наведении */
-            QTabBar::tab:!selected:hover {
-                color: #ffffff;
-                font: bold;
-            }
-
-            /* Стиль для активной (выбранной) вкладки */
-            QTabBar::tab:selected {
-                background-color: #ffffff;
-                font: bold;                
-                border: 1px solid #c0c0c0;
-                border-bottom: 1px solid white; /* "Сливается" с фоном */
-                margin-bottom: -1px; /* Сдвиг для эффекта слияния */
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                padding: 6px 12px;
-            }
-
-            """
-        )        
+       
         self.tabs.addTab(
             args_tab,
             self.locale_manager.get("dialogs.script_properties.tabs.arguments"),
@@ -220,9 +188,6 @@ class ScriptPropertiesDialog(QDialog):
         )
         self.instance_id_edit = QLineEdit()
         self.instance_id_edit.setReadOnly(True)
-        self.instance_id_edit.setStyleSheet(
-            "background-color: #f0f0f0; border: 1px solid #d0d0d0;"
-        )
         self.copy_id_action.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogContentsView)
         )
@@ -252,25 +217,7 @@ class ScriptPropertiesDialog(QDialog):
         # --- 2. БЛОК: Добавляем стили для QToolBox ---
         #        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #E1E1E1, stop: 0.4 #DDDDDD, stop: 1.0 #D3D3D3);
 
-        self.details_toolbox.setStyleSheet(
-            """
-            QToolBox::tab:!selected {
-                background-color: #ffc300;
-                color: black;
-                padding: 4px;
-                border-radius: 5px;                
-            }
-            QToolBox::tab:!selected:hover {
-                color: #ffffff;
-                font: bold;
-                
-            }               
-            QToolBox::tab:selected {
-                font: bold;
-                background-color: white;
-            }
-        """
-        )
+
 
         script_description_widget = QTextEdit()
         script_description_widget.setReadOnly(True)

@@ -278,6 +278,7 @@
         "appearance": "Appearance"
       },
       "buttons": {
+        "create": "Create New...",
         "change": "Change...",
         "add": "Add...",
         "edit": "Edit...",

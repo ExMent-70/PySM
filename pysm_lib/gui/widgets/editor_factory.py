@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QGridLayout,
     QSizePolicy,
+    QLabel,
 )
 
 from ...locale_manager import LocaleManager
@@ -92,22 +93,50 @@ class ChoicesEditorWidget(BaseEditor):
         self.edit_btn.clicked.connect(self._edit_choices)
 
     def _edit_choices(self):
-        text, ok = QInputDialog.getMultiLineText(
-            self,
-            self.locale_manager.get("dialogs.context_editor.edit_choices_title"),
-            self.locale_manager.get("dialogs.context_editor.edit_choices_label"),
-            "\n".join(self._choices),
+        # Создаем кастомный диалог вместо стандартного QInputDialog
+        dialog = QDialog(self)
+        dialog.setObjectName("MultilineTextDialog") # Используем тот же ID, что и для других
+        dialog.setWindowTitle(
+            self.locale_manager.get("dialogs.context_editor.edit_choices_title")
         )
-        if ok:
+        dialog.setMinimumSize(400, 300)
+        
+        layout = QVBoxLayout(dialog)
+        
+        label = QLabel(self.locale_manager.get("dialogs.context_editor.edit_choices_label"))
+        layout.addWidget(label)
+        
+        editor = QPlainTextEdit()
+        editor.setPlainText("\n".join(self._choices))
+        layout.addWidget(editor)
+        
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        layout.addWidget(button_box)
+        
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+
+        # Если пользователь нажал "ОК"
+        if dialog.exec():
+            text = editor.toPlainText()
             new_choices = [line.strip() for line in text.splitlines() if line.strip()]
             self._choices = new_choices
             self.choicesChanged.emit(self._choices)
+            
+            # Обновляем QComboBox
             current_text = self.combo.currentText()
-            self.combo.blockSignals(True)
-            self.combo.clear()
-            self.combo.addItems(self._choices)
-            self.combo.setCurrentText(current_text)
-            self.combo.blockSignals(False)
+            with QSignalBlocker(self.combo):
+                self.combo.clear()
+                self.combo.addItems(self._choices)
+                # Пытаемся восстановить выбор, если он все еще существует
+                if current_text in self._choices:
+                    self.combo.setCurrentText(current_text)
+                # Если старого выбора нет, а список не пуст, выбираем первый элемент
+                elif self._choices:
+                    self.combo.setCurrentIndex(0)
 
 
 class DialogEditorWidget(BaseEditor):
@@ -132,12 +161,7 @@ class DialogEditorWidget(BaseEditor):
         self.line_edit.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.line_edit.setStyleSheet(
-            """
-            QLineEdit { border: 1px solid transparent; background-color: transparent; }
-            QLineEdit:focus { border: 1px solid #5693c2; background-color: white; }
-        """
-        )
+
         if self.var_type in ("string_multiline", "json"):
             self.line_edit.setReadOnly(True)
         button = QPushButton("...")
@@ -224,9 +248,6 @@ class ListEditorWidget(BaseEditor):
         self.line_edit.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        self.line_edit.setStyleSheet(
-            "QLineEdit { border: 1px solid transparent; background-color: transparent; }"
-        )
         self._update_display_text()
         button = QPushButton("...")
         button.setFixedWidth(30)
@@ -271,12 +292,6 @@ class LineEditEditor(BaseEditor):
             self.line_edit.setValidator(validator)
         layout.addWidget(self.line_edit)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.line_edit.setStyleSheet(
-            """
-            QLineEdit { border: 1px solid transparent; background-color: transparent; }
-            QLineEdit:focus { border: 1px solid #5693c2; background-color: white; }
-        """
-        )
         self.line_edit.editingFinished.connect(
             lambda: self.valueChanged.emit(self.line_edit.text())
         )
@@ -331,15 +346,19 @@ class EditorFactory:
     ) -> Tuple[Any, bool]:
         collection_dir = options.get("collection_dir", pathlib.Path.home())
         start_path = str(current_value) if current_value else str(collection_dir)
+        
         if var_type == "file_path":
             new_path, _ = QFileDialog.getOpenFileName(parent, "Select File", start_path)
             return (new_path, True) if new_path else (current_value, False)
+        
         if var_type == "dir_path":
             new_path = QFileDialog.getExistingDirectory(
                 parent, "Select Directory", start_path
             )
             return (new_path, True) if new_path else (current_value, False)
+        
         if var_type == "password":
+            # Для стандартных диалогов QInputDialog стили применяются через QSS по имени класса
             new_pass, ok = QInputDialog.getText(
                 parent,
                 "Enter Password",
@@ -348,39 +367,67 @@ class EditorFactory:
                 current_value,
             )
             return (new_pass, ok)
+        
         if var_type == "string_multiline":
-            text, ok = QInputDialog.getMultiLineText(
-                parent, "Edit Text", "Value:", current_value
-            )
-            return (text, ok)
-        if var_type == "json":
             dialog = QDialog(parent)
-            dialog.setWindowTitle(
-                locale_manager.get(
-                    "dialogs.context_editor.json_editor_title", name="Value"
-                )
-            )
+            dialog.setObjectName("MultilineTextDialog") # Задаем ID для стилизации
+            dialog.setWindowTitle("Edit Text") # TODO: Локализовать
+            dialog.setMinimumSize(400, 300)
+            
             layout = QVBoxLayout(dialog)
             editor = QPlainTextEdit()
-            try:
-                text_to_edit = (
-                    json.dumps(current_value, indent=2, ensure_ascii=False)
-                    if current_value
-                    else ""
-                )
-            except (json.JSONDecodeError, TypeError):
-                text_to_edit = str(current_value or "")
-            editor.setPlainText(text_to_edit)
+            editor.setPlainText(str(current_value or ""))
             layout.addWidget(editor)
+            
             button_box = QDialogButtonBox(
                 QDialogButtonBox.StandardButton.Ok
                 | QDialogButtonBox.StandardButton.Cancel
             )
             layout.addWidget(button_box)
+            
             button_box.accepted.connect(dialog.accept)
             button_box.rejected.connect(dialog.reject)
+            
+            if dialog.exec():
+                return editor.toPlainText(), True
+            else:
+                return current_value, False
+        
+        if var_type == "json":
+            dialog = QDialog(parent)
+            dialog.setObjectName("JsonEditorDialog") # Задаем ID для стилизации
+            dialog.setWindowTitle(
+                locale_manager.get(
+                    "dialogs.context_editor.json_editor_title", name="Value"
+                )
+            )
+            dialog.setMinimumSize(400, 300) # Установим минимальный размер
+            
+            layout = QVBoxLayout(dialog)
+            editor = QPlainTextEdit()
+            try:
+                text_to_edit = (
+                    json.dumps(current_value, indent=2, ensure_ascii=False)
+                    if current_value is not None else "" # Обработка None
+                )
+            except (json.JSONDecodeError, TypeError):
+                text_to_edit = str(current_value or "")
+            editor.setPlainText(text_to_edit)
+            layout.addWidget(editor)
+            
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Ok
+                | QDialogButtonBox.StandardButton.Cancel
+            )
+            layout.addWidget(button_box)
+            
+            button_box.accepted.connect(dialog.accept)
+            button_box.rejected.connect(dialog.reject)
+            
             if dialog.exec():
                 text = editor.toPlainText()
+                if not text.strip(): # Если поле пустое, возвращаем None
+                    return None, True
                 try:
                     return json.loads(text), True
                 except json.JSONDecodeError:
@@ -390,4 +437,5 @@ class EditorFactory:
                         locale_manager.get("dialogs.context_editor.json_invalid_error"),
                     )
                     return current_value, False
+                    
         return current_value, False

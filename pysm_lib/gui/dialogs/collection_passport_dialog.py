@@ -52,25 +52,7 @@ class CollectionPassportDialog(QDialog):
 
         # --- 1. БЛОК: Создаем и стилизуем QToolBox ---
         self.properties_toolbox = QToolBox()
-        self.properties_toolbox.setStyleSheet(
-            """
-            QToolBox::tab {
-                background-color: #ffc300;
-                color: black;
-                padding: 4px;
-                border-radius: 5px;                                
-            }
-            QToolBox::tab:!selected:hover {
-                color: #ffffff;
-                font: bold;
-                
-            }             
-            QToolBox::tab:selected {
-                font: bold;
-                background-color: white;
-            }
-        """
-        )
+
         left_layout.addWidget(self.properties_toolbox)
 
         # --- 2. БЛОК: Создаем виджет для первой вкладки (Свойства) ---

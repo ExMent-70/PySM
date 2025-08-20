@@ -7,8 +7,13 @@ import os
 from typing import List, Dict, Optional, Any
 
 from PySide6.QtCore import QObject, Signal, QTimer, Slot, QThread
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
 
+# 1. Блок: Измененные импорты
+# ==============================================================================
+from .gui.dialogs import SettingsDialog # <--- Добавляем импорт
 from .config_manager import ConfigManager, AppConfigModel
+from .theme_manager import ThemeManager
 
 from .script_scanner import ScriptScannerWorker
 from .models import (
@@ -28,6 +33,7 @@ from .set_manager import SetManager
 from .locale_manager import LocaleManager
 from .set_runner_orchestrator import SetRunnerOrchestrator
 from .app_enums import AppState, ScriptRunStatus
+from .app_constants import APPLICATION_ROOT_DIR
 
 logger = logging.getLogger(f"PyScriptManager.{__name__}")
 
@@ -63,6 +69,11 @@ class AppController(QObject):
         logger.info(self.locale_manager.get("app_controller.log_info.init_start"))
 
         self.config_manager = config_manager_instance or ConfigManager()
+
+
+        # --- ИЗМЕНЕНИЕ: Инициализация ThemeManager ---
+        self.theme_manager = ThemeManager()
+        self.theme_manager.set_active_theme(self.config_manager.config.general.active_theme_name)
         
         
         self.set_manager = SetManager()
@@ -86,6 +97,103 @@ class AppController(QObject):
         self._apply_path_updates_to_current_process()
         QTimer.singleShot(0, self.load_initial_state)
         logger.info(self.locale_manager.get("app_controller.log_info.init_done"))
+
+
+
+
+    # 3. Блок: Метод apply_application_theme (ПЕРЕРАБОТАН)
+    # ==============================================================================
+    def apply_application_theme(self):
+        """
+        Получает QSS-стиль из ThemeManager, применяет его к приложению,
+        очищает консоль и обновляет все виджеты.
+        """
+        try:
+            stylesheet = self.theme_manager.get_active_theme_qss()
+            theme_name = self.theme_manager.get_active_theme_name()
+            
+            app_instance = QApplication.instance()
+            if not app_instance:
+                logger.error("Экземпляр QApplication не найден, тема не может быть применена.")
+                return
+
+            app_instance.setStyleSheet(stylesheet)
+            logger.info(f"Тема '{theme_name}' успешно применена.")
+            
+            # Очищаем консоль и выводим приветственное сообщение в новом стиле
+            self.clear_console_request.emit()
+            self._log_welcome_message()
+            
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # Запрашиваем полное обновление (перерисовку) дерева коллекции.
+            # Это необходимо, чтобы обновились все цвета, иконки и, что важно,
+            # всплывающие подсказки (tooltips), которые генерируются с учетом
+            # стилей из theme.toml.
+            self._request_collection_view_update()
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+            
+            # Отправляем сигнал, чтобы остальные виджеты (например, AvailableScripts)
+            # также могли обновить свои не-QSS стили (в основном, подсказки).
+            self.config_updated.emit()
+            
+        except Exception as e:
+            logger.error(f"Не удалось применить тему оформления: {e}", exc_info=True)
+
+    @Slot(dict)
+    def apply_new_config(self, settings_data: Dict[str, Any]):
+        if not settings_data:
+            return
+        
+        initial_language = self.config_manager.language
+        initial_theme = self.config_manager.config.general.active_theme_name
+        
+        new_config_model = AppConfigModel(**settings_data)
+        self.config_manager.config = new_config_model
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        new_theme_name = self.config_manager.config.general.active_theme_name
+        
+        # Пытаемся установить новую тему. Метод вернет False, если произошел откат.
+        success = self.theme_manager.set_active_theme(new_theme_name)
+        
+        # Применяем стили в любом случае (либо новой темы, либо 'default' после отката)
+        self.apply_application_theme()
+
+        # Если произошел откат, выводим сообщение и обновляем конфиг
+        if not success:
+            final_theme_name = self.theme_manager.get_active_theme_name()
+            self.status_message_updated.emit(
+                f"Ошибка загрузки темы '{new_theme_name}'. Выполнено переключение на '{final_theme_name}'."
+            )
+            # Обновляем модель конфигурации, чтобы при следующем запуске
+            # открылась правильная (работающая) тема.
+            self.config_manager.config.general.active_theme_name = final_theme_name
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+        if self.config_manager.save_config():
+            self.log_message_to_console.emit(
+                "runner_info", self.locale_manager.get("user_actions.config_saved")
+            )
+            
+            self._apply_path_updates_to_current_process()
+
+            if initial_language != self.config_manager.language:
+                self.status_message_updated.emit(
+                    self.locale_manager.get("main_window.status.settings_saved_restart_required")
+                )
+            # Если сообщение об ошибке темы не было показано, показываем стандартное
+            elif success:
+                self.status_message_updated.emit(
+                    self.locale_manager.get("main_window.status.settings_saved")
+                )
+        else:
+            self.log_message_to_console.emit(
+                "script_error_block",
+                self.locale_manager.get("user_actions.config_save_error"),
+            )
+            self.status_message_updated.emit(
+                self.locale_manager.get("app_controller.status_config_save_error")
+            )
 
     def _apply_path_updates_to_current_process(self):
         paths_to_add = []
@@ -367,38 +475,6 @@ class AppController(QObject):
                 count=len(self._scripts_by_id_cache),
             )
         )
-
-    @Slot(dict)
-    def apply_new_config(self, settings_data: Dict[str, Any]):
-        if not settings_data:
-            return
-        initial_language = self.config_manager.language
-        new_config_model = AppConfigModel(**settings_data)
-        self.config_manager.config = new_config_model
-        if self.config_manager.save_config():
-            self.log_message_to_console.emit(
-                "runner_info", self.locale_manager.get("user_actions.config_saved")
-            )
-            self._apply_path_updates_to_current_process()
-            if initial_language != self.config_manager.language:
-                self.status_message_updated.emit(
-                    self.locale_manager.get(
-                        "main_window.status.settings_saved_restart_required"
-                    )
-                )
-            else:
-                self.status_message_updated.emit(
-                    self.locale_manager.get("main_window.status.settings_saved")
-                )
-            self.config_updated.emit()
-        else:
-            self.log_message_to_console.emit(
-                "script_error_block",
-                self.locale_manager.get("user_actions.config_save_error"),
-            )
-            self.status_message_updated.emit(
-                self.locale_manager.get("app_controller.status_config_save_error")
-            )
 
     @Slot(str, ScriptInfoModel)
     def save_script_passport(self, script_id: str, updated_model: ScriptInfoModel):
@@ -810,7 +886,51 @@ class AppController(QObject):
             self.collection_dirty_state_changed.emit(self.set_manager.is_dirty)
 
 
+    # 1. Блок: Новый метод show_settings_dialog
+    # ==============================================================================
+    @Slot()
+    def show_settings_dialog(self):
+        """
+        Создает, настраивает и отображает модальный диалог настроек.
+        """
+        cfg = self.config_manager.config
+        main_window = self.get_main_window() # Находим главное окно для родительства
+        
+        # Создаем диалог, передавая ему все необходимые зависимости
+        dialog = SettingsDialog(
+            config_model=cfg, 
+            theme_manager=self.theme_manager,
+            locale_manager=self.locale_manager, 
+            parent=main_window
+        )
+        
+        # Подключаемся к сигналу для live-preview смены темы
+        dialog.theme_changed.connect(self._on_theme_changed_in_settings)
 
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            settings_data = dialog.get_settings_data()
+            if settings_data:
+                self.apply_new_config(settings_data)
+
+    # 2. Блок: Новый приватный слот для live-preview
+    # ==============================================================================
+    @Slot(str)
+    def _on_theme_changed_in_settings(self, theme_name: str):
+        """
+        Слот для обработки смены темы в диалоге настроек в реальном времени.
+        """
+        if self.theme_manager.set_active_theme(theme_name):
+            self.apply_application_theme()
+
+    # 3. Блок: Новый вспомогательный метод для получения главного окна
+    # ==============================================================================
+    def get_main_window(self) -> Optional[QWidget]:
+        """Находит и возвращает экземпляр MainWindow."""
+        # QApplication.topLevelWidgets() возвращает все окна верхнего уровня
+        for widget in QApplication.topLevelWidgets():
+            if isinstance(widget, QMainWindow):
+                return widget
+        return None
 
 
     def run_script_set(
@@ -822,16 +942,7 @@ class AppController(QObject):
     ):
         if self.is_busy():
             return
-            
-            
-            
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
-        #
-        # Удалена проверка 'if self.set_manager.is_dirty:'.
-        # Теперь запуск блокируется только в том случае, если коллекция
-        # ни разу не была сохранена, так как для создания файла контекста
-        # необходим путь к файлу коллекции.
-        #
+
         set_node = self.set_manager.get_set_node_by_id(set_node_id)
         if not set_node:
             return
@@ -842,71 +953,33 @@ class AppController(QObject):
                 self.locale_manager.get("collection_widget.run_tooltip_save_first")
             )
             return
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
-
-
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Вся логика подготовки контекста УДАЛЕНА отсюда.
+        # Мы просто получаем путь к файлу контекста.
         try:
             context_file_path = self.set_manager._get_context_file_path(collection_path)
-            all_instances_data = [
-                {
-                    "id": e.instance_id,
-                    "name": (
-                        e.name
-                        or (
-                            self.get_script_info_by_id(e.id).name
-                            if self.get_script_info_by_id(e.id)
-                            else e.id
-                        )
-                    ),
-                }
-                for e in set_node.script_entries
-            ]
-            context_data = {}
-            if context_file_path.is_file():
-                with open(context_file_path, "r", encoding="utf-8") as f:
-                    context_data = json.load(f)
-
-            current_log_level = logging.getLevelName(logger.getEffectiveLevel())
-            
-            # 2. Добавляем или обновляем переменную sys_log_level в контексте
-            context_data["sys_log_level"] = {
-                "type": "string",
-                "value": current_log_level,
-                "description": "System: Log level inherited from PyScriptManager.",
-                "read_only": True, # Дочерние скрипты должны только читать это значение
-            }
-
-            context_data["pysm_set_instance_ids"] = {
-                "type": "json",
-                "value": all_instances_data,
-                "description": "System: List of all instance data in the set.",
-                "read_only": True,
-            }
-            context_data.pop("pysm_next_script", None)
-            with open(context_file_path, "w", encoding="utf-8") as f:
-                json.dump(context_data, f, indent=2, ensure_ascii=False)
-        except (IOError, json.JSONDecodeError) as e:
-            logger.error(
-                self.locale_manager.get(
-                    "app_controller.log_error.context_path_error", error=e
-                ),
-                exc_info=True,
-            )
+        except Exception as e:
+            logger.error(f"Не удалось определить путь к файлу контекста: {e}", exc_info=True)
             return
-
+        
         self.script_run_statuses.clear()
 
+        # Создаем оркестратор, передавая ему все необходимые зависимости.
+        # Теперь ОН будет отвечать за подготовку контекста.
         self.current_orchestrator = SetRunnerOrchestrator(
             set_node=set_node,
             run_mode=run_mode,
             continue_on_error=continue_on_error,
             get_script_info_func=self.get_script_info_by_id,
             config_manager=self.config_manager,
+            theme_manager=self.theme_manager,  # <--- Передаем новый ThemeManager
             locale_manager=self.locale_manager,
             context_file_path=context_file_path,
             selected_instance_id=selected_instance_id,
         )
 
+        # Подключение сигналов остается прежним
         self.current_orchestrator.log_message.connect(self.log_message_to_console)
         self.current_orchestrator.clear_console.connect(self.clear_console_request)
         self.current_orchestrator.run_started.connect(self.set_run_started)
@@ -914,16 +987,13 @@ class AppController(QObject):
             self.script_instance_status_changed
         )
         self.current_orchestrator.progress_updated.connect(self.script_progress_updated)
-
         self.current_orchestrator.app_state_changed.connect(self._set_app_state)
-
-        # self.current_orchestrator.context_reloaded.connect(
-        # self.set_manager.reload_context_from_file
-        # )
         self.current_orchestrator.run_completed.connect(self._on_orchestrator_finished)
         self.current_orchestrator.run_stopped.connect(self._on_orchestrator_finished)
 
+        # Запускаем оркестратор
         self.current_orchestrator.start()
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
     @Slot(str, bool)
     def _on_orchestrator_finished(self, set_name: str, success: Optional[bool] = None):

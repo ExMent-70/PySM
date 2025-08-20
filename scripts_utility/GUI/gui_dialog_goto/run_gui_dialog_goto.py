@@ -28,6 +28,7 @@ from argparse import Namespace
 IS_MANAGED_RUN = False
 try:
     from pysm_lib import pysm_context
+    from pysm_lib import theme_api    
     from pysm_lib.pysm_context import ConfigResolver
     from pysm_lib.pysm_progress_reporter import tqdm
     IS_MANAGED_RUN = True
@@ -102,6 +103,7 @@ def main():
     #tqdm.write(f"Найдено {len(all_instances)} экземпляров. Показ диалога выбора.")
 
     q_app = QApplication.instance() or QApplication(sys.argv)
+    theme_api.apply_theme_to_app(q_app)
     
     # Показываем пользователю понятные имена
     selected_name, ok = QInputDialog.getItem(

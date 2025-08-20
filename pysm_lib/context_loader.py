@@ -3,47 +3,50 @@
 import sys
 import runpy
 import os
+import types
 from .locale_manager import LocaleManager
 
 locale_manager = LocaleManager()
 
 if os.environ.get("PY_SCRIPT_MANAGER_ACTIVE") == "1":
     try:
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        # КОММЕНТАРИЙ: Импортируем модули-заглушки напрямую
-        from .services.tqdm_patch_dir import auto, notebook
-        from .services.tqdm_patch_dir.contrib import concurrent
+        # --- НАЧАЛО ИЗМЕНЕНИЙ: Создание полной структуры прокси-пакета ---
+        from importlib.util import find_spec
+        from .services.tqdm_patch_dir import tqdm, trange, auto, notebook, contrib
 
-        # Создаем пустой объект-заглушку для самого 'contrib'
-        class ContribModule:
-            pass
+        # 1. Создаем в памяти прокси-объекты для КАЖДОГО уровня, который может быть импортирован
+        tqdm_proxy = types.ModuleType('tqdm')
+        contrib_proxy = types.ModuleType('tqdm.contrib')
         
-        contrib_mod = ContribModule()
-        contrib_mod.concurrent = concurrent # Присваиваем ему наш модуль concurrent
+        # 2. Наполняем главный прокси-модуль 'tqdm'
+        tqdm_proxy.tqdm = tqdm
+        tqdm_proxy.trange = trange
+        tqdm_proxy.auto = auto
+        tqdm_proxy.notebook = notebook
+        tqdm_proxy.contrib = contrib_proxy  # 'contrib' теперь тоже является модулем
 
-        # Создаем главный объект-заглушку
-        class TqdmPatchModule:
-            pass
+        # 3. Наполняем подмодуль 'tqdm.contrib'
+        contrib_proxy.concurrent = contrib.concurrent
+
+        # 4. Копируем метаданные (__spec__) из НАСТОЯЩИХ модулей в наши прокси.
+        #    Это удовлетворит и torch, и huggingface_hub.
+        real_tqdm_spec = find_spec('tqdm')
+        if real_tqdm_spec:
+            tqdm_proxy.__spec__ = real_tqdm_spec
+            # Указываем, что это пакет, чтобы из него можно было импортировать
+            tqdm_proxy.__path__ = real_tqdm_spec.submodule_search_locations
+
+        real_contrib_spec = find_spec('tqdm.contrib')
+        if real_contrib_spec:
+            contrib_proxy.__spec__ = real_contrib_spec
+            contrib_proxy.__path__ = real_contrib_spec.submodule_search_locations
         
-        tqdm_patch_dir = TqdmPatchModule()
-        tqdm_patch_dir.auto = auto
-        tqdm_patch_dir.notebook = notebook
-        tqdm_patch_dir.contrib = contrib_mod
-        # Функции tqdm и trange будут доступны через импорт `from tqdm import tqdm`
-        # благодаря следующему шагу.
-        from .services.tqdm_patch_dir import tqdm, trange
-        tqdm_patch_dir.tqdm = tqdm
-        tqdm_patch_dir.trange = trange
-        
-        # Регистрируем все заглушки в sys.modules
-        sys.modules["tqdm"] = tqdm_patch_dir
-        sys.modules["tqdm.auto"] = auto
-        sys.modules["tqdm.notebook"] = notebook
-        sys.modules["tqdm.contrib"] = contrib_mod
-        sys.modules["tqdm.contrib.concurrent"] = concurrent
+        # 5. Регистрируем ВСЮ нашу структуру в sys.modules.
+        sys.modules['tqdm'] = tqdm_proxy
+        sys.modules['tqdm.contrib'] = contrib_proxy
         # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
-    except ImportError as e:
+    except Exception as e:
         print(f"PySM Loader Warning: Could not patch tqdm: {e}", file=sys.stderr)
 
 

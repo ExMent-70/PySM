@@ -1,0 +1,34 @@
+# ===============================================
+# Глобальные настройки для приложения mask_rmbg
+# ===============================================
+[global]
+# Путь для кэширования всех моделей (относительно корня проекта img2mask)
+model_dir = "../../../_BIN/models/RMBG"
+# Устройство для вычислений: "auto", "cpu", "cuda"
+device = "auto"
+# Количество параллельных потоков для обработки
+num_threads = 12
+
+# ===============================================
+# Настройки для удаления фона
+# ===============================================
+[remove]
+# Модель по умолчанию для удаления фона.
+# Доступные: "RMBG-2.0", "BiRefNet-general", "BiRefNet-portrait" и т.д.
+model_name = "BiRefNet-portrait"
+
+# --- Параметры, специфичные только для RMBG-2.0 ---
+[remove.rmbg_specific]
+sensitivity = 1.0
+process_res = 1024
+
+# --- Общие параметры постобработки ---
+[remove.postprocess]
+refine_foreground = true
+background = "Alpha"  # "Alpha" или "Color"
+background_color = "#000000"
+mask_blur = 1
+mask_offset = -1
+smooth = 0.0
+fill_holes = false
+invert_output = false

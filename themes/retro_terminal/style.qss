@@ -1,0 +1,83 @@
+/* themes/retro_terminal/style.qss - Стиль ЭЛТ-монитора */
+
+/* --- 1. Общие стили --- */
+QWidget {
+    background-color: #0A0F0A; /* Глубокий, почти черный с оттенком зеленого */
+    color: #33FF33;            /* Классический ярко-зеленый */
+    font-family: "Consolas", "Lucida Console", "Courier New", monospace;
+    font-size: 10pt;
+    border-radius: 0px; /* Никаких скругленных углов */
+}
+QLabel, QCheckBox { background-color: transparent; border: none; }
+
+/* --- 2. Контейнеры и вкладки --- */
+QGroupBox, QTabWidget::pane {
+    background-color: #0A0F0A;
+    border: 1px solid #1A4A1A; /* Темно-зеленая рамка */
+}
+QGroupBox { margin-top: 15px; }
+QGroupBox::title {
+    subcontrol-origin: margin; subcontrol-position: top center;
+    padding: 2px 8px; top: -1px;
+    background-color: #1A4A1A;
+    color: #33FF33;
+    border: 1px solid #1A4A1A;
+}
+QTabWidget::pane { margin-top: 0px; }
+QTabBar::tab {
+    background: #0A0F0A; border: 1px solid #1A4A1A;
+    padding: 7px 15px;
+}
+QTabBar::tab:selected { background: #33FF33; color: #0A0F0A; font-weight: bold; }
+QTabBar::tab:!selected:hover { background: #1A4A1A; }
+
+QToolBox::tab { background: #1A4A1A; border: none; color: #33FF33; padding: 6px; }
+QToolBox::tab:selected, QToolBox::tab:hover { background: #33FF33; color: #0A0F0A; }
+QToolBox QWidget, QToolBox QTextEdit { background-color: #0A0F0A; color: #33FF33; border: none; }
+
+/* --- 3. Кнопки --- */
+QPushButton { background-color: transparent; color: #33FF33; border: 1px solid #33FF33; padding: 6px 12px; }
+QPushButton:hover { background-color: #1A4A1A; }
+QPushButton:pressed { background-color: #33FF33; color: #0A0F0A; }
+QPushButton:disabled { color: #1A4A1A; border-color: #1A4A1A; }
+
+QToolBar { background-color: #0A0F0A; border-bottom: 1px solid #1A4A1A; }
+QStatusBar { background-color: #1A4A1A; color: #33FF33; }
+QToolBar QToolButton { border: 1px solid #0A0F0A; padding: 5px; }
+QToolBar QToolButton:hover, QToolBar QToolButton:checked { background-color: #1A4A1A; border: 1px solid #33FF33; }
+QToolBar QToolButton:pressed { background-color: #33FF33; border: 1px solid #33FF33; }
+
+/* --- 4. Поля ввода, списки и таблицы --- */
+QLineEdit, QTextEdit, QPlainTextEdit, QTreeView, QListWidget, QComboBox { 
+    background-color: #0A0F0A; border: 1px solid #1A4A1A; padding: 4px; 
+}
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus { border: 1px solid #33FF33; }
+QLineEdit:disabled, QLineEdit:read-only { background-color: #050805; color: #1A4A1A; }
+
+QTreeView, QListWidget { alternate-background-color: #050805; }
+QTreeView::item:hover, QListWidget::item:hover { background-color: #1A4A1A; }
+/* Эффект блочного курсора/выделенной строки */
+QTreeView::item:selected, QListWidget::item:selected { background-color: #33FF33; color: #0A0F0A; }
+
+QHeaderView::section { background-color: #1A4A1A; padding: 5px; border: 1px solid #33FF33; border-top: none; border-left: none; }
+QTableWidget { border: 1px solid #1A4A1A; gridline-color: #1A4A1A; }
+QTableWidget::item:selected { background-color: #33FF33; color: #0A0F0A; }
+
+/* --- 5. Элементы управления --- */
+QComboBox::drop-down { border-left: 1px solid #1A4A1A; }
+QComboBox::down-arrow { image: url(none); /* Можно добавить свою иконку */ }
+QCheckBox::indicator { border: 1px solid #33FF33; background-color: #0A0F0A; }
+QCheckBox::indicator:checked { background-color: #33FF33; }
+QProgressBar { border: 1px solid #33FF33; text-align: center; color: #33FF33; background-color: #0A0F0A; }
+QProgressBar::chunk { background-color: #1A4A1A; }
+
+/* --- 6. Полосы прокрутки --- */
+QScrollBar:vertical, QScrollBar:horizontal { border: 1px solid #1A4A1A; background: #0A0F0A; width: 12px; height: 12px; }
+QScrollBar::handle { background: #33FF33; }
+QScrollBar::add-page, QScrollBar::sub-page { background: none; }
+QScrollBar::add-line, QScrollBar::sub-line { height: 0px; width: 0px; }
+
+/* --- 7. Меню и Подсказки --- */
+QMenu { background-color: #0A0F0A; border: 1px solid #33FF33; }
+QMenu::item:selected { background-color: #33FF33; color: #0A0F0A; }
+QToolTip { background-color: #0A0F0A; color: #33FF33; border: 1px solid #33FF33; padding: 5px; }

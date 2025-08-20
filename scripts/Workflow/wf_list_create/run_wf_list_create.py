@@ -21,16 +21,35 @@ from argparse import Namespace
 from typing import List, Dict, Any, Optional, Tuple
 
 # Опциональные зависимости
-try: from natasha import NamesExtractor
-except ImportError: NamesExtractor = None
-try: from bs4 import BeautifulSoup
-except ImportError: BeautifulSoup = None
-try: import pymorphy3
-except ImportError: pymorphy3 = None
-try: from ipymarkup.palette import Palette, Color, material; from ipymarkup.span import format_span_box_markup
-except ImportError: format_span_box_markup, Palette, Color, material = None, None, None, None
-try: from pysm_lib import pysm_context; from pysm_lib.pysm_context import ConfigResolver; IS_MANAGED_RUN = True
-except ImportError: IS_MANAGED_RUN, pysm_context, ConfigResolver = False, None, None
+try: 
+    from natasha import NamesExtractor
+except ImportError: 
+    NamesExtractor = None
+
+try: 
+    from bs4 import BeautifulSoup
+except ImportError: 
+    BeautifulSoup = None
+
+try: 
+    import pymorphy3
+except ImportError: 
+    pymorphy3 = None
+
+try: 
+    from ipymarkup.palette import Palette, Color, material 
+    from ipymarkup.span import format_span_box_markup
+except ImportError: 
+    format_span_box_markup, Palette, Color, material = None, None, None, None
+
+try: 
+    from pysm_lib import pysm_context 
+    from pysm_lib import theme_api
+    from pysm_lib.pysm_context import ConfigResolver 
+    IS_MANAGED_RUN = True
+except ImportError: 
+    IS_MANAGED_RUN, pysm_context, ConfigResolver = False, None, None
+
 try:
     from PySide6.QtCore import (Qt, QAbstractTableModel, QModelIndex, QEvent, Signal, QUrl, QPoint, QTimer)
     from PySide6.QtGui import (QAction, QKeySequence, QDesktopServices, QBrush, QColor)
@@ -806,6 +825,8 @@ def main() -> None:
     """Инициализирует и запускает Qt приложение."""
     config = get_raw_config()
     app = QApplication(sys.argv)
+    theme_api.apply_theme_to_app(app)
+    
     window = ClassListEditor(config)
     window.show()
     sys.exit(app.exec())

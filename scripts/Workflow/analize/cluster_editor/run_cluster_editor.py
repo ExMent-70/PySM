@@ -9,6 +9,7 @@ run_cluster_editor.py
 
 # 1. БЛОК: Импорты
 import sys
+import re
 import os
 import logging
 import argparse
@@ -36,6 +37,12 @@ try:
     
     from _common.json_data_manager import JsonDataManager
     IS_COMMON_AVAILABLE = True
+
+    from pysm_lib.pysm_context import ConfigResolver
+    from pysm_lib import pysm_context
+    from pysm_lib import theme_api    
+
+    IS_MANAGED_RUN = True
     
     from _lib.editor_viewer import ImageViewer
     from _lib.editor_workers import GalleryLoadWorker, ExportWorker, MoveWorker
@@ -44,10 +51,6 @@ try:
     from _lib.editor_dialogs import EnhanceSettingsDialog    
     from _lib import editor_styles as styles
 
-    from pysm_lib.pysm_context import ConfigResolver
-    from pysm_lib import pysm_context
-
-    IS_MANAGED_RUN = True
 except ImportError as e:
     print(f"Ошибка импорта: {e}", file=sys.stderr)
 
@@ -55,6 +58,25 @@ except ImportError as e:
 # Инициализируем глобальный логгер, но пока не настраиваем его
 logger = logging.getLogger(__name__)
 
+
+def get_color_from_css(css_string: Optional[str], default_color: str) -> QColor:
+    """Извлекает HEX/имя цвета из CSS-строки 'property: value;'."""
+    if not css_string:
+        return QColor(default_color)
+    
+    match = re.search(r":\s*(#[0-9a-fA-F]{3,6}\b|[a-zA-Z]+)", css_string)
+    if match:
+        color_val_str = match.group(1).strip()
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Создаем объект QColor из строки
+        temp_color = QColor(color_val_str)
+        # Проверяем валидность у самого объекта
+        if temp_color.isValid():
+            return temp_color
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+            
+    return QColor(default_color)
 
 # 2. БЛОК: Главное окно
 class MainWindow(QWidget):
@@ -75,16 +97,40 @@ class MainWindow(QWidget):
             self.data_dir / "info_portrait_faces.json",
             self.data_dir / "info_group_faces.json",
         )
-
         self.portrait_model: Dict[str, Any] = {}
         self.group_model: Dict[str, Any] = {}
-        
         self.changed_cluster_ids: set = set()
         self.pending_moves: Dict[str, Dict[str, str]] = {}
-        
         self.active_cluster_id: Optional[str] = None
         self.preview_pixmaps: Dict[str, QPixmap] = {}
         self.image_pixmap_cache: Dict[str, QPixmap] = {}
+
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # 1. Получаем CSS-строки из API тем
+        hover_css = theme_api.get_dynamic_style("delegate_hover_border", "color: #0078d7;")
+        changed_css = theme_api.get_dynamic_style("delegate_changed_indicator", "color: #f0ad4e;")
+        preview_bg_css = theme_api.get_dynamic_style("delegate_preview_background", "color: #e8e8e8;")
+        secondary_text_css = theme_api.get_dynamic_style("delegate_secondary_text", "color: #555555;")
+
+        # 2. Парсим цвета из строк с помощью новой утилиты
+        hover_color = get_color_from_css(hover_css, "#0078d7")
+        changed_color = get_color_from_css(changed_css, "#f0ad4e")
+        preview_bg = get_color_from_css(preview_bg_css, "#e8e8e8")
+        secondary_text = get_color_from_css(secondary_text_css, "#555555")
+
+        # 3. Создаем экземпляры делегатов (эта часть не меняется)
+        self.cluster_delegate = ClusterItemDelegate(
+            hover_border_color=hover_color,
+            changed_indicator_color=changed_color,
+            preview_bg_color=preview_bg,
+            secondary_text_color=secondary_text,
+            parent=self
+        )
+        self.image_delegate = ImageItemDelegate(
+            hover_border_color=hover_color,
+            parent=self
+        )
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         self.init_ui()
         self._load_and_display_data()
@@ -104,7 +150,7 @@ class MainWindow(QWidget):
         """Инициализирует пользовательский интерфейс с кастомными виджетами для Drag & Drop."""
         self.setWindowTitle("Редактор кластеров")
         self.setGeometry(0, 0, 1350, 900)
-        self.setStyleSheet(styles.MAIN_WINDOW_STYLE)
+        #self.setStyleSheet(styles.MAIN_WINDOW_STYLE)
 
         main_layout = QVBoxLayout(self)
         content_layout = QHBoxLayout()
@@ -118,21 +164,20 @@ class MainWindow(QWidget):
         left_layout.setSpacing(10)
         
         left_title = QLabel(f"Фотосессия: {self.photo_session} (cписок кластеров)")
-        left_title.setStyleSheet(styles.TITLE_LABEL_STYLE)
+        #left_title.setStyleSheet(styles.TITLE_LABEL_STYLE)
         
         self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText("Поиск...")
-        self.search_bar.setStyleSheet(styles.SEARCH_BAR_STYLE)
+        #self.search_bar.setStyleSheet(styles.SEARCH_BAR_STYLE)
         self.search_bar.textChanged.connect(self._on_search_text_changed)
         
         self.cluster_list_widget = ClusterDropListWidget(self)
-        self.cluster_list_widget.setItemDelegate(ClusterItemDelegate(self))
+        self.cluster_list_widget.setItemDelegate(self.cluster_delegate)
+        
         self.cluster_list_widget.setViewMode(QListWidget.ViewMode.IconMode)
         self.cluster_list_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
         self.cluster_list_widget.setMovement(QListWidget.Movement.Static)
         self.cluster_list_widget.setSpacing(10)
-        self.cluster_list_widget.setStyleSheet(styles.LIST_WIDGET_STYLE)
-        self.cluster_list_widget.verticalScrollBar().setStyleSheet(styles.SCROLLBAR_STYLE)
         self.cluster_list_widget.itemDoubleClicked.connect(self._rename_cluster_action)
         self.cluster_list_widget.currentItemChanged.connect(self._on_cluster_selected)
         self.cluster_list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -150,24 +195,22 @@ class MainWindow(QWidget):
         right_layout.setSpacing(10)
         
         self.right_panel_label = QLabel("Кластер")
-        self.right_panel_label.setStyleSheet(styles.TITLE_LABEL_STYLE)
+        #self.right_panel_label.setStyleSheet(styles.TITLE_LABEL_STYLE)
         
         self.image_list_widget = ImageDragListWidget(self)
         self.image_list_widget.setViewMode(QListWidget.ViewMode.IconMode)
         self.image_list_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
         self.image_list_widget.setSpacing(10)
-        self.image_list_widget.setItemDelegate(ImageItemDelegate(self))
-        self.image_list_widget.setStyleSheet(styles.LIST_WIDGET_STYLE)
-        self.image_list_widget.verticalScrollBar().setStyleSheet(styles.SCROLLBAR_STYLE)
+        self.image_list_widget.setItemDelegate(self.image_delegate)
         self.image_list_widget.setDragDropMode(QListWidget.DragDropMode.DragOnly)
         self.image_list_widget.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.image_list_widget.itemDoubleClicked.connect(self._open_image_viewer)
         
         # --- Кнопки и прогресс-бар ---
         self.export_button = QPushButton("Экспорт")
-        self.export_button.setStyleSheet(styles.BUTTON_STYLE)
+        #self.export_button.setStyleSheet(styles.BUTTON_STYLE)
         export_menu = QMenu(self)
-        export_menu.setStyleSheet(styles.MENU_STYLE)
+        #export_menu.setStyleSheet(styles.MENU_STYLE)
         export_all = export_menu.addAction("Экспортировать всё")
         export_active = export_menu.addAction("Экспортировать активный кластер")
         self.export_button.setMenu(export_menu)
@@ -175,7 +218,7 @@ class MainWindow(QWidget):
         export_active.triggered.connect(self._on_export_active_triggered)
         
         self.save_button = QPushButton("Сохранить изменения")
-        self.save_button.setStyleSheet(styles.BUTTON_STYLE)
+        #self.save_button.setStyleSheet(styles.BUTTON_STYLE)
         self.save_button.clicked.connect(self._save_changes)
         
         buttons_layout = QHBoxLayout()
@@ -194,7 +237,7 @@ class MainWindow(QWidget):
         content_layout.addWidget(right_panel_widget, 9)
         
         self.status_progress_bar = QProgressBar()
-        self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_INACTIVE)
+        #self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_INACTIVE)
         self.status_progress_bar.setTextVisible(True)
         
         main_layout.addWidget(self.status_progress_bar)
@@ -399,7 +442,7 @@ class MainWindow(QWidget):
 
     def _start_gallery_load(self, tasks: List[Dict]):
         self._stop_gallery_load_if_running()
-        self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_ACTIVE)
+        #self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_ACTIVE)
         self.status_progress_bar.setRange(0, len(tasks))
         self.status_progress_bar.setValue(0)
         self.status_progress_bar.setFormat("Загрузка изображений... %p%")
@@ -426,7 +469,7 @@ class MainWindow(QWidget):
 
     @Slot()
     def _on_gallery_load_finished(self):
-        self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_INACTIVE)
+        #self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_INACTIVE)
         self.status_progress_bar.reset()
         self.status_progress_bar.setFormat("")
         if hasattr(self, 'gallery_load_thread') and self.gallery_load_thread:
@@ -469,7 +512,7 @@ class MainWindow(QWidget):
         item = self.cluster_list_widget.itemAt(pos)
         if not item: return
         menu = QMenu(self)
-        menu.setStyleSheet(styles.MENU_STYLE)
+        #menu.setStyleSheet(styles.MENU_STYLE)
         rename_action = menu.addAction("Переименовать")
         
         action = menu.exec(self.cluster_list_widget.mapToGlobal(pos))
@@ -566,7 +609,7 @@ class MainWindow(QWidget):
         logger.info(f"Параметры обработки фотографий перед экспортом:")
         logger.info(f"<i>{enhancement_factors}<i>")
         
-        self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_ACTIVE)
+        #self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_ACTIVE)
         self.status_progress_bar.setRange(0, len(tasks))
         self.status_progress_bar.setValue(0)
         self.status_progress_bar.setFormat("Экспорт... %p%")
@@ -581,7 +624,7 @@ class MainWindow(QWidget):
       
     @Slot(str)
     def _on_export_finished(self, message: str):
-        self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_INACTIVE)
+        #self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_INACTIVE)
         self.status_progress_bar.reset()
         self.status_progress_bar.setFormat("")
         QMessageBox.information(self, "Экспорт завершен", message)
@@ -650,7 +693,7 @@ class MainWindow(QWidget):
         if not self.pending_moves: return
         tasks = [{"filename": fname, **move_info} for fname, move_info in self.pending_moves.items()]
         
-        self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_ACTIVE)
+        #self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_ACTIVE)
         self.status_progress_bar.setRange(0, len(tasks))
         self.status_progress_bar.setValue(0)
         self.status_progress_bar.setFormat(f"Перемещение {len(tasks)} фото...")
@@ -674,7 +717,7 @@ class MainWindow(QWidget):
 
     @Slot()
     def _on_move_all_finished(self):
-        self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_INACTIVE)
+        #self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_INACTIVE)
         self.status_progress_bar.reset()
         self.status_progress_bar.setFormat("")
         
@@ -722,6 +765,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     app = QApplication.instance() or QApplication(sys.argv)
+    theme_api.apply_theme_to_app(app)
 
     session_path_str = pysm_context.get("wf_session_path")
     session_name = pysm_context.get("wf_session_name")

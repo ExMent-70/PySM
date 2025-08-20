@@ -399,7 +399,7 @@
                   "id": "root_790d968b/Workflow/analize/export_to_jpeg",
                   "instance_id": "instance_701650ad9829",
                   "name": "1. Конвертировать RAW в JPEG",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Первый шаг в конвейере анализа изображений</b> \nСкрипт, конвертирует исходные файлы изображений (RAW или PSD) в формат JPEG для последующего анализа другими скриптами.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}:\n\n<b>base_dir</b> =<i> {wf_session_path} / {wf_session_name}</i>\n<b>input_dir</b> =<i> {base_dir} / Capture / {wf_photo_session}</i>\n<b>output_dir</b> =<i> {base_dir} / Output / Analysis_{wf_photo_session}  / JPG</i>\n\nЕсли ваши изображения уже в формате JPG, то данный скрипт можно не запускать.\n</div>",
+                  "description": "<div style=\"{theme.script_description}\">\n<b>Первый шаг в конвейере анализа изображений</b> \nСкрипт, конвертирует исходные файлы изображений (RAW или PSD) в формат JPEG для последующего анализа другими скриптами.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}:\n\n<b>base_dir</b> =<i> {wf_session_path} / {wf_session_name}</i>\n<b>input_dir</b> =<i> {base_dir} / Capture / {wf_photo_session}</i>\n<b>output_dir</b> =<i> {base_dir} / Output / Analysis_{wf_photo_session}  / JPG</i>\n\nЕсли ваши изображения уже в формате JPG, то данный скрипт можно не запускать.\n</div>",
                   "silent_mode": false,
                   "command_line_args": {
                     "a_r2j_image_type": {

@@ -1,0 +1,219 @@
+/* themes/graphite_fluent/style.qss - V3.2 - Фикс меню и стрелки */
+
+/* --- 1. Общие стили --- */
+QWidget {
+    background-color: #2D2D2D;
+    color: #E0E0E0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 9pt;
+    border: none;
+}
+QToolTip {
+    background-color: #202020; color: #E0E0E0;
+    border: 1px solid #4A4A4A; padding: 5px; border-radius: 3px;
+    opacity: 240;
+}
+QLabel, QCheckBox { background-color: transparent; }
+QStatusBar { background-color: #202020; }
+
+/* --- 2. Контейнеры и вкладки --- */
+QGroupBox {
+    border: 1px solid #4A4A4A;
+    border-radius: 4px; margin-top: 10px;
+}
+
+QGroupBox[isDirty="true"] {
+    border: 2px solid #D32F2F; /* Ярко-красная рамка */
+}
+QGroupBox[isDirty="true"]::title {
+    color: #D32F2F; /* Ярко-красный текст заголовка */
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin; subcontrol-position: top left;
+    padding: 0 5px; left: 10px;
+    background-color: #2D2D2D;
+    font-size: 11pt; font-weight: bold;
+}
+QTabWidget::pane { border-top: 1px solid #4A4A4A; }
+QTabBar::tab {
+    background: transparent; border-bottom: 2px solid transparent;
+    padding: 8px 15px; font-size: 10pt;
+}
+QTabBar::tab:hover { border-bottom: 2px solid #4A4A4A; }
+QTabBar::tab:selected { border-bottom: 2px solid #00A29A; font-weight: bold; }
+
+QToolBox::tab {
+    background: transparent;
+    border-bottom: 2px solid #4A4A4A;
+    color: #E0E0E0;
+    padding: 5px;
+    font-weight: bold;
+}
+QToolBox::tab:selected, QToolBox::tab:hover {
+    background: transparent;
+    color: #00C7BD;
+    border-bottom: 2px solid #00A29A;
+}
+QToolBox QWidget, QToolBox QTextEdit { background-color: #2D2D2D; border: none; }
+
+/* --- 3. Кнопки --- */
+QPushButton {
+    background-color: #383838; border: 1px solid #4A4A4A;
+    padding: 7px 15px; border-radius: 3px;
+}
+QPushButton:hover { background-color: #4A4A4A; }
+QPushButton:pressed { background-color: #00A29A; color: white; border-color: #00A29A; }
+QPushButton:disabled { background-color: #383838; color: #707070; border-color: #4A4A4A; }
+
+QToolBar { background-color: #2D2D2D; border-bottom: 1px solid #202020; padding: 1px; }
+QToolBar QToolButton {
+    background-color: transparent; border: none; padding: 6px; border-radius: 3px;
+}
+QToolBar QToolButton:hover, QToolBar QToolButton:checked { background-color: #383838; }
+QToolBar QToolButton:pressed { background-color: #00A29A; }
+QToolBar QToolButton[popupMode="1"] { padding-right: 18px; }
+QToolBar QToolButton::menu-button { border-left: 1px solid #4A4A4A; width: 15px; }
+QToolBar QToolButton::menu-arrow {
+    width: 0; height: 0;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-top: 2px solid #E0E0E0;
+}
+QToolBar QToolButton::menu-arrow:open { border-top: none; border-bottom: 2px solid #E0E0E0; }
+
+/* --- 4. Поля ввода --- */
+QLineEdit, QPlainTextEdit, QTextEdit, QComboBox {
+    background-color: transparent;
+    color: #E0E0E0;
+    border: none;
+    border-radius: 0px;
+    border-bottom: 2px solid #4A4A4A;
+    padding: 2px 0px;
+}
+QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus {
+    border-bottom: 2px solid #00A29A;
+}
+QLineEdit:disabled, QLineEdit:read-only {
+    border-bottom: 2px dotted #4A4A4A;
+    background-color: transparent;
+    color: #707070;
+}
+
+/* --- 5. Списки и таблицы --- */
+QTreeView, QListWidget, QTableWidget {
+    border: 1px solid #4A4A4A;
+    background-color: #202020;
+    alternate-background-color: #2D2D2D;
+}
+QTreeView::item, QListWidget::item, QTableWidget::item {
+    border: none;
+    padding: 3px;
+}
+QTreeView::item:hover, QListWidget::item:hover { background-color: rgba(0, 162, 154, 0.2); }
+QTreeView::item:selected, QListWidget::item:selected { background-color: #00A29A; color: white; }
+QHeaderView::section {
+    background-color: #2D2D2D; border: none;
+    border-bottom: 2px solid #4A4A4A;
+    padding: 6px; font-weight: bold; font-size: 10pt;
+}
+QTableWidget { gridline-color: #4A4A4A; }
+
+/* --- 6. Элементы управления в таблицах --- */
+QTableWidget QWidget { background-color: transparent; }
+QTableWidget QPushButton { padding: 3px 8px; font-weight: normal; }
+QTableWidget QLineEdit, QTableWidget QComboBox, QTableWidget QDateEdit, QTableWidget QDateTimeEdit {
+    border: none;
+    border-bottom: 1px solid #4A4A4A;
+    background-color: transparent;
+    border-radius: 0px;
+}
+QTableWidget QLineEdit:focus, QTableWidget QComboBox:focus, QTableWidget QDateEdit:focus, QTableWidget QDateTimeEdit:focus {
+    background-color: #383838;
+    border-bottom: 1px solid #00A29A;
+}
+
+/* --- 7. Прочие элементы управления --- */
+QCheckBox::indicator {
+    width: 16px; height: 16px; border: 1px solid #707070; border-radius: 3px;
+}
+QCheckBox::indicator:hover { border-color: #00A29A; }
+QCheckBox::indicator:checked {
+    background-color: #00A29A; border-color: #00A29A;
+    image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="white" d="M4.2,9.6L1.4,6.8L0,8.2l4.2,4.2L12,4.6L10.6,3.2L4.2,9.6z"/></svg>');
+}
+QComboBox::drop-down { border-left: 1px solid #4A4A4A; }
+QComboBox::down-arrow { image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23E0E0E0" d="M6,9L0,3h12L6,9z"/></svg>'); }
+QComboBox QAbstractItemView { background-color: #202020; border: 1px solid #4A4A4A; outline: none; }
+QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover { background-color: #00A29A; color: white; }
+QProgressBar { border: 1px solid #4A4A4A; border-radius: 3px; text-align: center; color: #E0E0E0; background-color: #383838; }
+QProgressBar::chunk { background-color: #00A29A; border-radius: 2px; }
+
+/* --- 8. Полосы прокрутки --- */
+QScrollBar:vertical, QScrollBar:horizontal {
+    border: none; background: #2D2D2D;
+    width: 10px; height: 10px;
+}
+QScrollBar::handle { background: #4A4A4A; border-radius: 5px; }
+QScrollBar::handle:hover { background: #707070; }
+QScrollBar::add-page, QScrollBar::sub-page { background: none; }
+QScrollBar::add-line, QScrollBar::sub-line { height: 0px; width: 0px; }
+
+/* --- 9. Диалоговые окна --- */
+QDialog { background-color: #2D2D2D; }
+
+/* --- НАЧАЛО ИЗМЕНЕНИЙ --- */
+QMessageBox, QFileDialog {
+    background-color: #2D2D2D;
+}
+QMessageBox QLabel {
+    background-color: transparent;
+    color: #E0E0E0; /* Основной цвет текста темы */
+}
+/* --- КОНЕЦ ИЗМЕНЕНИЙ --- */
+
+QDialogButtonBox QPushButton { padding: 7px 20px; }
+
+/* --- НАЧАЛО ИЗМЕНЕНИЙ --- */
+/* Стили для кастомных и стандартных диалогов-редакторов */
+QDialog#JsonEditorDialog, QDialog#MultilineTextDialog,
+QInputDialog {
+    background-color: #2D2D2D;
+    color: #E0E0E0;
+}
+
+QDialog#JsonEditorDialog QPlainTextEdit,
+QDialog#MultilineTextDialog QPlainTextEdit,
+QInputDialog QPlainTextEdit, QInputDialog QLineEdit {
+    /* Используем стиль для полей ввода из секции 4, но с моноширинным шрифтом */
+    background-color: transparent;
+    color: #E0E0E0;
+    border: none;
+    border-radius: 0px;
+    border-bottom: 2px solid #4A4A4A;
+    padding: 4px 2px;
+    font-family: "Consolas", "Courier New", monospace;
+}
+QDialog#JsonEditorDialog QPlainTextEdit:focus,
+QDialog#MultilineTextDialog QPlainTextEdit:focus,
+QInputDialog QPlainTextEdit:focus, QInputDialog QLineEdit:focus {
+    border-bottom: 2px solid #00A29A;
+}
+
+/* Кнопки в этих диалогах будут использовать стандартный стиль QPushButton */
+/* Если нужны особые стили, их можно добавить сюда. Пока оставляем общие. */
+
+/* --- 10. Меню --- */
+QMenu {
+    background-color: #2D2D2D;
+    border: 1px solid #4A4A4A;
+    padding: 4px;
+}
+QMenu::item {
+    padding: 6px 20px;
+    border-radius: 3px;
+}
+QMenu::item:selected {
+    background-color: #00A29A;
+    color: white;
+}

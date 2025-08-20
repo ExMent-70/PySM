@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QTextBrowser,
     QProgressBar,
 )
-from ..config_manager import ConfigManager
+from ..theme_manager import ThemeManager
 from ..locale_manager import LocaleManager
 from .gui_utils import resolve_themed_text
 
@@ -32,10 +32,10 @@ class ClickableConsoleBrowser(QTextBrowser):
 
 
 class ConsoleWidget(QWidget):
-    def __init__(self, config_manager: ConfigManager, locale_manager: LocaleManager, parent: Optional[QWidget] = None):
+    def __init__(self, theme_manager: ThemeManager, locale_manager: LocaleManager, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.logger = logging.getLogger(f"PyScriptManager.{self.__class__.__name__}")
-        self.config_manager = config_manager
+        self.theme_manager = theme_manager
         self.locale_manager = locale_manager
         self._init_ui()
         self.apply_theme()
@@ -71,15 +71,17 @@ class ConsoleWidget(QWidget):
 
     def apply_theme(self):
         """Применяет стили из активной темы к виджету."""
-        active_theme = self.config_manager.get_active_theme()
-        styles = active_theme.get_styles_as_dict()
+        styles = self.theme_manager.get_active_theme_dynamic_styles()
         
+        # Получаем стиль фона из темы
         bg_style_str = styles.get("console_background", "background-color: #ffffff;")
+        # Извлекаем HEX-код цвета с помощью регулярного выражения
         match = re.search(r"background-color:\s*(#[0-9a-fA-F]{3,6}\b|[a-zA-Z]+)", bg_style_str)
-        bg_color_hex = "#FFFFFF"
+        bg_color_hex = "#FFFFFF" # Цвет по умолчанию
         if match:
             bg_color_hex = match.group(1).strip()
             
+        # Применяем цвет фона к палитре виджета
         palette = self.text_console_output.palette()
         palette.setColor(QPalette.ColorRole.Base, QColor(bg_color_hex))
         self.text_console_output.setPalette(palette)
@@ -87,7 +89,7 @@ class ConsoleWidget(QWidget):
     def _wrap_padded_html_in_table(self, html: str) -> str:
         """
         Находит теги <div> с padding/margin, заменяет их на <td>
-        и оборачивает в табличную структуру.
+        и оборачивает в табличную структуру для корректного рендеринга отступов.
         """
         pattern = re.compile(
             r"<div([^>]*?style\s*=\s*['\"].*?(padding|margin):.*?)>(.*?)</div>",
@@ -105,25 +107,32 @@ class ConsoleWidget(QWidget):
     def clear_console(self):
         self.text_console_output.clear()
 
+
     @Slot(str, str)
     def append_to_console(self, msg_type: str, text: str):
-        processed_text = resolve_themed_text(text, self.config_manager)
+        #print("\nТекст до обработки в resolve_themed_text")
+        #print(text)
+        
+        processed_text = resolve_themed_text(text, self.theme_manager)
+        #print("\nТекст после resolve_themed_text")
+        #print(processed_text)
 
         if msg_type.lower() == "html_block":
             cursor = self.text_console_output.textCursor()
             cursor.movePosition(cursor.MoveOperation.End)
-
             final_html = self._wrap_padded_html_in_table(processed_text)
-            
+            #print("\nТекст после _wrap_padded_html_in_table")
+            #print(final_html)
             cursor.insertHtml(final_html)
+            self.text_console_output.ensureCursorVisible()
             return
 
         if msg_type.upper() == "EMPTY_LINE":
             self.text_console_output.append("")
+            self.text_console_output.ensureCursorVisible()
             return
         
-        active_theme = self.config_manager.get_active_theme()
-        styles = active_theme.get_styles_as_dict()
+        styles = self.theme_manager.get_active_theme_dynamic_styles()
         style = styles.get(msg_type.lower(), "color: black;")
         escaped_text = processed_text.replace("&", "&").replace("<", "<").replace(">", ">")
         html_content = escaped_text.replace("\n", "<br>")
@@ -144,6 +153,7 @@ class ConsoleWidget(QWidget):
 
         self.text_console_output.ensureCursorVisible()
 
+    # --- 6. БЛОК: Метод update_progress_bar (ЛОГИКА НЕ ИЗМЕНЕНА) ---
     @Slot(str, int, int, object)
     def update_progress_bar(
         self, instance_id: str, current: int, total: int, text_obj: Optional[Any]

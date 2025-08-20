@@ -4,11 +4,10 @@ import re # <--- НОВЫЙ ИМПОРТ
 from typing import Dict # <--- НОВЫЙ ИМПОРТ
 from ..models import ScriptInfoModel, ScriptSetEntryModel
 from ..locale_manager import LocaleManager
-from ..config_manager import ConfigManager # <--- ДОБАВЛЕН ЭТОТ ИМПОРТ
+from ..theme_manager import ThemeManager
 from .gui_utils import resolve_themed_text
 
-# pysm_lib/gui/tooltip_generator.py
-
+# --- 1. БЛОК: Функция _generate_header_script_html (ЛОГИКА НЕ ИЗМЕНЕНА) ---
 def _generate_header_script_html(
     script_info: ScriptInfoModel, locale_manager: LocaleManager
 ) -> str:
@@ -23,6 +22,7 @@ def _generate_header_script_html(
     return "".join(parts)
 
 
+# --- 2. БЛОК: Функция _generate_base_script_html (ИЗМЕНЕНА) ---
 def _generate_base_script_html(
     script_info: ScriptInfoModel, locale_manager: LocaleManager
 ) -> str:
@@ -48,7 +48,8 @@ def _generate_base_script_html(
             )
 
     if script_info.command_line_args_meta:
-        # Плейсхолдер для стиля блока будет обработан в вызывающей функции
+        # КОММЕНТАРИЙ: Здесь мы вставляем плейсхолдер.
+        # Он будет заменен на реальный CSS-стиль позже.
         arg_parts = [
             f"<div style='margin-top:10px; {{theme.tooltip_script_args_block}}'><b>{locale_manager.get('tooltips.instance.params_header')}</b>"
         ]
@@ -63,6 +64,7 @@ def _generate_base_script_html(
     return "".join(parts)
 
 
+# --- 3. БЛОК: Функция _generate_end_script_html (ЛОГИКА НЕ ИЗМЕНЕНА) ---
 def _generate_end_script_html(
     script_info: ScriptInfoModel, locale_manager: LocaleManager
 ) -> str:
@@ -84,7 +86,7 @@ def _generate_end_script_html(
 def generate_script_tooltip_html(
     script_info: ScriptInfoModel, 
     locale_manager: LocaleManager,
-    config_manager: ConfigManager # <--- НОВЫЙ АРГУМЕНТ
+    theme_manager: ThemeManager # <--- ИЗМЕНЕННЫЙ АРГУМЕНТ
 ) -> str:
     """Генерирует HTML-разметку для всплывающей подсказки скрипта."""
     if not script_info:
@@ -101,15 +103,15 @@ def generate_script_tooltip_html(
         <hr>
         <b>{locale_manager.get("tooltips.script.double_click_hint")}</b>
     """
-    # Вызываем новую утилиту, передавая ей config_manager
-    return resolve_themed_text(final_html, config_manager)
+    # КОММЕНТАРИЙ: Вызываем новую утилиту, передавая ей config_manager
+    return resolve_themed_text(final_html, theme_manager)
 
 
 def generate_instance_tooltip_html(
     script_info: ScriptInfoModel,
     instance_entry: ScriptSetEntryModel,
     locale_manager: LocaleManager,
-    config_manager: ConfigManager # <--- НОВЫЙ АРГУМЕНТ
+    theme_manager: ThemeManager # <--- ИЗМЕНЕННЫЙ АРГУМЕНТ
 ) -> str:
     """Генерирует HTML-разметку для всплывающей подсказки экземпляра скрипта."""
     if not script_info:
@@ -132,8 +134,9 @@ def generate_instance_tooltip_html(
         param_lines = []
         for name, entry_value in active_args.items():
             value_str = str(entry_value.value) if entry_value.value is not None else ""
-            escaped_value = value_str.replace("&", "&").replace("<", "<").replace(">", ">")
+            escaped_value = value_str.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             
+            # КОММЕНТАРИЙ: Вставляем плейсхолдер для цвета значения аргумента
             display_value = (
                 f"<span style=\"{{theme.tooltip_arg_value}}\">'{escaped_value}'</span>"
                 if entry_value.value is not None
@@ -145,6 +148,7 @@ def generate_instance_tooltip_html(
                 )
             )
 
+        # КОММЕНТАРИЙ: Вставляем плейсхолдер для фона всего блока
         overridden_params_html = f"""
         <div style='margin-top:10px; {{theme.tooltip_instance_args_block}}'>
             <b>{locale_manager.get("tooltips.instance.label_overridden_params")}</b>
@@ -163,6 +167,5 @@ def generate_instance_tooltip_html(
     <hr>
     <b>{locale_manager.get("tooltips.instance.double_click_hint")}</b>
     """
-
-    # Вызываем новую утилиту, передавая ей config_manager
-    return resolve_themed_text(final_html, config_manager)
+    
+    return resolve_themed_text(final_html, theme_manager)

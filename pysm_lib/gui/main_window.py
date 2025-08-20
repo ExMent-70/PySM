@@ -168,23 +168,37 @@ class MainWindow(QMainWindow):
 
     def _create_left_panel(self):
         self.left_panel_splitter = QSplitter(Qt.Orientation.Vertical)
+        
+        # --- ИЗМЕНЕНИЕ: Передаем theme_manager в AvailableScriptsWidget ---
         self.scripts_widget = AvailableScriptsWidget(
-            controller=self.controller, locale_manager=self.locale_manager, parent=self
+            controller=self.controller, 
+            theme_manager=self.controller.theme_manager,
+            locale_manager=self.locale_manager, 
+            parent=self
         )
         self.left_panel_splitter.addWidget(self.scripts_widget)
+        
+        # --- ИЗМЕНЕНИЕ: Передаем theme_manager в ScriptCollectionWidget ---
         self.collection_widget = ScriptCollectionWidget(
-            controller=self.controller, locale_manager=self.locale_manager, parent=self
+            controller=self.controller,
+            theme_manager=self.controller.theme_manager,
+            locale_manager=self.locale_manager, 
+            parent=self
         )
         self.left_panel_splitter.addWidget(self.collection_widget)
         self.main_splitter.addWidget(self.left_panel_splitter)
 
+
     def _create_right_panel(self):
+        # --- ИЗМЕНЕНИЕ: Передаем theme_manager в ConsoleWidget ---
         self.console_widget = ConsoleWidget(
-            config_manager=self.controller.config_manager,
+            theme_manager=self.controller.theme_manager,
             locale_manager=self.locale_manager,
             parent=self
         )
         self.main_splitter.addWidget(self.console_widget)
+
+
 
     def _setup_splitter_and_statusbar(self):
         self.main_splitter.setSizes([450, 500])
@@ -195,7 +209,9 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.statusBar)
         self.statusBar.showMessage(self.locale_manager.get("main_window.status.ready"))
 
+
     def _connect_signals(self):
+        # --- Сигналы от контроллера к виджетам главного окна ---
         self.controller.log_message_to_console.connect(
             self.console_widget.append_to_console
         )
@@ -208,8 +224,11 @@ class MainWindow(QMainWindow):
             self._update_window_title
         )
         self.controller.app_busy_state_changed.connect(self._on_app_busy_state_changed)
+        
+        # --- ИЗМЕНЕНИЕ: Этот сигнал теперь обновляет все виджеты, зависящие от темы ---
         self.controller.config_updated.connect(self._on_config_updated)
 
+        # --- Сигналы от тулбара к контроллеру ---
         self.action_refresh_scripts_toolbar.triggered.connect(
             self.controller.refresh_available_scripts_list
         )
@@ -218,15 +237,14 @@ class MainWindow(QMainWindow):
         )
         self.action_new_collection.triggered.connect(self._on_new_collection)
         self.action_open_collection.triggered.connect(self._on_open_collection)
-
         self.action_save_collection.triggered.connect(self._on_save_collection)
         self.action_save_collection_as.triggered.connect(self._on_save_collection_as)
-
         self.action_collection_passport.triggered.connect(
             self._on_collection_passport_clicked
         )
         self.action_settings_toolbar.triggered.connect(self._on_settings_clicked)
 
+        # --- Связи между контроллером и AvailableScriptsWidget ---
         self.controller.available_scripts_updated.connect(
             self.scripts_widget.update_scripts_tree
         )
@@ -243,6 +261,7 @@ class MainWindow(QMainWindow):
             self.controller.save_script_passport
         )
 
+        # --- Связи между контроллером и ScriptCollectionWidget ---
         self.controller.current_collection_updated.connect(
             self.collection_widget.on_collection_updated
         )
@@ -258,12 +277,12 @@ class MainWindow(QMainWindow):
         self.controller.active_set_node_changed.connect(
             self.collection_widget.on_active_set_node_changed
         )
-
         self.controller.active_set_node_changed.connect(
             lambda model: self.scripts_widget.on_collection_target_selection_changed(
                 model is not None
             )
         )
+
 
     @Slot()
     def _on_focus_requested_on_collection_widget(self):
@@ -281,14 +300,11 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _on_settings_clicked(self):
-        cfg = self.controller.config_manager.config
-        dialog = SettingsDialog(
-            config_model=cfg, locale_manager=self.locale_manager, parent=self
-        )
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            settings_data = dialog.get_settings_data()
-            if settings_data:
-                self.controller.apply_new_config(settings_data)
+        """
+        Обрабатывает нажатие на кнопку настроек и делегирует
+        задачу по отображению диалога AppController'у.
+        """
+        self.controller.show_settings_dialog()
 
     @Slot()
     def _on_collection_passport_clicked(self):

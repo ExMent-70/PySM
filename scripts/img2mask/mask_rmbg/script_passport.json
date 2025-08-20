@@ -1,0 +1,111 @@
+{
+  "description": "Удаляет фон с изображений, используя модели RMBG-2.0 или BiRefNet. Предоставляет широкие возможности по тонкой настройке маски.",
+  "category": "Маски и Фон",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.0.0",
+  "command_line_args_meta": {
+    "rmbg_inputs": {
+      "type": "dir_path",
+      "description": "Путь к исходным изображениям или папкам.",
+      "required": true,
+      "default": "D:/WORK_PYTHON2025/_INPUT"
+    },
+    "rmbg_output": {
+      "type": "dir_path",
+      "description": "Путь к папке для сохранения результатов.",
+      "required": true,
+      "default": "D:/WORK_PYTHON2025/_OUTPUT"
+    },
+    "rmbg_config": {
+      "type": "file_path",
+      "description": "Путь к файлу config.toml.",
+      "required": false,
+      "default": "config.toml"
+    },
+    "rmbg_model": {
+      "type": "choice",
+      "description": "Модель для удаления фона.",
+      "required": false,
+      "choices": [
+        "RMBG-2.0",
+        "BiRefNet-general",
+        "BiRefNet-portrait",
+        "BiRefNet_lite"
+      ]
+    },
+    "rmbg_threads": {
+      "type": "int",
+      "description": "Количество потоков.",
+      "required": false
+    },
+    "rmbg_device": {
+      "type": "choice",
+      "description": "Устройство для обработки.",
+      "required": false,
+      "choices": [
+        "auto",
+        "cpu",
+        "cuda"
+      ]
+    },
+    "rmbg_sensitivity": {
+      "type": "float",
+      "description": "Чувствительность детекции (для RMBG-2.0).",
+      "required": false
+    },
+    "rmbg_process_res": {
+      "type": "int",
+      "description": "Разрешение для обработки (для RMBG-2.0).",
+      "required": false
+    },
+    "rmbg_no_refine": {
+      "type": "bool",
+      "description": "Отключить уточнение переднего плана.",
+      "required": false
+    },
+    "rmbg_background": {
+      "type": "choice",
+      "description": "Тип фона.",
+      "required": false,
+      "choices": [
+        "Alpha",
+        "Color"
+      ]
+    },
+    "rmbg_bg_color": {
+      "type": "string",
+      "description": "Цвет фона в HEX.",
+      "required": false
+    },
+    "rmbg_blur": {
+      "type": "int",
+      "description": "Радиус размытия маски.",
+      "required": false
+    },
+    "rmbg_offset": {
+      "type": "int",
+      "description": "Смещение краев маски.",
+      "required": false
+    },
+    "rmbg_smooth": {
+      "type": "float",
+      "description": "Сила сглаживания краев.",
+      "required": false
+    },
+    "rmbg_fill_holes": {
+      "type": "bool",
+      "description": "Включить заполнение 'дыр' в маске.",
+      "required": false
+    },
+    "rmbg_invert": {
+      "type": "bool",
+      "description": "Инвертировать финальную маску.",
+      "required": false
+    },
+    "rmbg_verbose": {
+      "type": "bool",
+      "description": "Включить детальное логирование.",
+      "required": false
+    }
+  }
+}

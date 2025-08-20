@@ -33,7 +33,7 @@ class ImageViewer(QDialog):
 
         self.setWindowTitle("Просмотр изображений")
         self.setMinimumSize(800, 600)
-        self.setStyleSheet("QDialog { background-color: #252525; color: #eee; }")
+        #self.setStyleSheet("QDialog { background-color: #252525; color: #eee; }")
 
         # --- UI ---
         main_layout = QVBoxLayout(self)
@@ -43,9 +43,9 @@ class ImageViewer(QDialog):
         self.view.setDragMode(QGraphicsView.ScrollHandDrag)
         self.view.setRenderHint(QPainter.Antialiasing)
         self.view.setRenderHint(QPainter.SmoothPixmapTransform)
-        self.view.setStyleSheet("QGraphicsView { border: none; }")
-        self.view.verticalScrollBar().setStyleSheet(scrollbar_style)
-        self.view.horizontalScrollBar().setStyleSheet(scrollbar_style)
+        #self.view.setStyleSheet("QGraphicsView { border: none; }")
+        #self.view.verticalScrollBar().setStyleSheet(scrollbar_style)
+        #self.view.horizontalScrollBar().setStyleSheet(scrollbar_style)
         self.pixmap_item = QGraphicsPixmapItem()
         self.scene.addItem(self.pixmap_item)
         self.view.installEventFilter(self)
@@ -68,8 +68,8 @@ class ImageViewer(QDialog):
             QPushButton:hover { background-color: #0056b3; }
             QPushButton:disabled { background-color: #555; color: #999; }
         """
-        self.prev_button.setStyleSheet(button_style)
-        self.next_button.setStyleSheet(button_style)
+        #self.prev_button.setStyleSheet(button_style)
+        #self.next_button.setStyleSheet(button_style)
 
         self.prev_button.clicked.connect(self.show_previous_image)
         self.next_button.clicked.connect(self.show_next_image)

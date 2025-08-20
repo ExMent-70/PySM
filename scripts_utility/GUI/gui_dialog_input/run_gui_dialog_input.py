@@ -22,6 +22,7 @@ import sys
 IS_MANAGED_RUN = False
 try:
     from pysm_lib import pysm_context
+    from pysm_lib import theme_api    
     from pysm_lib.pysm_context import ConfigResolver
 
     IS_MANAGED_RUN = True
@@ -186,6 +187,8 @@ def main():
 
     # 3.4. Инициализация GUI и цикл ввода/валидации
     q_app = QApplication.instance() or QApplication(sys.argv)
+    theme_api.apply_theme_to_app(q_app)
+
     user_input = initial_value
     ok_pressed = False
 
