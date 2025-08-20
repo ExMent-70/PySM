@@ -3,7 +3,7 @@ comtypes
 cssutils
 einops
 hdbscan
-huggingface_hub
+huggingface_hub[hf_xet]
 insightface
 ipymarkup
 Jinja2
@@ -12,9 +12,7 @@ numpy==1.26.4
 onnxruntime-gpu
 opencv-python
 packaging
-pandas
 Pillow
-plotly
 photoshop-python-api
 psd-tools
 psutil
