@@ -1,7 +1,7 @@
 {
   "description": "Удаляет фон с изображений, используя модели RMBG и BiRefNet. Полностью настраивается через интерфейс.",
   "category": "Обработка изображений",
-  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03 | Адаптация: AI-Ассистент",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03 | Адаптация 1038lab",
   "version": "1.2.0",
   "command_line_args_meta": {
     "img_rmbg_input_dir": {
@@ -44,16 +44,16 @@
       "required": true,
       "default": "BiRefNet-general",
       "choices": [
-		"BiRefNet-portrait",
-		"BiRefNet_dynamic",
-		"BiRefNet-general",
-		"BiRefNet-matting",
-		"BiRefNet-HR",
-		"BiRefNet-HR-matting",
-		"BiRefNet_512x512",
-		"BiRefNet_lite",
-		"BiRefNet_lite-2K",
-		"BiRefNet_lite-matting"
+        "BiRefNet-portrait",
+        "BiRefNet_dynamic",
+        "BiRefNet-general",
+        "BiRefNet-matting",
+        "BiRefNet-HR",
+        "BiRefNet-HR-matting",
+        "BiRefNet_512x512",
+        "BiRefNet_lite",
+        "BiRefNet_lite-2K",
+        "BiRefNet_lite-matting"
       ]
     },
     "img_rmbg_background": {

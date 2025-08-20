@@ -109,7 +109,7 @@ def setup_logging(config: "LoggingConfig", log_dir: Path = Path(".")):
         )
 
     formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "%(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
@@ -136,7 +136,7 @@ def setup_logging(config: "LoggingConfig", log_dir: Path = Path(".")):
     logger.addHandler(stream_handler)
 
     # Логгируем сообщение о настройке после добавления обработчиков
-    logger.info(
+    logger.debug(
         f"Логирование настроено. Уровень: {log_level_str}. Файл: {log_file_path if file_handler else 'НЕ СОЗДАН'}"
     )
 

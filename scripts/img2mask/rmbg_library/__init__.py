@@ -32,7 +32,7 @@ from . import rmbg_mask_ops as mask_ops
 from . import rmbg_utils as rmbg_utils
 
 if not logging.getLogger().hasHandlers():
-    logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.basicConfig(level=logging.WARNING, format="%(name)s - %(levelname)s - %(message)s")
 
 # 6. БЛОК: Экспорты `__all__`
 # ==============================================================================

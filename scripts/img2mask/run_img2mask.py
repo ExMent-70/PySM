@@ -85,7 +85,7 @@ def get_config() -> Namespace:
 # ==============================================================================
 def get_processor(processor_name: str, config: Config, device: torch.device) -> Any:
     logger = logging.getLogger(__name__)
-    logger.info(f"Attempting to initialize processor: {processor_name}")
+    print(f"\nИнициализация процессора: <b>{processor_name}</b>")
     
     processor_class_map = {
         "rmbg": RmbgModuleProcessor,
@@ -99,7 +99,7 @@ def get_processor(processor_name: str, config: Config, device: torch.device) -> 
 
     try:
         processor_instance = ProcessorClass(config=config, device=device)
-        logger.info(f"Processor '{processor_name}' initialized successfully.")
+        print(f"Процессор <b>{processor_name}</b> успешно инициализирован.\n")
         return processor_instance
     except Exception as e:
         logger.critical(get_message("ERROR_PROCESSOR_INIT", processor_name=processor_name, exc=e), exc_info=True)
@@ -222,7 +222,7 @@ def main():
         tqdm.write(get_message("INFO_NO_IMAGES_FOUND", input_dir=str(config.paths.input_dir)))
         sys.exit(0)
 
-    logger.info(f"Found {len(image_files)} image(s) to process.")
+    logger.info(f"Найдено <b>{len(image_files)}</b> изображений для обработки")
     
     # 3. Определяем количество потоков
     num_threads = args.img_rmbg_threads
@@ -269,7 +269,7 @@ def main():
         f"Errors: {stats['error']} files."
     )
     tqdm.write(summary_message)
-    logger.info(summary_message.replace('\n', ' '))
+    #logger.info(summary_message.replace('\n', ' '))
 
     if IS_MANAGED_RUN:
         pysm_context.log_link(url_or_path=str(config.paths.output_dir), text="<br>Открыть папку с результатами")

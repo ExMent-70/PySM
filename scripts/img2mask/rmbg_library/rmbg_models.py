@@ -170,6 +170,7 @@ def download_model_files(model_name: str, config: "Config") -> Optional[Dict[str
         logger.info(f"No repo_id or files for '{model_name}'. Skipping HF download.")
         return {"model_dir": model_cache_path, "no_hf_download": True}
 
+
     logger.info(get_message("INFO_DOWNLOADING_MODEL", model_name=model_name, cache_dir=str(model_cache_path)))
     downloaded_files: Dict[str, Path] = {"model_dir": model_cache_path}
     try:

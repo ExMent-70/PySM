@@ -171,7 +171,7 @@ class BiRefNetModelProcessor(BaseModelProcessor):
                     model_content = model_content.replace(
                         relative_import_original, corrected_import
                     )
-                    logger.info(f"Patched relative import in {model_script_path}")
+                    logger.debug(f"Patched relative import in {model_script_path}")
                 timm_replacements = {
                     "from timm.models.layers": "from timm.layers",
                     "from timm.models.registry": "from timm.models",
@@ -179,7 +179,7 @@ class BiRefNetModelProcessor(BaseModelProcessor):
                 for old, new in timm_replacements.items():
                     if old in model_content:
                         model_content = model_content.replace(old, new)
-                        logger.info(f"Patched timm import in {model_script_path}")
+                        logger.debug(f"Patched timm import in {model_script_path}")
 
                 # --- ИСПРАВЛЕНИЕ ЗДЕСЬ (СНОВА) ---
                 if model_content != original_content:
