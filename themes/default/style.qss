@@ -54,7 +54,7 @@ QGroupBox {
 }
 QGroupBox[isDirty="true"] {
     /* Особый стиль для QGroupBox с динамическим свойством isDirty="true" */
-    border: 1px solid #d9534f; /* Красная рамка для индикации несохраненных изменений */
+    border: 3px solid #d9534f; /* Красная рамка для индикации несохраненных изменений */
 }
 QGroupBox[isDirty="true"]::title {
     color: #d9534f; /* Красный цвет для заголовка */
