@@ -44,14 +44,16 @@
       "required": true,
       "default": "BiRefNet-general",
       "choices": [
-        "BiRefNet-general",
-        "BiRefNet_512x512",
-        "BiRefNet-HR",
-        "BiRefNet-portrait",
-        "BiRefNet-matting",
-        "BiRefNet-HR-matting",
-        "BiRefNet_lite",
-        "BiRefNet_lite-2K"
+		"BiRefNet-portrait",
+		"BiRefNet_dynamic",
+		"BiRefNet-general",
+		"BiRefNet-matting",
+		"BiRefNet-HR",
+		"BiRefNet-HR-matting",
+		"BiRefNet_512x512",
+		"BiRefNet_lite",
+		"BiRefNet_lite-2K",
+		"BiRefNet_lite-matting"
       ]
     },
     "img_rmbg_background": {

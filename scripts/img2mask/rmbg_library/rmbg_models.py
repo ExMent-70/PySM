@@ -16,99 +16,135 @@ logger = logging.getLogger(__name__)
 # 1. БЛОК: Словарь AVAILABLE_MODELS (УПРОЩЕНО)
 # ==============================================================================
 AVAILABLE_MODELS: Dict[str, Dict[str, Any]] = {
-    # === Модели для процессора 'rmbg' (обрабатываются rmbg_rmbg.py) ===
+    # === Модели для процессора 'rmbg' (без изменений) ===
     "RMBG-2.0": {
-        "type": "birefnet",
-        "processor_module": "rmbg_rmbg",
-        "repo_id": "1038lab/RMBG-2.0",
+        "type": "birefnet", "processor_module": "rmbg_rmbg", "repo_id": "1038lab/RMBG-2.0",
         "files": {
-            "config_json": "config.json",
-            "model_weights": "model.safetensors",
-            "model_script": "birefnet.py",
-            "config_script": "BiRefNet_config.py",
+            "config_json": "config.json", "model_weights": "model.safetensors",
+            "model_script": "birefnet.py", "config_script": "BiRefNet_config.py",
         },
         "cache_dir": "RMBG/RMBG-2.0",
     },
     "INSPYRENET": {
-        "type": "inspyrenet_tb",
-        "processor_module": "rmbg_rmbg",
-        "repo_id": None,
-        "files": {},
-        "cache_dir": "RMBG/INSPYRENET",
+        "type": "inspyrenet_tb", "processor_module": "rmbg_rmbg",
+        "repo_id": None, "files": {}, "cache_dir": "RMBG/INSPYRENET",
     },
     "BEN": {
-        "type": "ben",
-        "processor_module": "rmbg_rmbg",
-        "repo_id": "1038lab/BEN",
+        "type": "ben", "processor_module": "rmbg_rmbg", "repo_id": "1038lab/BEN",
         "files": {"model_script": "model.py", "model_weights": "BEN_Base.pth"},
         "cache_dir": "RMBG/BEN",
     },
     "BEN2": {
-        "type": "ben2",
-        "processor_module": "rmbg_rmbg",
-        "repo_id": "1038lab/BEN2",
+        "type": "ben2", "processor_module": "rmbg_rmbg", "repo_id": "1038lab/BEN2",
         "files": {"model_weights": "BEN2_Base.pth", "model_script": "BEN2.py"},
         "cache_dir": "RMBG/BEN2",
     },
 
+    # --- НАЧАЛО ИСПРАВЛЕНИЙ: Сохраняем все ваши модели, но исправляем ключи `files` ---
     # === Модели для процессора 'birefnet' (обрабатываются rmbg_birefnet.py) ===
     "BiRefNet-general": {
-        "type": "birefnet",
-        "processor_module": "rmbg_birefnet",
-        "repo_id": "1038lab/BiRefNet",
-        "files": { "model_script": "birefnet.py", "config_script": "BiRefNet_config.py", "model_weights": "BiRefNet-general.safetensors", "config_json": "config.json" },
-        "cache_dir": "RMBG/BiRefNet", "default_res": 1024,
+        "type": "birefnet", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet-general.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "General purpose model", "default_res": 1024, "max_res": 2048, "min_res": 512
     },
     "BiRefNet_512x512": {
-        "type": "birefnet",
-        "processor_module": "rmbg_birefnet",
-        "repo_id": "1038lab/BiRefNet",
-        "files": { "model_script": "birefnet.py", "config_script": "BiRefNet_config.py", "model_weights": "BiRefNet_512x512.safetensors", "config_json": "config.json" },
-        "cache_dir": "RMBG/BiRefNet", "default_res": 512, "force_res": True,
+        "type": "birefnet", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet_512x512.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "Optimized for 512x512", "default_res": 512, "max_res": 1024, "min_res": 256, "force_res": True
     },
     "BiRefNet-HR": {
-        "type": "birefnet",
-        "processor_module": "rmbg_birefnet",
-        "repo_id": "1038lab/BiRefNet",
-        "files": { "model_script": "birefnet.py", "config_script": "BiRefNet_config.py", "model_weights": "BiRefNet-HR.safetensors", "config_json": "config.json" },
-        "cache_dir": "RMBG/BiRefNet", "default_res": 2048,
+        "type": "birefnet", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet-HR.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "High resolution model", "default_res": 2048, "max_res": 2560, "min_res": 1024
     },
     "BiRefNet-portrait": {
-        "type": "birefnet",
-        "processor_module": "rmbg_birefnet",
-        "repo_id": "1038lab/BiRefNet",
-        "files": { "model_script": "birefnet.py", "config_script": "BiRefNet_config.py", "model_weights": "BiRefNet-portrait.safetensors", "config_json": "config.json" },
-        "cache_dir": "RMBG/BiRefNet", "default_res": 1024,
+        "type": "birefnet", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet-portrait.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "Optimized for portraits", "default_res": 1024, "max_res": 2048, "min_res": 512
     },
     "BiRefNet-matting": {
-        "type": "birefnet",
-        "processor_module": "rmbg_birefnet",
-        "repo_id": "1038lab/BiRefNet",
-        "files": { "model_script": "birefnet.py", "config_script": "BiRefNet_config.py", "model_weights": "BiRefNet-matting.safetensors", "config_json": "config.json" },
-        "cache_dir": "RMBG/BiRefNet", "default_res": 1024,
+        "type": "birefnet", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet-matting.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "General purpose matting", "default_res": 1024, "max_res": 2048, "min_res": 512
     },
     "BiRefNet-HR-matting": {
-        "type": "birefnet",
-        "processor_module": "rmbg_birefnet",
-        "repo_id": "1038lab/BiRefNet",
-        "files": { "model_script": "birefnet.py", "config_script": "BiRefNet_config.py", "model_weights": "BiRefNet-HR-matting.safetensors", "config_json": "config.json" },
-        "cache_dir": "RMBG/BiRefNet", "default_res": 2048,
+        "type": "birefnet", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet-HR-matting.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "High resolution matting", "default_res": 2048, "max_res": 2560, "min_res": 1024
     },
     "BiRefNet_lite": {
-        "type": "birefnet_lite",
-        "processor_module": "rmbg_birefnet",
-        "repo_id": "1038lab/BiRefNet",
-        "files": { "model_script": "birefnet_lite.py", "config_script": "BiRefNet_config.py", "model_weights": "BiRefNet_lite.safetensors", "config_json": "config.json" },
-        "cache_dir": "RMBG/BiRefNet", "default_res": 1024,
+        "type": "birefnet_lite", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet_lite.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet_lite.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "Lightweight version", "default_res": 1024, "max_res": 2048, "min_res": 512
     },
     "BiRefNet_lite-2K": {
-        "type": "birefnet_lite",
-        "processor_module": "rmbg_birefnet",
-        "repo_id": "1038lab/BiRefNet",
-        "files": { "model_script": "birefnet_lite.py", "config_script": "BiRefNet_config.py", "model_weights": "BiRefNet_lite-2K.safetensors", "config_json": "config.json" },
-        "cache_dir": "RMBG/BiRefNet", "default_res": 2048,
+        "type": "birefnet_lite", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet_lite.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet_lite-2K.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "Lightweight 2K version", "default_res": 2048, "max_res": 2560, "min_res": 1024
     },
+    "BiRefNet_dynamic": {
+        "type": "birefnet", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet_dynamic.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "Dynamic high-resolution", "default_res": 1024, "max_res": 2048, "min_res": 512
+    },
+    "BiRefNet_lite-matting": {
+        "type": "birefnet_lite", "processor_module": "rmbg_birefnet", "repo_id": "1038lab/BiRefNet",
+        "files": {
+            "model_script": "birefnet_lite.py",
+            "config_script": "BiRefNet_config.py",
+            "model_weights": "BiRefNet_lite-matting.safetensors",
+            "config_json": "config.json"
+        },
+        "cache_dir": "RMBG/BiRefNet", "description": "Lightweight matting", "default_res": 1024, "max_res": 2048, "min_res": 512
+    }
+    # --- КОНЕЦ ИСПРАВЛЕНИЙ ---
 }
+
 
 # 2. БЛОК: Функции загрузки моделей (без изменений)
 # ==============================================================================
