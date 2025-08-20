@@ -1,0 +1,112 @@
+{
+  "description": "Удаляет фон с изображений, используя модели RMBG и BiRefNet. Полностью настраивается через интерфейс.",
+  "category": "Обработка изображений",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03 | Адаптация: AI-Ассистент",
+  "version": "1.2.0",
+  "command_line_args_meta": {
+    "img_rmbg_input_dir": {
+      "type": "dir_path",
+      "description": "Папка с исходными изображениями.",
+      "required": true,
+      "default": "D:/WORK_PYTHON2025/_INPUT"
+    },
+    "img_rmbg_output_dir": {
+      "type": "dir_path",
+      "description": "Папка для сохранения результатов.",
+      "required": true,
+      "default": "D:/WORK_PYTHON2025/_OUTPUT"
+    },
+    "img_rmbg_processor_type": {
+      "type": "choice",
+      "description": "Выбор семейства моделей для обработки.",
+      "required": true,
+      "default": "birefnet",
+      "choices": [
+        "rmbg",
+        "birefnet"
+      ]
+    },
+    "img_rmbg_model_rmbg": {
+      "type": "choice",
+      "description": "Модель для процессора 'rmbg'.",
+      "required": true,
+      "default": "RMBG-2.0",
+      "choices": [
+        "RMBG-2.0",
+        "INSPYRENET",
+        "BEN",
+        "BEN2"
+      ]
+    },
+    "img_rmbg_model_birefnet": {
+      "type": "choice",
+      "description": "Модель для процессора 'birefnet'.",
+      "required": true,
+      "default": "BiRefNet-general",
+      "choices": [
+        "BiRefNet-general",
+        "BiRefNet_512x512",
+        "BiRefNet-HR",
+        "BiRefNet-portrait",
+        "BiRefNet-matting",
+        "BiRefNet-HR-matting",
+        "BiRefNet_lite",
+        "BiRefNet_lite-2K"
+      ]
+    },
+    "img_rmbg_background": {
+      "type": "string",
+      "description": "Тип фона для итогового изображения.",
+      "required": true,
+      "default": "Alpha",
+      "choices": [
+        "Alpha",
+        "Solid",
+        "Original"
+      ]
+    },
+    "img_rmbg_mask_blur": {
+      "type": "int",
+      "description": "Радиус размытия краев маски (0 - без размытия).",
+      "required": false,
+      "default": 0
+    },
+    "img_rmbg_mask_offset": {
+      "type": "int",
+      "description": "Смещение краев маски (+ расширяет, - сужает).",
+      "required": false,
+      "default": 0
+    },
+    "img_rmbg_save_options": {
+      "type": "list",
+      "description": "Выберите, что сохранять. Каждая опция с новой строки.",
+      "required": false,
+      "default": [
+        "image",
+        "mask"
+      ],
+      "choices": [
+        "image",
+        "mask"
+      ]
+    },
+    "img_rmbg_invert_mask": {
+      "type": "bool",
+      "description": "Инвертировать финальную маску (белое станет черным).",
+      "required": false,
+      "default": false
+    },
+    "img_rmbg_fast_refine": {
+      "type": "bool",
+      "description": "Применить алгоритм быстрого смягчения краев маски.",
+      "required": false,
+      "default": true
+    },
+    "img_rmbg_threads": {
+      "type": "int",
+      "description": "Количество потоков для обработки. 0 = авто.",
+      "required": false,
+      "default": 0
+    }
+  }
+}

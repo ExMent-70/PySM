@@ -1,7 +1,9 @@
 beautifulsoup4
 comtypes
 cssutils
+einops
 hdbscan
+huggingface_hub
 insightface
 ipymarkup
 Jinja2
@@ -22,7 +24,11 @@ pymorphy3
 PySide6
 rawpy
 regex
+safetensors
 scikit-learn
 scipy
 toml
+torch
 tqdm
+transformers
+transparent-background[gui]
