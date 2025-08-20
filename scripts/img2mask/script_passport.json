@@ -8,13 +8,13 @@
       "type": "dir_path",
       "description": "Папка с исходными изображениями.",
       "required": true,
-      "default": "D:/WORK_PYTHON2025/_INPUT"
+      "default": "./_input"
     },
     "img_rmbg_output_dir": {
       "type": "dir_path",
       "description": "Папка для сохранения результатов.",
       "required": true,
-      "default": "D:/WORK_PYTHON2025/_OUTPUT"
+      "default": "./_output"
     },
     "img_rmbg_processor_type": {
       "type": "choice",

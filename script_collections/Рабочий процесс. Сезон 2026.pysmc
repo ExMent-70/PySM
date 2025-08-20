@@ -2,7 +2,7 @@
   "collection_name": "Рабочий процесс. Сезон 2026",
   "description": "<div style=\"{theme.collection_info}\">\n<h3>Коллекция \"Рабочий процесс. Сезон 2026\"</h3>\n<p>Коллекция содержит авторские скрипты для автоматизации работы школьного фотографа.</p>\n\n<p>Скрипты охватывают основные этапы рабочего процесса, начиная с редактирования списка класса/группы и заключения договора, и заканчивая подготовкой рабочего материала к хранению в архиве.</p>\n\n<p>Эта коллекция - ШАБЛОН, который нужно использовать для создания индивидуальной коллекции каждого класса/группы.</p>\n</div>\n<div style=\"{theme.tooltip_script_args_block}\">\n<h3>ВНИМАНИЕ</h3>\n<p>При знакомстве с наборами из папки <b>\"Пример рабочего процесса\"</b>, запускайте их по порядку</p>\n<p>Режим выполнения установите <b>Условный (авто)</b> или<b> Условный (пошагово)</b></p>\n\n<p>Для начало работы с новым классом/группой просто сохраните эту коллекцию под новым именем</p>\n</div>",
   "data_format_version": "1.1",
-  "execution_mode": "conditional_full",
+  "execution_mode": "single_from_set",
   "script_roots": [
     {
       "id": "root_790d968b",
@@ -1558,6 +1558,74 @@
                     },
                     "ps_action_name": {
                       "value": null,
+                      "enabled": true
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "script_set",
+              "id": "setnode_008973460284",
+              "name": "Удаление фона",
+              "description": null,
+              "script_entries": [
+                {
+                  "id": "root_790d968b/img2mask",
+                  "instance_id": "instance_e4bc55c3dbd0",
+                  "name": "img2mask",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {
+                    "img_rmbg_input_dir": {
+                      "value": "./_input",
+                      "enabled": true
+                    },
+                    "img_rmbg_output_dir": {
+                      "value": "./_output",
+                      "enabled": true
+                    },
+                    "img_rmbg_processor_type": {
+                      "value": "birefnet",
+                      "enabled": true
+                    },
+                    "img_rmbg_model_rmbg": {
+                      "value": "RMBG-2.0",
+                      "enabled": true
+                    },
+                    "img_rmbg_model_birefnet": {
+                      "value": "BiRefNet-general",
+                      "enabled": true
+                    },
+                    "img_rmbg_background": {
+                      "value": "Alpha",
+                      "enabled": true
+                    },
+                    "img_rmbg_mask_blur": {
+                      "value": 0,
+                      "enabled": true
+                    },
+                    "img_rmbg_mask_offset": {
+                      "value": 0,
+                      "enabled": true
+                    },
+                    "img_rmbg_save_options": {
+                      "value": [
+                        "image",
+                        "mask"
+                      ],
+                      "enabled": true
+                    },
+                    "img_rmbg_invert_mask": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "img_rmbg_fast_refine": {
+                      "value": true,
+                      "enabled": true
+                    },
+                    "img_rmbg_threads": {
+                      "value": 0,
                       "enabled": true
                     }
                   }

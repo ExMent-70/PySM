@@ -65,7 +65,9 @@
   "sys_log_level": {
     "type": "string",
     "value": "INFO",
-    "read_only": true
+    "description": null,
+    "read_only": true,
+    "choices": null
   },
   "wf_children_file_name": {
     "type": "string",
@@ -92,11 +94,5 @@
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
-  },
-  "pysm_active_theme_name": {
-    "type": "string",
-    "value": "default",
-    "description": "System: Name of the active PyScriptManager theme.",
-    "read_only": true
   }
 }
