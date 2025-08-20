@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QDialog
 )
 from PySide6.QtGui import QPixmap, QAction, QKeySequence, QDrag, QPainter, QColor
-from PySide6.QtCore import Qt, Signal, Slot, QTimer, QThread, QMimeData, QPoint
+from PySide6.QtCore import Qt, Signal, Slot, QTimer, QThread, QMimeData, QPoint, QEventLoop
 
 # Внутренние модули
 IS_COMMON_AVAILABLE = False
@@ -88,6 +88,8 @@ class MainWindow(QWidget):
         self.sorted_dir = sorted_dir
         self.photo_session = photo_session
         self.session_name = session_name
+        self._is_saving_on_exit = False
+
         
         self.is_clustered_mode = self.sorted_dir.is_dir()
         logger.info(f"Базовый метод группировки изображений: {'<b>папки кластеров</b>' if self.is_clustered_mode else 'отсутствует (папка JPG)'}")
@@ -632,17 +634,24 @@ class MainWindow(QWidget):
             self.export_thread.quit(); self.export_thread.wait()
 
     def _perform_save(self) -> bool:
+        """
+        Сохраняет данные и запускает асинхронное перемещение файлов.
+        """
         self.json_manager.portrait_data, self.json_manager.group_data = self.portrait_model, self.group_model
         if not self.json_manager.save_data():
             logger.error("Ошибка", "Не удалось сохранить JSON.", file=sys.stderr)
             return False
         
-        if self.is_clustered_mode:
+        if self.is_clustered_mode and self.pending_moves:
             self._process_pending_moves()
         else:
+            # Если перемещение не требуется, считаем сохранение завершенным
             self.pending_moves.clear()
             self.changed_cluster_ids.clear()
             self._refresh_left_panel()
+            if self._is_saving_on_exit and hasattr(self, '_exit_event_loop'):
+                self._exit_event_loop.quit()
+
         return True
 
     def _save_changes(self):
@@ -663,17 +672,44 @@ class MainWindow(QWidget):
         if not self.changed_cluster_ids and not self.pending_moves:
             event.accept()
             return
+
         reply = QMessageBox.question(
             self, "Несохраненные изменения",
             "У вас есть несохраненные изменения. Хотите сохранить их перед выходом?",
             QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
             QMessageBox.Save
         )
+        
+        if reply == QMessageBox.Cancel:
+            event.ignore()
+            return
+            
+        if reply == QMessageBox.Discard:
+            event.accept()
+            return
+            
         if reply == QMessageBox.Save:
-            if self._perform_save(): event.accept()
-            else: event.ignore()
-        elif reply == QMessageBox.Discard: event.accept()
-        else: event.ignore()
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # 1. Устанавливаем флаг и блокируем окно
+            self._is_saving_on_exit = True
+            self.setEnabled(False) 
+            
+            # 2. Запускаем сохранение (которое запустит асинхронное перемещение)
+            if not self._perform_save():
+                # Если уже на этапе сохранения JSON произошла ошибка
+                QMessageBox.critical(self, "Ошибка", "Не удалось сохранить данные. Выход отменен.")
+                self.setEnabled(True)
+                self._is_saving_on_exit = False
+                event.ignore()
+                return
+
+            # 3. Если перемещение было запущено, создаем и запускаем локальный цикл событий
+            if self.is_clustered_mode and self.pending_moves:
+                self._exit_event_loop = QEventLoop()
+                self._exit_event_loop.exec() # Этот цикл будет крутиться, пока мы не вызовем .quit()
+            
+            # 4. После выхода из цикла разрешаем закрытие
+            event.accept()
 
     def _get_folder_for_cluster_id(self, cluster_id: str) -> Optional[Path]:
         cluster_data = self._get_cluster_item_data_by_id(cluster_id)
@@ -693,7 +729,6 @@ class MainWindow(QWidget):
         if not self.pending_moves: return
         tasks = [{"filename": fname, **move_info} for fname, move_info in self.pending_moves.items()]
         
-        #self.status_progress_bar.setStyleSheet(styles.PROGRESS_BAR_STYLE_ACTIVE)
         self.status_progress_bar.setRange(0, len(tasks))
         self.status_progress_bar.setValue(0)
         self.status_progress_bar.setFormat(f"Перемещение {len(tasks)} фото...")
@@ -708,6 +743,8 @@ class MainWindow(QWidget):
         self.move_worker.finished.connect(self._on_move_all_finished)
         self.move_thread.started.connect(self.move_worker.run)
         self.move_thread.start()
+
+
 
     @Slot(int, int)
     def _on_move_task_finished(self, moved_count: int, error_count: int):
@@ -735,6 +772,10 @@ class MainWindow(QWidget):
             self.move_thread.wait()
             self.move_worker = None
             self.move_thread = None
+        # Если мы находимся в процессе сохранения при выходе,
+        # то выходим из нашего локального цикла событий.
+        if self._is_saving_on_exit and hasattr(self, '_exit_event_loop'):
+            self._exit_event_loop.quit()            
 
 # 3. БЛОК: Точка входа
 # ==============================================================================
