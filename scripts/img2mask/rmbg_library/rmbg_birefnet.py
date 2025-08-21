@@ -250,27 +250,38 @@ class BiRefNetModelProcessor(BaseModelProcessor):
             self.model = net
 
             # --- 6. Настройка препроцессинга ---
-            default_res = model_info.get("default_res", 1024)
-            config_res = None
-            if (
-                self.proc_config
-                and isinstance(self.proc_config, dict)
-                and "img_scale" in self.proc_config
-            ):
-                config_res = self.proc_config["img_scale"]
-            elif self.proc_config and hasattr(self.proc_config, "img_scale"):
-                config_res = self.proc_config.img_scale
-            self.img_scale = config_res if config_res is not None else default_res
-            logger.debug(
-                f"Initial img_scale: {self.img_scale} (config: {config_res}, default: {default_res})"
-            )
-            if model_info.get("force_res", False):
-                if self.img_scale != 512:
-                    logger.warning(...)
-                    self.img_scale = 512
-            elif self.img_scale % 32 != 0:
+            model_meta = AVAILABLE_MODELS.get(self.model_name, {})
+            
+            # Получаем значения из метаданных модели
+            default_res = model_meta.get("default_res", 1024)
+            min_res = model_meta.get("min_res", 256)
+            max_res = model_meta.get("max_res", 2560)
+            
+            # Получаем значение из конфига (которое было установлено из args)
+            user_res = self.proc_config.img_scale if self.proc_config else 0
+            
+            # Выбираем итоговое разрешение
+            if user_res is not None and user_res > 0:
+                self.img_scale = user_res
+                logger.debug(f"Using user-defined img_scale: {self.img_scale}")
+            else:
+                self.img_scale = default_res
+                logger.debug(f"User img_scale is 0 or None, using default: {self.img_scale}")
+
+            # Валидация и корректировка
+            original_scale = self.img_scale
+            if self.img_scale > max_res:
+                self.img_scale = max_res
+                logger.warning(f"Requested img_scale {original_scale} > max_res {max_res}. Clamped to {self.img_scale}.")
+            if self.img_scale < min_res:
+                self.img_scale = min_res
+                logger.warning(f"Requested img_scale {original_scale} < min_res {min_res}. Clamped to {self.img_scale}.")
+
+            # Округление до 32
+            if self.img_scale % 32 != 0:
                 self.img_scale = max(32, round(self.img_scale / 32) * 32)
-                logger.debug(f"Adjusted img_scale to {self.img_scale}")
+                logger.debug(f"Adjusted img_scale to be divisible by 32: {self.img_scale}")
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
             mean = [0.485, 0.456, 0.406]
             std = [0.229, 0.224, 0.225]

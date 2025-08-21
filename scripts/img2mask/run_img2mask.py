@@ -75,6 +75,21 @@ def get_config() -> Namespace:
     )    
     parser.add_argument("--img_rmbg_threads", type=int, default=0, help="Количество потоков. 0 = авто.")
 
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    parser.add_argument(
+        "--img_rmbg_sensitivity",
+        type=float,
+        default=1.0,
+        help="Чувствительность маски (0.0=агрессивно, 1.0=деликатно)."
+    )
+    parser.add_argument(
+        "--img_rmbg_img_scale",
+        type=int,
+        default=0,
+        help="Разрешение обработки для BiRefNet (0=авто)."
+    )
+
+
     if IS_MANAGED_RUN and ConfigResolver:
         return ConfigResolver(parser).resolve_all()
     else:
@@ -192,6 +207,15 @@ def main():
     config.model.invert_output = args.img_rmbg_invert_mask
     config.model.save_options = args.img_rmbg_save_options
     
+
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    config.model.sensitivity = args.img_rmbg_sensitivity
+    # Устанавливаем img_scale в специфичную секцию конфига
+    if not config.birefnet_specific:
+        from rmbg_library.rmbg_config import BiRefNetSpecificConfig
+        config.birefnet_specific = BiRefNetSpecificConfig()
+    config.birefnet_specific.img_scale = args.img_rmbg_img_scale
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
     # --- КОНЕЦ БЛОКА ГИБРИДНОЙ КОНФИГУРАЦИИ ---
 
     if not config.paths.input_dir.is_dir():

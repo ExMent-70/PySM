@@ -14,6 +14,7 @@ from pydantic import (
     PositiveInt,
     NonNegativeInt,
     conlist,
+    confloat,
 )
 
 try:
@@ -58,6 +59,8 @@ class ModelConfig(BaseModel):
     save_options: List[Literal["image", "mask"]] = Field(["image", "mask"], description="Что сохранять: 'image', 'mask' или и то, и другое.")
     process_res: Optional[PositiveInt] = 1024
 
+    sensitivity: confloat(ge=0.0, le=1.0) = 1.0 # Используем confloat для валидации
+
     @field_validator("background_color")
     @classmethod
     def check_color_range(cls, v: List[int]) -> List[int]:
@@ -86,7 +89,7 @@ class RmbgSpecificConfig(PostprocessingConfigMixin):
     class Config: extra = "allow"
 
 class BiRefNetSpecificConfig(PostprocessingConfigMixin):
-    img_scale: Optional[PositiveInt] = None
+    img_scale: Optional[int] = 0 # 0 будет означать "использовать default_res"
     class Config: extra = "allow"
 
 class LoggingConfig(BaseModel):

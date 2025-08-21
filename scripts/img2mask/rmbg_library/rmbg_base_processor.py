@@ -81,82 +81,75 @@ class BaseModelProcessor:
         logger.debug(f"Using default '{param_name}' = {default_value}")
         return default_value
 
+
     def _apply_common_postprocessing(
         self,
         raw_mask: Optional[Image.Image],
-        original_image: Image.Image,  # Передаем оригинал для apply_mask_to_image
+        original_image: Image.Image,
     ) -> Tuple[Optional[Image.Image], Optional[Image.Image]]:
-        """Applies common postprocessing steps (blur, offset, invert, background)."""
+        """
+        Применяет общие шаги постобработки (sensitivity, blur, offset, invert, background).
+        """
         # Импортируем утилиты здесь, чтобы избежать циклических зависимостей на уровне модуля
         from . import rmbg_utils, mask_ops
 
         if raw_mask is None:
             logger.warning(
-                f"Received None mask in postprocessing for {self.processor_name}. Cannot apply postprocessing."
+                f"Получена пустая маска в постобработке для {self.processor_name}. Постобработка невозможна."
             )
-            # Возвращаем None для обоих результатов, если нет сырой маски
             return None, None
 
         try:
-            # Получаем параметры постобработки
+            # Работаем с копией, чтобы не изменять оригинальную сырую маску
+            processed_mask = raw_mask.copy()
+
+            # --- 1. Применение sensitivity (если значение не по умолчанию) ---
+            sensitivity = self._get_postproc_param("sensitivity", 1.0)
+            if sensitivity != 1.0:
+                logger.debug(f"Применение sensitivity: {sensitivity}")
+                # Конвертируем в тензор для математических операций
+                mask_tensor = rmbg_utils.mask_pil_to_tensor(processed_mask)
+                
+                # Применяем формулу
+                factor = 1.0 + (1.0 - sensitivity)
+                mask_tensor = mask_tensor * factor
+                
+                # Обрезаем значения и конвертируем обратно
+                mask_tensor = torch.clamp(mask_tensor, 0.0, 1.0)
+                processed_mask = rmbg_utils.tensor_to_mask_pil(mask_tensor)
+
+            # --- 2. Применение blur и offset ---
             mask_blur = self._get_postproc_param("mask_blur", 0)
             mask_offset = self._get_postproc_param("mask_offset", 0)
-            invert_output = self._get_postproc_param("invert_output", False)
-            background_mode = self._get_postproc_param("background", "Alpha")
-            # background_color берется из специфичного или общего конфига
-            background_color_list = self._get_postproc_param(
-                "background_color", [255, 255, 255]
-            )
-
-            # Применяем blur и offset
-            logger.debug(
-                f"Applying postprocessing: blur={mask_blur}, offset={mask_offset}, invert={invert_output}, bg='{background_mode}'"
-            )
+            
+            # Передаем уже обработанную (sensitivity) маску дальше
             processed_mask = mask_ops.apply_postprocessing(
-                raw_mask, mask_blur, mask_offset
+                processed_mask, mask_blur, mask_offset
             )
 
-            # Применяем инверсию
+            # --- 3. Применение инверсии ---
+            invert_output = self._get_postproc_param("invert_output", False)
             if invert_output:
-                logger.debug("Inverting mask.")
-                processed_mask = ImageOps.invert(
-                    processed_mask.convert("L")
-                )  # Убедимся что L режим
+                logger.debug("Инвертирование маски.")
+                processed_mask = ImageOps.invert(processed_mask.convert("L"))
 
-            # Генерируем финальное изображение
-            if background_mode == "Alpha":
-                bg_color_tuple = (0, 0, 0, 0)  # Прозрачный
-                logger.debug("Applying Alpha background.")
-            elif background_mode == "Solid":
-                # Убедимся, что цвет корректный
-                if (
-                    not isinstance(background_color_list, list)
-                    or len(background_color_list) != 3
-                ):
-                    logger.warning(
-                        f"Invalid background_color list: {background_color_list}. Using white fallback."
-                    )
-                    background_color_list = [255, 255, 255]
-                bg_color_tuple = tuple(background_color_list) + (
-                    255,
-                )  # Добавляем альфа
-                logger.debug(f"Applying Solid background: {bg_color_tuple}")
-            elif background_mode == "Original":
-                bg_color_tuple = None  # Сигнал не применять фон
-                logger.debug("Keeping Original background.")
-            else:
-                bg_color_tuple = (0, 0, 0, 0)  # По умолчанию Alpha
-                logger.warning(
-                    f"Invalid background mode '{background_mode}', using Alpha."
-                )
-
-            if bg_color_tuple is None:
-                # Если фон "Original", возвращаем оригинальное изображение
+            # --- 4. Генерация финального изображения на основе фона ---
+            background_mode = self._get_postproc_param("background", "Alpha")
+            
+            if background_mode == "Original":
+                # Если фон "Original", просто возвращаем исходное изображение
                 final_image = original_image.copy()
-                logger.debug("Returning original image as final image.")
+                logger.debug("Возвращаем оригинальное изображение как финальное.")
             else:
-                # Применяем обработанную маску к ОРИГИНАЛЬНОМУ изображению
-                logger.debug("Applying processed mask to original image.")
+                # Для 'Alpha' и 'Solid' применяем маску
+                bg_color_tuple = (0, 0, 0, 0) # По умолчанию для 'Alpha' (прозрачный)
+                if background_mode == "Solid":
+                    background_color_list = self._get_postproc_param("background_color", [255, 255, 255])
+                    bg_color_tuple = tuple(background_color_list) + (255,)
+                    logger.debug(f"Применение сплошного фона: {bg_color_tuple}")
+                else:
+                    logger.debug("Применение альфа-канала (прозрачный фон).")
+                
                 final_image = rmbg_utils.apply_mask_to_image(
                     original_image, processed_mask, background_color=bg_color_tuple
                 )
@@ -166,9 +159,8 @@ class BaseModelProcessor:
 
         except Exception as e:
             logger.exception(
-                f"Error during common postprocessing for {self.processor_name}: {e}"
+                f"Ошибка во время общей постобработки для {self.processor_name}: {e}"
             )
-            # Возвращаем None при ошибке постобработки, чтобы main.py мог это обработать
             return None, None
 
     def process(

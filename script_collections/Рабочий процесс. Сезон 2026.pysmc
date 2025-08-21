@@ -2,7 +2,7 @@
   "collection_name": "Рабочий процесс. Сезон 2026",
   "description": "<div style=\"{theme.collection_info}\">\n<h3>Коллекция \"Рабочий процесс. Сезон 2026\"</h3>\n<p>Коллекция содержит авторские скрипты для автоматизации работы школьного фотографа.</p>\n\n<p>Скрипты охватывают основные этапы рабочего процесса, начиная с редактирования списка класса/группы и заключения договора, и заканчивая подготовкой рабочего материала к хранению в архиве.</p>\n\n<p>Эта коллекция - ШАБЛОН, который нужно использовать для создания индивидуальной коллекции каждого класса/группы.</p>\n</div>\n<div style=\"{theme.tooltip_script_args_block}\">\n<h3>ВНИМАНИЕ</h3>\n<p>При знакомстве с наборами из папки <b>\"Пример рабочего процесса\"</b>, запускайте их по порядку</p>\n<p>Режим выполнения установите <b>Условный (авто)</b> или<b> Условный (пошагово)</b></p>\n\n<p>Для начало работы с новым классом/группой просто сохраните эту коллекцию под новым именем</p>\n</div>",
   "data_format_version": "1.1",
-  "execution_mode": "single_from_set",
+  "execution_mode": "conditional_full",
   "script_roots": [
     {
       "id": "root_790d968b",
@@ -1594,7 +1594,7 @@
                       "enabled": true
                     },
                     "img_rmbg_model_birefnet": {
-                      "value": "BiRefNet-general",
+                      "value": "BiRefNet-portrait",
                       "enabled": true
                     },
                     "img_rmbg_background": {
@@ -1602,11 +1602,11 @@
                       "enabled": true
                     },
                     "img_rmbg_mask_blur": {
-                      "value": 0,
+                      "value": "1",
                       "enabled": true
                     },
                     "img_rmbg_mask_offset": {
-                      "value": 0,
+                      "value": "-1",
                       "enabled": true
                     },
                     "img_rmbg_save_options": {
@@ -1625,7 +1625,15 @@
                       "enabled": true
                     },
                     "img_rmbg_threads": {
-                      "value": 0,
+                      "value": "12",
+                      "enabled": true
+                    },
+                    "img_rmbg_sensitivity": {
+                      "value": "0.5",
+                      "enabled": true
+                    },
+                    "img_rmbg_img_scale": {
+                      "value": "0",
                       "enabled": true
                     }
                   }

@@ -109,6 +109,18 @@
       "description": "Количество потоков для обработки. 0 = авто.",
       "required": false,
       "default": 0
+    },
+    "img_rmbg_sensitivity": {
+      "type": "float",
+      "description": "Чувствительность маски. 0.0 = очень агрессивно, 1.0 = деликатно.",
+      "required": false,
+      "default": "0.5"
+    },
+    "img_rmbg_img_scale": {
+      "type": "int",
+      "description": "Только для моделей BiRefNet. Разрешение обработки. 0 = авто (рекомендуется).",
+      "required": false,
+      "default": 0
     }
   }
 }
