@@ -120,7 +120,7 @@
     "run_mode_step": "Весь набор (пошагово)",
     "run_mode_conditional_full": "Условный (авто)",
     "run_mode_conditional_step": "Условный (пошагово)",
-    "run_mode_single": "Только выбранный из набора",
+    "run_mode_single": "Один скрипт",
     "run_button_run": "Выполнить",
     "run_button_stop": "Остановить",
     "run_button_next_step": "Следующий шаг",

@@ -120,7 +120,7 @@
     "run_mode_step": "Full Set (Step-by-step)",
     "run_mode_conditional_full": "Conditional (Auto)",
     "run_mode_conditional_step": "Conditional (Step-by-step)",
-    "run_mode_single": "Only Selected from Set",
+    "run_mode_single": "Only Selected",
     "run_button_run": "Run",
     "run_button_stop": "Stop",
     "run_button_next_step": "Next Step",
