@@ -2,16 +2,6 @@
 
 # 1. БЛОК: Импорты и настройка окружения
 # ==============================================================================
-import argparse
-import logging
-import sys
-import time
-from argparse import Namespace
-from pathlib import Path
-from typing import Any, List
-import concurrent.futures
-import os
-
 try:
     from pysm_lib import pysm_context
     from pysm_lib.pysm_context import ConfigResolver
@@ -28,17 +18,37 @@ except ImportError:
             return iterable if iterable is not None else None
 
 
+# --- НАЧАЛО ИЗМЕНЕНИЙ: "Инъекция" зависимости tqdm в библиотеку ---
+# Импортируем модуль rmbg_models, чтобы получить доступ к его функциям
+from rmbg_library import rmbg_models
+# Вызываем сеттер и передаем туда наш класс tqdm (либо из PySM, либо стандартный)
+rmbg_models.set_tqdm_class(tqdm)
+# --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
-# --- НАЧАЛО ИЗМЕНЕНИЙ: Импортируем AVAILABLE_MODELS для динамических choices ---
+# --- Шаг 3: Остальные импорты ---
+import argparse
+import logging
+import time
+import sys
+from argparse import Namespace
+from pathlib import Path
+from typing import Any, List
+import concurrent.futures
+import os
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message="torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument.",
+    category=UserWarning
+)
+
 from rmbg_library import (
     load_config, setup_logging, get_message, Config,
     RmbgModuleProcessor, BiRefNetModuleProcessor, get_compute_device,
-    AVAILABLE_MODELS # <--- Новый импорт
+    AVAILABLE_MODELS
 )
-# --- КОНЕЦ ИЗМЕНЕНИЙ ---
 import torch
-
-
 
 
 # 2. БЛОК: Определение параметров и получение конфигурации (ПЕРЕРАБОТАНО)
@@ -223,14 +233,16 @@ def main():
         sys.exit(1)
 
     logger = setup_logging(config.logging, log_dir=config.paths.output_dir)
-    logger.info("--- RMBG/BiRefNet Tool Run (Multi-threaded) ---")
-    logger.info(f"Final effective processor: {config.processor_type}")
-    logger.info(f"Final effective model name: {config.model.name}")
-    logger.info(f"Input directory: {config.paths.input_dir}")
-    logger.info(f"Output directory: {config.paths.output_dir}")
+    logger.info("<b>Img2Mask RMBG-2.0/BiRefNet Tool Run (Multi-threaded)</b>\n")
+    logger.debug(f"Final effective processor: {config.processor_type}")
+    logger.debug(f"Final effective model name: {config.model.name}")
+    logger.info(f"Папка с исходными файлами:")
+    logger.info(f"<i>{config.paths.input_dir}</i>")
+    logger.info(f"Папка с файлами масок:")
+    logger.info(f"<i>{config.paths.output_dir}</i>\n")
 
     device = get_compute_device()
-    logger.info(f"Using device: {device}")
+    logger.info(f"Используемое устройство: <i>{device}</i>")
     
     # 1. Инициализируем процессор ОДИН РАЗ до пула потоков
     processor = get_processor(config.processor_type, config, device)
@@ -253,7 +265,7 @@ def main():
     if num_threads == 0:
         cpu_count = os.cpu_count() or 1
         num_threads = min(16, cpu_count * 2 + 1)
-    logger.info(f"Using {num_threads} worker threads.")
+    logger.info(f"Используется {num_threads} рабочих потоков.")
 
     # 4. Запускаем многопоточную обработку
     stats = {"success": 0, "skipped": 0, "error": 0}
@@ -287,12 +299,12 @@ def main():
     # 5. Финальный отчет
     total_time = time.monotonic() - total_start_time
     summary_message = (
-        f"\nProcessing finished in {total_time:.2f} seconds.\n"
-        f"Successfully processed: {stats['success']} files.\n"
-        f"Skipped: {stats['skipped']} files.\n"
-        f"Errors: {stats['error']} files."
+        f"\nОбщее время обработки <b>{total_time:.2f}</b> сек.\n"
+        f"Успешно обработано: <b>{stats['success']}</b> файлов.\n"
+        f"Пропущено: <b>{stats['skipped']}</b> файлов.\n"
+        f"Не обработано из-за ошибки: <b>{stats['error']}</b> файлов."
     )
-    tqdm.write(summary_message)
+    print(summary_message)
     #logger.info(summary_message.replace('\n', ' '))
 
     if IS_MANAGED_RUN:

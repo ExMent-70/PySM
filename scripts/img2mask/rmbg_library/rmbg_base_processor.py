@@ -239,4 +239,4 @@ class BaseModelProcessor:
                 )
         # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
-        logger.info(f"Resources released for {processor_display_name}.")
+        logger.info(f"Модель {processor_display_name} выгружена из памяти.")

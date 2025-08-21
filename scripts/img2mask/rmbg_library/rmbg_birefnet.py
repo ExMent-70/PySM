@@ -73,7 +73,7 @@ class BiRefNetModelProcessor(BaseModelProcessor):
             logger.error("safetensors library not found.")
             raise
 
-        logger.info(f"Loading model: {self.model_name} using BiRefNetModelProcessor")
+        logger.info(f"Загрузка модели: <b>{self.model_name}</b>")
         start_time = time.monotonic()
 
         # --- 1. Получаем информацию о модели и проверяем процессор ---
@@ -124,7 +124,7 @@ class BiRefNetModelProcessor(BaseModelProcessor):
             raise FileNotFoundError(
                 f"Missing required model files for {self.model_name}."
             )
-        logger.info(f"Все необходимые файлы для {self.model_name} найдены.")
+        logger.info(f"- все файлы модели {self.model_name} найдены.")
 
         model_script_path = paths.get("model_script")
         config_script_path = paths.get("config_script")
@@ -233,14 +233,14 @@ class BiRefNetModelProcessor(BaseModelProcessor):
                     k.replace("module.", ""): v for k, v in state_dict.items()
                 }
             net.load_state_dict(state_dict)
-            logger.info("Веса модели успешно загружены.")
+            logger.info("- веса модели успешно загружены")
             net.eval().to(self.device)
             if self.device.type == "cuda":
                 try:  # Проверка FP16
                     capability = torch.cuda.get_device_capability(self.device)
                     if capability[0] >= 7:
                         net.half()
-                        logger.info("Model converted to FP16.")
+                        logger.info("- модель конвертирована в FP16.")
                     else:
                         logger.warning(
                             f"GPU compute capability ({capability[0]}.{capability[1]}) < 7.0, FP16 not used."
@@ -297,7 +297,7 @@ class BiRefNetModelProcessor(BaseModelProcessor):
                 ]
             )
             logger.info(
-                f"Using image scale for preprocessing: {self.img_scale}x{self.img_scale}"
+                f"Изображения масштабировано для предобработки: {self.img_scale}x{self.img_scale}"
             )
             logger.info(
                 get_message(

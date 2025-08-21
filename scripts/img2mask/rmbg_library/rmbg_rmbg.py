@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple, Any
 import importlib.util
 import sys
+import types
 import torchvision.transforms as transforms
 import threading
 
@@ -75,7 +76,7 @@ class RmbgProcessorRMBG2(BaseModelProcessor):
             )
             raise
 
-        logger.info(f"Loading model: {self.model_name} using RmbgProcessorRMBG2")
+        logger.info(f"Загрузка модели: <b>{self.model_name}</b>")
         start_time = time.monotonic()
         try:
             logger.debug(f"Calling download_model_files for {self.model_name}")
@@ -117,7 +118,7 @@ class RmbgProcessorRMBG2(BaseModelProcessor):
             raise FileNotFoundError(
                 f"Missing required files for {self.model_name}. Check logs."
             )
-        logger.info(f"Все необходимые файлы для {self.model_name} найдены.")
+        logger.info(f"- все файлы модели {self.model_name} найдены.")
         model_script_path = paths["model_script"]
         config_script_path = paths["config_script"]
         weights_path = paths["model_weights"]
@@ -151,7 +152,7 @@ class RmbgProcessorRMBG2(BaseModelProcessor):
                     model_content = model_content.replace(
                         relative_import_original, relative_import_corrected
                     )
-                    logger.info(f"Patched relative import in {model_script_path}")
+                    logger.debug(f"Patched relative import in {model_script_path}")
                 timm_replacements = {
                     "from timm.models.layers": "from timm.layers",
                     "from timm.models.registry": "from timm.models",
@@ -160,7 +161,7 @@ class RmbgProcessorRMBG2(BaseModelProcessor):
                 for old_import, new_import in timm_replacements.items():
                     if old_import in model_content:
                         model_content = model_content.replace(old_import, new_import)
-                        logger.info(
+                        logger.debug(
                             f"Patched timm import: '{old_import}' -> '{new_import}'"
                         )
                         patched_timm = True
@@ -210,7 +211,7 @@ class RmbgProcessorRMBG2(BaseModelProcessor):
                     k.replace("module.", ""): v for k, v in state_dict.items()
                 }
             net.load_state_dict(state_dict)
-            logger.info("Веса модели успешно загружены.")
+            logger.info("- веса модели успешно загружены.")
             net.eval().to(self.device)
             self.model = net
 
@@ -413,54 +414,41 @@ class RmbgProcessorBEN(BaseModelProcessor):
         self.inference_lock = threading.Lock() # Блокировка для потокобезопасности
         self.load()
 
+
     def load(self):
-        logger.info(f"Loading model: {self.model_name} using RmbgProcessorBEN")
+        logger.info(f"Загрузка модели: <b>{self.model_name}</b>")
         start_time = time.monotonic()
         try:
             self.model_files = download_model_files(self.model_name, self.config)
-            if self.model_files is None:
-                raise FileNotFoundError("Could not download files.")
-            required_keys = ["model_script", "model_weights"]
-            paths = {}
-            for key in required_keys:
-                file_path = self.model_files.get(key)
-                if not (file_path and file_path.exists()):
-                    raise FileNotFoundError(f"Missing file for key '{key}': {file_path}")
-                paths[key] = file_path
-                
-            model_script_path = paths["model_script"]
-            weights_path = paths["model_weights"]
-            model_dir = self.model_files["model_dir"]
+            if not self.model_files: raise FileNotFoundError("Could not download model files.")
+            
+            model_script_path = self.model_files.get("model_script")
+            weights_path = self.model_files.get("model_weights")
+            if not (model_script_path and weights_path): raise FileNotFoundError("Missing script or weights path.")
 
-            original_sys_path = list(sys.path)
-            try:
-                if str(model_dir) not in sys.path:
-                    sys.path.insert(0, str(model_dir))
-                model_module_name = Path(model_script_path).stem
-                model_spec = importlib.util.spec_from_file_location(model_module_name, model_script_path)
-                if not (model_spec and model_spec.loader):
-                    raise ImportError(f"Cannot create spec for {model_script_path}")
-                self.model_module = importlib.util.module_from_spec(model_spec)
-                model_spec.loader.exec_module(self.model_module)
-                logger.debug(f"Script '{model_module_name}' loaded.")
-            finally:
-                sys.path = original_sys_path
+            with open(model_script_path, 'r', encoding='utf-8') as f:
+                model_content = f.read()
 
-            ModelClass = getattr(self.model_module, "BEN_Base", None)
-            if not ModelClass:
-                raise AttributeError("Could not find BEN_Base class in model.py.")
+            patched_content = model_content.replace("from timm.models.layers", "from timm.layers")
+            if patched_content != model_content:
+                logger.debug(f"Patched timm imports in {model_script_path.name}")
+            
+            module_name = f"custom_ben_model_{hash(model_script_path)}"
+            self.model_module = types.ModuleType(module_name)
+            sys.modules[module_name] = self.model_module
+            exec(patched_content, self.model_module.__dict__)
+
+            ModelClass = getattr(self.model_module, "BEN_Base")
             net = ModelClass()
-            net.eval().to(self.device)
-
-            logger.debug(f"Loading weights via model.loadcheckpoints from: {weights_path}")
             net.loadcheckpoints(str(weights_path))
-            logger.info("Model weights loaded successfully via loadcheckpoints.")
+            net.eval().to(self.device)
             self.model = net
             logger.info(get_message("INFO_MODEL_LOADED", model_name=self.model_name, time=time.monotonic() - start_time, processor=self.processor_name))
         except Exception as e:
             logger.exception(f"Failed to load BEN model: {e}")
             self.model = None
             raise
+
 
     def _do_process(self, image: Image.Image, **kwargs) -> Optional[Image.Image]:
         if self.model is None:
@@ -500,13 +488,16 @@ class RmbgProcessorBEN2(BaseModelProcessor):
         self.inference_lock = threading.Lock() # Блокировка для потокобезопасности
         self.load()
 
+
     def load(self):
-        logger.info(f"Loading model: {self.model_name} using RmbgProcessorBEN2")
+        logger.info(f"Загрузка модели: <b>{self.model_name}</b>")
         start_time = time.monotonic()
         try:
             self.model_files = download_model_files(self.model_name, self.config)
-            if self.model_files is None:
-                raise FileNotFoundError("Could not download files.")
+            if not self.model_files:
+                raise FileNotFoundError("Could not download model files.")
+
+            # --- Начало полного блока получения путей ---
             required_keys = ["model_script", "model_weights"]
             paths = {}
             for key in required_keys:
@@ -514,34 +505,27 @@ class RmbgProcessorBEN2(BaseModelProcessor):
                 if not (file_path and file_path.exists()):
                     raise FileNotFoundError(f"Missing file for key '{key}': {file_path}")
                 paths[key] = file_path
+            # --- Конец полного блока получения путей ---
 
             model_script_path = paths["model_script"]
             weights_path = paths["model_weights"]
-            model_dir = self.model_files["model_dir"]
 
-            original_sys_path = list(sys.path)
-            try:
-                if str(model_dir) not in sys.path:
-                    sys.path.insert(0, str(model_dir))
-                model_module_name = Path(model_script_path).stem
-                model_spec = importlib.util.spec_from_file_location(model_module_name, model_script_path)
-                if not (model_spec and model_spec.loader):
-                    raise ImportError(f"Cannot create spec for {model_script_path}")
-                self.model_module = importlib.util.module_from_spec(model_spec)
-                model_spec.loader.exec_module(self.model_module)
-                logger.debug(f"Script '{model_module_name}' loaded.")
-            finally:
-                sys.path = original_sys_path
+            with open(model_script_path, 'r', encoding='utf-8') as f:
+                model_content = f.read()
 
-            ModelClass = getattr(self.model_module, "BEN_Base", None)
-            if not ModelClass:
-                raise AttributeError("Could not find BEN_Base class in BEN2.py.")
+            patched_content = model_content.replace("from timm.models.layers", "from timm.layers")
+            if patched_content != model_content:
+                logger.debug(f"Patched timm imports in {model_script_path.name}")
+            
+            module_name = f"custom_ben2_model_{hash(model_script_path)}"
+            self.model_module = types.ModuleType(module_name)
+            sys.modules[module_name] = self.model_module
+            exec(patched_content, self.model_module.__dict__)
+
+            ModelClass = getattr(self.model_module, "BEN_Base")
             net = ModelClass()
-            net.eval().to(self.device)
-
-            logger.debug(f"Loading weights via model.loadcheckpoints from: {weights_path}")
             net.loadcheckpoints(str(weights_path))
-            logger.info("Model weights loaded successfully via loadcheckpoints.")
+            net.eval().to(self.device)
             self.model = net
             logger.info(get_message("INFO_MODEL_LOADED", model_name=self.model_name, time=time.monotonic() - start_time, processor=self.processor_name))
         except Exception as e:

@@ -3,12 +3,23 @@
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
-
+import requests
+from huggingface_hub import hf_hub_url
 from huggingface_hub import hf_hub_download
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .rmbg_config import Config
 from .rmbg_logger import get_message
+
+# --- НАЧАЛО ИЗМЕНЕНИЙ: Механизм для "инъекции" TQDM ---
+_TQDM_CLASS = None
+
+def set_tqdm_class(tqdm_class: Any):
+    """Позволяет основному скрипту установить правильный класс tqdm."""
+    global _TQDM_CLASS
+    if tqdm_class:
+        _TQDM_CLASS = tqdm_class
+
 
 logger = logging.getLogger(__name__)
 
@@ -156,9 +167,21 @@ def get_model_cache_dir(config_model_root: Path, model_info: Dict[str, Any]) -> 
     return cache_dir
 
 def download_model_files(model_name: str, config: "Config") -> Optional[Dict[str, Path]]:
-    # ... (код без изменений, но теперь он будет работать только с оставшимися моделями) ...
+    """
+    Скачивает файлы модели, используя requests и переданный класс tqdm для отображения прогресса.
+    """
+    global _TQDM_CLASS
+    # Если tqdm не был передан, импортируем стандартный как fallback
+    if _TQDM_CLASS is None:
+        try:
+            from tqdm import tqdm
+            _TQDM_CLASS = tqdm
+        except ImportError:
+            logger.error("TQDM is not available.")
+            return None
+
     if model_name not in AVAILABLE_MODELS:
-        logger.debug(f"Model '{model_name}' not in AVAILABLE_MODELS, handled elsewhere.")
+        logger.debug(f"Модель '{model_name}' не найдена в AVAILABLE_MODELS.")
         return None
     
     model_info = AVAILABLE_MODELS[model_name]
@@ -167,26 +190,56 @@ def download_model_files(model_name: str, config: "Config") -> Optional[Dict[str
     model_cache_path = get_model_cache_dir(config.paths.model_root, model_info)
 
     if not repo_id or not files_to_download:
-        logger.info(f"No repo_id or files for '{model_name}'. Skipping HF download.")
+        logger.info(f"Для модели '{model_name}' не требуется скачивание с HF Hub.")
         return {"model_dir": model_cache_path, "no_hf_download": True}
 
-
-    logger.info(get_message("INFO_DOWNLOADING_MODEL", model_name=model_name, cache_dir=str(model_cache_path)))
+    logger.debug(get_message("INFO_DOWNLOADING_MODEL", model_name=model_name, cache_dir=str(model_cache_path)))
     downloaded_files: Dict[str, Path] = {"model_dir": model_cache_path}
-    try:
-        hf_cache_dir = config.paths.model_root / ".hf_cache"
-        for logical_name, repo_filename in files_to_download.items():
-            downloaded_path_str = hf_hub_download(
-                repo_id=repo_id,
-                filename=repo_filename,
-                cache_dir=hf_cache_dir,
-                local_dir=model_cache_path,
-                #local_dir_use_symlinks=False,
-                #force_filename=repo_filename,
-            )
-            downloaded_files[logical_name] = Path(downloaded_path_str)
-        logger.info(get_message("INFO_MODEL_FILES_DOWNLOADED", model_name=model_name))
-        return downloaded_files
-    except Exception as e:
-        logger.error(get_message("ERROR_DOWNLOADING_MODEL", model_name=model_name, exc=e), exc_info=True)
-        return None
+    
+    for logical_name, repo_filename in files_to_download.items():
+        local_path = model_cache_path / repo_filename
+        
+        try:
+            # 1. Получаем URL для скачивания
+            download_url = hf_hub_url(repo_id=repo_id, filename=repo_filename)
+            
+            # 2. Используем requests для потокового скачивания
+            response = requests.get(download_url, stream=True, timeout=30)
+            response.raise_for_status()
+            
+            total_size = int(response.headers.get('content-length', 0))
+
+            # Проверяем, нужно ли скачивать заново
+            if local_path.exists() and local_path.stat().st_size == total_size:
+                 logger.debug(f"Файл '{repo_filename}' уже существует и имеет верный размер. Пропуск.")
+                 downloaded_files[logical_name] = local_path
+                 continue
+            
+            # 3. Оборачиваем цикл в наш tqdm
+            with open(local_path, "wb") as f, _TQDM_CLASS(
+                desc=f"Загрузка {repo_filename}",
+                total=total_size,
+                unit='iB',
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as bar:
+                for data in response.iter_content(chunk_size=1024 * 1024): # Качаем по 1MB
+                    size = f.write(data)
+                    bar.update(size)
+
+            downloaded_files[logical_name] = local_path
+
+        except Exception as e:
+            logger.error(get_message("ERROR_DOWNLOADING_MODEL", model_name=repo_filename, exc=e), exc_info=True)
+            # Также используем hf_hub_download как fallback на случай проблем с requests
+            try:
+                logger.warning(f"Fallback to hf_hub_download for {repo_filename}")
+                hf_cache_dir = config.paths.model_root / ".hf_cache"
+                path_str = hf_hub_download(repo_id=repo_id, filename=repo_filename, local_dir=model_cache_path, cache_dir=hf_cache_dir)
+                downloaded_files[logical_name] = Path(path_str)
+            except Exception as hf_e:
+                 logger.error(f"Fallback hf_hub_download also failed: {hf_e}")
+                 return None
+            
+    logger.info(get_message("INFO_MODEL_FILES_DOWNLOADED", model_name=model_name))
+    return downloaded_files

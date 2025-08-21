@@ -4,6 +4,8 @@ import sys
 from typing import Dict, Any, TYPE_CHECKING
 from pathlib import Path
 
+
+
 if TYPE_CHECKING:
     # Prevent circular import error during type checking
     try:
@@ -41,9 +43,9 @@ MESSAGES: Dict[str, str] = {
     "DEBUG_PROCESSING_DETAILS": "Детали обработки: {details}",
     "INFO_TOTAL_TIME": "Общее время выполнения: {time:.2f} секунд",
     "INFO_DOWNLOADING_MODEL": "Загрузка/проверка файлов модели {model_name} в {cache_dir}...",  # Изменено сообщение для ясности
-    "INFO_MODEL_FILES_DOWNLOADED": "Файлы модели {model_name} успешно загружены/проверены.",  # Изменено сообщение
+    "INFO_MODEL_FILES_DOWNLOADED": "Файлы модели {model_name} успешно загружены/проверены:",  # Изменено сообщение
     "INFO_MODEL_FOUND_CACHE": "Файлы модели {model_name} найдены в кэше: {cache_dir}",
-    "INFO_MODEL_CLEARED": "Модель {model_name} очищена из памяти",
+    "INFO_MODEL_CLEARED": "Модель {model_name} выгружена из памяти",
     "INFO_NO_IMAGES_FOUND": "В папке {input_dir} не найдено подходящих изображений.",
     "WARNING_SKIPPING_FILE": "Пропуск файла (возможно, не изображение): {file_path}",
     "WARNING_NO_OBJECTS_DETECTED": "Объекты не найдены для промпта '{prompt}' в файле {filename}, результат не сохраняется.",
@@ -89,55 +91,77 @@ def get_message(key: str, **kwargs) -> str:
 
 
 # --- Функция setup_logging ---
-# (Остается без изменений)
 def setup_logging(config: "LoggingConfig", log_dir: Path = Path(".")):
     """
     Настройка базового логирования.
     :param config: Объект конфигурации секции [logging].
     :param log_dir: Директория для сохранения лог-файла.
     """
-    logger = logging.getLogger()  # Корневой логгер
-
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    # Импортируем переменные окружения здесь, чтобы функция была самодостаточной
     try:
-        log_level_str = config.logging_level.upper()
-        log_level = getattr(logging, log_level_str, logging.INFO)
-    except AttributeError:
-        log_level = logging.INFO
-        print(
-            f"WARNING: Некорректный уровень логирования '{config.logging_level}', используется INFO.",
-            file=sys.stderr,
-        )
+        # Импорт PySM
+        from pysm_lib import pysm_context
+        IS_MANAGED_RUN = True
+    except ImportError as e:
+        IS_MANAGED_RUN = False
+        pysm_context = None
 
-    formatter = logging.Formatter(
-        "%(name)s - %(levelname)s - %(message)s",
+    # 1. Определяем уровень логирования с приоритетом PySM
+    log_level_str_from_config = config.logging_level.upper()
+    log_level_str = log_level_str_from_config
+
+    if IS_MANAGED_RUN and pysm_context:
+        # У PySM высший приоритет
+        log_level_str = pysm_context.get("sys_log_level", log_level_str_from_config).upper()
+    
+    # Преобразуем строку в объект уровня логирования
+    log_level = getattr(logging, log_level_str, logging.INFO)
+
+    # 2. Создаем форматтеры в зависимости от уровня
+    # Исправлены опечатки (%% и ss)
+    if log_level <= logging.INFO:
+        stream_formatter = logging.Formatter("%(message)s")
+    else: # DEBUG и выше
+        stream_formatter = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
+    
+    # Для файла всегда используем подробный формат
+    file_formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    log_file_path = log_dir / config.log_file
-    try:
-        file_handler = logging.FileHandler(log_file_path, encoding="utf-8")
-        file_handler.setLevel(log_level)
-        file_handler.setFormatter(formatter)
-    except Exception as e:
-        print(
-            f"ERROR: Не удалось создать обработчик файла логов {log_file_path}: {e}",
-            file=sys.stderr,
-        )  # Log before logger ready
-        file_handler = None
+    # 3. Настраиваем корневой логгер, НЕ ИСПОЛЬЗУЯ basicConfig
+    logger = logging.getLogger()
+    logger.setLevel(log_level)
+    # Очищаем все предыдущие обработчики, чтобы избежать дублирования вывода
+    logger.handlers = []
 
+    # 4. Создаем и добавляем обработчик для вывода в консоль (stdout/stderr)
+    # PySM обычно лучше работает с stderr
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setLevel(log_level)
-    stream_handler.setFormatter(formatter)
-
-    logger.handlers = []
-    logger.setLevel(log_level)
-    if file_handler:
-        logger.addHandler(file_handler)
+    stream_handler.setFormatter(stream_formatter)
     logger.addHandler(stream_handler)
 
+    # 5. Создаем и добавляем обработчик для вывода в файл
+    log_file_path = log_dir / config.log_file
+    try:
+        # mode='w' перезаписывает лог при каждом запуске, 'a' - дописывает в конец
+        file_handler = logging.FileHandler(log_file_path, encoding="utf-8", mode='w')
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
+    except Exception as e:
+        # Теперь сообщение об ошибке будет выведено в уже настроенный stream_handler
+        logger.error(f"Не удалось создать обработчик файла логов {log_file_path}: {e}")
+        file_handler = None # Убедимся, что переменная существует
+
     # Логгируем сообщение о настройке после добавления обработчиков
+    # Используем .debug(), чтобы это сообщение не мешало при обычном запуске (INFO)
     logger.debug(
         f"Логирование настроено. Уровень: {log_level_str}. Файл: {log_file_path if file_handler else 'НЕ СОЗДАН'}"
     )
 
     return logger
+
