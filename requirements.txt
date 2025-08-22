@@ -1,6 +1,3 @@
-torch
-torchvision
-torchaudio
 beautifulsoup4
 comtypes
 cssutils
@@ -29,6 +26,7 @@ safetensors
 scikit-learn
 scipy
 toml
+torch
 tqdm
 transformers
 transparent-background[gui]
