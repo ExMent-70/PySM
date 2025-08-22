@@ -87,15 +87,29 @@ def get_installed_packages(python_exe: pathlib.Path) -> Dict[str, str]:
         return {}
 
 
-def parse_requirements(file_path: pathlib.Path) -> List[str]:
+# Замените эту функцию
+def parse_requirements(file_path: pathlib.Path) -> (List[str], List[str]):
     print(f"\n[2/4] Чтение файла зависимостей: {file_path}")
     if not file_path.is_file():
         print("    - ОШИБКА: Файл не найден.", file=sys.stderr)
-        return []
+        return [], []
+    
+    packages = []
+    options = []
     with open(file_path, "r", encoding="utf-8") as f:
-        lines = [line.strip() for line in f if line.strip() and not line.strip().startswith("#")]
-    print(f"    - Найдено {len(lines)} требований.")
-    return lines
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                if line.startswith("--"):
+                    # Это опция, как --extra-index-url
+                    # Делим по пробелу, чтобы передать как два аргумента
+                    options.extend(line.split(' ', 1))
+                else:
+                    packages.append(line)
+
+    print(f"    - Найдено {len(packages)} требований к пакетам.")
+    print(f"    - Найдено {len(options) // 2} опций для pip.")
+    return packages, options
 
 
 def compare_and_get_to_install(
@@ -106,33 +120,26 @@ def compare_and_get_to_install(
     try:
         from packaging.requirements import Requirement
         from packaging.version import Version
-        from packaging.specifiers import SpecifierSet
     except ImportError:
-        Requirement = Version = SpecifierSet = None
-        print("    - ПРЕДУПРЕЖДЕНИЕ: Библиотека 'packaging' не найдена. Сравнение версий может быть неточным.")
+        Requirement = Version = None
+        print("    - ПРЕДУПРЕЖДЕНИЕ: 'packaging' не найдена. Сравнение версий может быть неточным.")
 
     if not requirements:
         print("    - Список требований пуст. Пропуск установки.")
         return []
 
     for req_str in requirements:
-        normalized_req_name = ""
-        specifier = None
-        if Requirement:
-            try:
-                req = Requirement(req_str)
-                normalized_req_name = _normalize_name(req.name)
-                specifier = req.specifier
-            except Exception:
-                normalized_req_name = _normalize_name(req_str)
-                specifier = SpecifierSet("")
-        else:
-            match = re.match(r"([a-zA-Z0-9\-_]+)", req_str)
-            if match:
-                normalized_req_name = _normalize_name(match.group(1))
+        # --- НАЧАЛО ИЗМЕНЕНИЙ: Чистим имя для сравнения ---
+        # Убираем +cu... для корректного парсинга, но для установки используем оригинальную строку
+        clean_req_str = re.sub(r'\+.+$', '', req_str)
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
         
-        if not normalized_req_name:
-            print(f"    - [!] Не удалось распознать имя пакета в строке: '{req_str}'. Пропуск.")
+        try:
+            req = Requirement(clean_req_str) if Requirement else None
+            normalized_req_name = _normalize_name(req.name if req else re.split(r'[=<>!~]', clean_req_str)[0])
+            specifier = req.specifier if req else None
+        except Exception as e:
+            print(f"    - [!] Не удалось распознать пакет '{req_str}': {e}. Пропуск.")
             continue
         
         if normalized_req_name not in installed:
@@ -143,34 +150,28 @@ def compare_and_get_to_install(
             if upgrade:
                 print(f"    - [U] Будет обновлен (режим --upgrade): {req_str}")
                 to_install.append(req_str)
-            elif specifier and Version and specifier:
-                if not specifier.contains(Version(current_version_str)):
-                     print(f"    - [!] Конфликт версий для '{normalized_req_name}': требуется '{specifier}', установлен '{current_version_str}'. Пропуск.")
-                else:
-                    print(f"    - [=] Уже установлен и соответствует: {req_str}")
+            elif specifier and Version and not specifier.contains(Version(current_version_str)):
+                print(f"    - [!] Конфликт версий для '{normalized_req_name}': требуется '{specifier}', установлен '{current_version_str}'. Будет установлен: {req_str}")
+                to_install.append(req_str)
             else:
-                 print(f"    - [=] Уже установлен (версия не проверялась): {normalized_req_name}=={current_version_str}")
+                print(f"    - [=] Уже установлен и соответствует: {req_str}")
+
     return to_install
 
 
+# Замените эту функцию
 def main():
     parser = argparse.ArgumentParser(
-        description="Интеллектуально устанавливает пакеты из файла requirements.txt, проверяя уже установленные.",
+        description="Интеллектуально устанавливает пакеты из файла requirements.txt.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument("--req_requirements_file", required=True, help="Путь к файлу requirements.txt")
     parser.add_argument("--req_python_interpreter", help="Путь к целевому python.exe. Если не указан, используется текущий.")
-    parser.add_argument("--req_upgrade", action="store_true", help="Принудительно обновить все пакеты до последних версий, удовлетворяющих требованиям.")
+    parser.add_argument("--req_upgrade", action="store_true", help="Принудительно обновить все пакеты.")
     args = parser.parse_args()
     
-    if args.req_python_interpreter:
-        target_python_exe = pathlib.Path(args.req_python_interpreter)
-    else:
-        target_python_exe = pathlib.Path(sys.executable)
-    if pysm_context:
-        req_file = pysm_context.resolve_path(args.req_requirements_file)
-    else:
-        req_file = pathlib.Path(args.req_requirements_file).resolve()
+    target_python_exe = pathlib.Path(args.req_python_interpreter or sys.executable)
+    req_file = pathlib.Path(args.req_requirements_file).resolve()
     
     print("--- Скрипт установки зависимостей ---")
     print(f"Целевой интерпретатор: {target_python_exe}")
@@ -179,67 +180,60 @@ def main():
     print("-" * 40)
     
     installed_packages = get_installed_packages(target_python_exe)
-    requirements_list = parse_requirements(req_file)
+    requirements_list, pip_options = parse_requirements(req_file) # Получаем и опции
+
     if not requirements_list:
         print("\nФайл зависимостей пуст или не найден. Завершение работы.")
         sys.exit(0)
+        
     packages_to_install = compare_and_get_to_install(requirements_list, installed_packages, args.req_upgrade)
+    
     if not packages_to_install:
         print("\n[4/4] Все зависимости уже установлены. Ничего не требуется.")
         print("-" * 40)
         print("Установка успешно завершена (без изменений).")
         sys.exit(0)
     
-    print("\n[4/4] Запуск установки пакетов...")
+    print("\n[4/4] Запуск установки/обновления пакетов...")
     
     command = [
-        str(target_python_exe), "-u", "-m", "pip", "install",
-        "-v",
-        "--progress-bar", "off",
-        "--no-cache-dir",
+        str(target_python_exe), "-m", "pip", "install",
     ]
+    # Добавляем сначала глобальные опции pip
+    command.extend(pip_options)
+    
     if args.req_upgrade:
         command.append("--upgrade")
+        
+    # Добавляем пакеты для установки
     command.extend(packages_to_install)
 
-    print(f"    - Команда: {' '.join(command)}")
-    print("    - Вывод pip:")
+    print(f"    - Итоговая команда: {' '.join(command)}")
+    print("--- Вывод pip ---")
 
     try:
-        startupinfo = None
-        if sys.platform == "win32":
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        # subprocess.run с потоковым выводом - самый надежный способ
+        # Он будет печатать вывод pip в реальном времени
+        process = subprocess.Popen(command, stdout=sys.stdout, stderr=sys.stderr)
+        process.communicate() # Ждем завершения процесса
 
-        process = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", bufsize=1, startupinfo=startupinfo
-        )
-        
-        progress_bar = tqdm(desc="Установка пакетов...", leave=True, bar_format='{l_bar}{bar}|')
-        
-        stdout_thread = threading.Thread(target=stream_reader, args=(process.stdout, progress_bar))
-        stderr_thread = threading.Thread(target=stream_reader, args=(process.stderr, progress_bar))
-        stdout_thread.start()
-        stderr_thread.start()
-
-        process.wait()
-
-        stdout_thread.join()
-        stderr_thread.join()
-        
-        progress_bar.close()
-
+        print("--- Конец вывода pip ---")
         print("-" * 40)
+        
         if process.returncode == 0:
             print("Установка успешно завершена.")
+            sys.exit(0)
         else:
-            print(f"Установка завершена с ошибкой (код: {process.returncode}).")
-        sys.exit(process.returncode)
+            print(f"Установка завершена с ошибкой (код возврата: {process.returncode}).")
+            sys.exit(process.returncode)
 
     except (FileNotFoundError, Exception) as e:
-        print(f"\nКритическая ошибка при выполнении установки: {e}", file=sys.stderr)
+        print(f"\nКритическая ошибка при запуске pip: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
