@@ -36,7 +36,7 @@
   },
   "var_user_choice": {
     "type": "string",
-    "value": "no",
+    "value": "yes",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null

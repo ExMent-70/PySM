@@ -84,11 +84,37 @@ class SetRunnerOrchestrator(QObject):
                 "description": "System: Name of the active PyScriptManager theme.",
                 "read_only": True,
             }
+            
 
             current_log_level = logging.getLevelName(logger.getEffectiveLevel())
             context_data["sys_log_level"] = {
                 "type": "string", "value": current_log_level, "read_only": True
             }
+
+
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+            # 1. Собираем всю системную информацию в один словарь
+            sys_info_data = {
+                "app_root_dir": str(APPLICATION_ROOT_DIR),
+                "collection_file_path": str(
+                    self.config_manager.last_used_sets_collection_file
+                ),
+                "active_theme_name": self.theme_manager.get_active_theme_name(),
+                "log_level": logging.getLevelName(logger.getEffectiveLevel()),
+                # --- НОВАЯ СТРОКА ---
+                "python_interpreter": str(self.config_manager.python_interpreter),
+            }
+
+            # 2. Добавляем этот словарь как единую переменную в контекст
+            context_data["pysm_sys_info"] = {
+                "type": "json",
+                "value": sys_info_data,
+                "description": "System: Information about the execution environment.",
+                "read_only": True,
+            }
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+
+
 
             all_instances_data = []
             for e in self.set_node.script_entries:
@@ -100,6 +126,10 @@ class SetRunnerOrchestrator(QObject):
                 "type": "json", "value": all_instances_data, "read_only": True
             }
             context_data.pop("pysm_next_script", None)
+            
+            # Удаляем старые, теперь дублирующиеся переменные
+            #context_data.pop("pysm_active_theme_name", None)
+            #context_data.pop("sys_log_level", None)
 
             with open(self.context_file_path, "w", encoding="utf-8") as f:
                 json.dump(context_data, f, indent=2, ensure_ascii=False)

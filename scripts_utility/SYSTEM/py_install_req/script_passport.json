@@ -1,0 +1,38 @@
+{
+  "description": "Интеллектуально устанавливает Python-зависимости из requirements.txt или pyproject.toml, учитывая наличие GPU и версии CUDA в системе.",
+  "category": "Утилиты",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.0.0",
+  "command_line_args_meta": {
+    "inst_search_path": {
+      "type": "dir_path",
+      "description": "Путь к файлу (requirements.txt/pyproject.toml) или к директории для поиска.",
+      "required": false,
+      "default": ""
+    },
+    "inst_python_interpreter": {
+      "type": "file_path",
+      "description": "Путь к исполняемому файлу Python (python.exe). По умолчанию используется тот же, что и у PySM.",
+      "required": false,
+      "default": ""
+    },
+    "inst_upgrade": {
+      "type": "bool",
+      "description": "Принудительно обновить пакеты, даже если они уже установлены.",
+      "required": false,
+      "default": false
+    },
+    "inst_verbose": {
+      "type": "bool",
+      "description": "Включить детальное логирование для отладки.",
+      "required": false,
+      "default": false
+    },
+    "inst_analyze_only": {
+      "type": "bool",
+      "description": "Только проанализировать систему и выйти, не устанавливая пакеты.",
+      "required": false,
+      "default": false
+    }
+  }
+}
