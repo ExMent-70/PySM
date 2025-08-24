@@ -1047,7 +1047,7 @@
                 {
                   "id": "root_7617c03c/SYSTEM/install_requirements",
                   "instance_id": "instance_a0d0aaddfd2f",
-                  "name": "Установить пакеты из файла requirements.txt",
+                  "name": "Установить зависимости Python (простой вариант)",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
@@ -1068,7 +1068,7 @@
                 {
                   "id": "root_7617c03c/SYSTEM/py_install_req",
                   "instance_id": "instance_e1bd2adac082",
-                  "name": "py_install_req",
+                  "name": "Установить зависимости Python (продвинутый вариант)",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
