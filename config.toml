@@ -4,7 +4,7 @@ additional_env_paths = []
 python_paths = []
 
 [ui]
-last_used_script_set = "setnode_248fdda481cb"
+last_used_script_set = "setnode_e1ff3c2be2ae"
 last_used_sets_collection_file = "script_collections/Рабочий процесс. Сезон 2026.pysmc"
 
 [logging]

@@ -88,7 +88,7 @@ def main():
             logging.info(f"  - <b>Память:</b> {gpu.memory_mb / 1024:.1f} GB")
             logging.info(f"  - <b>Бэкенд:</b> {gpu.backend.upper()}")
             logging.info(f"  - <b>Compute Capability:</b> {gpu.compute_capability}")
-            logging.info(f"  - <b>Поддержка TensorRT:</b> {'Да' if gpu.tensorrt_support else 'Нет'}")
+            logging.info(f"  - <b>Поддержка TensorRT (через ONNX):</b> {'Да' if gpu.tensorrt_support else 'Нет'}")
         else:
             logging.info("  - <b>GPU:</b> Не обнаружен")
         

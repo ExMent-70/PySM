@@ -1093,6 +1093,30 @@
                       "enabled": true
                     }
                   }
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/py_gpu_doctor",
+                  "instance_id": "instance_d335af9593d7",
+                  "name": "Анализ конфигурации GPU",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {}
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/py_tensorrt_doctor",
+                  "instance_id": "instance_c5c7ecb077ac",
+                  "name": "Проверка наличия и работоспособности NVIDIA TensorRT",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {}
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/py_torch_doctor",
+                  "instance_id": "instance_01a820435e56",
+                  "name": "Проверка наличия и работоспособности PyTorch [CUDA]",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {}
                 }
               ]
             },

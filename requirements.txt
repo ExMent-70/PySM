@@ -17,6 +17,7 @@ photoshop-python-api
 psd-tools
 psutil
 pydantic
+pynvml
 pypiwin32
 pymorphy3
 PySide6
@@ -30,3 +31,4 @@ torch
 tqdm
 transformers
 transparent-background[gui]
+WMI
