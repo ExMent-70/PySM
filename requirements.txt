@@ -8,6 +8,7 @@ insightface
 ipymarkup
 Jinja2
 natasha
+nvidia-ml-py
 numpy==1.26.4
 onnxruntime-gpu
 opencv-python
