@@ -21,8 +21,8 @@ def get_best_provider(provider_config: Dict[str, Any]) -> tuple[str, list[dict]]
     """
     try:
         available_providers = ort.get_available_providers()
-        logger.info(f"Доступные провайдеры ONNX:")
-        logger.info(f"<i>{available_providers}</i><br>")
+        print(f"Доступные провайдеры ONNX:")
+        print(f"<i>{available_providers}</i><br>")
     except Exception as e:
         logger.error(f"Не удалось получить список провайдеров ONNX: {e}. Используется CPU.", exc_info=True)
         return "CPUExecutionProvider", [{}]
@@ -31,12 +31,12 @@ def get_best_provider(provider_config: Dict[str, Any]) -> tuple[str, list[dict]]
 
     if preferred_provider and preferred_provider in available_providers:
         selected_provider = preferred_provider
-        logger.debug(f"Выбран предпочтительный провайдер из конфигурации: {selected_provider}")
+        print(f"Выбран предпочтительный провайдер из конфигурации: {selected_provider}")
     else:
         # Порядок предпочтения
         priority_order = ["TensorrtExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"]
         selected_provider = next((p for p in priority_order if p in available_providers), "CPUExecutionProvider")
-        logger.debug(f"Автоматически выбран провайдер: {selected_provider}")
+        print(f"Автоматически выбран провайдер: {selected_provider}")
     
     provider_options = []
     if selected_provider == "TensorrtExecutionProvider":
@@ -92,7 +92,7 @@ class ONNXModelManager:
             Объект InferenceSession или None в случае ошибки.
         """
         if self._first_session:
-            logger.info(f"<br>Создание ONNX-сессии и начало анализа изображений...")
+            print(f"Создание ONNX-сессии и начало анализа изображений...")
             self._first_session = False
 
         resolved_path = model_path.resolve()
@@ -119,6 +119,7 @@ class ONNXModelManager:
                     provider_options=self.provider_options,
                 )
                 self._sessions[resolved_path] = session
+                logger.info("")
                 logger.debug(f"Сессия для {resolved_path.name} успешно создана и закэширована.")
                 return session
             except Exception as e:
@@ -129,7 +130,7 @@ class ONNXModelManager:
         """
         Освобождает ресурсы, связанные с сессиями ONNX.
         """
-        logger.debug(f"Завершение работы ONNXModelManager. Освобождение {len(self._sessions)} сессий...")
+        print(f"Завершение работы ONNXModelManager. Освобождение {len(self._sessions)} сессий...")
         sess_len = len(self._sessions)
         with self._lock:
             for model_path, session in self._sessions.items():
@@ -140,4 +141,4 @@ class ONNXModelManager:
                 except Exception as e:
                     logger.warning(f"Ошибка при завершении сессии для {model_path.name}: {e}")
             self._sessions.clear()
-        logger.info(f" - сессии ONNX освобождены (<b>{sess_len}</b>)")
+        print(f" - сессии ONNX освобождены (<b>{sess_len}</b>)")

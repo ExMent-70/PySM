@@ -1,0 +1,32 @@
+{
+  "description": "Кластеризует или классифицирует фотографии по локациям. Если текстовые описания локаций не заданы, использует автоматическую кластеризацию. Иначе, классифицирует фото по наиболее похожему описанию.\n<div style=\" {theme.tooltip_instance_args_block}\">\nДля работы использует маски (изображения без людей), которые должны быть предварительно сгенерированы.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output / Analysis_{photo_session}</i>\n<b>masks_dir</b> = <i>{data_dir} / Masks</i>\n</div>",
+  "category": "Анализ и AI",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2.2.0",
+  "command_line_args_meta": {
+    "a_cl_config_file": {
+      "type": "file_path",
+      "description": "Путь к файлу конфигурации (config.toml) для этапа кластеризации локаций.",
+      "required": false,
+      "default": "config.toml"
+    },
+    "a_cl_cluster_eps": {
+      "type": "float",
+      "description": "Параметр 'eps' для DBSCAN. Максимальное расстояние между эмбеддингами для объединения в один кластер. Меньшее значение -> больше кластеров.",
+      "required": false,
+      "default": 0.14
+    },
+    "a_cl_location_prompts": {
+      "type": "list_str",
+      "description": "Необязательный список текстовых описаний локаций. Если задан, включает режим классификации вместо кластеризации.",
+      "required": false,
+      "default": []
+    },
+    "all_threads": {
+      "type": "int",
+      "description": "Количество потоков для параллельного вычисления эмбеддингов. 0 - авто.",
+      "required": false,
+      "default": 0
+    }
+  }
+}

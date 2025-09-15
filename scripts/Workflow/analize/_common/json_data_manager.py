@@ -49,7 +49,7 @@ class JsonDataManager:
         try:
             self.portrait_data = self._load_single_file(self.portrait_json_path)
             self.group_data = self._load_single_file(self.group_json_path)
-            logger.info(f"Загружено <b>{len(self.portrait_data)}</b> портретных и <b>{len(self.group_data)}</b> групповых записей<br>")
+            print(f"Загружено <b>{len(self.portrait_data)}</b> портретных и <b>{len(self.group_data)}</b> групповых записей<br>")
             return True
         except (IOError, TypeError, json.JSONDecodeError) as e:
             logger.error(f"Критическая ошибка при загрузке JSON-данных: {e}", exc_info=True)
@@ -75,13 +75,13 @@ class JsonDataManager:
             True, если сохранение прошло успешно, False при ошибке.
         """
         try:
-            logger.info(f"<b>Сохранение результатов работы...</b>")
+            print(f"<b>Сохранение результатов работы...</b>")
             self._save_single_file("портретных", self.portrait_json_path, self.portrait_data)
             self._save_single_file("групповых", self.group_json_path, self.group_data)
-            logger.info(f"Рабочая папка:")
-            logger.info(f"<i>{self.portrait_json_path.parent}</i>")
-            logger.info(f"- портретные фотографии: <i>{self.portrait_json_path.name}</i>")
-            logger.info(f"- групповые  фотографии: <i>{self.group_json_path.name}</i>")
+            print(f"Рабочая папка:")
+            print(f"<i>{self.portrait_json_path.parent}</i>")
+            print(f"- портретные фотографии: <i>{self.portrait_json_path.name}</i>")
+            print(f"- групповые  фотографии: <i>{self.group_json_path.name}</i>")
             return True
         except IOError as e:
             logger.error(f"Критическая ошибка при сохранении JSON-данных: {e}", exc_info=True)
@@ -156,10 +156,10 @@ class JsonDataManager:
         """Очищает внутренние словари данных."""
         if data_type in ["portrait", "all"]:
             self.portrait_data.clear()
-            logger.info("Данные портретных файлов очищены из памяти.")
+            print("Данные портретных файлов очищены из памяти.")
         if data_type in ["group", "all"]:
             self.group_data.clear()
-            logger.info("Данные групповых файлов очищены из памяти.")
+            print("Данные групповых файлов очищены из памяти.")
 
     def get_portrait_filenames_with_children(self) -> Tuple[List[str], List[str]]:
         """Возвращает списки имен портретных файлов и соответствующих им имен детей."""

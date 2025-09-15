@@ -43,11 +43,11 @@ class JsonProgressReporter:
         # Переименовываем переменные для совместимости
         self.current = self.n
         self.description = self.desc
-
+       
         if IS_RUNNING_UNDER_PYSM and not self._pysm_initial_sent:
             # Отправляем начальное состояние даже для total=0, чтобы показать неопределенный бар
             self._send_progress_json()
-            self._pysm_initial_sent = True
+            self._pysm_initial_sent = True            
 
     def _send_progress_json(self):
         if self._closed:

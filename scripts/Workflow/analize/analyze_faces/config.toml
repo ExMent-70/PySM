@@ -48,4 +48,4 @@ analyze_age = true
 analyze_beauty = false
 analyze_eyeblink = true
 # Сохранять ли отладочные изображения с нанесенными ключевыми точками
-save_debug_kps = true
+save_debug_kps = false

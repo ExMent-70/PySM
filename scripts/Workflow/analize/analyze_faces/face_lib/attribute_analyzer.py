@@ -13,7 +13,7 @@ import numpy as np
 
 from .config_loader import ConfigManager
 from .face_data_processor_interface import FaceDataProcessorInterface
-from .onnx_manager import ONNXModelManager
+from _common.onnx_manager import ONNXModelManager
 
 logger = logging.getLogger(__name__)
 

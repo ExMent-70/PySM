@@ -8,7 +8,7 @@ from typing import Protocol, Dict, Any
 
 # Импортируем наши новые классы для тайп-хинтинга
 from .config_loader import ConfigManager
-from .onnx_manager import ONNXModelManager
+from _common.onnx_manager import ONNXModelManager
 
 
 class FaceDataProcessorInterface(Protocol):

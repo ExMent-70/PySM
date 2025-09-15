@@ -22,6 +22,7 @@
     </rdf:Seq>
    </dc:creator>
    <Iptc4xmpCore:IntellectualGenre></Iptc4xmpCore:IntellectualGenre>
+   <Iptc4xmpCore:Location></Iptc4xmpCore:Location>
    <dc:subject>
     <rdf:Bag>
 	 <!-- Пусто -->

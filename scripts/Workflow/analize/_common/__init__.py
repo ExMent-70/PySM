@@ -2,5 +2,10 @@
 # Этот файл делает папку _common пакетом Python.
 
 from .json_data_manager import JsonDataManager
+from .onnx_manager import ONNXModelManager
 
-__all__ = ["JsonDataManager"]
+
+__all__ = [
+    "ConfigManager",
+    "ONNXModelManager",
+]

@@ -2,7 +2,7 @@
   "description": "Конвертирует исходные файлы (RAW, PSD) в JPEG. Автоматически определяет папки на основе контекста рабочего процесса. Является первым шагом в конвейере обработки.\n<div style=\" {theme.tooltip_instance_args_block}\">\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}:\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>input_dir</b> =<i> {base_dir} / Capture / {wf_photo_session}</i>\n<b>output_dir</b> =<i> {base_dir} / Output / Analysis_{wf_photo_session} / JPG</i>\n</div>",
   "category": "Подготовка данных",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "command_line_args_meta": {
     "a_r2j_image_type": {
       "type": "choice",

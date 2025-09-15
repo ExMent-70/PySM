@@ -258,7 +258,9 @@ class XmpManager:
         self._update_text_field(description, "Credit", "photoshop", "1")
 
         self._update_text_field(description, "Headline", "photoshop", session_name)
-        self._update_text_field(description, "IntellectualGenre", "Iptc4xmpCore", "Группа" if len(faces) > 1 else "Портрет")
+        is_portrait = len(faces) == 1
+
+        self._update_text_field(description, "IntellectualGenre", "Iptc4xmpCore", "portrait" if is_portrait else "group_photo")
         bbox_val = first_face.get("original_bbox") or first_face.get("bbox")
         pose_val = first_face.get("pose")
         if bbox_val: self._update_text_field(description, "Instructions", "photoshop", self._format_coordinates("bbox", bbox_val))
@@ -266,9 +268,22 @@ class XmpManager:
 
         general_keywords = set()
         subject_codes_final = []
-        is_portrait = len(faces) == 1
-        photo_type = "Портрет" if is_portrait else "Группа"
+        photo_type = "portrait" if is_portrait else "group_photo"
         general_keywords.add(photo_type)
+
+    # ==============================================================================
+        location_cluster = (file_data or {}).get("location_name")
+        # Проверяем, что значение не None. Это важно для корректной обработки кластера "0".
+        if location_cluster is not None:
+            # Преобразуем число в строку для записи в XMP
+            location_value = str(location_cluster)
+            # Обновляем отдельный тег <Iptc4xmpCore:Location>
+            self._update_text_field(description, "Location", "Iptc4xmpCore", location_value)
+            # Добавляем в общий список ключевых слов
+            general_keywords.add(location_value)
+
+    # 3. БЛОК: Основной цикл обработки лиц и сохранение (без изменений)
+    # ==============================================================================      
         
         for face_idx, face in enumerate(faces):
             if not isinstance(face, dict): continue
