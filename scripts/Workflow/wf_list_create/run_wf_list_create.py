@@ -382,6 +382,9 @@ class ClassListEditor(QMainWindow):
         self.config = config
         self._is_dirty: bool = False
         self._save_children: bool = False
+        # Добавляем флаг, чтобы отслеживать процесс загрузки
+        self._is_loading: bool = False        
+
         self.SERVICES: Dict[str, int] = {}
         self._load_services()
         self.smart_parser = SmartParser()
@@ -435,11 +438,19 @@ class ClassListEditor(QMainWindow):
         )        
 
         self.statusBar().showMessage("Готово")
+
+        # Включаем флаг блокировки ПЕРЕД загрузкой и вызовом _update_cost_label
+        self._is_loading = True
         if self.config.wf_dest_dir:
             self.class_name_input.setText(pathlib.Path(self.config.wf_dest_dir).name)
             self._load_current_session()
-        self._update_cost_label()
+        
+        # Этот вызов теперь не будет перезаписывать цены благодаря флагу
+        self._update_cost_label() 
         self._update_summary_info()
+        # Выключаем флаг блокировки ПОСЛЕ всех инициализирующих операций
+        self._is_loading = False
+
     
     def _create_menu(self) -> None:
         """Создает и настраивает меню приложения."""
@@ -605,13 +616,22 @@ class ClassListEditor(QMainWindow):
                 self.SERVICES = default_services
             except Exception: self.SERVICES = default_services
 
+                    
     def _update_cost_label(self) -> None:
+        """
+        Обновляет метку стоимости и, если это действие пользователя,
+        применяет новую услугу ко всем строкам.
+        """
         s_type = self.service_type_combo.currentText()
         cost = self.SERVICES.get(s_type, 0)
         self.service_cost_label.setText(f"{cost} руб.")
-        if self.table_model.rowCount() > 0:
+
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Применяем услугу ко всем, только если это не процесс загрузки/инициализации
+        if not self._is_loading and self.table_model.rowCount() > 0:
             self._is_dirty = True
-            self.table_model.update_all_services(s_type, cost)
+            self.table_model.update_all_services(s_type, cost)        
+            
 
     def _process_raw_list(self) -> None:
         if self.table_model.rowCount() > 0 and QMessageBox.question(self, "Подтверждение", "Заменить список?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.No: return
@@ -691,15 +711,19 @@ class ClassListEditor(QMainWindow):
 
     def _load_from_file(self, path: pathlib.Path) -> None:
         try:
-            with open(path, 'r', encoding='utf-8') as f: data = json.load(f)
+            with open(path, 'r', encoding='utf-8') as f: data = json.load(f)            
             self.class_name_input.setText(data.get("class_name", path.stem))
+
             self.service_type_combo.setCurrentText(data.get("service_type", next(iter(self.SERVICES))))
+
             self.table_model.update_data(data.get("students", []))
             self.table_model.sort(StudentTableModel.COL_SURNAME)
+
             self.config.wf_dest_dir = str(path.parent)
             self.statusBar().showMessage(f"Загружено: {path.name}", 5000)
             self._is_dirty = False
-        except Exception as e: QMessageBox.critical(self, "Ошибка", f"Не удалось прочитать файл:\n{e}")
+        except Exception as e: 
+            QMessageBox.critical(self, "Ошибка", f"Не удалось прочитать файл:\n{e}")
 
     def _save_list(self, save_as: bool = False) -> bool:
         path = self._get_default_filepath('list') if not save_as else None
