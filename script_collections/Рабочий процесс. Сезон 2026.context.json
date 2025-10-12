@@ -1,11 +1,4 @@
 {
-  "var_Hello": {
-    "type": "string",
-    "value": "Андрей",
-    "description": null,
-    "read_only": false,
-    "choices": null
-  },
   "wf_session_path": {
     "type": "dir_path",
     "value": "G:/2026_Capture_One_Session",
@@ -22,28 +15,21 @@
   },
   "wf_session_name": {
     "type": "string",
-    "value": "Школа212_11а_класс",
+    "value": "ШколаТур_9а_класс",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
   },
   "wf_raw_path": {
     "type": "dir_path",
-    "value": "G:/2025/TEST",
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
-  },
-  "var_user_choice": {
-    "type": "string",
-    "value": "yes",
+    "value": "H:/DCIM/100EOSR5",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
   },
   "wf_photo_session": {
     "type": "choice",
-    "value": "STREET",
+    "value": "SCHOOL",
     "description": "Имя текущей сессии для записи в метаданные. Обычно устанавливается автоматически.",
     "read_only": false,
     "choices": [
@@ -54,13 +40,6 @@
       "STREET",
       "STUDIO"
     ]
-  },
-  "dlg_msg_user_var": {
-    "type": "string",
-    "value": "yes",
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
   },
   "sys_log_level": {
     "type": "string",
@@ -79,18 +58,100 @@
   "enhancer_settings": {
     "type": "json",
     "value": {
-      "brightness": 0.99,
-      "contrast": 1.1,
-      "color": 1.12,
+      "brightness": 1.12,
+      "contrast": 1.02,
+      "color": 1.0,
       "sharpness": 1.11
     },
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
   },
-  "var_jpg_move": {
-    "type": "int",
-    "value": 0,
+  "generated_idml_path": {
+    "type": "string",
+    "value": "E:\\YandexDisk\\ФОТОСЕССИИ\\СЕЗОН_2026\\ШколаТур_9а_класс\\Альбом\\_Шаблоны_\\ШколаТур_9а_класс_Фото А6 вертикальное.indd",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_idsgn_catalog": {
+    "type": "file_path",
+    "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/catalog.template",
+    "description": null,
+    "read_only": false,
+    "choices": null
+  },
+  "var_album_cover": {
+    "type": "json",
+    "value": {
+      "id": "e85be8c5-46d7-45a6-9781-5bd70fc89529",
+      "name": "Фото А6 (вертикальное)",
+      "category": "Фотографии",
+      "template_path": "templates/00-Фотографии/ФФ_В_А6.indd",
+      "placeholder_map": {
+        "portrait0": "portrait_cover"
+      }
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_album_sheet_02": {
+    "type": "json",
+    "value": {
+      "id": "62117ed4-c171-4743-a82b-20100dd0e769",
+      "name": "Разворот. Природа",
+      "category": "Альбомные развороты",
+      "template_path": "templates/01-Черный_бархат/01_01_Sheet.indd",
+      "placeholder_map": {
+        "group_photo_01": "group_photo_01",
+        "group_photo_gender": "group_photo_gender"
+      }
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_album_photoA6": {
+    "type": "json",
+    "value": {
+      "id": "e85be8c5-46d7-45a6-9781-5bd70fc89529",
+      "name": "Фото А6 (вертикальное)",
+      "category": "Фотографии",
+      "template_path": "templates/00-Фотографии/ФФ_В_А6.indd",
+      "placeholder_map": {
+        "portrait0": "portrait_cover"
+      }
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_album_cover_test": {
+    "type": "json",
+    "value": {
+      "id": "1ed7fb6a-9045-456e-931c-8a8c0e6ec30b",
+      "name": "Персональная обложка (2 фотографии)",
+      "category": "Обложки",
+      "template_path": "templates/01-Черный_бархат/01_02_Cover.indd",
+      "placeholder_map": {
+        "group_photo_cover_01": "group_photo_cover_01",
+        "portrait_cover": "portrait_cover"
+      }
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "sys_location_name": {
+    "type": "list",
+    "value": [
+      "group_photo_01",
+      "group_photo_all",
+      "group_photo_cover_01",
+      "group_photo_gender",
+      "portrait_cover"
+    ],
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
