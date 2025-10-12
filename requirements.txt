@@ -6,6 +6,7 @@ hdbscan
 huggingface_hub[hf_xet]
 insightface
 ipymarkup
+ijson
 Jinja2
 natasha
 nvidia-ml-py
