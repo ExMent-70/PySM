@@ -14,7 +14,13 @@
       "type": "int",
       "description": "Количество потоков для параллельной обработки изображений. 0 - авто (по числу ядер CPU).",
       "required": false,
-      "default": 0
+      "default": "12"
+    },
+    "a_af_det_thresh": {
+      "type": "float",
+      "description": "Порог уверенности для детектора лиц (от 0.0 до 1.0). Переопределяет значение из config.toml.",
+      "required": false,
+      "default": "0.25"
     }
   }
 }

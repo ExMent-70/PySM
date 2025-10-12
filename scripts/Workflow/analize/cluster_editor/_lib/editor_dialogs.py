@@ -4,14 +4,15 @@
 """
 import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QGraphicsView,
-    QGraphicsScene, QGraphicsPixmapItem, QPushButton, QSlider, QFrame
+    QGraphicsScene, QGraphicsPixmapItem, QPushButton, QSlider, QFrame, QComboBox, QDialogButtonBox
 )
 from PySide6.QtGui import QPixmap, QPainter, QTransform, QWheelEvent
 from PySide6.QtCore import Qt, Slot, QEvent
+
 
 from . import editor_styles as styles
 
@@ -243,3 +244,39 @@ class EnhanceSettingsDialog(QDialog):
     def _get_all_sliders(self) -> Dict[str, Dict]:
         return {"brightness": self.brightness_slider, "contrast": self.contrast_slider,
                 "color": self.color_slider, "sharpness": self.sharpness_slider}
+                
+                
+
+class RenameDialog(QDialog):
+    """
+    Кастомный диалог для переименования кластера с использованием
+    редактируемого выпадающего списка.
+    """
+    def __init__(self, predefined_names: List[str], current_name: str = "", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Переименование кластера")
+        self.setMinimumWidth(350)
+
+        layout = QVBoxLayout(self)
+
+        info_label = QLabel("Выберите имя из списка или введите новое:")
+        layout.addWidget(info_label)
+
+        self.combo_box = QComboBox(self)
+        self.combo_box.setEditable(True)
+        if predefined_names:
+            self.combo_box.addItems(predefined_names)
+        self.combo_box.setCurrentText(current_name)
+        self.combo_box.lineEdit().selectAll() # Выделяем текст для удобства
+
+        layout.addWidget(self.combo_box)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        
+        layout.addWidget(button_box)
+
+    def get_selected_name(self) -> str:
+        """Возвращает итоговый текст из QComboBox."""
+        return self.combo_box.currentText().strip()

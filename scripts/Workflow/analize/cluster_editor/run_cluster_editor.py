@@ -1,4 +1,4 @@
-# 3. БЛОК: run_cluster_editor.py (ПОЛНЫЙ ОБНОВЛЕННЫЙ КОД)
+# 1. БЛОК: run_cluster_editor.py (ПОЛНЫЙ ОБНОВЛЕННЫЙ КОД)
 # ==============================================================================
 
 #!/usr/bin/env python3
@@ -15,6 +15,8 @@ import re
 import os
 import logging
 import argparse
+import json
+import traceback
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
@@ -24,12 +26,10 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QDialog, QCheckBox
 )
 from PySide6.QtGui import QPixmap, QAction, QColor
-from PySide6.QtCore import Qt, Signal, Slot, QThread
+from PySide6.QtCore import Qt, Signal, Slot, QThread, QTimer
 
 # Внутренние модули
-IS_COMMON_AVAILABLE = False
 IS_MANAGED_RUN = False
-
 
 try:
     current_script_dir = Path(__file__).resolve().parent
@@ -41,14 +41,13 @@ try:
     IS_MANAGED_RUN = True
 
     from _lib.editor_viewer import ImageViewer
-    from _lib.editor_workers import GalleryPrepareWorker, GalleryLoadWorker, ExportWorker
+    from _lib.editor_workers import GalleryPrepareWorker, FileReaderWorker, GalleryLoadWorker, ExportWorker
     from _lib.editor_delegates import ClusterItemDelegate, ImageItemDelegate
     from _lib.editor_widgets import ImageDragListWidget, ClusterDropListWidget
-    from _lib.editor_dialogs import EnhanceSettingsDialog
+    from _lib.editor_dialogs import EnhanceSettingsDialog, RenameDialog
     from _lib import editor_styles as styles
-    # --- ИЗМЕНЕНИЕ: Импортируем новые классы ---
     from _lib.data_manager import ClusterDataManager
-    from _lib.data_models import Face # Face нужен для type hinting
+    from _lib.data_models import Face
 
 except ImportError as e:
     print(f"Ошибка импорта: {e}", file=sys.stderr)
@@ -58,7 +57,6 @@ logger = logging.getLogger(__name__)
 
 
 def get_color_from_css(css_string: Optional[str], default_color: str) -> QColor:
-    """Извлекает HEX/имя цвета из CSS-строки 'property: value;'."""
     if not css_string:
         return QColor(default_color)
     
@@ -82,20 +80,38 @@ class MainWindow(QWidget):
 
         if self.mode == 'face':
             self.mode_config = {
-                "mode_name": "face", "json_field_id": "cluster_label", "json_field_name": "child_name",
+                "mode_name": "face",
                 "window_title": f"Редактор кластеров [по Лицам] - {photo_session}",
                 "name_prefix_logic": lambda cid: f"{int(cid):02d}-" if str(cid).isdigit() else "",
             }
         elif self.mode == 'location':
             self.mode_config = {
-                "mode_name": "location", "json_field_id": "location_cluster", "json_field_name": "location_name",
+                "mode_name": "location",
                 "window_title": f"Редактор кластеров [по Локациям] - {photo_session}",
                 "name_prefix_logic": lambda cid: "",
+            }
+        elif self.mode == 'matches':
+             self.mode_config = {
+                "mode_name": "matches",
+                "window_title": f"Просмотр совпадений [Портреты -> Группы] - {photo_session}",
+                "name_prefix_logic": lambda cid: f"{int(cid):02d}-" if str(cid).isdigit() else "",
             }
         else:
             raise ValueError(f"Неизвестный режим работы: {self.mode}")
 
-        # --- ИЗМЕНЕНИЕ: Инициализируем DataManager и удаляем старые модели ---
+        self.predefined_cluster_names: List[str] = []
+        try:
+            current_dir = Path(__file__).resolve().parent
+            predefined_names_path = current_dir / "predefined_names.json"
+            if predefined_names_path.exists():
+                with open(predefined_names_path, 'r', encoding='utf-8') as f:
+                    self.predefined_cluster_names = json.load(f)
+                    logger.info(f"Загружено {len(self.predefined_cluster_names)} предопределенных имен кластеров.")
+            else:
+                logger.warning(f"Файл 'predefined_names.json' не найден в {current_dir}.")
+        except Exception as e:
+            logger.error(f"Ошибка при загрузке или парсинге predefined_names.json: {e}")
+        
         self.data_manager = ClusterDataManager(
             self.data_dir / "info_portrait_faces.json",
             self.data_dir / "info_group_faces.json",
@@ -104,6 +120,13 @@ class MainWindow(QWidget):
         self.active_cluster_id: Optional[str] = None
         self.preview_pixmaps: Dict[str, QPixmap] = {}
         self.image_pixmap_cache: Dict[str, QPixmap] = {}
+        
+        self.file_reader_thread = None
+        self.file_reader_worker = None
+        self.gallery_load_thread = None
+        self.gallery_load_worker = None
+        self.gallery_populator_timer = None
+        self.gallery_item_iterator = None
 
         hover_css = theme_api.get_dynamic_style("delegate_hover_border", "color: #0078d7;")
         changed_css = theme_api.get_dynamic_style("delegate_changed_indicator", "color: #f0ad4e;")
@@ -125,7 +148,6 @@ class MainWindow(QWidget):
         self._load_and_display_data()
     
     def _center_on_screen(self):
-        """Центрирует окно на экране, на котором оно будет показано."""
         try:
             screen_geometry = self.screen().geometry()
             window_geometry = self.frameGeometry()
@@ -136,7 +158,6 @@ class MainWindow(QWidget):
             logger.warning(f"Не удалось центрировать окно на экране: {e}")
 
     def init_ui(self):
-        """Инициализирует пользовательский интерфейс."""
         self.setWindowTitle(self.mode_config["window_title"])
         self.setGeometry(0, 0, 1350, 900)
 
@@ -165,8 +186,13 @@ class MainWindow(QWidget):
         self.cluster_list_widget.currentItemChanged.connect(self._on_cluster_selected)
         self.cluster_list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.cluster_list_widget.customContextMenuRequested.connect(self.show_cluster_context_menu)
-        self.cluster_list_widget.itemsDropped.connect(self._handle_drop)
-        self.cluster_list_widget.setDragDropMode(QListWidget.DragDropMode.DropOnly)
+        
+        if self.mode == 'matches':
+            self.cluster_list_widget.setDragDropMode(QListWidget.DragDropMode.NoDragDrop)
+        else:
+            self.cluster_list_widget.itemsDropped.connect(self._handle_drop)
+            self.cluster_list_widget.setDragDropMode(QListWidget.DragDropMode.DropOnly)
+        
         self.cluster_list_widget.viewport().setAcceptDrops(True)
         self.cluster_list_widget.setDropIndicatorShown(False)
         
@@ -182,7 +208,12 @@ class MainWindow(QWidget):
         self.image_list_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
         self.image_list_widget.setSpacing(10)
         self.image_list_widget.setItemDelegate(self.image_delegate)
-        self.image_list_widget.setDragDropMode(QListWidget.DragDropMode.DragOnly)
+        
+        if self.mode == 'matches':
+            self.image_list_widget.setDragDropMode(QListWidget.DragDropMode.NoDragDrop)
+        else:
+            self.image_list_widget.setDragDropMode(QListWidget.DragDropMode.DragOnly)
+            
         self.image_list_widget.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.image_list_widget.itemDoubleClicked.connect(self._open_image_viewer)
         
@@ -197,6 +228,9 @@ class MainWindow(QWidget):
         self.save_button = QPushButton("Сохранить изменения")
         self.save_button.clicked.connect(self._save_changes)
         
+        if self.mode == 'matches':
+            self.save_button.setText("Сгенерировать matches.json")
+
         buttons_layout = QHBoxLayout()
         buttons_layout.addWidget(self.export_button)
         buttons_layout.addWidget(self.save_button)
@@ -222,22 +256,29 @@ class MainWindow(QWidget):
         main_layout.addWidget(self.status_progress_bar)
         self._center_on_screen()
 
-    # --- ИЗМЕНЕНИЕ: Упрощенные методы, делегирующие DataManager ---
     def _load_and_display_data(self):
-        if not self.data_manager.load_data():
-            QMessageBox.critical(self, "Ошибка", "Не удалось загрузить JSON.")
+        success, message = self.data_manager.load_data()
+        if not success:
+            QMessageBox.critical(self, "Ошибка загрузки данных", message)
             return
         self._refresh_left_panel()
 
     def _get_clusters_from_model(self) -> Dict[str, List[Face]]:
+        if self.mode == 'matches':
+            face_mode_config = {
+                "mode_name": "face",
+                "name_prefix_logic": lambda cid: f"{int(cid):02d}-" if str(cid).isdigit() else "",
+            }
+            return self.data_manager.get_clusters(face_mode_config)
         return self.data_manager.get_clusters(self.mode_config)
 
-    def _get_files_for_cluster(self, cluster_id: str) -> List[str]:
-        return self.data_manager.get_files_for_cluster(self.mode_config, cluster_id)
-
-    def get_cluster_count(self, cluster_id: str) -> int:
-        return len(self._get_files_for_cluster(cluster_id))
+    def _get_files_for_cluster_for_viewer(self, cluster_id: str) -> List[str]:
+        if self.mode == 'matches':
+            return self.data_manager.get_group_matches_for_cluster(cluster_id)
         
+        config_map = { 'face': {'mode_name': 'face'}, 'location': {'mode_name': 'location'} }
+        return self.data_manager.get_files_for_cluster(config_map[self.mode], cluster_id)
+
     def _get_image_path(self, filename: str) -> Path:
         return self.flat_images_dir / filename
 
@@ -270,15 +311,17 @@ class MainWindow(QWidget):
         self.preview_pixmaps.clear()
         clusters = self._get_clusters_from_model()
         
-        if self.mode_config["mode_name"] == 'face':
-            sorted_labels = sorted(
-                clusters.keys(), key=lambda x: int(x) if x.isdigit() else (9998 if x == "-1" else 9999),
-            )
-        else:
-            sorted_labels = sorted(clusters.keys())
+        sort_key_func = lambda x: int(x) if x.isdigit() else (9998 if x == "-1" else 9999)
+        if self.mode == 'location':
+            sort_key_func = lambda x: x
+
+        sorted_labels = sorted(clusters.keys(), key=sort_key_func)
 
         item_to_select = None
         for label in sorted_labels:
+            if self.mode == 'matches' and label in ["-1", "group"]:
+                continue
+            
             faces = clusters[label]
             cluster_name = faces[0].effective_name if faces else f"Кластер {label}"
             
@@ -292,65 +335,82 @@ class MainWindow(QWidget):
             
             self.preview_pixmaps[label] = pixmap
             
-            item_data = { "id": label, "name": cluster_name, "count": len(faces),
-                          "pixmap": pixmap, "is_changed": False } # is_changed теперь в DataManager
+            if self.mode == 'matches':
+                count = len(self.data_manager.get_group_matches_for_cluster(label))
+            else:
+                count = len(self.data_manager.get_files_for_cluster(self.mode_config, label))
+
+            item_data = { "id": label, "name": cluster_name, "count": count,
+                          "pixmap": pixmap, "is_changed": False }
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, item_data)
             self.cluster_list_widget.addItem(item)
             
             if label == active_id_before_refresh:
                 item_to_select = item
-
-        for new_cluster in self.data_manager.newly_created_clusters:
-            if new_cluster["id"] in clusters:
-                continue
-            item_data = {
-                "id": new_cluster["id"], "name": new_cluster["name"], "count": 0,
-                "pixmap": QPixmap(), "is_changed": True
-            }
-            item = QListWidgetItem()
-            item.setData(Qt.ItemDataRole.UserRole, item_data)
-            self.cluster_list_widget.addItem(item)
-            if new_cluster["id"] == active_id_before_refresh:
-                item_to_select = item
+        
+        if self.mode != 'matches':
+            for new_cluster in self.data_manager.newly_created_clusters:
+                if new_cluster["id"] in clusters:
+                    continue
+                item_data = {
+                    "id": new_cluster["id"], "name": new_cluster["name"], "count": 0,
+                    "pixmap": QPixmap(), "is_changed": True
+                }
+                item = QListWidgetItem()
+                item.setData(Qt.ItemDataRole.UserRole, item_data)
+                self.cluster_list_widget.addItem(item)
+                if new_cluster["id"] == active_id_before_refresh:
+                    item_to_select = item
 
         if item_to_select:
             self.cluster_list_widget.setCurrentItem(item_to_select)
         elif self.cluster_list_widget.count() > 0:
             self.cluster_list_widget.setCurrentRow(0)
 
-    # 2. БЛОК: Метод _render_gallery (заменить в run_cluster_editor.py)
-    # ==============================================================================
     def _render_gallery(self, cluster_id: str):
         self._stop_gallery_load_if_running()
-        self._stop_gallery_prepare_if_running() # Останавливаем и подготовку
+        self._stop_file_reader_if_running()
+        self._stop_gallery_prepare_if_running()
+        self._stop_populator_timer()
 
         cluster_data = self._get_cluster_item_data_by_id(cluster_id)
         if not cluster_data:
             self.image_list_widget.clear()
             self.right_panel_label.setText("Кластер не найден")
             return
-            
-        self.right_panel_label.setText(f"Кластер: {cluster_data['name']} ({cluster_data['count']} фото)")
+        
+        if self.mode == 'matches':
+             self.right_panel_label.setText(f"Групповые фото для кластера: {cluster_data['name']} ({cluster_data['count']} совпадений)")
+        else:
+             self.right_panel_label.setText(f"Кластер: {cluster_data['name']} ({cluster_data['count']} фото)")
+
         self.image_list_widget.clear()
         
-        # Запускаем подготовку в фоновом потоке
-        self.prepare_thread = QThread(self)
-        self.prepare_worker = GalleryPrepareWorker(
-            self.data_manager, self.mode_config, cluster_id, self.image_pixmap_cache
-        )
-        self.prepare_worker.moveToThread(self.prepare_thread)
+        if self.mode == 'matches':
+            files_to_show = self.data_manager.get_group_matches_for_cluster(cluster_id)
+        else:
+            files_to_show = self.data_manager.get_files_for_cluster(self.mode_config, cluster_id)
+
+        if not files_to_show:
+            return
         
-        self.prepare_worker.prepared.connect(self._on_gallery_prepared)
-        self.prepare_worker.finished.connect(self._on_gallery_prepare_finished)
+        cached_items, uncached_tasks = [], []
+        for filename in files_to_show:
+            if filename in self.image_pixmap_cache:
+                cached_items.append({
+                    "filename": filename,
+                    "pixmap": self.image_pixmap_cache[filename]
+                })
+            else:
+                uncached_tasks.append({
+                    "filename": filename,
+                    "cluster_id": cluster_id
+                })
         
-        self.prepare_thread.started.connect(self.prepare_worker.run)
-        self.prepare_thread.start()
-        
-    # 3. БЛОК: НОВЫЕ МЕТОДЫ (добавить в MainWindow в run_cluster_editor.py)
-    # ==============================================================================
+        self._on_gallery_prepared(cached_items, uncached_tasks)
+
     def _stop_gallery_prepare_if_running(self):
-        """Останавливает поток подготовки галереи, если он запущен."""
         if hasattr(self, 'prepare_thread') and self.prepare_thread and self.prepare_thread.isRunning():
             if hasattr(self, 'prepare_worker') and self.prepare_worker:
                 self.prepare_worker.requestInterruption()
@@ -367,41 +427,61 @@ class MainWindow(QWidget):
 
     @Slot(list, list)
     def _on_gallery_prepared(self, cached_items: List[Dict], uncached_tasks: List[Dict]):
-        """
-        Слот, который вызывается после завершения подготовки.
-        Быстро заполняет галерею кэшированными элементами и запускает загрузку остальных.
-        """
-        # 1. Быстро добавляем все, что уже есть в кэше
         for item_data in cached_items:
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.DecorationRole, item_data["pixmap"])
             item.setData(Qt.ItemDataRole.UserRole, {"filename": item_data["filename"]})
             self.image_list_widget.addItem(item)
             
-        # 2. Если остались некэшированные - запускаем для них старый воркер
         if uncached_tasks:
-            # Дополняем задачи полными путями
             full_tasks = [
                 {**task, "full_path": self._get_image_path(task["filename"])}
                 for task in uncached_tasks
             ]
-            self._start_gallery_load(full_tasks)
+            self._start_file_reading(full_tasks)
+    
+    def _stop_file_reader_if_running(self):
+        if hasattr(self, 'file_reader_thread') and self.file_reader_thread and self.file_reader_thread.isRunning():
+            if hasattr(self, 'file_reader_worker') and self.file_reader_worker:
+                self.file_reader_worker.requestInterruption()
+            try:
+                self.file_reader_worker.finished.disconnect(self._on_files_read)
+            except (RuntimeError, TypeError):
+                pass
+            self.file_reader_thread.quit()
+            if not self.file_reader_thread.wait(1000):
+                self.file_reader_thread.terminate()
+            self.file_reader_worker = None
+            self.file_reader_thread = None
 
-    @Slot()
-    def _on_gallery_prepare_finished(self):
-        """Очищает ресурсы после завершения потока подготовки."""
-        if hasattr(self, 'prepare_thread') and self.prepare_thread:
-            self.prepare_thread.quit()
-            self.prepare_thread.wait()
-            self.prepare_worker = None
-            self.prepare_thread = None
+    def _start_file_reading(self, tasks: List[Dict]):
+        self._stop_file_reader_if_running()
+        
+        self.file_reader_thread = QThread(self)
+        self.file_reader_worker = FileReaderWorker(tasks)
+        self.file_reader_worker.moveToThread(self.file_reader_thread)
+        self.file_reader_worker.finished.connect(self._on_files_read)
+        self.file_reader_thread.started.connect(self.file_reader_worker.run)
+        self.file_reader_thread.start()
 
+    @Slot(list)
+    def _on_files_read(self, read_data_tasks: List[Dict]):
+        if hasattr(self, 'file_reader_thread') and self.file_reader_thread:
+            self.file_reader_thread.quit()
+            self.file_reader_thread.wait()
+            self.file_reader_worker = None
+            self.file_reader_thread = None
+
+        if read_data_tasks:
+            self._start_gallery_load(read_data_tasks)
 
     @Slot(QListWidgetItem, QListWidgetItem)
     def _on_cluster_selected(self, current_item: QListWidgetItem, previous_item: Optional[QListWidgetItem] = None):
         if not current_item:
             self._stop_gallery_prepare_if_running()
+            self._stop_file_reader_if_running()
             self._stop_gallery_load_if_running()
+            self._stop_populator_timer()
             self.image_list_widget.clear()
             self.right_panel_label.setText("Кластер")
             self.active_cluster_id = None
@@ -411,19 +491,20 @@ class MainWindow(QWidget):
         cluster_id = cluster_data["id"]
         if self.active_cluster_id == cluster_id:
             return
-            
+        
         self._stop_gallery_prepare_if_running()
+        self._stop_file_reader_if_running()
         self._stop_gallery_load_if_running()
+        self._stop_populator_timer()
         self.active_cluster_id = cluster_id
         self._render_gallery(cluster_id)
-
 
     def _stop_gallery_load_if_running(self):
         if hasattr(self, 'gallery_load_thread') and self.gallery_load_thread and self.gallery_load_thread.isRunning():
             if hasattr(self, 'gallery_load_worker') and self.gallery_load_worker:
                 self.gallery_load_worker.requestInterruption()
             try:
-                self.gallery_load_worker.widget_ready.disconnect(self._add_gallery_item)
+                self.gallery_load_worker.progress_updated.disconnect(self.status_progress_bar.setValue)
                 self.gallery_load_worker.finished.disconnect(self._on_gallery_load_finished)
             except (RuntimeError, TypeError): pass
             self.gallery_load_thread.quit()
@@ -434,56 +515,73 @@ class MainWindow(QWidget):
         self._stop_gallery_load_if_running()
         self.status_progress_bar.setRange(0, len(tasks))
         self.status_progress_bar.setValue(0)
-        self.status_progress_bar.setFormat("Загрузка изображений... %p%")
+        self.status_progress_bar.setFormat("Подготовка изображений... %p%")
         
         self.gallery_load_thread = QThread(self)
-        self.gallery_load_worker = GalleryLoadWorker(tasks)
+        self.gallery_load_worker = GalleryLoadWorker(tasks, self.image_pixmap_cache)
         self.gallery_load_worker.moveToThread(self.gallery_load_thread)
-        self.gallery_load_worker.widget_ready.connect(self._add_gallery_item)
+        self.gallery_load_worker.progress_updated.connect(self.status_progress_bar.setValue)
         self.gallery_load_worker.finished.connect(self._on_gallery_load_finished)
         self.gallery_load_thread.started.connect(self.gallery_load_worker.run)
         self.gallery_load_thread.start()
 
-    @Slot(str, str, Path, QPixmap)
-    def _add_gallery_item(self, filename: str, cluster_id: str, full_path: Path, pixmap: QPixmap):
-        if self.active_cluster_id != cluster_id: return
-        if filename not in self.image_pixmap_cache:
-            self.image_pixmap_cache[filename] = pixmap
-        
-        item = QListWidgetItem()
-        item.setData(Qt.ItemDataRole.DecorationRole, pixmap)
-        item.setData(Qt.ItemDataRole.UserRole, {"filename": filename})
-        self.image_list_widget.addItem(item)
-        self.status_progress_bar.setValue(self.status_progress_bar.value() + 1)
-
-    @Slot()
-    def _on_gallery_load_finished(self):
+    @Slot(list)
+    def _on_gallery_load_finished(self, processed_tasks: List[Dict]):
         self.status_progress_bar.reset(); self.status_progress_bar.setFormat("")
         if hasattr(self, 'gallery_load_thread') and self.gallery_load_thread:
             self.gallery_load_thread.quit(); self.gallery_load_thread.wait()
             self.gallery_load_worker = None; self.gallery_load_thread = None
+        
+        if not processed_tasks:
+            return
 
-    @Slot(QListWidgetItem)
-    def _rename_cluster_action(self, item: QListWidgetItem):
-        cluster_data = item.data(Qt.ItemDataRole.UserRole)
-        cluster_id = cluster_data["id"]
-        if self.mode_config["mode_name"] == 'face' and cluster_id in ["group", "-1"]:
-            QMessageBox.information(self, "Инфо", "Этот кластер нельзя переименовать."); return
+        self.gallery_item_iterator = iter(processed_tasks)
+        if not self.gallery_populator_timer:
+            self.gallery_populator_timer = QTimer(self)
+            self.gallery_populator_timer.timeout.connect(self._populate_gallery_chunk)
+        self.gallery_populator_timer.start(0)
+
+    def _stop_populator_timer(self):
+        if self.gallery_populator_timer and self.gallery_populator_timer.isActive():
+            self.gallery_populator_timer.stop()
+        self.gallery_item_iterator = None
+
+    def _populate_gallery_chunk(self):
+        if not self.gallery_item_iterator:
+            self._stop_populator_timer()
+            return
             
-        current_name_no_prefix = cluster_data["name"].split('-', 1)[-1]
-        new_name, ok = QInputDialog.getText(self, "Переименование", "Новое имя (без префикса):", text=current_name_no_prefix)
-        if ok and new_name.strip():
-            self._handle_rename(cluster_id, new_name.strip())
+        chunk_size = 50 
+        
+        for _ in range(chunk_size):
+            try:
+                task = next(self.gallery_item_iterator)
+                filename = task["filename"]
+                
+                pixmap = self.image_pixmap_cache.get(filename)
+                if not pixmap:
+                    continue
+
+                item = QListWidgetItem()
+                item.setData(Qt.ItemDataRole.DecorationRole, pixmap)
+                item.setData(Qt.ItemDataRole.UserRole, {"filename": filename})
+                self.image_list_widget.addItem(item)
+            
+            except StopIteration:
+                self._stop_populator_timer()
+                return
 
     @Slot(QListWidgetItem)
     def _open_image_viewer(self, item: QListWidgetItem):
         current_filename = item.data(Qt.ItemDataRole.UserRole)["filename"]
         cluster_id = self.active_cluster_id
-        all_filenames = self._get_files_for_cluster(cluster_id)
+        
+        all_filenames = self._get_files_for_cluster_for_viewer(cluster_id)
+        
         try:
             current_index = all_filenames.index(current_filename)
         except ValueError:
-            logger.warning(f"Файл {current_filename} не найден в списке файлов кластера {cluster_id}.")
+            logger.warning(f"Файл {current_filename} не найден в списке файлов для просмотра.")
             return
         
         image_paths = [self._get_image_path(fname) for fname in all_filenames]
@@ -491,6 +589,9 @@ class MainWindow(QWidget):
         viewer.exec()
    
     def show_cluster_context_menu(self, pos):
+        if self.mode == 'matches':
+            return
+            
         item = self.cluster_list_widget.itemAt(pos)
         menu = QMenu(self)
         
@@ -518,6 +619,32 @@ class MainWindow(QWidget):
             self._rename_cluster_action(item)
         elif action == delete_action and item:
             self._delete_cluster_action(item)
+
+    @Slot(QListWidgetItem)
+    def _rename_cluster_action(self, item: QListWidgetItem):
+        cluster_data = item.data(Qt.ItemDataRole.UserRole)
+        cluster_id = cluster_data["id"]
+        if self.mode == 'face' and cluster_id in ["group", "-1"]:
+            QMessageBox.information(self, "Инфо", "Этот кластер нельзя переименовать.")
+            return
+            
+        current_name_no_prefix = cluster_data["name"].split('-', 1)[-1]
+        new_name = ""
+        ok = False
+
+        if self.mode == 'location':
+            dialog = RenameDialog(self.predefined_cluster_names, current_name_no_prefix, self)
+            if dialog.exec() == QDialog.Accepted:
+                new_name = dialog.get_selected_name()
+                ok = True
+        else:
+            new_name, ok = QInputDialog.getText(
+                self, "Переименование", "Новое имя (без префикса):",
+                text=current_name_no_prefix
+            )
+
+        if ok and new_name.strip():
+            self._handle_rename(cluster_id, new_name.strip())
 
     @Slot(str, str, list)
     def _handle_drop(self, source_id: str, target_id: str, filenames: List[str]):
@@ -562,17 +689,24 @@ class MainWindow(QWidget):
     @Slot()
     def _on_export_all_triggered(self):
         portrait_ids = [cid for cid in self._get_clusters_from_model().keys() if cid not in ["-1", "group"]]
-        if not portrait_ids: QMessageBox.information(self, "Инфо", "Нет кластеров для экспорта."); return
+        if not portrait_ids: 
+            QMessageBox.information(self, "Инфо", "Нет кластеров для экспорта.")
+            return
         self._start_export(portrait_ids)
         
     @Slot()
     def _on_export_active_triggered(self):
         active_id = self.active_cluster_id
-        if active_id and active_id not in ["-1", "group"]: self._start_export([active_id])
-        else: QMessageBox.warning(self, "Внимание", "Выберите портретный кластер.")
+        if active_id and active_id not in ["-1", "group"]: 
+            self._start_export([active_id])
+        else: 
+            QMessageBox.warning(self, "Внимание", "Выберите портретный кластер для экспорта совпадений.")
+
 
     def _start_export(self, cluster_ids: List[str]):
-        base_output_dir = self.data_dir.parent / self.session_name /f"Выбор_Фото_{self.photo_session}"
+        # --- ИЗМЕНЕНИЕ: Добавляем self.mode в имя папки ---
+        base_output_dir = self.data_dir.parent / self.session_name / f"Выбор_Фото_{self.photo_session}_{self.mode}"
+        
         tasks = []
         for cid in cluster_ids:
             cluster_data = self._get_cluster_item_data_by_id(cid)
@@ -580,7 +714,12 @@ class MainWindow(QWidget):
             
             disk_folder_name = cluster_data["name"]
             output_folder = base_output_dir / disk_folder_name
-            filenames = self._get_files_for_cluster(cid)
+
+            if self.mode == 'matches':
+                filenames = self.data_manager.get_group_matches_for_cluster(cid)
+            else:
+                filenames = self.data_manager.get_files_for_cluster(self.mode_config, cid)
+
             for fname in filenames:
                 tasks.append({
                     "source_path": self._get_image_path(fname),
@@ -588,7 +727,9 @@ class MainWindow(QWidget):
                     "child_name": cluster_data["name"].split('-', 1)[-1].strip()
                 })
         
-        if not tasks: QMessageBox.information(self, "Инфо", "Нет файлов для экспорта."); return
+        if not tasks: 
+            QMessageBox.information(self, "Инфо", "Нет файлов для экспорта в выбранных кластерах.")
+            return
         
         first_image_path = tasks[0]["source_path"]
         dialog = EnhanceSettingsDialog(first_image_path, self)
@@ -619,16 +760,40 @@ class MainWindow(QWidget):
         if hasattr(self, 'export_thread'):
             self.export_thread.quit(); self.export_thread.wait()
 
+# ==============================================================================
+
     def _perform_save(self) -> bool:
-        """Сохраняет данные JSON."""
+        """
+        Выполняет сохранение данных JSON и, в режиме 'location',
+        обновляет переменную контекста PySM.
+
+        Returns:
+            bool: True в случае успеха, иначе False.
+        """
         if not self.data_manager.save_data():
             QMessageBox.critical(self, "Ошибка", "Не удалось сохранить JSON.")
             return False
         
         self._refresh_left_panel()
+
+        # --- ИЗМЕНЕНИЕ: Добавляем сохранение списка локаций в контекст ---
+        if self.mode == 'location' and IS_MANAGED_RUN:
+            location_names = self.data_manager.get_all_location_names()
+            pysm_context.set("sys_location_name", location_names)
+            logger.info("Список имен локаций сохранен в переменную контекста 'sys_location_name'.")
+
         return True
 
     def _save_changes(self):
+        if self.mode == 'matches':
+            output_path = self.data_dir / "matches_portrait_to_group.json"
+            success, message = self.data_manager.generate_and_save_matches_json(output_path)
+            if success:
+                QMessageBox.information(self, "Успех", message)
+            else:
+                QMessageBox.critical(self, "Ошибка", message)
+            return
+
         if not self.data_manager.has_changes():
             QMessageBox.information(self, "Инфо", "Нет изменений для сохранения.")
             return
@@ -644,8 +809,12 @@ class MainWindow(QWidget):
                 logger.error("Ошибка при сохранении изменений.")
 
     def closeEvent(self, event):
+        self._stop_gallery_prepare_if_running()
+        self._stop_file_reader_if_running()
         self._stop_gallery_load_if_running()
-        if not self.data_manager.has_changes():
+        self._stop_populator_timer()
+        
+        if self.mode == 'matches' or not self.data_manager.has_changes():
             event.accept()
             return
 
@@ -655,10 +824,13 @@ class MainWindow(QWidget):
             QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save
         )
         
-        if reply == QMessageBox.Cancel: event.ignore()
-        elif reply == QMessageBox.Discard: event.accept()
+        if reply == QMessageBox.Cancel: 
+            event.ignore()
+        elif reply == QMessageBox.Discard: 
+            event.accept()
         elif reply == QMessageBox.Save:
-            if self._perform_save(): event.accept()
+            if self._perform_save(): 
+                event.accept()
             else:
                 QMessageBox.critical(self, "Ошибка", "Не удалось сохранить данные. Выход отменен.")
                 event.ignore()
@@ -666,8 +838,8 @@ class MainWindow(QWidget):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Редактор кластеров изображений.")
     parser.add_argument(
-        "--mode", type=str, choices=["face", "location"], default="face",
-        help="Режим кластеризации: 'face' (по лицам) или 'location' (по локациям)."
+        "--mode", type=str, choices=["face", "location", "matches"], default="face",
+        help="Режим работы: 'face' (по лицам), 'location' (по локациям), 'matches' (совпадения)."
     )
     args = parser.parse_args()
 
@@ -680,8 +852,9 @@ if __name__ == "__main__":
         format="%(message)s", stream=sys.stdout
     )
 
-    export_status = 0
-    pysm_context.set("var_jpg_move", export_status)
+    if IS_MANAGED_RUN:
+        export_status = 0
+        pysm_context.set("var_jpg_move", export_status)
 
     if not IS_MANAGED_RUN:
         msg = "Критическая ошибка: Скрипт требует запуска из среды PySM."

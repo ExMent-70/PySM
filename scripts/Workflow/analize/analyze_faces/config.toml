@@ -25,7 +25,7 @@ tensorRT_cache_path = "../../../../_BIN/TensorRT_cache"
 # Имя набора моделей insightface (например, "antelopev2", "buffalo_l")
 name = "buffalo_l"
 # Порог уверенности для детектора лиц (от 0.0 до 1.0)
-det_thresh = 0.25
+det_thresh = 0.35
 # Размер изображения, до которого оно будет уменьшено для детекции
 det_size = [1280, 1280]
 

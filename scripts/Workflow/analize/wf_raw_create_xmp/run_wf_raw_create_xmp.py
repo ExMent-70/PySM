@@ -99,6 +99,7 @@ NS = {
     "dc": "http://purl.org/dc/elements/1.1/", "photoshop": "http://ns.adobe.com/photoshop/1.0/",
     "xmpRights": "http://ns.adobe.com/xap/1.0/rights/", "lightroom": "http://ns.adobe.com/lightroom/1.0/",
     "Iptc4xmpCore": "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/",
+    "GettyImagesGIFT": "http://ns.gettyimages.com/gift/1.0/",
 }
 for prefix, uri in NS.items():
     try:
@@ -258,6 +259,8 @@ class XmpManager:
         self._update_text_field(description, "Credit", "photoshop", "1")
 
         self._update_text_field(description, "Headline", "photoshop", session_name)
+        self._update_text_field(description, "OriginalFilename", "GettyImagesGIFT", image_filename)        
+
         is_portrait = len(faces) == 1
 
         self._update_text_field(description, "IntellectualGenre", "Iptc4xmpCore", "portrait" if is_portrait else "group_photo")
@@ -271,16 +274,16 @@ class XmpManager:
         photo_type = "portrait" if is_portrait else "group_photo"
         general_keywords.add(photo_type)
 
-    # ==============================================================================
-        location_cluster = (file_data or {}).get("location_name")
-        # Проверяем, что значение не None. Это важно для корректной обработки кластера "0".
-        if location_cluster is not None:
-            # Преобразуем число в строку для записи в XMP
-            location_value = str(location_cluster)
-            # Обновляем отдельный тег <Iptc4xmpCore:Location>
-            self._update_text_field(description, "Location", "Iptc4xmpCore", location_value)
-            # Добавляем в общий список ключевых слов
-            general_keywords.add(location_value)
+        # ==============================================================================
+        location_name = (file_data or {}).get("location_name")
+        # Проверяем, что значение является строкой, и оно не пустое после удаления пробелов
+        if isinstance(location_name, str):
+            clean_location_name = location_name.strip()
+            if clean_location_name:
+                # Обновляем отдельный тег <Iptc4xmpCore:Location>
+                self._update_text_field(description, "Location", "Iptc4xmpCore", clean_location_name)
+                # Добавляем в общий список ключевых слов
+                general_keywords.add(clean_location_name)
 
     # 3. БЛОК: Основной цикл обработки лиц и сохранение (без изменений)
     # ==============================================================================      

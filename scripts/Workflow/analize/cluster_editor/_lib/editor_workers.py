@@ -1,7 +1,9 @@
-# 2. БЛОК: editor_workers.py (ПОЛНЫЙ ИЗМЕНЕННЫЙ КОД)
+# 1. БЛОК: editor_workers.py (ПОЛНЫЙ ИСПРАВЛЕННЫЙ КОД)
 # ==============================================================================
 
-# analize/cluster_editor/_lib/editor_workers.py
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Модуль, содержащий классы-воркеры для выполнения длительных операций
 (загрузка галереи, экспорт) в фоновых потоках.
@@ -13,6 +15,7 @@ import re
 import shutil
 import sys
 import threading
+import time
 import concurrent.futures
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
@@ -37,7 +40,6 @@ from .editor_styles import THUMBNAIL_SIZE
 logger = logging.getLogger(__name__)
 
 
-# <-- ИЗМЕНЕНИЕ: Класс MoveWorker полностью УДАЛЕН отсюда -->
 class GalleryPrepareWorker(QObject):
     """
     В фоновом потоке подготавливает списки изображений для отображения в галерее.
@@ -57,32 +59,25 @@ class GalleryPrepareWorker(QObject):
         self._is_interruption_requested = True
 
     def run(self):
-        """
-        Основной метод воркера. Выполняется в фоновом потоке.
-        """
         if self._is_interruption_requested:
             self.finished.emit()
             return
             
-        # 1. Получаем список файлов (потенциально долгая операция)
         files_to_show = self.data_manager.get_files_for_cluster(self.mode_config, self.cluster_id)
         
         cached_items = []
         uncached_tasks = []
 
-        # 2. Разделяем файлы на кэшированные и некэшированные
         for filename in files_to_show:
             if self._is_interruption_requested:
                 break
             
             if filename in self.pixmap_cache:
-                # Для кэшированных сразу готовим данные
                 cached_items.append({
                     "filename": filename,
                     "pixmap": self.pixmap_cache[filename]
                 })
             else:
-                # Для некэшированных готовим задачи для следующего воркера
                 uncached_tasks.append({
                     "filename": filename,
                     "cluster_id": self.cluster_id
@@ -93,16 +88,56 @@ class GalleryPrepareWorker(QObject):
             
         self.finished.emit()
 
-class GalleryLoadWorker(QObject):
-    """
-    Загружает изображения и создает для них QPixmap в фоновых потоках.
-    """
-    widget_ready = Signal(str, str, Path, QPixmap)
-    finished = Signal()
+
+class FileReaderWorker(QObject):
+    """Читает файлы с диска последовательно в одном потоке, чтобы избежать I/O contention."""
+    finished = Signal(list)
 
     def __init__(self, tasks: List[Dict]):
         super().__init__()
         self.tasks = tasks
+        self._is_interruption_requested = False
+
+    def requestInterruption(self):
+        self._is_interruption_requested = True
+
+    def run(self):
+        read_data_tasks = []
+        for task in self.tasks:
+            if self._is_interruption_requested:
+                break
+            
+            full_path = task.get("full_path")
+            if not full_path or not full_path.is_file():
+                continue
+
+            try:
+                raw_data = full_path.read_bytes()
+                new_task = {
+                    "filename": task["filename"],
+                    "cluster_id": task["cluster_id"],
+                    "raw_data": raw_data
+                }
+                read_data_tasks.append(new_task)
+            except IOError as e:
+                logger.error(f"Ошибка чтения файла {full_path}: {e}")
+        
+        if not self._is_interruption_requested:
+            self.finished.emit(read_data_tasks)
+
+
+class GalleryLoadWorker(QObject):
+    """
+    Создает QPixmap из данных в памяти и кэширует их.
+    Сообщает о прогрессе и о завершении со списком обработанных файлов.
+    """
+    progress_updated = Signal(int)
+    finished = Signal(list) 
+
+    def __init__(self, tasks: List[Dict], pixmap_cache: Dict):
+        super().__init__()
+        self.tasks = tasks
+        self.pixmap_cache = pixmap_cache
         self.num_threads = os.cpu_count() or 4
         self._is_interruption_requested = False
 
@@ -110,42 +145,59 @@ class GalleryLoadWorker(QObject):
         self._is_interruption_requested = True
         logger.debug("Получен запрос на прерывание GalleryLoadWorker.")
 
-    def _process_single_image(self, task: Dict) -> Optional[Tuple[str, str, Path, QPixmap]]:
+    def _process_single_image(self, task: Dict) -> Optional[Dict]:
         if self._is_interruption_requested:
             return None
             
         filename = task["filename"]
-        cluster_id = task["cluster_id"]
-        full_path = task["full_path"]
+        raw_data = task["raw_data"]
 
-        if full_path.is_file():
-            pixmap = QPixmap(str(full_path))
-            if pixmap.isNull():
-                raise IOError(f"Не удалось загрузить QPixmap для {full_path}")
-            scaled_pixmap = pixmap.scaled(
-                THUMBNAIL_SIZE, THUMBNAIL_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            return filename, cluster_id, full_path, scaled_pixmap
-        return None
+        pixmap = QPixmap()
+        if not pixmap.loadFromData(raw_data):
+            logger.error(f"Не удалось создать QPixmap из данных для {filename}")
+            return None
+            
+        scaled_pixmap = pixmap.scaled(
+            THUMBNAIL_SIZE, THUMBNAIL_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        
+        self.pixmap_cache[filename] = scaled_pixmap
+        
+        return {"filename": filename}
 
     def run(self):
-        """Запускает многопоточную загрузку pixmap'ов."""
+        processed_tasks = []
+        processed_count = 0
+        total_tasks = len(self.tasks)
+        progress_step = max(1, total_tasks // 100) 
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_threads) as executor:
             future_to_task = {executor.submit(self._process_single_image, task): task for task in self.tasks}
+            
             for future in concurrent.futures.as_completed(future_to_task):
                 if self._is_interruption_requested:
-                    logger.debug("Загрузка галереи прервана в цикле.")
                     for f in future_to_task: f.cancel()
                     break
                 try:
                     result = future.result()
                     if result:
-                        self.widget_ready.emit(*result)
+                        processed_tasks.append(result)
                 except Exception as e:
                     task = future_to_task[future]
-                    logger.error(f"Ошибка загрузки pixmap для {task['filename']}: {e}")
-        self.finished.emit()
+                    logger.error(f"Ошибка обработки pixmap для {task['filename']}: {e}")
+                
+                processed_count += 1
+                
+                if processed_count % progress_step == 0 or processed_count == total_tasks:
+                    self.progress_updated.emit(processed_count)
+
+        if not self._is_interruption_requested:
+            if processed_count % progress_step != 0:
+                 self.progress_updated.emit(processed_count)
+            self.finished.emit(processed_tasks)
+        else:
+            self.finished.emit([])
 
 
 class ExportWorker(QObject):
@@ -197,7 +249,6 @@ class ExportWorker(QObject):
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with Image.open(source_path).convert("RGBA") as base_image:
-            # --- БЛОК 1: Автоматическое улучшение изображения ---
             enhanced_image = base_image
             factors = self.enhancement_factors
             if factors.get("brightness", 1.0) != 1.0:
@@ -211,13 +262,10 @@ class ExportWorker(QObject):
 
             final_image = enhanced_image
             
-            # --- БЛОК 2: Накладываем водяные знаки только если флаг установлен ---
             if self.apply_watermarks:
-                # Сетка
                 watermark_grid = self._create_watermark(enhanced_image.size)
                 final_image = Image.alpha_composite(enhanced_image, watermark_grid)
 
-                # Текст "Выбор фото"
                 try:
                     font_watermark = ImageFont.truetype("calibri.ttf", int(base_image.height / 18))
                 except IOError:
@@ -241,7 +289,6 @@ class ExportWorker(QObject):
                     rand_y = random.randint(0, int(base_image.height * 0.8))
                     final_image.paste(rotated_txt_layer, (rand_x, rand_y), rotated_txt_layer)
 
-                # Имя и номер
                 draw_main = ImageDraw.Draw(final_image)
                 font_size = int(base_image.height / 15)
                 
@@ -267,7 +314,6 @@ class ExportWorker(QObject):
             
             final_image.convert("RGB").save(output_path, "JPEG", quality=95)
 
-
     def run(self):
         total = len(self.tasks)
         processed_count = 0
@@ -275,14 +321,18 @@ class ExportWorker(QObject):
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_threads) as executor:
             future_to_task = {executor.submit(self._process_single_task, task): task for task in self.tasks}
             for future in concurrent.futures.as_completed(future_to_task):
-                try: future.result()
+                try:
+                    future.result()
                 except Exception as e:
                     task = future_to_task[future]
                     logger.error(f"Ошибка экспорта файла {task['source_path'].name}: {e}")
                 processed_count += 1
                 self.progress_updated.emit(processed_count)
         logger.info(f"Экспорт завершен. Обработано {total} файла(ов).")
-        export_status = 1
-        pysm_context.set("var_jpg_move", export_status)
-        logger.info(f"\nПеременная контекста <b>var_jpg_move</b> установлена в значение <b>{export_status}</b>.")
+        
+        if IS_MANAGED_RUN:
+            export_status = 1
+            pysm_context.set("var_jpg_move", export_status)
+            logger.info(f"\nПеременная контекста <b>var_jpg_move</b> установлена в значение <b>{export_status}</b>.")
+            
         self.finished.emit(f"Экспорт завершен. Обработано {total} файлов.")

@@ -93,6 +93,13 @@ def get_config() -> argparse.Namespace:
     )
     # Динамические параметры
     parser.add_argument("--all_threads", type=int, dest="all_threads", default=0, help="Количество потоков (0=авто).")
+    parser.add_argument(
+        "--a_af_det_thresh",
+        type=float,
+        dest="a_af_det_thresh",
+        default=None,
+        help="Переопределить порог уверенности для детектора лиц (значение из config.toml)."
+    )
     
     if IS_MANAGED_RUN and ConfigResolver:
         return ConfigResolver(parser).resolve_all()
@@ -120,6 +127,17 @@ def main():
     except (FileNotFoundError, ValidationError) as e:
         logger.critical(f"Не удалось загрузить или провалидировать конфигурацию: {e}")
         sys.exit(1)
+
+
+    # Переопределение det_thresh из CLI, если он был указан
+    if cli_config.a_af_det_thresh is not None:
+        old_thresh = config_manager.get('model.det_thresh')
+        new_thresh = cli_config.a_af_det_thresh
+        config_manager.config['model']['det_thresh'] = new_thresh
+        logger.info(
+            f"Параметр 'det_thresh' переопределен значением из командной строки: "
+            f"<b>{old_thresh} -> {new_thresh}</b>"
+        )
 
     # 2. Получение и валидация динамических путей из контекста
     paths = construct_analysis_paths()

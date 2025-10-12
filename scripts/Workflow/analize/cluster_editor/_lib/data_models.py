@@ -1,4 +1,4 @@
-# 1. БЛОК: Файл _lib/data_models.py (ПОЛНАЯ ИСПРАВЛЕННАЯ ВЕРСИЯ)
+# 1. БЛОК: data_models.py (ПОЛНЫЙ ОБНОВЛЕННЫЙ КОД)
 # ==============================================================================
 
 #!/usr/bin/env python3
@@ -17,7 +17,6 @@ from typing import List, Optional, Tuple, Dict, Any
 class Face:
     """
     Представляет только необходимые для редактора данные одного лица.
-    Все остальные поля из JSON хранятся в `extra_data`.
     """
     bbox: List[float]
     
@@ -25,7 +24,7 @@ class Face:
     cluster_label: Optional[int] = None
     child_name: Optional[str] = None
     
-    # Словарь для хранения всех остальных полей из JSON
+    # --- ИЗМЕНЕНИЕ: Возвращаем extra_data для доступа к прочим полям, таким как matched_portrait_cluster_label ---
     extra_data: Dict[str, Any] = field(default_factory=dict)
 
     # Поля, добавляемые во время выполнения для удобства UI
@@ -38,7 +37,7 @@ class ImageRecord:
     """Представляет полную запись для одного изображения."""
     filename: str
     image_type: str  # 'portrait' или 'group'
-    faces: List[Face]
+    faces: List[Face] # Список легковесных объектов для UI
     original_shape: Tuple[int, int]
     
     # Поля для кластеризации по локациям
@@ -47,3 +46,6 @@ class ImageRecord:
     
     # Поле для отслеживания изменений
     is_changed: bool = False
+    
+    # Поле для хранения исходных "сырых" данных лиц для сохранения
+    raw_faces_data: List[Dict[str, Any]] = field(default_factory=list)
