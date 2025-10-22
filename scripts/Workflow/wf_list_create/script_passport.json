@@ -2,7 +2,7 @@
   "description": "Создает и редактирует списки учеников. Поддерживает парсинг имен, управление услугами и экспорт в разные форматы (list, txt, html, csv).",
   "category": "Редакторы",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "1.1.1",
+  "version": "2025.10.19",
   "command_line_args_meta": {
     "wf_dest_dir": {
       "type": "dir_path",

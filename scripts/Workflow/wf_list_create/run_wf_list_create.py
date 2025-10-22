@@ -53,10 +53,14 @@ except ImportError:
 try:
     from PySide6.QtCore import (Qt, QAbstractTableModel, QModelIndex, QEvent, Signal, QUrl, QPoint, QTimer)
     from PySide6.QtGui import (QAction, QKeySequence, QDesktopServices, QBrush, QColor)
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
     from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
                                    QSplitter, QLabel, QLineEdit, QTextEdit, QTableView, QPushButton, QHeaderView,
                                    QComboBox, QMenu, QStyle, QTabWidget, QTextBrowser, QStyledItemDelegate,
-                                   QAbstractItemDelegate, QFileDialog, QMessageBox)
+                                   QAbstractItemDelegate, QFileDialog, QMessageBox, QDialog, QTableWidget,
+                                   QTableWidgetItem, QDialogButtonBox)
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
 except ImportError: print("Ошибка: для работы этого скрипта требуется PySide6.", file=sys.stderr); sys.exit(1)
 try: import jinja2
 except ImportError: jinja2 = None
@@ -171,12 +175,20 @@ class SmartParser:
                 surname, name = fact.last, fact.first
                 span1_label, span2_label = " (Имя)", " (Фамилия)"
 
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # Применяем нормализацию к обоим словам.
+            # Функция безопасна для фамилий и вернет их без изменений.
+            normalized_surname = self._normalize_name(surname)
+            normalized_name = self._normalize_name(name)
+
             parsed_data.append({
-                "surname": smart_capitalize(surname), 
-                "name": smart_capitalize(self._normalize_name(name))
+                "surname": smart_capitalize(normalized_surname), 
+                "name": smart_capitalize(normalized_name)
             })
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
             
             try:
+                # Для поиска в тексте используем оригинальные, ненормализованные слова
                 match_text = text[match.start:match.stop]
                 s_match = re.search(re.escape(surname), match_text, re.IGNORECASE)
                 n_match = re.search(re.escape(name), match_text, re.IGNORECASE)
@@ -201,7 +213,6 @@ class SmartParser:
             soup = BeautifulSoup(markup_html, 'html.parser')
             all_color_spans = soup.find_all('span', style=background_regex)
             
-            # Проверяем, что количество найденных span'ов соответствует количеству людей (по 2 на каждого)
             if len(all_color_spans) == len(parsed_data) * 2:
                 for i, person_data in enumerate(parsed_data):
                     span1 = all_color_spans[i * 2]
@@ -255,38 +266,53 @@ class StudentTableModel(QAbstractTableModel):
                 self._brush_cache[color_hex] = brush
                 return brush
 
-    def setData(self, index: QModelIndex, value: Any, role: int = Qt.EditRole) -> bool:
-        if role != Qt.EditRole or not index.isValid(): return False
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
+        if role != Qt.ItemDataRole.EditRole or not index.isValid():
+            return False
+
         row, col, row_data = index.row(), index.column(), self._data[index.row()]
         try:
             if col == self.COL_SHOOT_ORDER:
-                if not str(value).strip(): row_data['shoot_order'] = ""
+                if not str(value).strip():
+                    row_data["shoot_order"] = ""
                 else:
                     new_val = int(value)
-                    if new_val <= 0: raise ValidationError("Номер съемки должен быть > 0.")
-                    if new_val > self.rowCount(): raise ValidationError(f"Номер не может быть > {self.rowCount()}.")
-                    if any(i != row and s.get("shoot_order") == new_val for i, s in enumerate(self._data)): raise ValidationError(f"Номер '{new_val}' уже используется.")
-                    row_data['shoot_order'] = new_val
+                    if new_val <= 0:
+                        raise ValidationError("Номер съемки должен быть > 0.")
+                    if new_val > self.rowCount():
+                        raise ValidationError(f"Номер не может быть > {self.rowCount()}.")
+                    if any(
+                        i != row and s.get("shoot_order") == new_val
+                        for i, s in enumerate(self._data)
+                    ):
+                        raise ValidationError(f"Номер '{new_val}' уже используется.")
+                    row_data["shoot_order"] = new_val
             elif col in [self.COL_SURNAME, self.COL_NAME]:
                 val_str = str(value).strip()
-                if not val_str or not self.NAME_VALIDATION_PATTERN.match(val_str): raise ValidationError("Поле должно содержать только буквы и дефис.")
-                row_data['surname' if col == self.COL_SURNAME else 'name'] = val_str
-                if col == self.COL_SURNAME: self.sort_and_refocus(row, col)
+                if not val_str or not self.NAME_VALIDATION_PATTERN.match(val_str):
+                    raise ValidationError("Поле должно содержать только буквы и дефис.")
+                row_data["surname" if col == self.COL_SURNAME else "name"] = val_str
+                # УДАЛЯЕМ вызов sort_and_refocus отсюда
             elif col == self.COL_SERVICE:
                 if (cost := self.services.get(str(value))) is not None:
-                    row_data['service_type'], row_data['service_cost'] = str(value), cost
+                    row_data["service_type"], row_data["service_cost"] = str(value), cost
                     self.dataChanged.emit(index, self.index(row, self.COL_COST), [role])
-                else: return False
+                else:
+                    return False
             elif col == self.COL_COST:
                 new_cost = int(value)
-                if new_cost < 0: raise ValidationError("Стоимость не может быть < 0.")
-                row_data['service_cost'] = new_cost
-            else: return False
+                if new_cost < 0:
+                    raise ValidationError("Стоимость не может быть < 0.")
+                row_data["service_cost"] = new_cost
+            else:
+                return False
         except (ValueError, TypeError, ValidationError) as e:
             raise ValidationError(str(e)) from e
+
         self.dataChanged.emit(index, index, [role])
         return True
-    
+
+  
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         flags = super().flags(index)
         if index.column() in self.EDITABLE_COLUMNS: flags |= Qt.ItemIsEditable
@@ -313,12 +339,20 @@ class StudentTableModel(QAbstractTableModel):
             return True
         return False
 
-    def sort_and_refocus(self, row: int, col: int):
+
+    def sort_and_refocus(self, row: int, col: int) -> None:
+        """
+        Сортирует данные и ИСПУСКАЕТ СИГНАЛ с новым индексом измененной строки.
+        """
         if 0 <= row < len(self._data):
-            item = self._data[row]
+            item_to_track = self._data[row]
             self.sort(self.COL_SURNAME)
-            try: self.row_focus_requested.emit(self._data.index(item), col)
-            except ValueError: pass
+            try:
+                new_row_index = self._data.index(item_to_track)
+                # Испускаем сигнал с новым индексом
+                self.row_focus_requested.emit(new_row_index, col)
+            except ValueError:
+                pass  # Элемент мог быть удален или изменен
 
     def update_data(self, data: List[Dict[str, Any]]):
         self.beginResetModel(); self._data = data; self.endResetModel()
@@ -370,8 +404,204 @@ class EnterKeyDelegate(QStyledItemDelegate):
                 return True
         return super().eventFilter(editor, event)
 
-# 6. БЛОК: Основное окно
+
+
+# 7. БЛОК: Диалог редактирования услуг
 # ==============================================================================
+class ServicesEditorDialog(QDialog):
+    """Диалоговое окно для редактирования списка услуг и их цен."""
+    def __init__(self, services_data: Dict[str, int], parent: QWidget = None):
+        super().__init__(parent)
+        self.setWindowTitle("Редактор Услуг")
+        self.setMinimumSize(450, 350)
+
+        self.layout = QVBoxLayout(self)
+        
+        # Таблица для данных
+        self.table = QTableWidget()
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Название услуги", "Цена"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        
+        # --- ИЗМЕНЕНИЕ 1: Добавляем чередование цветов ---
+        self.table.setAlternatingRowColors(True)
+        # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+        
+        self.layout.addWidget(self.table)
+        
+        self._populate_table(services_data)
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЯ 2: Единая панель для всех кнопок ---
+        # Кнопки управления (Добавить, Удалить, Сохранить, Отмена)
+        button_layout = QHBoxLayout()
+        
+        add_button = QPushButton("Добавить")
+        remove_button = QPushButton("Удалить")
+        add_button.clicked.connect(self._add_row)
+        remove_button.clicked.connect(self._remove_row)
+        
+        button_layout.addWidget(add_button)
+        button_layout.addWidget(remove_button)
+        button_layout.addStretch() # Распорка, чтобы разнести кнопки по краям
+
+        # Используем стандартные кнопки для правильной обработки сигналов accepted/rejected
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.button(QDialogButtonBox.StandardButton.Save).setText("Сохранить")
+        self.button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Отмена")
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        
+        button_layout.addWidget(self.button_box)
+        
+        self.layout.addLayout(button_layout)
+        # --- КОНЕЦ ИЗМЕНЕНИЯ 2 ---
+
+    def _populate_table(self, data: Dict[str, int]) -> None:
+        """Заполняет таблицу данными из словаря."""
+        # Устанавливаем количество строк равным длине данных, чтобы избежать многократного insertRow
+        self.table.setRowCount(len(data))
+        for i, (name, cost) in enumerate(data.items()):
+            self.table.setItem(i, 0, QTableWidgetItem(name))
+            self.table.setItem(i, 1, QTableWidgetItem(str(cost)))
+
+    def _add_row(self) -> None:
+        """Добавляет пустую строку в конец таблицы."""
+        row_position = self.table.rowCount()
+        self.table.insertRow(row_position)
+        self.table.setItem(row_position, 0, QTableWidgetItem("Новая услуга"))
+        self.table.setItem(row_position, 1, QTableWidgetItem("0"))
+        # Устанавливаем фокус на новую строку для немедленного редактирования
+        self.table.setCurrentCell(row_position, 0)
+
+    def _remove_row(self) -> None:
+        """Удаляет текущую выделенную строку."""
+        current_row = self.table.currentRow()
+        if current_row >= 0:
+            self.table.removeRow(current_row)
+
+    def get_services(self) -> Dict[str, int]:
+        """
+        Собирает данные из таблицы в словарь и возвращает его.
+        Вызывает исключение, если данные некорректны.
+        """
+        services = {}
+        for row in range(self.table.rowCount()):
+            name_item = self.table.item(row, 0)
+            cost_item = self.table.item(row, 1)
+            
+            if not name_item or not name_item.text().strip():
+                raise ValueError(f"Название услуги в строке {row + 1} не может быть пустым.")
+            
+            name = name_item.text().strip()
+            
+            if not cost_item or not cost_item.text().strip():
+                 raise ValueError(f"Цена для услуги '{name}' не может быть пустой.")
+            
+            try:
+                cost = int(cost_item.text().strip())
+                if cost < 0:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                raise ValueError(f"Цена для услуги '{name}' должна быть целым неотрицательным числом.")
+            
+            if name in services:
+                raise ValueError(f"Название услуги '{name}' дублируется.")
+            
+            services[name] = cost
+        return services
+
+
+# 8. БЛОК: Диалог редактирования словаря имен
+# ==============================================================================
+class NamesEditorDialog(QDialog):
+    """Диалоговое окно для редактирования словаря нормализации имен."""
+    def __init__(self, names_data: Dict[str, str], parent: QWidget = None):
+        super().__init__(parent)
+        self.setWindowTitle("Редактор Словаря Имен")
+        self.setMinimumSize(450, 400)
+
+        self.layout = QVBoxLayout(self)
+        
+        # Таблица для данных
+        self.table = QTableWidget()
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Сокращенное имя", "Полное имя"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table.setAlternatingRowColors(True)
+        self.layout.addWidget(self.table)
+        
+        self._populate_table(names_data)
+        
+        # Кнопки управления
+        button_layout = QHBoxLayout()
+        add_button = QPushButton("Добавить")
+        remove_button = QPushButton("Удалить")
+        add_button.clicked.connect(self._add_row)
+        remove_button.clicked.connect(self._remove_row)
+        
+        button_layout.addWidget(add_button)
+        button_layout.addWidget(remove_button)
+        button_layout.addStretch()
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.button(QDialogButtonBox.StandardButton.Save).setText("Сохранить")
+        self.button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Отмена")
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        
+        button_layout.addWidget(self.button_box)
+        self.layout.addLayout(button_layout)
+
+    def _populate_table(self, data: Dict[str, str]) -> None:
+        """Заполняет таблицу данными из словаря."""
+        self.table.setRowCount(len(data))
+        for i, (short_name, full_name) in enumerate(data.items()):
+            self.table.setItem(i, 0, QTableWidgetItem(short_name))
+            self.table.setItem(i, 1, QTableWidgetItem(full_name))
+
+    def _add_row(self) -> None:
+        """Добавляет пустую строку в конец таблицы."""
+        row_position = self.table.rowCount()
+        self.table.insertRow(row_position)
+        self.table.setItem(row_position, 0, QTableWidgetItem("Сокращенное_Имя"))
+        self.table.setItem(row_position, 1, QTableWidgetItem("Полное_Имя"))
+        self.table.setCurrentCell(row_position, 0)
+
+    def _remove_row(self) -> None:
+        """Удаляет текущую выделенную строку."""
+        current_row = self.table.currentRow()
+        if current_row >= 0:
+            self.table.removeRow(current_row)
+
+    def get_names_dict(self) -> Dict[str, str]:
+        """
+        Собирает данные из таблицы в словарь и возвращает его.
+        Вызывает исключение, если данные некорректны.
+        """
+        names_dict = {}
+        for row in range(self.table.rowCount()):
+            short_item = self.table.item(row, 0)
+            full_item = self.table.item(row, 1)
+            
+            if not short_item or not short_item.text().strip():
+                raise ValueError(f"Сокращенное имя в строке {row + 1} не может быть пустым.")
+            
+            short_name = short_item.text().strip()
+            
+            if not full_item or not full_item.text().strip():
+                 raise ValueError(f"Полное имя для '{short_name}' не может быть пустым.")
+            
+            full_name = full_item.text().strip()
+            
+            if short_name in names_dict:
+                raise ValueError(f"Сокращенное имя '{short_name}' дублируется.")
+            
+            names_dict[short_name] = full_name
+        return names_dict
+
+
 # 6. БЛОК: Основное окно
 # ==============================================================================
 class ClassListEditor(QMainWindow):
@@ -383,7 +613,14 @@ class ClassListEditor(QMainWindow):
         self._is_dirty: bool = False
         self._save_children: bool = False
         # Добавляем флаг, чтобы отслеживать процесс загрузки
-        self._is_loading: bool = False        
+        self._is_loading: bool = False     
+
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Создаем действия (actions) один раз при инициализации
+        self.add_row_action: QAction
+        self.delete_rows_action: QAction
+        self.swap_names_action: QAction
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---        
 
         self.SERVICES: Dict[str, int] = {}
         self._load_services()
@@ -395,7 +632,8 @@ class ClassListEditor(QMainWindow):
         self.setWindowTitle("PySM - Редактор списка класса")
         self.resize(1200, 800)
         
-        self._create_menu()
+        self._create_actions()
+        self._create_menus()
 
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
@@ -439,21 +677,19 @@ class ClassListEditor(QMainWindow):
 
         self.statusBar().showMessage("Готово")
 
-        # Включаем флаг блокировки ПЕРЕД загрузкой и вызовом _update_cost_label
         self._is_loading = True
         if self.config.wf_dest_dir:
             self.class_name_input.setText(pathlib.Path(self.config.wf_dest_dir).name)
             self._load_current_session()
         
-        # Этот вызов теперь не будет перезаписывать цены благодаря флагу
         self._update_cost_label() 
         self._update_summary_info()
-        # Выключаем флаг блокировки ПОСЛЕ всех инициализирующих операций
         self._is_loading = False
 
     
-    def _create_menu(self) -> None:
+    def _create_menus(self) -> None:
         """Создает и настраивает меню приложения."""
+        # Меню "Файл" (код перенесен из старого _create_menu)
         file_menu = self.menuBar().addMenu("&Файл")
         actions = {
             "Загрузить список текущей сессии": self._load_current_session,
@@ -482,6 +718,127 @@ class ClassListEditor(QMainWindow):
             else:
                 action.triggered.connect(handler)
             file_menu.addAction(action)
+
+        # Новое меню "Настройки"
+        settings_menu = self.menuBar().addMenu("&Настройки")
+
+        edit_services_action = QAction("Редактировать услуги...", self)
+        edit_services_action.triggered.connect(self._open_services_editor)
+        settings_menu.addAction(edit_services_action)
+        
+        edit_names_action = QAction("Редактировать словарь имен...", self)
+        edit_names_action.triggered.connect(self._open_names_editor)
+        settings_menu.addAction(edit_names_action)        
+
+
+    def _create_actions(self) -> None:
+        """Создает QAction для повторного использования в меню и горячих клавишах."""
+        # --- ИЗМЕНЕНИЯ ЗДЕСЬ ---
+        # Мы будем добавлять текст шортката динамически, поэтому убираем его отсюда
+        self.add_row_action = QAction("Добавить строку", self)
+        self.add_row_action.triggered.connect(self._add_new_row)
+
+        self.delete_rows_action = QAction("Удалить выделенные строки", self)
+        self.delete_rows_action.triggered.connect(self._delete_selected_rows)
+
+        self.swap_names_action = QAction("Поменять Имя/Фамилию", self)
+        self.swap_names_action.triggered.connect(self._swap_current_row_names)
+
+    def keyPressEvent(self, event: QEvent) -> None:
+        """Перехватывает нажатия клавиш на уровне всего окна."""
+        if self.processed_table.hasFocus():
+            # Обработка Ctrl+N для добавления строки
+            if event.key() == Qt.Key.Key_N and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                self._add_new_row()
+                event.accept()
+                return
+
+            # Обработка клавиши Delete
+            if event.key() == Qt.Key.Key_Delete:
+                self._delete_selected_rows()
+                event.accept()
+                return
+            
+            # Обработка сочетания Ctrl+T
+            if event.key() == Qt.Key.Key_T and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                self._swap_current_row_names()
+                event.accept()
+                return
+
+        super().keyPressEvent(event)
+
+
+
+
+
+    def _open_names_editor(self) -> None:
+        """Открывает диалог редактирования словаря нормализации имен."""
+        # Передаем копию словаря, чтобы изменения не затрагивали оригинал до сохранения
+        dialog = NamesEditorDialog(self.smart_parser.normalization_dict.copy(), self)
+        if dialog.exec():
+            try:
+                new_dict = dialog.get_names_dict()
+                # Обновляем словарь в парсере
+                self.smart_parser.normalization_dict = new_dict
+                self._save_normalization_dict()
+                self.statusBar().showMessage("Словарь имен успешно обновлен.", 3000)
+            except ValueError as e:
+                QMessageBox.critical(self, "Ошибка данных", f"Не удалось сохранить словарь:\n{e}")
+
+    def _save_normalization_dict(self) -> None:
+        """Сохраняет текущий словарь нормализации в _names_normalization.json."""
+        dict_path = pathlib.Path(__file__).parent / "_names_normalization.json"
+        try:
+            with open(dict_path, 'w', encoding='utf-8') as f:
+                json.dump(self.smart_parser.normalization_dict, f, ensure_ascii=False, indent=4)
+        except IOError as e:
+            QMessageBox.critical(self, "Ошибка сохранения", f"Не удалось записать файл словаря имен:\n{e}")
+
+
+    def _open_services_editor(self) -> None:
+        """Открывает диалог редактирования услуг."""
+        dialog = ServicesEditorDialog(self.SERVICES, self)
+        if dialog.exec():
+            # Если пользователь нажал "Сохранить"
+            try:
+                new_services = dialog.get_services()
+                self.SERVICES = new_services
+                self._save_services()
+                self._reload_services_combo()
+                self.statusBar().showMessage("Список услуг успешно обновлен.", 3000)
+            except ValueError as e:
+                QMessageBox.critical(self, "Ошибка данных", f"Не удалось сохранить услуги:\n{e}")
+
+    def _save_services(self) -> None:
+        """Сохраняет текущий словарь услуг в _services.json."""
+        services_path = pathlib.Path(__file__).parent / "_services.json"
+        try:
+            with open(services_path, 'w', encoding='utf-8') as f:
+                json.dump(self.SERVICES, f, ensure_ascii=False, indent=4)
+        except IOError as e:
+            QMessageBox.critical(self, "Ошибка сохранения", f"Не удалось записать файл услуг:\n{e}")
+
+
+    def _reload_services_combo(self) -> None:
+        """Перезагружает список услуг в выпадающем меню главного окна."""
+        current_service = self.service_type_combo.currentText()
+        
+        # Блокируем сигналы, чтобы избежать лишнего срабатывания _update_cost_label
+        self.service_type_combo.blockSignals(True)
+        
+        self.service_type_combo.clear()
+        self.service_type_combo.addItems(self.SERVICES.keys())
+        
+        # Пытаемся восстановить предыдущий выбор
+        if current_service in self.SERVICES:
+            self.service_type_combo.setCurrentText(current_service)
+        
+        # Разблокируем сигналы
+        self.service_type_combo.blockSignals(False)
+        
+        # Принудительно обновляем метку с ценой для текущего элемента
+        self._update_cost_label()
+
 
     def _create_top_panel(self, parent_layout: QVBoxLayout) -> None:
         """Создает верхнюю панель с названием класса и выбором услуги."""
@@ -569,7 +926,7 @@ class ClassListEditor(QMainWindow):
         self.table_model.dataChanged.connect(self._on_data_changed)
         self.table_model.rowsInserted.connect(self._update_summary_info)
         self.table_model.rowsRemoved.connect(self._update_summary_info)
-        self.table_model.row_focus_requested.connect(self._handle_row_focus_request)
+        self.table_model.row_focus_requested.connect(self._handle_row_focus_request_async)
         
         self.processed_table = QTableView()
         self.processed_table.setModel(self.table_model)
@@ -605,16 +962,17 @@ class ClassListEditor(QMainWindow):
 
     def _load_services(self) -> None:
         services_path = pathlib.Path(__file__).parent / "_services.json"
-        default_services = {"Стандарт": 1500}
+        default_services = {"Стандарт": 1500, "-": 0}
         if services_path.exists():
             try:
                 with open(services_path, 'r', encoding='utf-8') as f: self.SERVICES = json.load(f)
             except Exception: self.SERVICES = default_services
         else:
-            try:
-                with open(services_path, 'w', encoding='utf-8') as f: json.dump(default_services, f, ensure_ascii=False, indent=4)
-                self.SERVICES = default_services
-            except Exception: self.SERVICES = default_services
+            self.SERVICES = default_services
+            # --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+            # Если файл создается впервые, сразу его сохраняем
+            self._save_services()
+            # --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
                     
     def _update_cost_label(self) -> None:
@@ -653,24 +1011,50 @@ class ClassListEditor(QMainWindow):
 
     def _show_table_context_menu(self, pos: QPoint) -> None:
         menu = QMenu()
-        menu.addAction(QAction("Добавить строку", self, triggered=self._add_new_row))
-        if (idx := self.processed_table.indexAt(pos)).isValid():
-            row = idx.row()
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Формируем текст с "горячей клавишей" и устанавливаем его для QAction
+        # \t (табуляция) автоматически выровняет шорткат по правому краю
+        self.add_row_action.setText("Добавить строку\tCtrl+N")
+        menu.addAction(self.add_row_action)
+        
+        if self.processed_table.selectionModel().hasSelection():
             menu.addSeparator()
-            menu.addAction(QAction("Поменять Имя/Фамилию", self, triggered=lambda: self._on_swap_name_surname(row)))
-            menu.addAction(QAction("Удалить выделенные строки", self, triggered=self._delete_selected_rows))
+
+            current_row = self.processed_table.currentIndex().row()
+            # Устанавливаем основной текст
+            self.swap_names_action.setText(f"Поменять Имя/Фамилию (строка {current_row + 1})\tCtrl+T")
+            menu.addAction(self.swap_names_action)
+            
+            self.delete_rows_action.setText("Удалить выделенные строки\tDelete")
+            menu.addAction(self.delete_rows_action)
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+            
         menu.exec(self.processed_table.viewport().mapToGlobal(pos))
 
     def _add_new_row(self) -> None:
+        """Добавляет новую строку, корректно управляя выделением и фокусом."""
         s_color = self.smart_parser.SURNAME_COLOR_HEX
         n_color = self.smart_parser.NAME_COLOR_HEX
         data = {"surname": "Ученик", "name": "Новый", "color1": s_color, "color2": n_color, "service_type": self.service_type_combo.currentText(), "service_cost": self.SERVICES.get(self.service_type_combo.currentText(), 0)}
+        
+        # Вставляем строку
         self.table_model.insert_row(self.table_model.rowCount(), data)
+        # Сортируем
         self.table_model.sort(StudentTableModel.COL_SURNAME)
+
         try:
+            # Находим новый индекс после сортировки
             new_idx = self.table_model.get_all_data().index(data)
-            self._handle_row_focus_request(new_idx, StudentTableModel.COL_SURNAME)
-        except ValueError: pass
+
+            # --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+            # Вызываем _handle_row_focus_request с флагом очистки выделения
+            self._handle_row_focus_request(new_idx, StudentTableModel.COL_SURNAME, clear_selection=True)
+            # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+        except ValueError: 
+            pass # Если не нашли, ничего страшного
+
         self._is_dirty = True
         self._update_summary_info()
         
@@ -680,19 +1064,56 @@ class ClassListEditor(QMainWindow):
             self.table_model.remove_rows(rows)
             self.table_model.sort(StudentTableModel.COL_SURNAME)
 
+    def _swap_current_row_names(self) -> None:
+        """Вызывает смену имени/фамилии для текущей выделенной строки."""
+        current_row = self.processed_table.currentIndex().row()
+        if current_row >= 0:
+            self._on_swap_name_surname(current_row)
+
     def _on_swap_name_surname(self, row: int) -> None:
+        """Меняет местами имя и фамилию в указанной строке."""
         self.table_model.swap_name_surname(row)
 
+
+
     def _on_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles: List[int] = []) -> None:
+        """
+        Реагирует на изменение данных, инициируя сортировку и рефокус.
+        """
         self._is_dirty = True
         self._update_summary_info()
-        if top_left.isValid() and top_left.column() in [StudentTableModel.COL_SURNAME, StudentTableModel.COL_NAME]:
+        if top_left.isValid() and top_left.column() in [
+            StudentTableModel.COL_SURNAME,
+            StudentTableModel.COL_NAME,
+        ]:
+            # Просто просим модель отсортироваться и сообщить нам новый индекс через сигнал
             self.table_model.sort_and_refocus(top_left.row(), top_left.column())
 
-    def _handle_row_focus_request(self, row: int, col: int) -> None:
+    def _handle_row_focus_request(
+        self, row: int, col: int, clear_selection: bool = False
+    ) -> None:
+        """Синхронно устанавливает фокус. Используется для _add_new_row."""
+        if clear_selection:
+            self.processed_table.selectionModel().clear()
+
         index = self.table_model.index(row, col)
         self.processed_table.scrollTo(index, QTableView.ScrollHint.EnsureVisible)
         self.processed_table.setCurrentIndex(index)
+
+    def _handle_row_focus_request_async(self, row: int, col: int) -> None:
+        """
+        Асинхронно устанавливает фокус. Вызывается по сигналу от модели.
+        Это позволяет Qt завершить все операции перерисовки перед установкой фокуса.
+        """
+        def set_focus():
+            self.processed_table.selectionModel().clear()
+            index = self.table_model.index(row, col)
+            self.processed_table.scrollTo(index, QTableView.ScrollHint.EnsureVisible)
+            self.processed_table.setCurrentIndex(index)
+        
+        # Выполняем установку фокуса на следующем витке цикла событий
+        QTimer.singleShot(0, set_focus)
+
 
     def _get_default_filepath(self, ext: str) -> Optional[pathlib.Path]:
         if self.config.wf_dest_dir:

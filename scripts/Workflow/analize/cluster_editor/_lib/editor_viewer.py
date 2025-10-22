@@ -15,8 +15,6 @@ from PySide6.QtGui import (
 )
 from PySide6.QtCore import Qt, QTimer, QEvent
 
-from .editor_styles import SCROLLBAR_STYLE
-
 logger = logging.getLogger(__name__)
 
 
@@ -24,7 +22,7 @@ class ImageViewer(QDialog):
     """Модальное диалоговое окно для просмотра изображений с зумом и навигацией."""
 
     def __init__(self, image_paths: List[Path], filenames: List[str],
-                 current_index: int, scrollbar_style: str, parent=None):
+                 current_index: int, parent=None):
         super().__init__(parent)
         self.image_paths = image_paths
         self.filenames = filenames
@@ -33,58 +31,48 @@ class ImageViewer(QDialog):
 
         self.setWindowTitle("Просмотр изображений")
         self.setMinimumSize(800, 600)
-        #self.setStyleSheet("QDialog { background-color: #252525; color: #eee; }")
 
         # --- UI ---
         main_layout = QVBoxLayout(self)
 
+        # 1. Элементы для отображения изображения (без изменений)
         self.scene = QGraphicsScene(self)
         self.view = QGraphicsView(self.scene)
         self.view.setDragMode(QGraphicsView.ScrollHandDrag)
         self.view.setRenderHint(QPainter.Antialiasing)
         self.view.setRenderHint(QPainter.SmoothPixmapTransform)
-        #self.view.setStyleSheet("QGraphicsView { border: none; }")
-        #self.view.verticalScrollBar().setStyleSheet(scrollbar_style)
-        #self.view.horizontalScrollBar().setStyleSheet(scrollbar_style)
+
         self.pixmap_item = QGraphicsPixmapItem()
         self.scene.addItem(self.pixmap_item)
         self.view.installEventFilter(self)
 
-        info_layout = QHBoxLayout()
-        self.nav_label = QLabel()
+        # 2. Создаем все виджеты для нижней панели
+        self.nav_label = QLabel()  # "Фото X из Y"
         self.filename_label = QLabel()
         self.filename_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        info_layout.addWidget(self.nav_label)
-        info_layout.addWidget(self.filename_label)
 
         self.prev_button = QPushButton("<< Предыдущее")
         self.next_button = QPushButton("Следующее >>")
 
-        button_style = """
-            QPushButton { 
-                background-color: #007bff; color: white; font-weight: bold; 
-                border: none; padding: 10px; border-radius: 5px; min-width: 120px;
-            }
-            QPushButton:hover { background-color: #0056b3; }
-            QPushButton:disabled { background-color: #555; color: #999; }
-        """
-        #self.prev_button.setStyleSheet(button_style)
-        #self.next_button.setStyleSheet(button_style)
-
         self.prev_button.clicked.connect(self.show_previous_image)
         self.next_button.clicked.connect(self.show_next_image)
 
-        button_layout = QHBoxLayout()
-        button_layout.addStretch(1)
-        button_layout.addWidget(self.prev_button)
-        button_layout.addWidget(self.next_button)
-        button_layout.addStretch(1)
+        # 3. --- ИЗМЕНЕНИЕ: Создаем единую нижнюю панель ---
+        #    В один QHBoxLayout помещаем и информацию, и кнопки
+        bottom_layout = QHBoxLayout()
+        bottom_layout.addWidget(self.nav_label)        # Инфо слева
+        bottom_layout.addStretch()                       # Растяжитель, толкает кнопки к центру
+        bottom_layout.addWidget(self.prev_button)
+        bottom_layout.addWidget(self.next_button)
+        bottom_layout.addStretch()                       # Растяжитель, толкает имя файла вправо
+        bottom_layout.addWidget(self.filename_label)   # Имя файла справа
 
-        main_layout.addLayout(info_layout)
-        main_layout.addWidget(self.view)
-        main_layout.addLayout(button_layout)
+        # 4. --- ИЗМЕНЕНИЕ: Собираем основной layout ---
+        #    Сначала виджет просмотра, потом нижняя панель. Верхняя панель удалена.
+        main_layout.addWidget(self.view, 1)  # Добавляем 1, чтобы виджет занимал все доступное место
+        main_layout.addLayout(bottom_layout)
 
-        # Создаем QAction для шорткатов
+        # 5. Шорткаты (без изменений)
         prev_action = QAction(self)
         prev_action.setShortcut(QKeySequence(Qt.Key.Key_Left))
         prev_action.triggered.connect(self.show_previous_image)

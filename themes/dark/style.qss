@@ -1,180 +1,307 @@
-/* themes/dark/style.qss - Контрастная темная тема */
+/* -----------------------------------------------------------------------------
+ * themes/dark/style.qss
+ *
+ * Контрастная темная тема, основанная на структуре default.qss.
+ * -------------------------------------------------------------------------- */
 
-/* --- 1. Общие стили --- */
+/* --- [0] ПЕРЕМЕННЫЕ ТЕМЫ --- */
+@bgColorBase = #1e1e1e;
+@bgColorContainer = #252526;
+@bgColorAlternate = #2d2d30;
+@bgColorHover = #3e3e42;
+@bgColorPressed = #005a9e;
+@bgColorDisabled = #2d2d30;
+@bgColorHeader = #2d2d30;
+@bgColorTooltip = #2D2D2D;
+@bgColorScrollbar = #1e1e1e;
+@bgColorScrollHandle = #3e3e42;
+@bgColorScrollHandleHover = #555555;
+@bgColorScrollHandlePressed = #094771;
+@bgColorMenu = #252526;
+@bgColorDialog = #252526;
+
+@textColor = #d4d4d4;
+@textColorSecondary = #888888;
+@textColorDisabled = #888888;
+@textColorOnAccent = #ffffff;
+@textColorGroupBoxTitle = #d4d4d4;
+
+@borderColor = #3e3e42;
+@borderColorGrid = #3e3e42;
+@borderColorDirty = #f14c4c;
+@borderColorTooltip = #555555;
+
+@accentColor = #007acc;
+@accentColorHover = #1177bb;
+@accentColorPressed = #005a9e;
+@accentColorPrimaryBtn = #0e639c;
+@accentColorSelection = #094771;
+
+
+/* --- [1] ГЛОБАЛЬНЫЕ И ОСНОВНЫЕ СТИЛИ --- */
 QWidget {
-    background-color: #1e1e1e;
-    color: #d4d4d4;
+    background-color: @bgColorBase;
+    color: @textColor;
     font-family: "Segoe UI", Arial, sans-serif;
     font-size: 10pt;
+    border: none;
 }
-QLabel, QCheckBox { background-color: transparent; border: none; }
-
-/* --- 2. Контейнеры и вкладки --- */
-QGroupBox, QTabWidget::pane {
-    background-color: #252526;
-    border: 1px solid #3e3e42;
-    border-radius: 6px;
-}
-
-QGroupBox[isDirty="true"] {
-    border: 2px solid #f14c4c; /* Ярко-красная рамка */
-}
-QGroupBox[isDirty="true"]::title {
-    color: #f14c4c; /* Ярко-красный текст заголовка */
+QLabel, QCheckBox { background-color: transparent; }
+QStatusBar { background-color: @accentColor; color: @textColorOnAccent; }
+QToolTip {
+    background-color: @bgColorTooltip;
+    color: @textColor;
+    border: 1px solid @borderColorTooltip;
+    padding: 5px; border-radius: 4px; opacity: 240;
 }
 
-QGroupBox { margin-top: 6px; }
-QGroupBox::title {
-    subcontrol-origin: margin; subcontrol-position: top center;
-    padding: 0 5px; top: -4px;
-}
-QTabWidget::pane { margin-top: -1px; }
-QTabBar::tab {
-    background: #2d2d30;
-    border: 1px solid #3e3e42;
-    border-bottom: none;
-    padding: 7px 15px;
-    border-top-left-radius: 5px;
-    border-top-right-radius: 5px;
-}
-QTabBar::tab:selected { background: #1e1e1e; font-weight: bold; margin-bottom: -1px; }
-QTabBar::tab:!selected:hover { background: #3e3e42; }
 
-QToolBox::tab {
-    background: #3e3e42; border: 1px solid #3e3e42; border-radius: 5px;
-    color: #d4d4d4; padding: 6px; font-weight: bold;
-}
-QToolBox::tab:selected, QToolBox::tab:hover { background: #007acc; color: white; }
-QToolBox QWidget { background-color: #252526; }
-QToolBox QTextEdit { background-color: #1e1e1e; color: #d4d4d4; border: none; }
-
-/* --- 3. Кнопки --- */
+/* --- [2] КНОПКИ (QPushButton, QToolButton) --- */
 QPushButton {
-    background-color: #0e639c; color: white; border: 1px solid #007acc;
-    padding: 6px 12px; border-radius: 5px;
+    background-color: @accentColorPrimaryBtn;
+    color: @textColorOnAccent;
+    border: 1px solid @accentColor;
+    padding: 6px 12px;
+    border-radius: 5px;
 }
-QPushButton:hover { background-color: #1177bb; }
-QPushButton:pressed { background-color: #005a9e; }
-QPushButton:disabled { background-color: #2d2d30; color: #888888; }
+QPushButton:hover { background-color: @accentColorHover; }
+QPushButton:pressed { background-color: @accentColorPressed; }
+QPushButton:disabled {
+    background-color: @bgColorDisabled;
+    color: @textColorDisabled;
+}
+QPushButton[class~="primary"] { background-color: @accentColorPrimaryBtn; }
+QDialogButtonBox QPushButton { padding: 6px 20px; }
 
+
+/* --- [3] ПАНЕЛЬ ИНСТРУМЕНТОВ --- */
 QToolBar {
-    background-color: #1e1e1e; border-bottom: 0px solid #3e3e42;
+    background-color: #333333;
+    border-bottom: 1px solid @borderColor;
     padding: 2px; spacing: 5px;
 }
-QStatusBar { background-color: #1e1e1e; color: white; }
-
 QToolBar QToolButton {
     background-color: transparent; border: 1px solid transparent; padding: 5px;
     border-radius: 5px; margin: 2px;
 }
 QToolBar QToolButton:hover { background-color: #4f4f53; border: 1px solid #4f4f53; }
-QToolBar QToolButton:pressed, QToolBar QToolButton:checked { background-color: #007acc; border: 1px solid #007acc; }
+QToolBar QToolButton:pressed, QToolBar QToolButton:checked {
+    background-color: @accentColor;
+    border: 1px solid @accentColor;
+}
 QToolBar QToolButton[popupMode="1"] { padding-right: 20px; }
 QToolBar QToolButton::menu-button {
     border: none; border-left: 1px solid #4f4f53; width: 16px;
     border-top-right-radius: 5px; border-bottom-right-radius: 5px;
 }
 QToolBar QToolButton::menu-arrow {
-    width: 0; height: 0;
-    border-left: 3px solid transparent;
-    border-right: 3px solid transparent;
-    border-top: 2px solid #d4d4d4;
+    width: 0; height: 0; border-left: 3px solid transparent;
+    border-right: 3px solid transparent; border-top: 2px solid @textColor;
 }
-QToolBar QToolButton::menu-arrow:open { border-top: none; border-bottom: 2px solid #d4d4d4; }
+QToolBar QToolButton::menu-arrow:open { border-top: none; border-bottom: 2px solid @textColor; }
 
-/* --- 4. Поля ввода, списки и таблицы --- */
-QLineEdit, QTextEdit, QPlainTextEdit, QTreeView, QListWidget, QComboBox { 
-    background-color: #252526; border: 1px solid #3e3e42;
-    border-radius: 5px; padding: 4px; 
+
+/* --- [4] ПОЛЯ ВВОДА --- */
+QLineEdit, QTextEdit, QPlainTextEdit {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+    border-radius: 5px; padding: 4px;
 }
-QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus { border: 1px solid #0078d7; }
-QLineEdit:disabled, QLineEdit:read-only, 
-QTextEdit:disabled, QTextEdit:read-only, 
-QPlainTextEdit:disabled, QPlainTextEdit:read-only {
-    background-color: #2D2D2D; color: #8c8c8c; border: 1px solid #3e3e42;
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus { border: 1px solid @accentColor; }
+QLineEdit:disabled, QLineEdit:read-only {
+    background-color: #2D2D2D;
+    color: #8c8c8c;
+    border: 1px solid @borderColor;
 }
 
-QTreeView, QListWidget, QTableWidget { alternate-background-color: #2d2d30; }
+
+/* --- [5] КОНТЕЙНЕРЫ (QGroupBox, QTabWidget, QToolBox) --- */
+QGroupBox {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+    border-radius: 6px; margin-top: 15px;
+}
+QGroupBox[isDirty="true"] { border: 2px solid @borderColorDirty; }
+QGroupBox[isDirty="true"]::title { color: @borderColorDirty; }
+QGroupBox::title {
+    subcontrol-origin: margin; subcontrol-position: top center;
+    padding: 0 5px; top: 5px;
+    color: @textColorGroupBoxTitle;
+}
+
+QTabWidget::pane {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+    border-radius: 6px; margin-top: -1px;
+}
+QTabBar::tab {
+    background: @bgColorAlternate; color: @textColor;
+    border: 1px solid @borderColor; border-bottom: none;
+    padding: 7px 15px;
+    border-top-left-radius: 5px; border-top-right-radius: 5px;
+}
+QTabBar::tab:selected {
+    background: @bgColorBase; font-weight: bold; margin-bottom: -1px;
+}
+QTabBar::tab:!selected:hover { background: @bgColorHover; }
+
+QToolBox::tab {
+    background: @bgColorHover; border: 1px solid @borderColor; border-radius: 5px;
+    color: @textColor; padding: 6px; font-weight: bold;
+}
+QToolBox::tab:selected, QToolBox::tab:hover {
+    background: @accentColor; color: @textColorOnAccent;
+}
+QToolBox QWidget { background-color: @bgColorContainer; }
+QToolBox QTextEdit { background-color: @bgColorBase; color: @textColor; border: none; }
+
+
+/* --- [6] СПИСКИ И ТАБЛИЦЫ (QTreeView, QListWidget, QTableWidget) --- */
+QTreeView, QListWidget, QTableWidget {
+    background-color: @bgColorContainer;
+    alternate-background-color: @bgColorAlternate;
+    border: 1px solid @borderColor; border-radius: 5px;
+}
 QTreeView::item:hover, QListWidget::item:hover { background-color: #4f4f53; }
-QTreeView::item:selected, QListWidget::item:selected { background-color: #094771; color: white; }
+QTreeView::item:selected, QListWidget::item:selected {
+    background-color: @accentColorSelection;
+    color: @textColorOnAccent;
+}
 
 QHeaderView::section {
-    background-color: #2d2d30; padding: 5px; font-weight: normal;
-    border: none; border-bottom: 1px solid #3e3e42; 
+    background-color: @bgColorHeader; padding: 5px; border: none; font-weight: normal;
 }
-QHeaderView::section:!last-of-type { border-right: 1px solid #3e3e42; }
+QHeaderView::section:!last-of-type { border-right: 1px solid @borderColor; }
 
-QTableWidget { border: 1px solid #3e3e42; border-radius: 5px; gridline-color: #3e3e42; }
-QTableWidget::item { padding: 2px; border: none; color: #d4d4d4; }
-QTableWidget::item:selected { background-color: #094771; color: white; }
+QTableWidget { gridline-color: @borderColorGrid; }
+QTableWidget::item { padding: 2px; border: none; color: @textColor; }
+QTableWidget::item:selected { background-color: @accentColorSelection; color: @textColorOnAccent; }
 QTableWidget QWidget { background-color: transparent; padding: 0px; margin: 0px; }
 QTableWidget QPushButton { padding: 2px 5px; font-weight: normal; margin: 1px; }
 QTableWidget QLineEdit, QTableWidget QComboBox, QTableWidget QDateEdit, QTableWidget QDateTimeEdit {
-    border: none; background-color: transparent; border-radius: 0px; color: #d4d4d4;
+    border: none; background-color: transparent; border-radius: 0px; color: @textColor;
 }
 QTableWidget QLineEdit:focus, QTableWidget QComboBox:focus, QTableWidget QDateEdit:focus, QTableWidget QDateTimeEdit:focus {
-    background-color: #3e3e42; border: 1px solid #007acc;
+    background-color: @bgColorHover;
+    border: 1px solid @accentColor;
 }
 
-/* --- 5. Элементы управления --- */
+/* --- [6.1] СТИЛИ ДЛЯ РЕДАКТОРА КЛАСТЕРОВ --- */
+/* Применяем стили к виджетам по их уникальным именам */
+QListWidget#clusterListWidget, QListWidget#imageListWidget {
+    background-color: @bgColorContainer;
+    alternate-background-color: @bgColorAlternate;
+    border: 1px solid @borderColor;
+    border-radius: 5px;
+    padding: 5px; /* Небольшой отступ для элементов */
+}
+
+/* Стиль для одного элемента списка (item) */
+QListWidget#clusterListWidget::item, QListWidget#imageListWidget::item {
+    outline: 0;
+    border: 1px solid transparent; /* Прозрачная рамка по умолчанию */
+    border-radius: 5px;
+    margin: 2px;
+    /* Убираем стандартное выделение, т.к. делегат рисует свое содержимое */
+    background-color: transparent;
+    color: transparent;
+}
+
+/* Стиль при наведении курсора */
+QListWidget#clusterListWidget::item:hover, QListWidget#imageListWidget::item:hover {
+    background-color: @bgColorHover;
+    border-color: @accentColor;
+}
+
+/* Стиль при выделении элемента */
+QListWidget#clusterListWidget::item:selected, QListWidget#imageListWidget::item:selected {
+    background-color: @accentColor;
+    border-color: @accentColor;
+    color: @textColorOnAccent; /* Цвет текста для выделенных элементов */
+}
+
+/* --- [7] ВЫПАДАЮЩИЕ СПИСКИ (QComboBox) --- */
+QComboBox {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+    border-radius: 5px; padding: 4px;
+}
+QComboBox:focus { border: 1px solid @accentColor; }
 QComboBox::drop-down {
     subcontrol-origin: padding; subcontrol-position: top right; width: 20px;
-    border-left: 1px solid #3e3e42; border-top-right-radius: 5px; border-bottom-right-radius: 5px;
+    border-left: 1px solid @borderColor;
+    border-top-right-radius: 5px; border-bottom-right-radius: 5px;
 }
-QComboBox::down-arrow { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 4px solid #d4d4d4; }
-QComboBox::down-arrow:on { border-top: none; border-bottom: 4px solid #d4d4d4; }
-QComboBox QAbstractItemView { background-color: #252526; border: 1px solid #3e3e42; outline: none; }
+QComboBox::down-arrow {
+    width: 0; height: 0; border-left: 4px solid transparent;
+    border-right: 4px solid transparent; border-top: 4px solid @textColor;
+}
+QComboBox::down-arrow:on { border-top: none; border-bottom: 4px solid @textColor; }
+QComboBox QAbstractItemView {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+    outline: none;
+}
 QComboBox QAbstractItemView::item { padding: 6px 10px; }
-QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover { background-color: #007acc; color: white; }
+QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover {
+    background-color: @accentColor;
+    color: @textColorOnAccent;
+}
 
-QCheckBox::indicator { border: 1px solid #888888; border-radius: 4px; }
-QCheckBox::indicator:unchecked { background-color: #2d2d30; }
-QCheckBox::indicator:unchecked:hover { border-color: #007acc; }
-QCheckBox::indicator:checked { background-color: #007acc; }
-QCheckBox::indicator:checked:hover { background-color: #1177bb; }
 
-QProgressBar { border: 1px solid #3e3e42; border-radius: 5px; text-align: center; color: #d4d4d4; background-color: #2d2d30; }
-QProgressBar::chunk { background-color: #007acc; border-radius: 4px; }
+/* --- [8] ЧЕКБОКСЫ И ПРОГРЕСС-БАРЫ --- */
+QCheckBox::indicator { border: 1px solid @textColorSecondary; border-radius: 4px; }
+QCheckBox::indicator:unchecked { background-color: @bgColorAlternate; }
+QCheckBox::indicator:unchecked:hover { border-color: @accentColor; }
+QCheckBox::indicator:checked { background-color: @accentColor; }
+QCheckBox::indicator:checked:hover { background-color: @accentColorHover; }
 
-/* --- 6. Полосы прокрутки --- */
-QScrollBar:vertical { border: none; width: 12px; margin: 0px; }
-QScrollBar:horizontal { border: none; height: 12px; margin: 0px; }
-QScrollBar::handle:vertical { background-color: #3e3e42; min-height: 25px; border-radius: 6px; }
-QScrollBar::handle:vertical:hover { background-color: #555555; }
-QScrollBar::handle:vertical:pressed { background-color: #094771; }
-QScrollBar::handle:horizontal { background-color: #3e3e42; min-width: 25px; border-radius: 6px; }
-QScrollBar::handle:horizontal:hover { background-color: #555555; }
-QScrollBar::handle:horizontal:pressed { background-color: #094771; }
+QProgressBar {
+    border: 1px solid @borderColor; border-radius: 5px;
+    text-align: center; color: @textColor; background-color: @bgColorAlternate;
+}
+QProgressBar::chunk { background-color: @accentColor; border-radius: 4px; }
+
+
+/* --- [9] ПОЛОСЫ ПРОКРУТКИ (QScrollBar) --- */
+QScrollBar:vertical { border: none; background: @bgColorScrollbar; width: 12px; margin: 0px; }
+QScrollBar::handle:vertical { background-color: @bgColorScrollHandle; min-height: 25px; border-radius: 6px; }
+QScrollBar::handle:vertical:hover { background-color: @bgColorScrollHandleHover; }
+QScrollBar::handle:vertical:pressed { background-color: @bgColorScrollHandlePressed; }
+QScrollBar:horizontal { border: none; background: @bgColorScrollbar; height: 12px; margin: 0px; }
+QScrollBar::handle:horizontal { background-color: @bgColorScrollHandle; min-width: 25px; border-radius: 6px; }
+QScrollBar::handle:horizontal:hover { background-color: @bgColorScrollHandleHover; }
+QScrollBar::handle:horizontal:pressed { background-color: @bgColorScrollHandlePressed; }
 QScrollBar::add-line, QScrollBar::sub-line { height: 0px; width: 0px; }
 QScrollBar::add-page, QScrollBar::sub-page { background: none; }
 
-/* --- 7. Меню --- */
-QMenu { background-color: #252526; border: 1px solid #3e3e42; padding: 5px; }
+
+/* --- [10] МЕНЮ (QMenu) --- */
+QMenu { background-color: @bgColorMenu; border: 1px solid @borderColor; padding: 5px; }
 QMenu::item { padding: 8px 25px; border-radius: 4px; }
-QMenu::item:selected { background-color: #094771; color: white; }
+QMenu::item:selected { background-color: @accentColorSelection; color: @textColorOnAccent; }
 
-/* --- 8. Диалоговые окна --- */
-QDialog { background-color: #252526; }
-QMessageBox, QFileDialog { background-color: #252526; }
-QMessageBox QLabel { background-color: transparent; color: #d4d4d4; }
+
+/* --- [11] ДИАЛОГОВЫЕ ОКНА --- */
+QDialog { background-color: @bgColorDialog; }
+QMessageBox, QFileDialog { background-color: @bgColorDialog; }
+QMessageBox QLabel { background-color: transparent; color: @textColor; }
 QDialogButtonBox QPushButton { padding: 6px 20px; }
-QDialog#JsonEditorDialog, QDialog#MultilineTextDialog, QInputDialog { background-color: #252526; color: #d4d4d4; }
-QDialog#JsonEditorDialog QPlainTextEdit, QDialog#MultilineTextDialog QPlainTextEdit, QInputDialog QPlainTextEdit, QInputDialog QLineEdit {
-    background-color: #3e3e42; color: #d4d4d4; border: 1px solid #3e3e42; font-family: "Consolas", "Courier New", monospace;
-}
-QDialog#JsonEditorDialog QPushButton, QDialog#MultilineTextDialog QPushButton, QInputDialog QPushButton {
-    background-color: #0e639c; color: white; border: 1px solid #007acc; padding: 6px 20px; border-radius: 5px;
-}
-QDialog#JsonEditorDialog QPushButton:hover, QDialog#MultilineTextDialog QPushButton:hover, QInputDialog QPushButton:hover {
-    background-color: #1177bb;
-}
 
-/* --- 9. Всплывающие подсказки --- */
-QToolTip {
-    background-color: #2D2D2D;
-    color: #d4d4d4;
-    border: 1px solid #555555;
-    padding: 5px;
-    border-radius: 4px;
-    opacity: 240;
+QDialog#JsonEditorDialog, QDialog#MultilineTextDialog, QInputDialog {
+    background-color: @bgColorDialog; color: @textColor;
+}
+QDialog#JsonEditorDialog QPlainTextEdit, QDialog#MultilineTextDialog QPlainTextEdit,
+QInputDialog QPlainTextEdit, QInputDialog QLineEdit {
+    background-color: @bgColorHover; color: @textColor; border: 1px solid @borderColor;
+    font-family: "Consolas", "Courier New", monospace;
+}
+QDialog#JsonEditorDialog QPushButton, QDialog#MultilineTextDialog QPushButton,
+QInputDialog QPushButton {
+    background-color: @accentColorPrimaryBtn; color: @textColorOnAccent;
+    border: 1px solid @accentColor;
+}
+QDialog#JsonEditorDialog QPushButton:hover, QDialog#MultilineTextDialog QPushButton:hover,
+QInputDialog QPushButton:hover {
+    background-color: @accentColorHover;
 }

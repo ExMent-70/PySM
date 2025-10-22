@@ -21,9 +21,7 @@
       "description": "Список папок с портретами, которые необходимо проанализировать (каждая папка с новой строки).",
       "required": false,
       "default": [
-        "portrait0",
-        "portrait1",
-        "portrait2"
+        "portrait_cover"
       ]
     }
   }
