@@ -258,17 +258,38 @@ class ListEditorWidget(BaseEditor):
         button.clicked.connect(self.on_button_click)
 
     def on_button_click(self):
+        # --- ИСПРАВЛЕНИЕ: Заменяем QInputDialog на кастомный QDialog ---
+        dialog = QDialog(self)
+        dialog.setObjectName("MultilineTextDialog") # Используем тот же ID для стилей
+        
+        dialog.setWindowTitle(self.locale_manager.get("dialogs.context_editor.list_editor_title", default="Редактор списка"))
+        dialog.setMinimumSize(400, 300)
+        
+        layout = QVBoxLayout(dialog)
+        label = QLabel(self.locale_manager.get("dialogs.context_editor.list_editor_label", default="Введите по одному значению на строку:"))
+        layout.addWidget(label)
+        
+        editor = QPlainTextEdit()
+        # Преобразуем список в текст для редактора
         text_value = "\n".join(self.current_value)
-        text, ok = QInputDialog.getMultiLineText(
-            self, "List Editor", "Enter one value per line:", text_value
-        )
-        if ok:
+        editor.setPlainText(text_value)
+        layout.addWidget(editor)
+        
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        layout.addWidget(button_box)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+
+        if dialog.exec():
+            text = editor.toPlainText()
+            # Обратно преобразуем текст в список
             new_list = [line.strip() for line in text.splitlines() if line.strip()]
             self.current_value = new_list
             self._update_display_text()
             self.valueChanged.emit(self.current_value)
 
     def _update_display_text(self):
+        # Преобразуем список в строку через запятую для отображения в ячейке
         display_text = ", ".join(self.current_value)
         self.line_edit.setText(display_text)
         self.line_edit.setToolTip(display_text)
@@ -371,7 +392,11 @@ class EditorFactory:
         if var_type == "string_multiline":
             dialog = QDialog(parent)
             dialog.setObjectName("MultilineTextDialog") # Задаем ID для стилизации
-            dialog.setWindowTitle("Edit Text") # TODO: Локализовать
+            dialog.setWindowTitle(
+                locale_manager.get(
+                    "dialogs.context_editor.multiline_editor_title"
+                )
+            )            
             dialog.setMinimumSize(400, 300)
             
             layout = QVBoxLayout(dialog)
@@ -398,7 +423,7 @@ class EditorFactory:
             dialog.setObjectName("JsonEditorDialog") # Задаем ID для стилизации
             dialog.setWindowTitle(
                 locale_manager.get(
-                    "dialogs.context_editor.json_editor_title", name="Value"
+                    "dialogs.context_editor.json_editor_title"
                 )
             )
             dialog.setMinimumSize(400, 300) # Установим минимальный размер
@@ -431,11 +456,17 @@ class EditorFactory:
                 try:
                     return json.loads(text), True
                 except json.JSONDecodeError:
-                    QMessageBox.warning(
-                        parent,
-                        locale_manager.get("general.error_title"),
-                        locale_manager.get("dialogs.context_editor.json_invalid_error"),
-                    )
+                    # --- НАЧАЛО ИЗМЕНЕНИЙ (ВОЗВРАЩАЕМСЯ К ЭТОМУ РЕШЕНИЮ) ---
+                    # Создаем экземпляр QMessageBox вместо статического вызова.
+                    # Это гарантирует, что он будет дочерним элементом `parent`
+                    # и корректно унаследует глобальные стили приложения.
+                    msg_box = QMessageBox(parent)
+                    msg_box.setIcon(QMessageBox.Icon.Warning)
+                    msg_box.setWindowTitle(locale_manager.get("general.error_title"))
+                    msg_box.setText(locale_manager.get("dialogs.context_editor.json_invalid_error"))
+                    msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+                    msg_box.exec() # Показываем модальное окно
+                    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
                     return current_value, False
                     
         return current_value, False

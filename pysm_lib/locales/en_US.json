@@ -372,14 +372,17 @@
       "add_label": "Variable name:",
       "add_duplicate_error": "A variable named '{name}' already exists.",
       "add_invalid_name_error": "Invalid variable name: '{name}'.\nNames must start with a letter or underscore and contain only letters, numbers, and underscores.",
-      "json_editor_title": "Editor for '{name}'",
+      "json_editor_title": "Editor for JSON",
       "json_invalid_error": "The entered text is not valid JSON.",
       "edit_choices_tooltip": "Edit choice list",
       "edit_choices_title": "Choice Editor",
       "edit_choices_label": "Enter one choice per line:",
       "create_title": "Create New Context Variable",
       "search_placeholder": "Search by name...",
-      "view_title": "View Context Variable"
+      "view_title": "View Context Variable",
+      "multiline_editor_title": "MultiLine Editor",
+      "list_editor_title": "List Editor",
+      "list_editor_label": "Enter one value per line:"	  
     }
   },
   "user_actions": {
