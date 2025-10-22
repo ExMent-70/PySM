@@ -148,7 +148,7 @@ QGroupBox[isDirty="true"] { border: 2px solid @borderColorDirty; }
 QGroupBox[isDirty="true"]::title { color: @borderColorDirty; }
 QGroupBox::title {
     subcontrol-origin: margin; subcontrol-position: top center;
-    padding: 0 5px; top: -12px; /* Изменено с 5px на -12px для лучшего вида */
+    padding: 0 5px; top: 5px; /* Изменено с 5px на -12px для лучшего вида */
     color: @textColorGroupBoxTitle;
 }
 
