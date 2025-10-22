@@ -1,8 +1,8 @@
 {
-  "collection_name": "ШколаТур_9а_класс",
-  "description": "<div style=\"{theme.collection_info}\">\n<h3>ШколаТур_9а_класс</h3>\n<p>Коллекция содержит авторские скрипты для автоматизации работы школьного фотографа.</p>\n\n<p>Скрипты охватывают основные этапы рабочего процесса, начиная с редактирования списка класса/группы и заключения договора, и заканчивая подготовкой рабочего материала к хранению в архиве.</p>\n\n<p>Эта коллекция - ШАБЛОН, который нужно использовать для создания индивидуальной коллекции каждого класса/группы.</p>\n</div>\n<div style=\"{theme.tooltip_script_args_block}\">\n<h3>ВНИМАНИЕ</h3>\n<p>При знакомстве с наборами из папки <b>\"Рабочий процесс\"</b>, запускайте их по порядку</p>\n<p>Режим выполнения установите <b>Условный (авто)</b> или<b> Условный (пошагово)</b></p>\n\n<p>Для начало работы с новым классом/группой просто сохраните эту коллекцию под новым именем</p>\n</div>",
+  "collection_name": "Рабочий процесс. Сезон 2026",
+  "description": "<div style=\"{theme.collection_info}\">\n<h3>ДЕМО</h3>\n<p>Коллекция содержит авторские скрипты для автоматизации работы школьного фотографа.</p>\n\n<p>Скрипты охватывают основные этапы рабочего процесса, начиная с редактирования списка класса/группы и заключения договора, и заканчивая подготовкой рабочего материала к хранению в архиве.</p>\n\n<p>Эта коллекция - ШАБЛОН, который нужно использовать для создания индивидуальной коллекции каждого класса/группы.</p>\n</div>\n<div style=\"{theme.tooltip_script_args_block}\">\n<h3>ВНИМАНИЕ</h3>\n<p>При знакомстве с наборами из папки <b>\"Рабочий процесс\"</b>, запускайте их по порядку</p>\n<p>Режим выполнения установите <b>Условный (авто)</b> или<b> Условный (пошагово)</b></p>\n\n<p>Для начало работы с новым классом/группой просто сохраните эту коллекцию под новым именем</p>\n</div>",
   "data_format_version": "1.1",
-  "execution_mode": "single_from_set",
+  "execution_mode": "conditional_full",
   "script_roots": [
     {
       "id": "root_790d968b",
@@ -21,7 +21,7 @@
     {
       "type": "set_folder",
       "id": "foldernode_8653804262c2",
-      "name": "2025-2026 учебный год",
+      "name": "ДЕМО",
       "description": null,
       "children": [
         {
@@ -125,7 +125,7 @@
               "silent_mode": false,
               "command_line_args": {
                 "dlg_open_var": {
-                  "value": "wf_idsgn_catalog",
+                  "value": "var_idsgn_catalog",
                   "enabled": true
                 },
                 "dlg_open_type": {
@@ -159,9 +159,9 @@
                 {
                   "id": "root_7617c03c/SYSTEM/log_report",
                   "instance_id": "instance_162596c2f183",
-                  "name": "Общая информация о выполнении работ",
+                  "name": "Информационная панель",
                   "description": null,
-                  "silent_mode": false,
+                  "silent_mode": true,
                   "command_line_args": {}
                 }
               ]
@@ -256,23 +256,6 @@
                       "enabled": true
                     }
                   }
-                },
-                {
-                  "id": "root_7617c03c/GUI/gui_dialog_vars",
-                  "instance_id": "instance_b7850a5851ea",
-                  "name": "Проверка переменных контекста (после)",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "edit": {
-                      "value": false,
-                      "enabled": true
-                    },
-                    "title": {
-                      "value": "Значение переменных контекста после установки",
-                      "enabled": true
-                    }
-                  }
                 }
               ]
             },
@@ -285,7 +268,7 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_open",
                   "instance_id": "instance_90225786020e",
-                  "name": "СООБЩЕНИЕ: Выбрать карту памяти с исходными RAW-файлами",
+                  "name": "ВВОД: Выбрать карту памяти с исходными RAW-файлами",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
@@ -805,6 +788,10 @@
                     "__fs_mode": {
                       "value": "copy",
                       "enabled": true
+                    },
+                    "__fs_on_conflict": {
+                      "value": "skip",
+                      "enabled": true
                     }
                   }
                 },
@@ -941,7 +928,7 @@
                       "enabled": true
                     },
                     "ps_file_path": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}/11.psd",
+                      "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/Школа8_1д_класс/Альбом/Фото/SCHOOL/Дополнительное фото А5/Арабжаева Сарана-9573.psd",
                       "enabled": true
                     },
                     "ps_recursive": {
@@ -983,111 +970,123 @@
             },
             {
               "type": "script_set",
-              "id": "setnode_8df4226cbf38",
-              "name": "Этап 7. Выбор дизайна альбома",
+              "id": "setnode_27cd685bb66f",
+              "name": "Этап 7. Автоматическая верстка",
               "description": null,
               "script_entries": [
                 {
-                  "id": "root_790d968b/InDesign/idsgn_catalog",
-                  "instance_id": "instance_1ee46510cab4",
-                  "name": "Обложка - var_album_cover",
+                  "id": "root_7617c03c/GUI/gui_dialog_open",
+                  "instance_id": "instance_1ac49931aa3a",
+                  "name": "ВВОД: Выбор каталога шаблонов InDesign",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
-                    "idsgn_catalog": {
-                      "value": "{wf_idsgn_catalog}",
+                    "dlg_open_var": {
+                      "value": "var_idsgn_catalog",
                       "enabled": true
                     },
-                    "idsgn_template_var": {
-                      "value": "var_album_cover",
+                    "dlg_open_type": {
+                      "value": "file",
                       "enabled": true
                     },
-                    "idsgn_msg": {
-                      "value": "Выберите шаблон для обложки альбома",
+                    "dlg_open_title": {
+                      "value": "Выберите файл-каталог шаблонов InDesign",
+                      "enabled": true
+                    },
+                    "dlg_open_filter": {
+                      "value": "*.template",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_dialog_msg",
+                  "instance_id": "instance_72577cadb9c0",
+                  "name": "СООБЩЕНИЕ: Автоматическая генерация разворотов",
+                  "description": null,
+                  "silent_mode": true,
+                  "command_line_args": {
+                    "dlg_msg_var": {
+                      "value": "var_avto_generate",
+                      "enabled": true
+                    },
+                    "dlg_msg_type": {
+                      "value": "yes_no_cancel",
+                      "enabled": true
+                    },
+                    "dlg_msg_title": {
+                      "value": "Подтверждение",
+                      "enabled": true
+                    },
+                    "dlg_msg_message": {
+                      "value": "Данный блок скриптов предназначен для быстрой верстки персональных разворотов альбомов.\n\nВы готовы начать работы?",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/py_if_else",
+                  "instance_id": "instance_d2411aa33f15",
+                  "name": "УСЛОВИЕ: Создать новый разворот (да/нет/отмена)",
+                  "description": "<div style=\" {theme.status_error}\">\nЕсли выбран режим РУЧНОГО редактирования кластеров, то запускается соответствующий редактор, в противном случае продолжается анализ фотографий.\n</div>",
+                  "silent_mode": true,
+                  "command_line_args": {
+                    "if-variable-name": {
+                      "value": "var_avto_generate",
+                      "enabled": true
+                    },
+                    "if-operator": {
+                      "value": "равно",
+                      "enabled": true
+                    },
+                    "if-comparison-value": {
+                      "value": "yes",
+                      "enabled": true
+                    },
+                    "then-instance-id": {
+                      "value": "instance_b2eec42c20b7",
+                      "enabled": true
+                    },
+                    "else-instance-id": {
+                      "value": "instance_d684a046d05c",
+                      "enabled": true
+                    },
+                    "clear-variable": {
+                      "value": true,
                       "enabled": true
                     }
                   }
                 },
                 {
                   "id": "root_790d968b/InDesign/idsgn_catalog",
-                  "instance_id": "instance_44d57056bb79",
-                  "name": "Разворот - var_album_sheet_02",
+                  "instance_id": "instance_b2eec42c20b7",
+                  "name": "Выбрать шаблон оформления",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
                     "idsgn_catalog": {
-                      "value": "{wf_idsgn_catalog}",
+                      "value": "{var_idsgn_catalog}",
                       "enabled": true
                     },
                     "idsgn_template_var": {
-                      "value": "var_album_sheet_02",
+                      "value": "var_album_demo",
                       "enabled": true
                     },
                     "idsgn_msg": {
-                      "value": "Выберите шаблон 2 разворота альбома",
+                      "value": "Выберите шаблон для генерации разворота",
                       "enabled": true
                     }
                   }
                 },
-                {
-                  "id": "root_790d968b/InDesign/idsgn_catalog",
-                  "instance_id": "instance_60fdff8b8870",
-                  "name": "Разворот - var_album_photoA6",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "idsgn_catalog": {
-                      "value": "{wf_idsgn_catalog}",
-                      "enabled": true
-                    },
-                    "idsgn_template_var": {
-                      "value": "var_album_photoA6",
-                      "enabled": true
-                    },
-                    "idsgn_msg": {
-                      "value": "Выберите шаблон фотографии А6",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/InDesign/idsgn_catalog",
-                  "instance_id": "instance_727bd70d723d",
-                  "name": "Обложка - var_album_cover_test",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "idsgn_catalog": {
-                      "value": "{wf_idsgn_catalog}",
-                      "enabled": true
-                    },
-                    "idsgn_template_var": {
-                      "value": "var_album_cover_test",
-                      "enabled": true
-                    },
-                    "idsgn_msg": {
-                      "value": "Выберите шаблон для обложки альбома",
-                      "enabled": true
-                    }
-                  }
-                }
-              ]
-            },
-            {
-              "type": "script_set",
-              "id": "setnode_524fe9e42f8b",
-              "name": "Этап 8. Верстка",
-              "description": null,
-              "script_entries": [
                 {
                   "id": "root_790d968b/InDesign/idsgn_spread_generator",
-                  "instance_id": "instance_65831f5dadb8",
-                  "name": "Генерировать обложку - var_album_cover",
+                  "instance_id": "instance_f0435ebc4871",
+                  "name": "Создать разворот альбома",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
                     "template": {
-                      "value": "var_album_cover",
+                      "value": "var_album_demo",
                       "enabled": true
                     },
                     "output_file": {
@@ -1113,130 +1112,70 @@
                   }
                 },
                 {
-                  "id": "root_790d968b/InDesign/idsgn_spread_generator",
-                  "instance_id": "instance_7897280d6603",
-                  "name": "Генерировать разворот - var_album_sheet_02",
+                  "id": "root_7617c03c/GUI/gui_dialog_msg",
+                  "instance_id": "instance_953c16899e39",
+                  "name": "СООБЩЕНИЕ: Продолжить автоматическую генерацию разворотов",
                   "description": null,
-                  "silent_mode": false,
+                  "silent_mode": true,
                   "command_line_args": {
-                    "template": {
-                      "value": "var_album_sheet_02",
+                    "dlg_msg_var": {
+                      "value": "var_avto_generate",
                       "enabled": true
                     },
-                    "output_file": {
-                      "value": "",
-                      "enabled": false
-                    },
-                    "data_json_file": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
+                    "dlg_msg_type": {
+                      "value": "yes_no_cancel",
                       "enabled": true
                     },
-                    "portraits_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
+                    "dlg_msg_title": {
+                      "value": "Подтверждение",
                       "enabled": true
                     },
-                    "group_photos_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "placeholder_image": {
-                      "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/placeholder.png",
-                      "enabled": true
-                    },
-                    "validate": {
-                      "value": false,
+                    "dlg_msg_message": {
+                      "value": "Скрипт завершил генерацию персонального разворота.\n\nВы хотите создать еще один разворот?",
                       "enabled": true
                     }
                   }
                 },
                 {
-                  "id": "root_790d968b/InDesign/idsgn_spread_generator",
-                  "instance_id": "instance_5fd24e029da9",
-                  "name": "Генерировать фото А6 - var_album_photoA6",
-                  "description": null,
-                  "silent_mode": false,
+                  "id": "root_7617c03c/SYSTEM/py_if_else",
+                  "instance_id": "instance_15b3b3da69e5",
+                  "name": "УСЛОВИЕ: Создать еще один разворот (да/нет)",
+                  "description": "<div style=\" {theme.status_error}\">\nЕсли выбран режим РУЧНОГО редактирования кластеров, то запускается соответствующий редактор, в противном случае продолжается анализ фотографий.\n</div>",
+                  "silent_mode": true,
                   "command_line_args": {
-                    "template": {
-                      "value": "var_album_photoA6",
+                    "if-variable-name": {
+                      "value": "var_avto_generate",
                       "enabled": true
                     },
-                    "output_file": {
-                      "value": "",
-                      "enabled": false
-                    },
-                    "data_json_file": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
+                    "if-operator": {
+                      "value": "равно",
                       "enabled": true
                     },
-                    "source_photos_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
+                    "if-comparison-value": {
+                      "value": "yes",
                       "enabled": true
                     },
-                    "placeholder_image": {
-                      "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/placeholder.png",
+                    "then-instance-id": {
+                      "value": "instance_b2eec42c20b7",
                       "enabled": true
                     },
-                    "validate": {
-                      "value": false,
+                    "else-instance-id": {
+                      "value": "instance_d684a046d05c",
+                      "enabled": true
+                    },
+                    "clear-variable": {
+                      "value": true,
                       "enabled": true
                     }
                   }
                 },
                 {
-                  "id": "root_790d968b/Workflow/wf_csv_generate",
-                  "instance_id": "instance_51304c4d64d7",
-                  "name": "Создать CSV файл для InDesign",
+                  "id": "root_7617c03c/SYSTEM/log_report",
+                  "instance_id": "instance_d684a046d05c",
+                  "name": "Завершение работы",
                   "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "__wf_psd_path": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото",
-                      "enabled": true
-                    },
-                    "wf_csv_file_name": {
-                      "value": "",
-                      "enabled": false
-                    },
-                    "wf_portrait_folders": {
-                      "value": [
-                        "portrait_cover"
-                      ],
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/InDesign/idsgn_spread_generator",
-                  "instance_id": "instance_f3d45dbdf481",
-                  "name": "Генерировать обложку - var_album_cover_test",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "template": {
-                      "value": "var_album_cover_test",
-                      "enabled": true
-                    },
-                    "output_file": {
-                      "value": "",
-                      "enabled": false
-                    },
-                    "data_json_file": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
-                      "enabled": true
-                    },
-                    "source_photos_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "placeholder_image": {
-                      "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/placeholder.png",
-                      "enabled": true
-                    },
-                    "validate": {
-                      "value": false,
-                      "enabled": true
-                    }
-                  }
+                  "silent_mode": true,
+                  "command_line_args": {}
                 }
               ]
             },
@@ -1267,7 +1206,7 @@
                   "silent_mode": false,
                   "command_line_args": {
                     "ps_source_folder": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/",
+                      "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/ШколаТур_9а_класс/Альбом/Фото",
                       "enabled": true
                     },
                     "ps_output_folder": {
@@ -1298,124 +1237,6 @@
           "name": "Демонстрация работы отдельных скриптов",
           "description": null,
           "children": [
-            {
-              "type": "set_folder",
-              "id": "foldernode_5b8a12c48fb1",
-              "name": "PySM API Demo",
-              "description": null,
-              "children": [
-                {
-                  "type": "script_set",
-                  "id": "setnode_43d0c52863df",
-                  "name": "Демонстрационный набор",
-                  "description": null,
-                  "script_entries": [
-                    {
-                      "id": "root_a427badc/hello_pysm",
-                      "instance_id": "instance_3f80c30ae6be",
-                      "name": "hello_pysm",
-                      "description": null,
-                      "silent_mode": false,
-                      "command_line_args": {}
-                    },
-                    {
-                      "id": "root_a427badc/var_set",
-                      "instance_id": "instance_1ab6810d16b6",
-                      "name": "var_set",
-                      "description": null,
-                      "silent_mode": false,
-                      "command_line_args": {}
-                    },
-                    {
-                      "id": "root_a427badc/var_get",
-                      "instance_id": "instance_c8c05a6df70f",
-                      "name": "var_get",
-                      "description": null,
-                      "silent_mode": false,
-                      "command_line_args": {}
-                    },
-                    {
-                      "id": "root_a427badc/var_get_structured",
-                      "instance_id": "instance_448582b88c04",
-                      "name": "var_get_structured",
-                      "description": null,
-                      "silent_mode": false,
-                      "command_line_args": {}
-                    },
-                    {
-                      "id": "root_a427badc/path_resolve",
-                      "instance_id": "instance_8ccc80ca1da9",
-                      "name": "path_resolve",
-                      "description": null,
-                      "silent_mode": false,
-                      "command_line_args": {}
-                    },
-                    {
-                      "id": "root_a427badc/path_resolve_template",
-                      "instance_id": "instance_2f29b1b8e4eb",
-                      "name": "path_resolve_template",
-                      "description": null,
-                      "silent_mode": false,
-                      "command_line_args": {}
-                    },
-                    {
-                      "id": "root_7617c03c/SYSTEM/log_img",
-                      "instance_id": "instance_c08a3bf76acb",
-                      "name": "log_img",
-                      "description": null,
-                      "silent_mode": true,
-                      "command_line_args": {
-                        "img_source_path": {
-                          "value": "C:/Users/fotodeti/Downloads/photo_2024-12-28_20-08-09.jpg",
-                          "enabled": true
-                        },
-                        "img_width": {
-                          "value": 300,
-                          "enabled": true
-                        },
-                        "img_align": {
-                          "value": "center",
-                          "enabled": true
-                        },
-                        "img_margin": {
-                          "value": "5",
-                          "enabled": true
-                        },
-                        "img_desc": {
-                          "value": "Санта спешит по делам",
-                          "enabled": true
-                        }
-                      }
-                    },
-                    {
-                      "id": "root_7617c03c/SYSTEM/log_link",
-                      "instance_id": "instance_07b1e8275adb",
-                      "name": "log_link",
-                      "description": null,
-                      "silent_mode": true,
-                      "command_line_args": {
-                        "link_href": {
-                          "value": "https://t.me/pugachev_fotodeti03",
-                          "enabled": true
-                        },
-                        "link_text": {
-                          "value": "Рабочий блокнот школьного фотографа | Андрей Пугачев",
-                          "enabled": true
-                        },
-                        "link_align": {
-                          "value": "center",
-                          "enabled": true
-                        },
-                        "link_margin": {
-                          "value": 5,
-                          "enabled": true
-                        }
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
             {
               "type": "script_set",
               "id": "setnode_3a6f019bdcaa",
@@ -2062,29 +1883,6 @@
                     },
                     "img_rmbg_img_scale": {
                       "value": "0",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow/analize/sort_files",
-                  "instance_id": "instance_057902935e32",
-                  "name": "7. Сортировать файлы по папкам кластеров",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Шестой (<i>НЕОБАЗЯТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт физически сортирует файлы (RAW, JPEG, XMP и др. созданные в ходе анализа) по папкам на основе результатов кластеризации.\nВ зависимости от настроек файлы копируются или перемещаются в папку с именем кластера\n\nЕсли эта операция не нужна, то скрипт можно удалить из рабочеого процесса\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "a_sf_operation": {
-                      "value": "copy",
-                      "enabled": true
-                    },
-                    "a_sf_extensions": {
-                      "value": [
-                        ".jpg"
-                      ],
-                      "enabled": true
-                    },
-                    "all_threads": {
-                      "value": "8",
                       "enabled": true
                     }
                   }
