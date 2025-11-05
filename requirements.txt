@@ -9,8 +9,8 @@ ipymarkup
 ijson
 Jinja2
 natasha
-nvidia-ml-py
 numpy==1.26.4
+nvidia-ml-py
 onnxruntime-gpu
 opencv-python
 packaging
@@ -19,6 +19,7 @@ photoshop-python-api
 psd-tools
 psutil
 pydantic
+pynvml
 pypiwin32
 pymorphy3
 PySide6
@@ -30,6 +31,6 @@ scipy
 toml
 torch
 tqdm
-transformers
+transformers==4.55.4
 transparent-background[gui]
 WMI
