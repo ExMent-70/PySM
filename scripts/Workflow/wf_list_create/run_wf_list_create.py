@@ -37,10 +37,10 @@ except ImportError:
     pymorphy3 = None
 
 try: 
-    from ipymarkup.palette import Palette, Color, material 
+    from ipymarkup.palette import Palette, Color, material, Rgb
     from ipymarkup.span import format_span_box_markup
 except ImportError: 
-    format_span_box_markup, Palette, Color, material = None, None, None, None
+    format_span_box_markup, Palette, Color, material, Rgb = None, None, None, None, None
 
 try: 
     from pysm_lib import pysm_context 
@@ -107,28 +107,59 @@ def simple_parse_text(text: str) -> List[Dict[str, Any]]:
 # 3. БЛОК: "Умный" парсер
 # ==============================================================================
 class SmartParser:
-    def __init__(self):
+    def __init__(
+        self,
+        surname_color: Optional[Color] = None,
+        name_color: Optional[Color] = None,
+        fio_color: Optional[Color] = None,
+    ):
+        """
+        Инициализирует парсер, принимая готовые объекты цвета ipymarkup.
+
+        Args:
+            surname_color (Optional[Color]): Объект цвета для "Фамилии".
+            name_color (Optional[Color]): Объект цвета для "Имени".
+            fio_color (Optional[Color]): Объект цвета для "ФИО".
+        """
         self.morph, self.extractor, self.palette = None, None, None
         self.normalization_dict = {}
-        # Явные HEX-коды для надежной работы с Qt
+        # Явные HEX-коды для надежной работы с Qt (могут быть использованы в будущем)
         self.SURNAME_COLOR_HEX = "#e3f2fd"
         self.NAME_COLOR_HEX = "#e8f5e9"
-        
+
         if Palette and Color and material:
-            try:
-                # Используем material() только для ipymarkup, который это понимает
-                surname_color = Color('Фамилия', background=material('Blue', '50'), border=material('Blue', '100'), text=material('Blue', '900'))
-                name_color = Color('Имя', background=material('Green', '50'), border=material('Green', '100'), text=material('Green', '900'))
-                fio_color = Color('ФИО', background=material('Orange', '50'), border=material('Orange', '100'), text=material('Orange', '900'))
-                self.palette = Palette([surname_color, name_color, fio_color])
-            except Exception as e: print(f"Ошибка палитры: {e}", file=sys.stderr)
-        
+            # 1. Используем переданные цвета, если они есть.
+            # 2. Если цвета не переданы (None), создаем их по умолчанию (fallback).
+            final_surname_color = surname_color or Color(
+                "Фамилия",
+                background=material("Blue", "50"),
+                border=material("Blue", "100"),
+                text=material("Blue", "900"),
+            )
+            final_name_color = name_color or Color(
+                "Имя",
+                background=material("Green", "50"),
+                border=material("Green", "100"),
+                text=material("Green", "900"),
+            )
+            final_fio_color = fio_color or Color(
+                "ФИО",
+                background=material("Orange", "50"),
+                border=material("Orange", "100"),
+                text=material("Orange", "900"),
+            )
+
+            self.palette = Palette([final_surname_color, final_name_color, final_fio_color])
+
+        # Остальная логика инициализации остается без изменений
         if pymorphy3 and NamesExtractor:
             try:
                 self.morph = pymorphy3.MorphAnalyzer()
                 self.extractor = NamesExtractor(self.morph)
-            except Exception as e: print(f"Ошибка Natasha: {e}", file=sys.stderr)
+            except Exception as e:
+                print(f"Ошибка Natasha: {e}", file=sys.stderr)
         self._load_normalization_dict()
+
 
     def _load_normalization_dict(self):
         dict_path = pathlib.Path(__file__).parent / "_names_normalization.json"
@@ -612,20 +643,71 @@ class ClassListEditor(QMainWindow):
         self.config = config
         self._is_dirty: bool = False
         self._save_children: bool = False
-        # Добавляем флаг, чтобы отслеживать процесс загрузки
-        self._is_loading: bool = False     
+        self._is_loading: bool = False
 
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        # Создаем действия (actions) один раз при инициализации
         self.add_row_action: QAction
         self.delete_rows_action: QAction
         self.swap_names_action: QAction
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---        
 
         self.SERVICES: Dict[str, int] = {}
         self._load_services()
-        self.smart_parser = SmartParser()
+
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        self._load_theme_colors() # Загружаем цвета
+        # Передаем цвета в конструктор SmartParser
+        self.smart_parser = SmartParser(
+            surname_color=self.surname_color,
+            name_color=self.name_color,
+            fio_color=self.fio_color,
+        )
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
         self._init_ui()
+
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    def _load_theme_colors(self):
+        """Загружает цвета из API тем с резервными значениями."""
+        if IS_MANAGED_RUN and theme_api:
+            # Используем get_ipymarkup_color для получения готовых объектов
+            self.surname_color = theme_api.get_ipymarkup_color(
+                "markup_surname",
+                defaults={
+                    "background-color": "#e3f2fd",
+                    "border-color": "#bbdefb",
+                    "color": "#0d47a1",
+                },
+            )
+            self.name_color = theme_api.get_ipymarkup_color(
+                "markup_name",
+                defaults={
+                    "background-color": "#e8f5e9",
+                    "border-color": "#c8e6c9",
+                    "color": "#1b5e20",
+                },
+            )
+            self.fio_color = theme_api.get_ipymarkup_color(
+                "markup_fio",
+                defaults={
+                    "background-color": "#fff3e0",
+                    "border-color": "#ffe0b2",
+                    "color": "#e65100",
+                },
+            )
+            # Присваиваем HEX-коды для совместимости с QColor, если нужно
+            self.SURNAME_COLOR_HEX = (
+                theme_api.get_parsed_style("markup_surname").get("background-color", "#e3f2fd")
+            )
+            self.NAME_COLOR_HEX = (
+                theme_api.get_parsed_style("markup_name").get("background-color", "#e8f5e9")
+            )
+
+        else:
+            # Для автономного запуска цвета будут None, и сработает fallback
+            self.surname_color, self.name_color, self.fio_color = None, None, None
+            self.SURNAME_COLOR_HEX = "#e3f2fd"
+            self.NAME_COLOR_HEX = "#e8f5e9"
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
 
     def _init_ui(self) -> None:
         """Инициализирует и компонует все виджеты интерфейса."""
@@ -930,7 +1012,8 @@ class ClassListEditor(QMainWindow):
         
         self.processed_table = QTableView()
         self.processed_table.setModel(self.table_model)
-        self.processed_table.setAlternatingRowColors(True)
+        self.processed_table.setAlternatingRowColors(False)
+        #self.processed_table.setAlternatingRowColors(True)
         delegate = EnterKeyDelegate(self.processed_table, services=list(self.SERVICES.keys()))
         self.processed_table.setItemDelegate(delegate)
         self.processed_table.setSortingEnabled(True)

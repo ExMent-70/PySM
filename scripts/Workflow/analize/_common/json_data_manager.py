@@ -97,6 +97,24 @@ class JsonDataManager:
     def get_data(self, filename: str) -> Optional[Dict[str, Any]]:
         """Возвращает полный словарь данных для указанного имени файла."""
         return self.portrait_data.get(filename) or self.group_data.get(filename)
+        
+    # ==============================================================================
+    def get_data_with_type(self, filename: str) -> Optional[Tuple[Dict[str, Any], str]]:
+        """
+        Возвращает данные для файла и его тип источника ('portrait' или 'group').
+
+        Args:
+            filename: Имя файла для поиска.
+
+        Returns:
+            Кортеж (данные_файла, тип_фото) в случае успеха, иначе None.
+        """
+        if filename in self.portrait_data:
+            return self.portrait_data[filename], "portrait"
+        if filename in self.group_data:
+            return self.group_data[filename], "group"
+        return None        
+        
 
     def get_face(self, filename: str, face_index: int) -> Optional[Dict[str, Any]]:
         """Возвращает словарь данных для конкретного лица в указанном файле."""

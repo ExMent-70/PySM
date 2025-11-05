@@ -506,6 +506,7 @@ class ScriptCollectionWidget(QWidget):
         else:
             return (self.controller.selected_set_node_id is not None and self.controller.selected_set_node_model is not None and bool(self.controller.selected_set_node_model.script_entries))
 
+
     @Slot("QPoint")
     def _show_context_menu(self, position):
         if self.controller.is_busy(): return
@@ -513,13 +514,34 @@ class ScriptCollectionWidget(QWidget):
         item = self.collection_model.itemFromIndex(index) if index.isValid() else None
         item_data = item.data(Qt.ItemDataRole.UserRole) if item else None
         menu = QMenu(self)
+        
         parent_id_for_new_node = None
-
-        if isinstance(item_data, SetFolderNodeModel): parent_id_for_new_node = item_data.id
-        elif isinstance(item_data, ScriptSetNodeModel): parent_id_for_new_node = item_data.id
-        elif item and item.parent():
-            if isinstance(parent_data := item.parent().data(Qt.ItemDataRole.UserRole), SetFolderNodeModel):
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+        # Логика определения родителя для новых узлов и импорта
+        parent_folder_for_import = None
+        if isinstance(item_data, SetFolderNodeModel):
+            parent_id_for_new_node = item_data.id
+            parent_folder_for_import = item_data
+        elif isinstance(item_data, ScriptSetNodeModel):
+            # Для набора тоже можно импортировать "рядом" с ним, т.е. в ту же папку
+            parent_id_for_new_node = item_data.id # Для создания узлов "после"
+            if item and item.parent():
+                parent_folder_for_import = item.parent().data(Qt.ItemDataRole.UserRole)
+        elif item and item.parent(): # Если выбран экземпляр скрипта
+            parent_data = item.parent().data(Qt.ItemDataRole.UserRole)
+            if isinstance(parent_data, SetFolderNodeModel):
                 parent_id_for_new_node = parent_data.id
+                parent_folder_for_import = parent_data
+            elif isinstance(parent_data, ScriptSetNodeModel): # Родитель - набор
+                 if item.parent().parent(): # Ищем "дедушку" - папку
+                     parent_folder_for_import = item.parent().parent().data(Qt.ItemDataRole.UserRole)
+        
+        # Если клик был не на элементе, но есть корневая папка
+        if not parent_folder_for_import:
+            main_root = self.controller.set_manager.get_main_root_folder()
+            if main_root:
+                parent_folder_for_import = main_root
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
 
         action_create_folder = QAction(self.locale_manager.get("collection_widget.context_menu.create_folder"), self)
         action_create_set = QAction(self.locale_manager.get("collection_widget.context_menu.create_set"), self)
@@ -527,6 +549,27 @@ class ScriptCollectionWidget(QWidget):
         action_create_set.triggered.connect(lambda: self._create_node_action(False, parent_id_for_new_node))
         menu.addAction(action_create_folder)
         menu.addAction(action_create_set)
+
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+        # Логика добавления пунктов импорта/экспорта
+        menu.addSeparator()
+        
+        # Действие "Импортировать" доступно всегда, если определена родительская папка
+        if parent_folder_for_import:
+            action_import_set = QAction(self.locale_manager.get("collection_widget.context_menu.import_set"), self)
+            action_import_set.triggered.connect(
+                lambda: self.controller.import_set_requested(parent_folder_for_import.id)
+            )
+            menu.addAction(action_import_set)
+        
+        # Действие "Экспортировать" доступно, только если выбран набор
+        if isinstance(item_data, ScriptSetNodeModel):
+            action_export_set = QAction(self.locale_manager.get("collection_widget.context_menu.export_set"), self)
+            action_export_set.triggered.connect(
+                lambda: self.controller.export_set_requested(item_data.id)
+            )
+            menu.addAction(action_export_set)
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
 
         if isinstance(item_data, ScriptSetNodeModel):
             menu.addSeparator()
@@ -603,8 +646,20 @@ class ScriptCollectionWidget(QWidget):
                                  self.locale_manager.get("collection_widget.error.script_info_not_found", id=entry_data.id))
             return
         
-        dialog = ScriptPropertiesDialog(edit_mode=EditMode.INSTANCE, script_info=script_info.model_copy(deep=True),
-                                      instance_entry=entry_data, locale_manager=self.locale_manager, parent=self)
+        active_set_model = self.controller.selected_set_node_model
+        all_entries_in_set = active_set_model.script_entries if active_set_model else []
+        
+        dialog = ScriptPropertiesDialog(
+            edit_mode=EditMode.INSTANCE, 
+            script_info=script_info.model_copy(deep=True),
+            instance_entry=entry_data, 
+            locale_manager=self.locale_manager,
+            theme_manager=self.theme_manager, # Эта строка уже была добавлена, проверяем
+            available_script_entries=all_entries_in_set,
+            get_script_name_func=self.controller.get_script_info_by_id,
+            parent=self
+        )
+        
         if dialog.exec():
             if updated_instance_model := dialog.get_updated_instance_entry_model():
                 self.controller.update_script_instance_in_active_set_node(updated_instance_model)
@@ -616,7 +671,12 @@ class ScriptCollectionWidget(QWidget):
         if not item: return
         item_data = item.data(Qt.ItemDataRole.UserRole)
         if not isinstance(item_data, ScriptSetEntryModel): return
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+        # Теперь просто вызываем наш обновленный метод, передав ему копию данных
         self._show_script_instance_properties_dialog(item_data.model_copy(deep=True))
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---        
+        
 
     def _custom_drop_mime_data(self, data: QMimeData, action: Qt.DropAction, row: int, column: int, parent_index: QModelIndex) -> bool:
         if not self.collection_model.canDropMimeData(data, action, row, column, parent_index): return False

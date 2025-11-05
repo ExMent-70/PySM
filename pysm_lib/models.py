@@ -34,6 +34,7 @@ ContextVariableType = Literal[
     "password",
     "json",
     "list",
+    "instance",
 ]
 
 

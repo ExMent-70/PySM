@@ -256,8 +256,11 @@ class AvailableScriptsWidget(QWidget):
 
     def _show_script_properties_dialog(self, script_info: ScriptInfoModel):
         dialog = ScriptPropertiesDialog(
-            edit_mode=EditMode.PASSPORT, script_info=script_info,
-            locale_manager=self.locale_manager, parent=self
+            edit_mode=EditMode.PASSPORT, 
+            script_info=script_info,
+            locale_manager=self.locale_manager, 
+            theme_manager=self.theme_manager, # <--- ДОБАВЛЕНА ЭТА СТРОКА
+            parent=self
         )
         if dialog.exec():
             original_id = script_info.id

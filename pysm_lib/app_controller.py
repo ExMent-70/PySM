@@ -7,7 +7,7 @@ import os
 from typing import List, Dict, Optional, Any
 
 from PySide6.QtCore import QObject, Signal, QTimer, Slot, QThread
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QFileDialog
 
 # 1. Блок: Измененные импорты
 # ==============================================================================
@@ -70,6 +70,14 @@ class AppController(QObject):
 
         self.config_manager = config_manager_instance or ConfigManager()
 
+        # Определяем и создаем директорию для сниппетов
+        self.snippets_dir = APPLICATION_ROOT_DIR / "script_collections" / "snippets"
+        try:
+            self.snippets_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            logger.error(
+                f"Не удалось создать директорию для сниппетов '{self.snippets_dir}': {e}"
+            )
 
         # --- ИЗМЕНЕНИЕ: Инициализация ThemeManager ---
         self.theme_manager = ThemeManager()
@@ -1072,3 +1080,129 @@ class AppController(QObject):
 
     def is_waiting_for_next_step(self) -> bool:
         return self._app_state == AppState.SET_RUNNING_STEP_WAIT
+
+    # 1. БЛОК: Новый слот export_set_requested
+    # ==============================================================================
+    @Slot(str)
+    def export_set_requested(self, node_id: str):
+        """
+        Обрабатывает запрос на экспорт набора скриптов.
+        Открывает диалог сохранения файла и сохраняет набор в JSON.
+        """
+        set_node = self.set_manager.get_set_node_by_id(node_id)
+        if not set_node:
+            logger.warning(
+                self.locale_manager.get(
+                    "app_controller.log_warning.export_node_not_found", node_id=node_id
+                )
+            )
+            return
+
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+        # Используем новое расширение .snip и новую директорию по умолчанию
+        suggested_filename = f"{set_node.name}.snip"
+        start_dir = self.snippets_dir
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self.get_main_window(),
+            self.locale_manager.get("app_controller.file_dialog.export_set_title"),
+            str(start_dir / suggested_filename),
+            self.locale_manager.get("app_controller.file_dialog.snippet_filter"), # Используем новый фильтр
+        )
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+
+        if not file_path:
+            return
+
+        json_data = self.set_manager.export_set_node(node_id)
+        if json_data:
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(json_data)
+                self.log_message_to_console.emit(
+                    "runner_info",
+                    self.locale_manager.get(
+                        "user_actions.set_exported", name=set_node.name, path=file_path
+                    ),
+                )
+            except Exception as e:
+                logger.error(
+                    self.locale_manager.get(
+                        "app_controller.log_error.export_save_failed", path=file_path, error=e
+                    ), 
+                    exc_info=True
+                )
+                QMessageBox.critical(
+                    self.get_main_window(),
+                    self.locale_manager.get("general.error_title"),
+                    self.locale_manager.get(
+                        "app_controller.message_box.export_save_failed", path=file_path, error=e
+                    ),
+                )
+        else:
+            QMessageBox.critical(
+                self.get_main_window(),
+                self.locale_manager.get("general.error_title"),
+                self.locale_manager.get("app_controller.message_box.export_failed"),
+            )
+
+    # 3. БЛОК: Изменения в слоте import_set_requested
+    # ==============================================================================
+    @Slot(str)
+    def import_set_requested(self, parent_folder_id: str):
+        """
+        Обрабатывает запрос на импорт набора скриптов.
+        Открывает диалог выбора файла и импортирует набор.
+        """
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+        # Используем новую директорию по умолчанию и новый фильтр
+        start_dir = self.snippets_dir
+        
+        file_path, _ = QFileDialog.getOpenFileName(
+            self.get_main_window(),
+            self.locale_manager.get("app_controller.file_dialog.import_set_title"),
+            str(start_dir),
+            self.locale_manager.get("app_controller.file_dialog.snippet_filter"), # Используем новый фильтр
+        )
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                json_data = f.read()
+
+            imported_node = self.set_manager.import_set_node(json_data, parent_folder_id)
+            if imported_node:
+                self.log_message_to_console.emit(
+                    "runner_info",
+                    self.locale_manager.get(
+                        "user_actions.set_imported",
+                        name=imported_node.name,
+                        path=file_path,
+                    ),
+                )
+                self._request_collection_view_update(imported_node.id)
+                self.collection_dirty_state_changed.emit(self.set_manager.is_dirty)
+            else:
+                QMessageBox.critical(
+                    self.get_main_window(),
+                    self.locale_manager.get("general.error_title"),
+                    self.locale_manager.get("app_controller.message_box.import_failed"),
+                )
+
+        except Exception as e:
+            logger.error(
+                self.locale_manager.get(
+                    "app_controller.log_error.import_read_failed", path=file_path, error=e
+                ), 
+                exc_info=True
+            )
+            QMessageBox.critical(
+                self.get_main_window(),
+                self.locale_manager.get("general.error_title"),
+                self.locale_manager.get(
+                    "app_controller.message_box.import_read_failed", path=file_path, error=e
+                ),
+            )

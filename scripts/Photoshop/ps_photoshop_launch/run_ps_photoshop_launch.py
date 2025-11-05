@@ -91,6 +91,7 @@ def find_photoshop_executable_auto() -> str | None:
         photoshop_keys = [
             r"SOFTWARE\Adobe\Photoshop\260.0", # v2025
             r"SOFTWARE\Adobe\Photoshop\210.0", # v2024
+            r"SOFTWARE\Adobe\Photoshop\200.0", # v2026
             r"SOFTWARE\Adobe\Photoshop\190.0", # CC 2020+
             r"SOFTWARE\Adobe\Photoshop\180.0", # CC 2019
         ]

@@ -343,7 +343,6 @@ QMenu::item:selected {
 
 /* --- [11] ДИАЛОГОВЫЕ ОКНА --- */
 QDialog { background-color: @bgColorDialog; }
-/* --- НАЧАЛО ИЗМЕНЕНИЙ --- */
 QMessageBox, QFileDialog {
     background-color: @bgColorDialog;
 }
@@ -367,7 +366,6 @@ QMessageBox QPushButton:hover {
 QMessageBox QPushButton:pressed {
     background-color: @bgColorPressed;
 }
-/* --- КОНЕЦ ИЗМЕНЕНИЙ --- */
 
 QDialog#JsonEditorDialog, QDialog#MultilineTextDialog, QInputDialog {
     background-color: @bgColorDialog; color: @textColor;
@@ -378,4 +376,22 @@ QInputDialog QPlainTextEdit, QInputDialog QLineEdit {
     color: @textColor;
     border: 1px solid @borderColor;
     font-family: "Consolas", "Courier New", monospace;
+}
+
+/* Стили для нового диалога выбора экземпляра */
+QDialog#InstanceSelectionDialog {
+    background-color: @bgColorDialog;
+    color: @textColor;
+}
+QDialog#InstanceSelectionDialog QLineEdit {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+    border-radius: 5px;
+    padding: 4px;
+}
+QDialog#InstanceSelectionDialog QListWidget {
+    background-color: @bgColorContainer;
+}
+QDialog#InstanceSelectionDialog QPushButton {
+    min-width: 80px;
 }

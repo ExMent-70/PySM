@@ -1,10 +1,9 @@
 # pysm_lib/gui/widgets/parameter_editor_widget.py
 
 from typing import Dict, Optional, Any, List, Union
-from enum import Enum
 
 from PySide6.QtCore import Qt, Slot, QSignalBlocker, QTimer, QEvent, QObject, Signal
-from PySide6.QtGui import QColor, QBrush
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -16,7 +15,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QPushButton,
-    
 )
 
 from ...models import (
@@ -24,15 +22,13 @@ from ...models import (
     ScriptSetEntryValueEnabled,
     ContextVariableType,
     ContextVariableModel,
+    ScriptSetEntryModel,
 )
 from ...locale_manager import LocaleManager
+from ...theme_manager import ThemeManager
+from ...app_enums import EditMode
 from .editor_factory import EditorFactory
-
-
-class EditorMode(Enum):
-    PASSPORT_ARGS = 1
-    INSTANCE_ARGS = 2
-    CONTEXT_VARS = 3
+from .editor_context import EditorContext
 
 
 class ParamTableColumn:
@@ -47,31 +43,42 @@ class ParamTableColumn:
     PASSPORT_DEFAULT = 3
     PASSPORT_DESCRIPTION = 4
 
+    CONTEXT_NAME = 0
+    CONTEXT_TYPE = 1
+    CONTEXT_VALUE = 2
+    CONTEXT_READONLY = 3
+    CONTEXT_DESCRIPTION = 4
+
 
 class ParameterEditorWidget(QWidget):
     data_changed = Signal()
 
     def __init__(
         self,
-        mode: EditorMode,
+        mode: EditMode,
         locale_manager: LocaleManager,
+        theme_manager: ThemeManager,
+        script_entries: Optional[List[ScriptSetEntryModel]] = None,
+        get_script_name_func: Optional[callable] = None,
         parent: Optional[QWidget] = None,
     ):
         super().__init__(parent)
         self.mode = mode
-        self.locale_manager = locale_manager
+        
+        self.editor_context = EditorContext(
+            theme_manager=theme_manager,
+            locale_manager=locale_manager,
+            get_script_info_func=get_script_name_func or (lambda x: None),
+            script_entries=script_entries or [],
+        )
 
         self._args_meta: Dict[str, ScriptArgMetaDetailModel] = {}
         self._args_values: Dict[str, ScriptSetEntryValueEnabled] = {}
         self._context_vars: Dict[str, ContextVariableModel] = {}
 
-        # Палитра для цветовой группировки префиксов
         self.prefix_color_palette = [
-            QColor("#e8f0fe"),
-            QColor("#eaf5ea"),
-            QColor("#fff5e6"),
-            QColor("#fdecf0"),
-            QColor("#f0eefc"),
+            QColor("#e8f0fe"), QColor("#eaf5ea"), QColor("#fff5e6"),
+            QColor("#fdecf0"), QColor("#f0eefc"),
         ]
         self._prefix_to_color_map: Dict[str, QColor] = {}
 
@@ -81,23 +88,33 @@ class ParameterEditorWidget(QWidget):
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-
         self.table = QTableWidget()
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
-
         layout.addWidget(self.table, 1)
 
     def _connect_signals(self):
-        # Этот сигнал остается для внутреннего использования
-        self.table.cellDoubleClicked.connect(self._on_internal_cell_double_clicked)
+        self.table.cellDoubleClicked.connect(self.on_cell_double_clicked)
 
-    # --- БЛОК 1: Новый публичный метод ---
-    def on_cell_double_clicked(self, row, column):
-        """Публичный метод, вызываемый извне для имитации двойного клика."""
-        self._on_internal_cell_double_clicked(row, column)
+    def on_cell_double_clicked(self, row: int, column: int):
+        allowed_columns = []
+        if self.mode == EditMode.PASSPORT:
+            allowed_columns = [ParamTableColumn.PASSPORT_DEFAULT, ParamTableColumn.PASSPORT_DESCRIPTION]
+        elif self.mode == EditMode.INSTANCE:
+            allowed_columns = [ParamTableColumn.INSTANCE_VALUE]
+        elif self.mode == EditMode.CONTEXT_VARS:
+            allowed_columns = [ParamTableColumn.CONTEXT_VALUE, ParamTableColumn.CONTEXT_DESCRIPTION]
+
+        if column in allowed_columns:
+            widget = self.table.cellWidget(row, column)
+            if hasattr(widget, "on_button_click"):
+                widget.on_button_click()
+            else:
+                item = self.table.item(row, column)
+                if item and item.flags() & Qt.ItemFlag.ItemIsEditable:
+                    self.table.editItem(item)
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if event.type() == QEvent.Type.Wheel and isinstance(watched, QComboBox):
@@ -106,481 +123,228 @@ class ParameterEditorWidget(QWidget):
 
     def set_data(
         self,
-        data: Union[
-            Dict[str, ScriptArgMetaDetailModel], Dict[str, ContextVariableModel]
-        ],
+        data: Dict[str, Any],
         instance_values: Optional[Dict[str, ScriptSetEntryValueEnabled]] = None,
     ):
-        if self.mode == EditorMode.PASSPORT_ARGS:
+        if self.mode == EditMode.PASSPORT:
             self._args_meta = {k: v.model_copy(deep=True) for k, v in data.items()}
-        elif self.mode == EditorMode.INSTANCE_ARGS:
+        elif self.mode == EditMode.INSTANCE:
             self._args_meta = {k: v.model_copy(deep=True) for k, v in data.items()}
-            self._args_values = {
-                k: v.model_copy(deep=True) for k, v in instance_values.items()
-            }
-        elif self.mode == EditorMode.CONTEXT_VARS:
+            self._args_values = {k: v.model_copy(deep=True) for k, v in (instance_values or {}).items()}
+        elif self.mode == EditMode.CONTEXT_VARS:
             self._context_vars = {k: v.model_copy(deep=True) for k, v in data.items()}
-
         self._populate_table()
 
-    def get_updated_meta(self) -> Dict[str, ScriptArgMetaDetailModel]:
-        return self._args_meta
-
-    def get_updated_values(self) -> Dict[str, ScriptSetEntryValueEnabled]:
-        return self._args_values
-
-    def get_updated_context_vars(self) -> Dict[str, ContextVariableModel]:
-        return self._context_vars
+    def get_updated_meta(self) -> Dict[str, ScriptArgMetaDetailModel]: return self._args_meta
+    def get_updated_values(self) -> Dict[str, ScriptSetEntryValueEnabled]: return self._args_values
+    def get_updated_context_vars(self) -> Dict[str, ContextVariableModel]: return self._context_vars
 
     def _populate_table(self):
         self._prefix_to_color_map.clear()
-
         with QSignalBlocker(self.table):
-            self.table.clear()
-            self.table.setRowCount(0)
-
-            if self.mode == EditorMode.PASSPORT_ARGS:
-                self._setup_passport_mode()
-                data_source = self._args_meta
-            elif self.mode == EditorMode.INSTANCE_ARGS:
-                self._setup_instance_mode()
-                data_source = self._args_meta
-            else:
-                self._setup_context_mode()
-                data_source = self._context_vars
-
+            self.table.clear(); self.table.setRowCount(0)
+            if self.mode == EditMode.PASSPORT: self._setup_passport_mode()
+            elif self.mode == EditMode.INSTANCE: self._setup_instance_mode()
+            else: self._setup_context_mode()
+            data_source = self._args_meta if self.mode != EditMode.CONTEXT_VARS else self._context_vars
             for row, (name, model) in enumerate(sorted(data_source.items())):
                 self.table.insertRow(row)
-                if self.mode == EditorMode.PASSPORT_ARGS:
-                    self._create_passport_row(row, name, model)
-                elif self.mode == EditorMode.INSTANCE_ARGS:
-                    self._create_instance_row(row, name, model)
-                else:
-                    self._create_context_row(row, name, model)
-
+                if self.mode == EditMode.PASSPORT: self._create_passport_row(row, name, model)
+                elif self.mode == EditMode.INSTANCE: self._create_instance_row(row, name, model)
+                else: self._create_context_row(row, name, model)
         QTimer.singleShot(0, self._adjust_table_columns)
+
 
     def _setup_passport_mode(self):
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            [
-                self.locale_manager.get(
-                    "dialogs.script_properties.args_tab.header_required"
-                ),
-                self.locale_manager.get(
-                    "dialogs.script_properties.args_tab.header_name"
-                ),
-                self.locale_manager.get(
-                    "dialogs.script_properties.args_tab.header_type"
-                ),
-                self.locale_manager.get(
-                    "dialogs.script_properties.args_tab.header_default"
-                ),
-                self.locale_manager.get(
-                    "dialogs.script_properties.args_tab.header_description"
-                ),
-            ]
-        )
+        self.table.setHorizontalHeaderLabels([
+            self.editor_context.locale_manager.get("dialogs.script_properties.args_tab.header_required"),
+            self.editor_context.locale_manager.get("dialogs.script_properties.args_tab.header_name"),
+            self.editor_context.locale_manager.get("dialogs.script_properties.args_tab.header_type"),
+            self.editor_context.locale_manager.get("dialogs.script_properties.args_tab.header_default"),
+            self.editor_context.locale_manager.get("dialogs.script_properties.args_tab.header_description"),
+        ])
 
+    # 2. БЛОК: Метод _setup_instance_mode (ИСПРАВЛЕН)
+    # ==============================================================================
     def _setup_instance_mode(self):
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(
-            [
-                self.locale_manager.get(
-                    "dialogs.script_properties.args_tab.header_enable"
-                ),
-                self.locale_manager.get(
-                    "dialogs.script_properties.args_tab.header_name"
-                ),
-                self.locale_manager.get(
-                    "dialogs.script_properties.args_tab.header_value"
-                ),
-                self.locale_manager.get(
-                    "dialogs.script_properties.args_tab.header_actions"
-                ),
-            ]
-        )
+        self.table.setHorizontalHeaderLabels([
+            self.editor_context.locale_manager.get("dialogs.script_properties.args_tab.header_enable"),
+            self.editor_context.locale_manager.get("dialogs.script_properties.args_tab.header_name"),
+            self.editor_context.locale_manager.get("dialogs.script_properties.args_tab.header_value"),
+            self.editor_context.locale_manager.get("dialogs.script_properties.args_tab.header_actions"),
+        ])
 
+    # 3. БЛОК: Метод _setup_context_mode (ИСПРАВЛЕН)
+    # ==============================================================================
     def _setup_context_mode(self):
         self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(
-            [
-                self.locale_manager.get("dialogs.context_editor.header_name"),
-                self.locale_manager.get("dialogs.context_editor.header_type"),
-                self.locale_manager.get("dialogs.context_editor.header_value"),
-                self.locale_manager.get("dialogs.context_editor.header_readonly"),
-                self.locale_manager.get("dialogs.context_editor.header_description"),
-            ]
-        )
+        self.table.setHorizontalHeaderLabels([
+            self.editor_context.locale_manager.get("dialogs.context_editor.header_name"),
+            self.editor_context.locale_manager.get("dialogs.context_editor.header_type"),
+            self.editor_context.locale_manager.get("dialogs.context_editor.header_value"),
+            self.editor_context.locale_manager.get("dialogs.context_editor.header_readonly"),
+            self.editor_context.locale_manager.get("dialogs.context_editor.header_description"),
+        ])
 
 
-    # 1. БЛОК: Метод _create_context_row (ПЕРЕРАБОТАН)
     def _create_context_row(self, row: int, name: str, var: ContextVariableModel):
         prefix = name.split("_", 1)[0] if "_" in name else None
-        background_color = self._get_color_for_prefix(prefix)
-
-        # Функция-помощник для создания и раскраски ячеек
-        def create_and_paint_item(text=""):
-            item = QTableWidgetItem(text)
-            if background_color:
-                item.setBackground(background_color)
+        bg_color = self._get_color_for_prefix(prefix)
+        def create_item(text=""):
+            item = QTableWidgetItem(text);
+            if bg_color: item.setBackground(bg_color)
             return item
-
-        # 1. Имя
-        name_item = create_and_paint_item(name)
-        name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        self.table.setItem(row, 0, name_item)
-
-        # 2. Тип (ячейка красится, виджет - нет)
-        self.table.setItem(row, 1, create_and_paint_item())
-        type_combo = QComboBox()
-        type_combo.addItems(list(ContextVariableType.__args__))
-        type_combo.installEventFilter(self)
-        type_combo.setCurrentText(var.type)
-        type_combo.currentTextChanged.connect(
-            lambda t, r=row: self._on_type_changed(r, t)
-        )
-        self.table.setCellWidget(row, 1, type_combo)
-
-        # 3. Значение (ячейка красится, виджет - нет)
-        self.table.setItem(row, 2, create_and_paint_item())
+        name_item = create_item(name); name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.table.setItem(row, ParamTableColumn.CONTEXT_NAME, name_item)
+        self.table.setItem(row, ParamTableColumn.CONTEXT_TYPE, create_item())
+        type_combo = QComboBox(); type_combo.addItems(list(ContextVariableType.__args__))
+        type_combo.installEventFilter(self); type_combo.setCurrentText(var.type)
+        type_combo.currentTextChanged.connect(lambda t, r=row: self._on_type_changed(r, t))
+        self.table.setCellWidget(row, ParamTableColumn.CONTEXT_TYPE, type_combo)
+        self.table.setItem(row, ParamTableColumn.CONTEXT_VALUE, create_item())
         self._create_value_editor(row, name, var)
-
-        # 4. Только чтение (ячейка красится, виджет - нет)
-        self.table.setItem(row, 3, create_and_paint_item())
-        ro_check = QCheckBox()
-        ro_check.setChecked(var.read_only)
+        self.table.setItem(row, ParamTableColumn.CONTEXT_READONLY, create_item())
+        ro_check = QCheckBox(); ro_check.setChecked(var.read_only)
         ro_check.toggled.connect(lambda s, r=row: self._on_readonly_changed(r, s))
-        cell_widget_ro = self._center_widget(ro_check)
-        self.table.setCellWidget(row, 3, cell_widget_ro)
-
-        # 5. Описание (ячейка красится, виджет - нет)
-        self.table.setItem(row, 4, create_and_paint_item())
-        self._create_description_editor(row, var)
-
+        self.table.setCellWidget(row, ParamTableColumn.CONTEXT_READONLY, self._center_widget(ro_check))
+        desc_item = create_item(var.description or ""); desc_item.setToolTip(var.description)
+        self.table.setItem(row, ParamTableColumn.CONTEXT_DESCRIPTION, desc_item)
 
     def _create_instance_row(self, row: int, name: str, meta: ScriptArgMetaDetailModel):
-        current_entry = self._args_values.get(name)
-
-        chk_enable = QCheckBox()
-        chk_enable.setChecked(current_entry.enabled)
+        entry = self._args_values.get(name)
+        chk_enable = QCheckBox(); chk_enable.setChecked(entry.enabled if entry else False)
         chk_enable.setEnabled(not meta.required)
-        chk_enable.toggled.connect(
-            lambda state, r=row: self._on_enable_toggled(r, state)
-        )
-        self.table.setCellWidget(
-            row, ParamTableColumn.INSTANCE_ENABLE, self._center_widget(chk_enable)
-        )
-
-        name_item = QTableWidgetItem(name)
-        name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        chk_enable.toggled.connect(lambda state, r=row: self._on_enable_toggled(r, state))
+        self.table.setCellWidget(row, ParamTableColumn.INSTANCE_ENABLE, self._center_widget(chk_enable))
+        name_item = QTableWidgetItem(name); name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         name_item.setToolTip(meta.description or name)
         self.table.setItem(row, ParamTableColumn.INSTANCE_NAME, name_item)
-
+        self.table.setItem(row, ParamTableColumn.INSTANCE_VALUE, QTableWidgetItem())
         self._create_value_editor(row, name, meta)
-
+        reset_btn = QPushButton("Reset")
+        
+        
         reset_btn = QPushButton(
-            self.locale_manager.get("dialogs.script_properties.reset_button")
-        )
-        reset_btn.clicked.connect(
-            lambda checked=False, r=row, n=name: self._on_reset_to_default(r, n)
-        )
-        self.table.setCellWidget(
-            row, ParamTableColumn.INSTANCE_ACTIONS, self._center_widget(reset_btn)
-        )
+            self.editor_context.locale_manager.get("dialogs.script_properties.reset_button")
+        )        
+        
+        
+        reset_btn.clicked.connect(lambda checked=False, r=row, n=name: self._on_reset_to_default(r, n))
+        self.table.setCellWidget(row, ParamTableColumn.INSTANCE_ACTIONS, self._center_widget(reset_btn))
 
     def _create_passport_row(self, row: int, name: str, meta: ScriptArgMetaDetailModel):
-        chk_required = QCheckBox()
-        chk_required.setChecked(meta.required)
-        chk_required.toggled.connect(
-            lambda state, r=row: self._on_required_toggled(r, state)
-        )
-        self.table.setCellWidget(
-            row, ParamTableColumn.PASSPORT_REQUIRED, self._center_widget(chk_required)
-        )
-
+        chk_required = QCheckBox(); chk_required.setChecked(meta.required)
+        chk_required.toggled.connect(lambda state, r=row: self._on_required_toggled(r, state))
+        self.table.setCellWidget(row, ParamTableColumn.PASSPORT_REQUIRED, self._center_widget(chk_required))
         name_item = QTableWidgetItem(name)
-        name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        name_item.setToolTip(name)
         self.table.setItem(row, ParamTableColumn.PASSPORT_NAME, name_item)
-
-        type_combo = QComboBox()
-        type_combo.addItems(list(ContextVariableType.__args__))
-        type_combo.installEventFilter(self)
-        type_combo.setCurrentText(meta.type)
-        type_combo.currentTextChanged.connect(
-            lambda text, r=row: self._on_type_changed(r, text)
-        )
+        type_combo = QComboBox(); type_combo.addItems(list(ContextVariableType.__args__))
+        type_combo.installEventFilter(self); type_combo.setCurrentText(meta.type)
+        type_combo.currentTextChanged.connect(lambda text, r=row: self._on_type_changed(r, text))
         self.table.setCellWidget(row, ParamTableColumn.PASSPORT_TYPE, type_combo)
-
+        self.table.setItem(row, ParamTableColumn.PASSPORT_DEFAULT, QTableWidgetItem())
         self._create_value_editor(row, name, meta)
-        self._create_description_editor(row, meta)
+        desc_item = QTableWidgetItem(meta.description or "")
+        self.table.setItem(row, ParamTableColumn.PASSPORT_DESCRIPTION, desc_item)
 
-    def _create_value_editor(
-        self,
-        row: int,
-        arg_name: str,
-        model: Union[ScriptArgMetaDetailModel, ContextVariableModel],
-    ):
-        is_passport_mode = self.mode == EditorMode.PASSPORT_ARGS
-        is_context_mode = self.mode == EditorMode.CONTEXT_VARS
-
-        target_column = -1
-        if is_passport_mode:
-            target_column = ParamTableColumn.PASSPORT_DEFAULT
-        elif is_context_mode:
-            target_column = 2
-        else:
-            target_column = ParamTableColumn.INSTANCE_VALUE
-
-        if self.table.cellWidget(row, target_column):
-            self.table.removeCellWidget(row, target_column)
-
-        entry = (
-            self._args_values.get(arg_name)
-            if self.mode == EditorMode.INSTANCE_ARGS
-            else None
-        )
-
-        if isinstance(model, ContextVariableModel):
-            value = model.value
-            choices = model.choices
-            var_type = model.type
-        else:
-            value = (
-                model.default if is_passport_mode else (entry.value if entry else None)
-            )
-            choices = model.choices
-            var_type = model.type
-
-        options = {"value": value, "choices": choices}
-        editor = EditorFactory.create_editor(var_type, options, self.locale_manager)
-
+    def _create_value_editor(self, row: int, name: str, model: Union[ScriptArgMetaDetailModel, ContextVariableModel]):
+        is_passport, is_context = self.mode == EditMode.PASSPORT, self.mode == EditMode.CONTEXT_VARS
+        target_col, value, var_type, choices = -1, None, "string", None
+        
+        if is_context:
+            target_col, value, var_type, choices = ParamTableColumn.CONTEXT_VALUE, model.value, model.type, model.choices
+        elif is_passport:
+            target_col, value, var_type, choices = ParamTableColumn.PASSPORT_DEFAULT, model.default, model.type, model.choices
+        else: # INSTANCE_ARGS
+            target_col, entry = ParamTableColumn.INSTANCE_VALUE, self._args_values.get(name)
+            value, var_type, choices = (entry.value if entry else None), model.type, model.choices
+        
+        if self.table.cellWidget(row, target_col): self.table.removeCellWidget(row, target_col)
+        
+        options = {"choices": choices}
+        editor = EditorFactory.create_editor(var_type, value, self.editor_context, options)
+        
         if editor:
-            slot = None
-            if is_passport_mode:
-                slot = self._on_default_value_changed
-            elif is_context_mode:
-                slot = self._on_context_value_changed
-            else:
-                slot = self._on_instance_value_changed
+            if is_passport: editor.valueChanged.connect(lambda v, r=row: self._on_default_value_changed(r, v))
+            elif is_context: editor.valueChanged.connect(lambda v, r=row: self._on_context_value_changed(r, v))
+            else: editor.valueChanged.connect(lambda v, r=row: self._on_instance_value_changed(r, v))
+            
+            if (is_passport or is_context) and hasattr(editor, "choicesChanged"):
+                editor.choicesChanged.connect(lambda c, r=row: self._on_choices_changed(r, c))
 
-            if hasattr(editor, "valueChanged"):
-                editor.valueChanged.connect(lambda v, r=row: slot(r, v))
-
-            if (is_passport_mode or is_context_mode) and hasattr(
-                editor, "choicesChanged"
-            ):
-                editor.choicesChanged.connect(
-                    lambda c, r=row: self._on_choices_changed(r, c)
-                )
-
-            is_enabled = (
-                is_passport_mode or is_context_mode or (entry and entry.enabled)
-            )
+            entry = self._args_values.get(name) if not (is_passport or is_context) else None
+            is_enabled = is_passport or is_context or (entry and entry.enabled)
 
             if is_enabled:
-                self.table.setCellWidget(row, target_column, editor)
+                self.table.setCellWidget(row, target_col, editor)
             else:
-                item = QTableWidgetItem(
-                    self.locale_manager.get("general.not_applicable")
-                )
+                item = QTableWidgetItem("N/A")
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
-                item.setToolTip("Argument is disabled")
-                self.table.setItem(row, target_column, item)
-
-    # 2. БЛОК: Метод _create_description_editor (ИСПРАВЛЕН)
-    def _create_description_editor(
-        self, row: int, model: Union[ScriptArgMetaDetailModel, ContextVariableModel]
-    ):
-        target_column = 4
-        value = model.description
-        editor = EditorFactory.create_editor(
-            "string", {"value": value}, self.locale_manager
-        )
-
-        if editor and hasattr(editor, "valueChanged"):
-            slot = (
-                self._on_context_description_changed
-                if self.mode == EditorMode.CONTEXT_VARS
-                else self._on_description_changed
-            )
-            editor.valueChanged.connect(lambda v, r=row: slot(r, v))
-            editor.setToolTip(value or "")
-
-            # --- ИЗМЕНЕНИЕ: Убираем прямое применение стиля к редактору ---
-            # if background_color:
-            #     editor.setStyleSheet(f"background-color: {background_color.name()};")
-
-            self.table.setCellWidget(row, target_column, editor)
+                self.table.setItem(row, target_col, item)
 
     def _get_color_for_prefix(self, prefix: Optional[str]) -> Optional[QColor]:
-        if not prefix:
-            return None
-
+        if not prefix: return None
         if prefix not in self._prefix_to_color_map:
-            next_color_index = len(self._prefix_to_color_map) % len(
-                self.prefix_color_palette
-            )
-            self._prefix_to_color_map[prefix] = self.prefix_color_palette[
-                next_color_index
-            ]
-
+            self._prefix_to_color_map[prefix] = self.prefix_color_palette[len(self._prefix_to_color_map) % len(self.prefix_color_palette)]
         return self._prefix_to_color_map[prefix]
 
     def _get_name_from_row(self, row: int) -> Optional[str]:
-        target_column = 0
-        if self.mode != EditorMode.CONTEXT_VARS:
-            target_column = (
-                ParamTableColumn.PASSPORT_NAME
-                if self.mode == EditorMode.PASSPORT_ARGS
-                else ParamTableColumn.INSTANCE_NAME
-            )
-
-        name_item = self.table.item(row, target_column)
-        return name_item.text() if name_item else None
+        col_map = {EditMode.CONTEXT_VARS: 0, EditMode.PASSPORT: 1, EditMode.INSTANCE: 1}
+        item = self.table.item(row, col_map[self.mode])
+        return item.text() if item else None
 
     @Slot(int, bool)
     def _on_required_toggled(self, row: int, state: bool):
-        name = self._get_name_from_row(row)
-        if name and name in self._args_meta:
-            self._args_meta[name].required = state
-            self.data_changed.emit()
-
+        if name := self._get_name_from_row(row): self._args_meta[name].required = state; self.data_changed.emit()
     @Slot(int, str)
     def _on_type_changed(self, row: int, new_type: str):
-        name = self._get_name_from_row(row)
-
-        if self.mode == EditorMode.CONTEXT_VARS:
-            if name and name in self._context_vars:
-                var = self._context_vars[name]
-                if var.type != new_type:
-                    var.type = new_type
-                    var.value = None
-                    var.choices = [] if new_type == "choice" else None
-                    self._create_value_editor(row, name, var)
-                    self.data_changed.emit()
-        else:  # PASSPORT_ARGS
-            if name and name in self._args_meta:
-                meta = self._args_meta[name]
-                if meta.type != new_type:
-                    meta.type = new_type
-                    meta.default = None
-                    self._create_value_editor(row, name, meta)
-                    self.data_changed.emit()
-
+        if name := self._get_name_from_row(row):
+            model = self._context_vars[name] if self.mode == EditMode.CONTEXT_VARS else self._args_meta[name]
+            if model.type != new_type:
+                if self.mode == EditMode.CONTEXT_VARS: model.value = None
+                else: setattr(model, 'default', None)
+                model.type = new_type; model.choices = [] if new_type == "choice" else None
+                self._create_value_editor(row, name, model); self.data_changed.emit()
     @Slot(int, object)
     def _on_default_value_changed(self, row: int, value: Any):
-        name = self._get_name_from_row(row)
-        if name and name in self._args_meta:
-            self._args_meta[name].default = value
-            self.data_changed.emit()
-
-    @Slot(int, object)
-    def _on_description_changed(self, row: int, value: Any):
-        name = self._get_name_from_row(row)
-        if name and name in self._args_meta:
-            self._args_meta[name].description = str(value) or None
-            self.data_changed.emit()
-
-    @Slot(int, list)
-    def _on_choices_changed(self, row: int, choices: List[str]):
-        name = self._get_name_from_row(row)
-        if self.mode == EditorMode.CONTEXT_VARS:
-            if name in self._context_vars:
-                self._context_vars[name].choices = choices
-        else:
-            if name in self._args_meta:
-                self._args_meta[name].choices = choices
-        self.data_changed.emit()
-
-    @Slot(int, bool)
-    def _on_enable_toggled(self, row: int, state: bool):
-        name = self._get_name_from_row(row)
-        if name and name in self._args_values:
-            self._args_values[name].enabled = state
-            meta = self._args_meta[name]
-            self._create_value_editor(row, name, meta)
-            self.data_changed.emit()
-
-    @Slot(int, object)
-    def _on_instance_value_changed(self, row: int, value: Any):
-        name = self._get_name_from_row(row)
-        if name and name in self._args_values:
-            self._args_values[name].value = value
-            self.data_changed.emit()
-
-    @Slot(int, str)
-    def _on_reset_to_default(self, row: int, name: str):
-        meta = self._args_meta.get(name)
-        if not meta:
-            return
-        self._args_values[name].value = meta.default
-        self._create_value_editor(row, name, meta)
-        self.data_changed.emit()
-
-    @Slot(int, bool)
-    def _on_readonly_changed(self, row: int, checked: bool):
-        name = self._get_name_from_row(row)
-        if name and name in self._context_vars:
-            self._context_vars[name].read_only = checked
-            self.data_changed.emit()
-
+        if name := self._get_name_from_row(row): self._args_meta[name].default = value; self.data_changed.emit()
     @Slot(int, object)
     def _on_context_value_changed(self, row: int, value: Any):
-        name = self._get_name_from_row(row)
-        if name and name in self._context_vars:
-            self._context_vars[name].value = value
+        if name := self._get_name_from_row(row): self._context_vars[name].value = value; self.data_changed.emit()
+    @Slot(int, list)
+    def _on_choices_changed(self, row: int, choices: List[str]):
+        if name := self._get_name_from_row(row):
+            (self._context_vars[name] if self.mode == EditMode.CONTEXT_VARS else self._args_meta[name]).choices = choices; self.data_changed.emit()
+    @Slot(int, bool)
+    def _on_enable_toggled(self, row: int, state: bool):
+        if name := self._get_name_from_row(row):
+            self._args_values[name].enabled = state
+            self._create_value_editor(row, name, self._args_meta[name])
             self.data_changed.emit()
-
     @Slot(int, object)
-    def _on_context_description_changed(self, row: int, value: Any):
-        name = self._get_name_from_row(row)
-        if name and name in self._context_vars:
-            self._context_vars[name].description = str(value) or None
+    def _on_instance_value_changed(self, row: int, value: Any):
+        if name := self._get_name_from_row(row): self._args_values[name].value = value; self.data_changed.emit()
+    @Slot(int, str)
+    def _on_reset_to_default(self, row: int, name: str):
+        if meta := self._args_meta.get(name):
+            self._args_values[name].value = meta.default
+            self._create_value_editor(row, name, meta)
             self.data_changed.emit()
-
-    # --- БЛОК 2: Слот переименован в приватный ---
-    @Slot(int, int)
-    def _on_internal_cell_double_clicked(self, row: int, column: int):
-        widget = self.table.cellWidget(row, column)
-        if hasattr(widget, "on_button_click"):
-            widget.on_button_click()
-        elif hasattr(widget, "line_edit"):
-            widget.line_edit.setFocus()
-        else:
-            # Для ячеек без виджета (например, имя в контексте),
-            # делаем их редактируемыми по двойному клику
-            item = self.table.item(row, column)
-            if item and item.flags() & Qt.ItemFlag.ItemIsEditable:
-                self.table.editItem(item)
-
+    @Slot(int, bool)
+    def _on_readonly_changed(self, row: int, checked: bool):
+        if name := self._get_name_from_row(row): self._context_vars[name].read_only = checked; self.data_changed.emit()
     def _center_widget(self, widget: QWidget) -> QWidget:
-        cell = QWidget()
-        layout = QHBoxLayout(cell)
-        layout.addWidget(widget)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.setContentsMargins(0, 0, 0, 0)
-        return cell
-
+        cell = QWidget(); layout = QHBoxLayout(cell)
+        layout.addWidget(widget); layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setContentsMargins(0, 0, 0, 0); return cell
     def _adjust_table_columns(self):
         self.table.resizeColumnsToContents()
         header = self.table.horizontalHeader()
-        if self.mode == EditorMode.PASSPORT_ARGS:
-            header.setSectionResizeMode(
-                ParamTableColumn.PASSPORT_DESCRIPTION, QHeaderView.ResizeMode.Stretch
-            )
-        elif self.mode == EditorMode.INSTANCE_ARGS:
-            header.setSectionResizeMode(
-                ParamTableColumn.INSTANCE_VALUE, QHeaderView.ResizeMode.Stretch
-            )
-            header.setSectionResizeMode(
-                ParamTableColumn.INSTANCE_ACTIONS,
-                QHeaderView.ResizeMode.ResizeToContents,
-            )
-        elif self.mode == EditorMode.CONTEXT_VARS:
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-            header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-            header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-            header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        if self.mode == EditMode.PASSPORT: header.setSectionResizeMode(ParamTableColumn.PASSPORT_DESCRIPTION, QHeaderView.ResizeMode.Stretch)
+        elif self.mode == EditMode.INSTANCE: header.setSectionResizeMode(ParamTableColumn.INSTANCE_VALUE, QHeaderView.ResizeMode.Stretch)
+        elif self.mode == EditMode.CONTEXT_VARS:
+            header.setSectionResizeMode(ParamTableColumn.CONTEXT_NAME, QHeaderView.ResizeMode.Interactive)
+            header.setSectionResizeMode(ParamTableColumn.CONTEXT_VALUE, QHeaderView.ResizeMode.Stretch)
+            header.setSectionResizeMode(ParamTableColumn.CONTEXT_DESCRIPTION, QHeaderView.ResizeMode.Stretch)

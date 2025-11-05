@@ -19,7 +19,8 @@
     "ps_file_path": {
       "type": "file_path",
       "description": "Путь к файлу (для режимов 'selected_file' и 'selected_file_folder').",
-      "required": false,
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}/11.psd",
       "filter": "Photoshop Document (*.psd)"
     },
     "ps_recursive": {

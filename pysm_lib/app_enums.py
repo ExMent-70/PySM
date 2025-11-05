@@ -34,3 +34,11 @@ class ScriptRunStatus(Enum):
     SUCCESS = auto()
     ERROR = auto()
     SKIPPED = auto()
+
+# --- НАЧАЛО НОВОГО БЛОКА ---
+class EditMode(Enum):
+    """Определяет режим работы диалога свойств."""
+    PASSPORT = auto()
+    INSTANCE = auto()
+    CONTEXT_VARS = auto()
+# --- КОНЕЦ НОВОГО БЛОКА ---

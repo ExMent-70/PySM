@@ -140,7 +140,9 @@
       "delete_from_set": "Remove from Set",
       "copy_instance": "Copy Instance",
       "duplicate_instance": "Duplicate",
-      "paste_instance": "Paste Instance"
+      "paste_instance": "Paste Instance",
+      "import_set": "Import Set Here...",
+      "export_set": "Export Set..."	  
     },
     "create_folder": {
       "title": "Create Folder",
@@ -189,6 +191,10 @@
     }
   },
   "dialogs": {
+    "instance_editor": {
+        "title": "Select Script Instance",
+        "none_selected": "(not selected)"
+    },	  
     "script_properties": {
       "title_passport": "Script Properties: {name}",
       "title_instance": "Instance Parameters: {name}",
@@ -405,7 +411,9 @@
     "script_reordered": "Script order changed in set '{set_name}'.",
     "script_root_added": "Added script root directory: {path}",
     "script_root_removed": "Removed script root directory.",
-    "script_root_updated": "Updated script root directory."
+    "script_root_updated": "Updated script root directory.",
+    "set_exported": "Set '{name}' exported to file: {path}",
+    "set_imported": "Set '{name}' imported from file: {path}"
   },
   "app_controller": {
     "log_info": {
@@ -428,14 +436,29 @@
     "log_warning": {
       "scan_while_busy": "Attempted to start scan while application is busy. Aborting.",
       "delete_context_file_failed": "Failed to delete context file '{path}': {error}",
-      "run_with_unsaved_changes": "Attempted to run with unsaved changes. Please save the collection."
+      "run_with_unsaved_changes": "Attempted to run with unsaved changes. Please save the collection.",
+      "export_node_not_found": "Attempted to export node with ID '{node_id}', but it was not found.",
+      "export_node_not_found": "Attempted to export node with ID '{node_id}', but it was not found."	  
     },
     "log_error": {
       "async_scan_error": "Async scan error: {error}",
       "context_file_failed": "Failed to create context file: {error}",
       "run_unsaved_collection": "Cannot run: the collection has never been saved.",
-      "context_path_error": "Could not determine context file path: {error}"
+      "context_path_error": "Could not determine context file path: {error}",
+      "export_save_failed": "Failed to save exported set to '{path}': {error}",
+      "import_read_failed": "Failed to read or import set from '{path}': {error}"	  
     },
+    "message_box": {
+      "export_save_failed": "Failed to save exported set to '{path}':\n{error}",
+      "export_failed": "Failed to export the set.",
+      "import_failed": "Failed to import the set. Check logs for validation errors.",
+      "import_read_failed": "Failed to read or import set from '{path}':\n{error}"
+    },
+    "file_dialog": {
+      "export_set_title": "Export Set As...",
+      "import_set_title": "Import Set From...",
+      "snippet_filter": "Snippet files (*.snip);;All files (*)"
+    },	
     "path_update": {
       "log_info": {
         "updating_path": "Updating PATH for current process...",
@@ -560,7 +583,11 @@
       "loading_context_file": "SetManager: Loading context file: {path}",
       "saving_context_file": "SetManager: Saving context file: {path}",
       "deleting_empty_context_file": "SetManager: Deleting empty context file: {path}",
-      "context_reloaded": "SetManager: Context successfully reloaded from file: {path}"
+      "context_reloaded": "SetManager: Context successfully reloaded from file: {path}",
+      "set_exported_success": "Set '{name}' exported successfully.",
+      "set_imported_success": "Set '{name}' imported successfully.",
+      "set_exported_success": "Set '{name}' exported successfully.",
+      "set_imported_success": "Set '{name}' imported successfully."	  
     },
     "log_debug": {
       "cache_rebuilt": "SetManager node cache rebuilt. Nodes found: {count}",
@@ -568,7 +595,15 @@
     },
     "log_warning": {
       "adapting_structure": "Collection structure in '{path}' has no main folder node. Adapting...",
-      "reload_context_no_path": "SetManager: Cannot reload context, collection path is not defined."
+      "reload_context_no_path": "SetManager: Cannot reload context, collection path is not defined.",
+      "export_set_not_found": "Export error: Script set with ID '{node_id}' not found.",
+      "import_parent_not_found": "Import error: Parent folder with ID '{folder_id}' not found.",
+      "import_set_validation_failed": "Validation error during set import: {error}",
+      "import_set_generic_failed": "Unknown error during set import: {error}",
+      "export_set_not_found": "Export error: Script set with ID '{node_id}' not found.",
+      "import_parent_not_found": "Import error: Parent folder with ID '{folder_id}' not found.",
+      "import_set_validation_failed": "Validation error during set import: {error}",
+      "import_set_generic_failed": "Unknown error during set import: {error}"	  
     },
     "log_error": {
       "file_not_found": "Collection file '{path}' not found. Creating a new empty collection.",

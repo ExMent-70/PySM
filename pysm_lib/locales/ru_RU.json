@@ -140,7 +140,9 @@
           "delete_from_set": "Удалить из набора",
           "copy_instance": "Копировать Экземпляр",
           "duplicate_instance": "Создать дубликат",
-          "paste_instance": "Вставить Экземпляр"
+          "paste_instance": "Вставить Экземпляр",
+		  "import_set": "Импортировать набор сюда...",
+		  "export_set": "Экспортировать набор..."		  
     },
     "create_folder": {
       "title": "Создание папки",
@@ -189,6 +191,10 @@
     }
   },
   "dialogs": {
+    "instance_editor": {
+        "title": "Выбор экземпляра скрипта",
+        "none_selected": "(не выбрано)"
+    },
     "script_properties": {
       "title_passport": "Свойства скрипта: {name}",
       "title_instance": "Параметры экземпляра: {name}",
@@ -406,7 +412,9 @@
     "script_reordered": "Изменен порядок скриптов в наборе '{set_name}'.",
     "script_root_added": "Добавлена корневая директория: {path}",
     "script_root_removed": "Удалена корневая директория.",
-    "script_root_updated": "Обновлена корневая директория."
+    "script_root_updated": "Обновлена корневая директория.",
+    "set_exported": "Набор '{name}' экспортирован в файл: {path}",
+    "set_imported": "Набор '{name}' импортирован из файла: {path}"
   },
   "app_controller": {
     "log_info": {
@@ -429,14 +437,28 @@
     "log_warning": {
       "scan_while_busy": "Попытка запустить сканирование, пока приложение занято. Отмена.",
       "delete_context_file_failed": "Не удалось удалить файл контекста '{path}': {error}",
-      "run_with_unsaved_changes": "Попытка запуска с несохраненными изменениями. Сохраните коллекцию."
+      "run_with_unsaved_changes": "Попытка запуска с несохраненными изменениями. Сохраните коллекцию.",
+      "export_node_not_found": "Попытка экспорта узла с ID '{node_id}', но он не найден."	  
     },
     "log_error": {
       "async_scan_error": "Ошибка асинхронного сканирования: {error}",
       "context_file_failed": "Не удалось создать файл контекста: {error}",
       "run_unsaved_collection": "Запуск невозможен: коллекция ни разу не была сохранена.",
-      "context_path_error": "Не удалось определить путь к файлу контекста: {error}"
+      "context_path_error": "Не удалось определить путь к файлу контекста: {error}",
+      "export_save_failed": "Не удалось сохранить экспортированный набор в '{path}': {error}",
+      "import_read_failed": "Не удалось прочитать или импортировать набор из '{path}': {error}"	  
     },
+    "message_box": {
+      "export_save_failed": "Не удалось сохранить экспортированный набор в '{path}':\n{error}",
+      "export_failed": "Не удалось экспортировать набор.",
+      "import_failed": "Не удалось импортировать набор. Проверьте логи на наличие ошибок валидации.",
+      "import_read_failed": "Не удалось прочитать или импортировать набор из '{path}':\n{error}"
+    },
+    "file_dialog": {
+      "export_set_title": "Экспортировать набор как...",
+      "import_set_title": "Импортировать набор из...",
+	  "snippet_filter": "Файлы сниппетов (.snip);;Все файлы ()"
+    },	
     "path_update": {
       "log_info": {
         "updating_path": "Обновление PATH для текущего процесса...",
@@ -561,7 +583,9 @@
       "loading_context_file": "SetManager: Загрузка файла контекста: {path}",
       "saving_context_file": "SetManager: Сохранение файла контекста: {path}",
       "deleting_empty_context_file": "SetManager: Удаление пустого файла контекста: {path}",
-      "context_reloaded": "SetManager: Контекст успешно перезагружен из файла: {path}"
+      "context_reloaded": "SetManager: Контекст успешно перезагружен из файла: {path}",
+      "set_exported_success": "Набор '{name}' успешно экспортирован.",
+      "set_imported_success": "Набор '{name}' успешно импортирован."	  
     },
     "log_debug": {
       "cache_rebuilt": "Кэш узлов SetManager перестроен. Найдено узлов: {count}",
@@ -569,7 +593,11 @@
     },
     "log_warning": {
       "adapting_structure": "Структура коллекции в '{path}' не имеет главного узла-папки. Адаптация...",
-      "reload_context_no_path": "SetManager: Невозможно перезагрузить контекст, путь к коллекции не определен."
+      "reload_context_no_path": "SetManager: Невозможно перезагрузить контекст, путь к коллекции не определен.",
+      "export_set_not_found": "Ошибка экспорта: Набор скриптов с ID '{node_id}' не найден.",
+      "import_parent_not_found": "Ошибка импорта: Родительская папка с ID '{folder_id}' не найдена.",
+      "import_set_validation_failed": "Ошибка валидации при импорте набора: {error}",
+      "import_set_generic_failed": "Неизвестная ошибка при импорте набора: {error}"	  
     },
     "log_error": {
       "file_not_found": "Файл коллекции '{path}' не найден. Создается новая пустая коллекция.",

@@ -31,16 +31,14 @@
       "default": ""
     },
     "then-instance-id": {
-      "type": "string",
+      "type": "instance",
       "description": "ID экземпляра скрипта, на который нужно перейти, если условие выполняется.",
-      "required": true,
-      "default": ""
+      "required": true
     },
     "else-instance-id": {
-      "type": "string",
+      "type": "instance",
       "description": "ID экземпляра скрипта, если условие не выполняется. Если оставить пустым, выполнение пойдет дальше по списку.",
-      "required": false,
-      "default": ""
+      "required": false
     },
     "clear-variable": {
       "type": "bool",

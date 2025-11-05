@@ -2,7 +2,7 @@
 
 import pathlib
 import logging
-from typing import Optional
+from typing import Optional, List
 
 from PySide6.QtCore import Slot, QSize, Qt
 from PySide6.QtWidgets import (
@@ -32,6 +32,13 @@ from .console_widget import ConsoleWidget
 from .dialogs import SettingsDialog, CollectionPassportDialog
 from .available_scripts_widget import AvailableScriptsWidget
 from .script_collection_widget import ScriptCollectionWidget
+
+from ..models import ( # <--- НОВЫЙ БЛОК ИМПОРТОВ
+    SetHierarchyNodeType,
+    ScriptSetNodeModel,
+    SetFolderNodeModel,
+    ScriptSetEntryModel,
+)
 
 mw_logger = logging.getLogger(f"PyScriptManager.{__name__}")
 
@@ -309,12 +316,24 @@ class MainWindow(QMainWindow):
     @Slot()
     def _on_collection_passport_clicked(self):
         collection_model = self.controller.set_manager.current_collection_model
+        
+        all_entries: List[ScriptSetEntryModel] = []
+        def find_script_entries_recursive(nodes: List[SetHierarchyNodeType]):
+            for node in nodes:
+                if isinstance(node, ScriptSetNodeModel): all_entries.extend(node.script_entries)
+                elif isinstance(node, SetFolderNodeModel) and node.children: find_script_entries_recursive(node.children)
+        find_script_entries_recursive(collection_model.root_nodes)
+
         dialog = CollectionPassportDialog(
             controller=self.controller,
             collection_model=collection_model,
             locale_manager=self.locale_manager,
+            theme_manager=self.controller.theme_manager, # Эта строка уже была добавлена, проверяем
+            script_entries=all_entries,
+            get_script_name_func=self.controller.get_script_info_by_id,
             parent=self,
         )
+
         if dialog.exec() == QDialog.DialogCode.Accepted:
             data = dialog.get_data()
             if data:

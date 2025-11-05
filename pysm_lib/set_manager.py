@@ -4,7 +4,8 @@ import pathlib
 import json
 import logging
 import os
-from typing import List, Optional, Dict, Tuple
+import uuid
+from typing import List, Optional, Dict, Tuple, Union
 
 
 from .models import (
@@ -258,7 +259,6 @@ class SetManager:
                     pass
             # Пробрасываем исходное исключение наверх для обработки
             raise e
-
 
 
     def save_collection_to_file(self, file_path: Optional[pathlib.Path] = None) -> bool:
@@ -616,3 +616,141 @@ class SetManager:
         )
 
         return True
+        
+    # 1. БЛОК: Новый метод export_set_node
+    # ==============================================================================
+    def export_set_node(self, node_id: str) -> Optional[str]:
+        """
+        Экспортирует ScriptSetNodeModel в JSON-строку.
+
+        :param node_id: ID ScriptSetNodeModel для экспорта.
+        :return: JSON-строка, представляющая набор, или None в случае ошибки.
+        """
+        set_node = self.get_set_node_by_id(node_id)
+        if not set_node:
+            logger.warning(
+                locale_manager.get(
+                    "set_manager.log_warning.export_set_not_found", node_id=node_id
+                )
+            )
+            return None
+        
+        try:
+            # Используем Pydantic метод model_dump_json для сериализации
+            json_data = set_node.model_dump_json(indent=2)
+            logger.info(
+                locale_manager.get(
+                    "set_manager.log_info.set_exported_success", name=set_node.name
+                )
+            )
+            return json_data
+        except Exception as e:
+            logger.error(
+                locale_manager.get(
+                    "set_manager.log_error.export_set_failed",
+                    name=set_node.name,
+                    error=e,
+                ),
+                exc_info=True,
+            )
+            return None
+
+    # 2. БЛОК: Новый метод import_set_node
+    # ==============================================================================
+    def import_set_node(self, json_data: str, parent_folder_id: str) -> Optional[ScriptSetNodeModel]:
+        """
+        Импортирует ScriptSetNodeModel из JSON-строки, генерирует новые ID
+        и добавляет его в указанную родительскую папку.
+        Также обновляет ссылки на instance_id внутри параметров скриптов.
+
+        :param json_data: JSON-строка, представляющая набор.
+        :param parent_folder_id: ID SetFolderNodeModel, куда будет импортирован набор.
+        :return: Импортированный ScriptSetNodeModel или None в случае ошибки.
+        """
+        parent_folder = self.get_folder_node_by_id(parent_folder_id)
+        if not parent_folder:
+            logger.warning(
+                locale_manager.get(
+                    "set_manager.log_warning.import_parent_not_found", folder_id=parent_folder_id
+                )
+            )
+            return None
+
+        try:
+            # 1. Десериализация и создание карты сопоставления ID
+            original_set_node = ScriptSetNodeModel.model_validate_json(json_data)
+            
+            # Новый ID для самого набора
+            new_set_id = f"setnode_{uuid.uuid4().hex[:12]}"
+            
+            id_map: Dict[str, str] = {}
+            new_script_entries: List[ScriptSetEntryModel] = []
+
+            for entry in original_set_node.script_entries:
+                old_instance_id = entry.instance_id
+                new_instance_id = f"instance_{uuid.uuid4().hex[:12]}"
+                id_map[old_instance_id] = new_instance_id
+                
+                # Создаем копию элемента с новым ID
+                new_entry = entry.model_copy(deep=True)
+                new_entry.instance_id = new_instance_id
+                new_script_entries.append(new_entry)
+            
+            # 2. Обновление ссылок в параметрах
+            for new_entry in new_script_entries:
+                if not new_entry.command_line_args:
+                    continue
+                
+                # Проходим по всем аргументам командной строки
+                for arg_name, arg_value_enabled_model in new_entry.command_line_args.items():
+                    value = arg_value_enabled_model.value
+                    
+                    if isinstance(value, str):
+                        # Если значение - строка и является старым instance_id
+                        if value in id_map:
+                            arg_value_enabled_model.value = id_map[value]
+                    elif isinstance(value, list):
+                        # Если значение - список, проверяем каждый элемент списка
+                        updated_list: List[Union[str, int, float, bool, dict]] = []
+                        for item in value:
+                            if isinstance(item, str) and item in id_map:
+                                updated_list.append(id_map[item])
+                            else:
+                                updated_list.append(item)
+                        arg_value_enabled_model.value = updated_list
+            
+            # Создаем новый объект ScriptSetNodeModel с новым ID и обновленными элементами
+            imported_set_node = ScriptSetNodeModel(
+                id=new_set_id,
+                name=original_set_node.name,
+                description=original_set_node.description,
+                script_entries=new_script_entries
+            )
+
+            # 3. Добавление в коллекцию
+            parent_folder.children.append(imported_set_node)
+            self._rebuild_nodes_cache()
+            self._set_dirty(True)
+            logger.info(
+                locale_manager.get(
+                    "set_manager.log_info.set_imported_success", name=imported_set_node.name
+                )
+            )
+            return imported_set_node
+        except ValidationError as ve:
+            logger.error(
+                locale_manager.get(
+                    "set_manager.log_error.import_set_validation_failed",
+                    error=ve.errors(include_url=False),
+                ),
+                exc_info=True,
+            )
+            return None
+        except Exception as e:
+            logger.error(
+                locale_manager.get(
+                    "set_manager.log_error.import_set_generic_failed", error=e
+                ),
+                exc_info=True,
+            )
+            return None        
