@@ -19,37 +19,52 @@ class JsonDataManager:
     в JSON-файлах info_portrait_faces.json и info_group_faces.json.
     """
 
-    def __init__(self, portrait_json_path: Path, group_json_path: Path):
+    # --- Блок 1: Инициализация ---
+    # ==============================================================================
+    def __init__(self, portrait_json_path: Optional[Path] = None, group_json_path: Optional[Path] = None):
         """
         Инициализирует менеджер путями к JSON-файлам.
+        Хотя бы один путь должен быть предоставлен.
 
         Args:
             portrait_json_path: Путь к файлу с данными портретных фото.
             group_json_path: Путь к файлу с данными групповых фото.
         """
-        if not isinstance(portrait_json_path, Path) or not isinstance(group_json_path, Path):
-            raise TypeError("Пути к JSON должны быть объектами Path.")
+        if portrait_json_path and not isinstance(portrait_json_path, Path):
+            raise TypeError("Путь к JSON портретов должен быть объектом Path.")
+        if group_json_path and not isinstance(group_json_path, Path):
+            raise TypeError("Путь к JSON групп должен быть объектом Path.")
+        if not portrait_json_path and not group_json_path:
+            raise ValueError("Необходимо предоставить хотя бы один путь к JSON-файлу.")
 
-        self.portrait_json_path = portrait_json_path.resolve()
-        self.group_json_path = group_json_path.resolve()
+        self.portrait_json_path = portrait_json_path.resolve() if portrait_json_path else None
+        self.group_json_path = group_json_path.resolve() if group_json_path else None
         self.portrait_data: Dict[str, Dict[str, Any]] = {}
         self.group_data: Dict[str, Dict[str, Any]] = {}
 
         logger.debug("<br>JsonDataManager инициализирован.")
 
+    # --- Блок 2: Загрузка и сохранение данных ---
+    # ==============================================================================
     def load_data(self) -> bool:
         """
-        Загружает данные из JSON-файлов в память.
-        Если файлы не существуют, инициализирует пустыми словарями.
+        Загружает данные из предоставленных при инициализации JSON-файлов в память.
 
         Returns:
             True, если загрузка прошла успешно, False при ошибке.
         """
-        logger.debug(f"Загрузка данных из {self.portrait_json_path.name} и {self.group_json_path.name}")
         try:
-            self.portrait_data = self._load_single_file(self.portrait_json_path)
-            self.group_data = self._load_single_file(self.group_json_path)
-            print(f"Загружено <b>{len(self.portrait_data)}</b> портретных и <b>{len(self.group_data)}</b> групповых записей<br>")
+            loaded_messages = []
+            if self.portrait_json_path:
+                self.portrait_data = self._load_single_file(self.portrait_json_path)
+                loaded_messages.append(f"<b>{len(self.portrait_data)}</b> портретных")
+            
+            if self.group_json_path:
+                self.group_data = self._load_single_file(self.group_json_path)
+                loaded_messages.append(f"<b>{len(self.group_data)}</b> групповых")
+
+            if loaded_messages:
+                print(f"Загружено {' и '.join(loaded_messages)} записей<br>")
             return True
         except (IOError, TypeError, json.JSONDecodeError) as e:
             logger.error(f"Критическая ошибка при загрузке JSON-данных: {e}", exc_info=True)
@@ -69,52 +84,56 @@ class JsonDataManager:
 
     def save_data(self) -> bool:
         """
-        Сохраняет данные из памяти в JSON-файлы.
+        Сохраняет данные из памяти в JSON-файлы, указанные при инициализации.
 
         Returns:
             True, если сохранение прошло успешно, False при ошибке.
         """
         try:
-            print(f"<b>Сохранение результатов работы...</b>")
-            self._save_single_file("портретных", self.portrait_json_path, self.portrait_data)
-            self._save_single_file("групповых", self.group_json_path, self.group_data)
-            print(f"Рабочая папка:")
-            print(f"<i>{self.portrait_json_path.parent}</i>")
-            print(f"- портретные фотографии: <i>{self.portrait_json_path.name}</i>")
-            print(f"- групповые  фотографии: <i>{self.group_json_path.name}</i>")
+            print("<b>Сохранение результатов работы...</b>")
+            saved_files_messages = []
+            
+            if self.portrait_json_path:
+                self._save_single_file(self.portrait_json_path, self.portrait_data)
+                saved_files_messages.append(f"- портретные фотографии: <i>{self.portrait_json_path.name}</i>")
+            
+            if self.group_json_path:
+                self._save_single_file(self.group_json_path, self.group_data)
+                saved_files_messages.append(f"- групповые  фотографии: <i>{self.group_json_path.name}</i>")
+            
+            if saved_files_messages:
+                base_path = self.portrait_json_path.parent if self.portrait_json_path else (self.group_json_path.parent if self.group_json_path else None)
+                if base_path:
+                    print(f"Рабочая папка:\n<i>{base_path}</i>")
+                for msg in saved_files_messages:
+                    print(msg)
             return True
         except IOError as e:
             logger.error(f"Критическая ошибка при сохранении JSON-данных: {e}", exc_info=True)
             return False
 
-    def _save_single_file(self, description: str, file_path: Path, data: Dict[str, Dict[str, Any]]):
+    def _save_single_file(self, file_path: Path, data: Dict[str, Dict[str, Any]]):
         """Сохраняет данные в один JSON-файл."""
         file_path.parent.mkdir(parents=True, exist_ok=True)
         with file_path.open("w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        logger.debug(f"Файл {description} данных сохранен: {file_path}")
+        logger.debug(f"Файл данных сохранен: {file_path}")
 
+    # --- Блок 3: Методы для доступа и модификации данных (без изменений) ---
+    # ==============================================================================
     def get_data(self, filename: str) -> Optional[Dict[str, Any]]:
         """Возвращает полный словарь данных для указанного имени файла."""
         return self.portrait_data.get(filename) or self.group_data.get(filename)
         
-    # ==============================================================================
     def get_data_with_type(self, filename: str) -> Optional[Tuple[Dict[str, Any], str]]:
         """
         Возвращает данные для файла и его тип источника ('portrait' или 'group').
-
-        Args:
-            filename: Имя файла для поиска.
-
-        Returns:
-            Кортеж (данные_файла, тип_фото) в случае успеха, иначе None.
         """
         if filename in self.portrait_data:
             return self.portrait_data[filename], "portrait"
         if filename in self.group_data:
             return self.group_data[filename], "group"
         return None        
-        
 
     def get_face(self, filename: str, face_index: int) -> Optional[Dict[str, Any]]:
         """Возвращает словарь данных для конкретного лица в указанном файле."""
@@ -127,14 +146,14 @@ class JsonDataManager:
     def get_all_filenames(self, data_type: str = "all") -> List[str]:
         """Возвращает список имен файлов (ключей) из хранимых данных."""
         filenames = []
-        if data_type in ["portrait", "all"]:
+        if data_type in ["portrait", "all"] and self.portrait_data:
             filenames.extend(self.portrait_data.keys())
-        if data_type in ["group", "all"]:
+        if data_type in ["group", "all"] and self.group_data:
             filenames.extend(self.group_data.keys())
         return filenames
 
+    """
     def update_face(self, filename: str, face_index: int, updates: Dict[str, Any]) -> bool:
-        """Обновляет (добавляет или перезаписывает) поля для указанного лица."""
         target_dict = None
         if filename in self.portrait_data:
             target_dict = self.portrait_data
@@ -158,6 +177,61 @@ class JsonDataManager:
         else:
             logger.warning(f"Запись лица {face_index} в файле '{filename}' не является словарем.")
             return False
+    """
+
+    def update_face(
+        self, filename: str, face_index: int, updates: Dict[str, Any], data_type: str
+    ) -> bool:
+        """
+        Обновляет поля для указанного лица в словаре заданного типа.
+
+        Args:
+            filename: Имя файла для обновления.
+            face_index: Индекс лица в списке "faces".
+            updates: Словарь с обновляемыми полями.
+            data_type: Тип данных для обновления ('portrait' или 'group').
+                       Этот параметр обязателен для избежания неоднозначности.
+        """
+        target_dict = None
+        
+        if data_type == "portrait":
+            target_dict = self.portrait_data
+        elif data_type == "group":
+            target_dict = self.group_data
+        else:
+            logger.warning(f"Неизвестный тип данных '{data_type}' для обновления лица.")
+            return False
+
+        if filename not in target_dict:
+            logger.warning(
+                f"Файл '{filename}' не найден в данных типа '{data_type}' "
+                "при попытке обновления лица."
+            )
+            return False
+
+        file_entry = target_dict.get(filename, {})
+        faces = file_entry.get("faces")
+
+        if not isinstance(faces, list) or not (0 <= face_index < len(faces)):
+            logger.warning(
+                f"Некорректный индекс лица {face_index} или структура "
+                f"'faces' для файла '{filename}'."
+            )
+            return False
+
+        if isinstance(faces[face_index], dict):
+            faces[face_index].update(updates)
+            logger.debug(
+                f"Обновлены данные для лица {face_index} в файле '{filename}': "
+                f"{list(updates.keys())}"
+            )
+            return True
+        else:
+            logger.warning(
+                f"Запись лица {face_index} в файле '{filename}' не является словарем."
+            )
+            return False
+
 
     def add_file_data(self, filename: str, file_data: Dict[str, Any], is_portrait: bool):
         """Добавляет или перезаписывает данные для целого файла."""

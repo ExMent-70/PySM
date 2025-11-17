@@ -220,7 +220,12 @@ class KeypointAnalyzer:
                         "mouth_state": analysis_results["mouth_state"]["state"],
                         "head_pose": analysis_results["head_pose"]["state"],
                     }
-                    json_manager.update_face(filename, i, {"keypoint_analysis": simplified_results})
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
+                    # Явно передаем data_type, который уже известен в этом контексте
+                    json_manager.update_face(
+                        filename, i, {"keypoint_analysis": simplified_results}, data_type=data_type
+                    )
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
                     detailed_metrics.append(analysis_results)
         
         if detailed_metrics:

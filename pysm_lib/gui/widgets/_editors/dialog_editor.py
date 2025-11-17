@@ -22,7 +22,16 @@ class DialogEditorWidget(BaseEditor):
         self.line_edit.setToolTip(self.line_edit.text())
         self.line_edit.setCursorPosition(0)
         self.line_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.line_edit.setReadOnly(True)
+
+
+        # Устанавливаем read-only только для определенных типов
+        if self.var_type in ("string_multiline", "json"):
+            self.line_edit.setReadOnly(True)
+        else:
+            # Для остальных (file_path, dir_path) подключаем сигнал о завершении редактирования
+            self.line_edit.editingFinished.connect(self._on_editing_finished)
+        
+
         button = QPushButton("...")
         button.setFixedWidth(30)
         button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
@@ -30,6 +39,18 @@ class DialogEditorWidget(BaseEditor):
         layout.addWidget(button, 0, 1)
         layout.setColumnStretch(0, 1)
         button.clicked.connect(self.on_button_click)
+
+
+
+    # слот _on_editing_finished
+    # ==============================================================================
+    def _on_editing_finished(self):
+        """Вызывается, когда пользователь заканчивает ручное редактирование."""
+        new_value = self.line_edit.text()
+        self.value = new_value
+        self.line_edit.setToolTip(new_value)
+        self.valueChanged.emit(new_value)
+
 
     def on_button_click(self):
         new_value, changed = self._handle_button_dialogs()

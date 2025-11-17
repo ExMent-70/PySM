@@ -17,10 +17,9 @@
       "default": 0.14
     },
     "a_cl_location_prompts": {
-      "type": "list_str",
+      "type": "list",
       "description": "Необязательный список текстовых описаний локаций. Если задан, включает режим классификации вместо кластеризации.",
-      "required": false,
-      "default": []
+      "required": false
     },
     "all_threads": {
       "type": "int",

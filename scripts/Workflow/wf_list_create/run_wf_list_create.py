@@ -1012,8 +1012,7 @@ class ClassListEditor(QMainWindow):
         
         self.processed_table = QTableView()
         self.processed_table.setModel(self.table_model)
-        self.processed_table.setAlternatingRowColors(False)
-        #self.processed_table.setAlternatingRowColors(True)
+        self.processed_table.setAlternatingRowColors(True)
         delegate = EnterKeyDelegate(self.processed_table, services=list(self.SERVICES.keys()))
         self.processed_table.setItemDelegate(delegate)
         self.processed_table.setSortingEnabled(True)

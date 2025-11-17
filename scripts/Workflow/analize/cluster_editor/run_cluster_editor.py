@@ -19,7 +19,7 @@ from typing import Dict, Any, List, Optional
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QInputDialog, QProgressBar, QMessageBox, QLineEdit, QMenu,
-    QListWidget, QListWidgetItem, QDialog, QCheckBox
+    QListWidget, QListWidgetItem, QDialog, QCheckBox, QFileDialog
 )
 from PySide6.QtGui import QPixmap, QAction
 from PySide6.QtCore import Qt, Signal, Slot, QThread, QTimer
@@ -34,6 +34,7 @@ try:
     if str(project_root) not in sys.path: sys.path.insert(0, str(project_root))
 
     from pysm_lib import pysm_context, theme_api
+    from pysm_lib.pysm_context import ConfigResolver
     IS_MANAGED_RUN = True
 
     from _lib.editor_viewer import ImageViewer
@@ -53,34 +54,54 @@ logger = logging.getLogger(__name__)
 
 
 class MainWindow(QWidget):
-    def __init__(self, data_dir: Path, images_dir: Path, photo_session: str, session_name: str, mode: str):
+    def __init__(self, portrait_json_path: Path, group_json_path: Path, mode: str):
         super().__init__()
-        self.data_dir = data_dir
-        self.flat_images_dir = images_dir
-        self.photo_session = photo_session
-        self.session_name = session_name
         self.mode = mode
+        
+        # Основные пути, полученные извне
+        self.portrait_json_path = portrait_json_path
+        self.group_json_path_initial = group_json_path
+        
+        # Производные пути
+        self.data_dir = self.portrait_json_path.parent
+        self.portrait_images_dir: Path = self.data_dir / "JPG"
+        
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Переносим вычисление self.photo_session и self.session_name ВВЕРХ ---
+        # Инициализируем photo_session и session_name на основе ИСХОДНОГО group_json_path
+        group_analysis_dir = self.group_json_path_initial.parent
+        group_output_dir = group_analysis_dir.parent
+        group_session_dir = group_output_dir.parent
+        self.photo_session = group_analysis_dir.name.replace("Analysis_", "")
+        self.session_name = group_session_dir.name
+
+        self.group_images_dir: Optional[Path] = group_analysis_dir / "JPG"
+        self.current_group_json_path: Optional[Path] = self.group_json_path_initial
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
         if self.mode == 'face':
             self.mode_config = {
                 "mode_name": "face",
-                "window_title": f"Редактор кластеров [по Лицам] - {photo_session}",
+                "window_title_template": "Редактор кластеров [по Лицам] - {}",
                 "name_prefix_logic": lambda cid: f"{int(cid):02d}-" if str(cid).isdigit() else "",
             }
         elif self.mode == 'location':
             self.mode_config = {
                 "mode_name": "location",
-                "window_title": f"Редактор кластеров [по Локациям] - {photo_session}",
+                "window_title_template": "Редактор кластеров [по Локациям] - {}",
                 "name_prefix_logic": lambda cid: "",
             }
         elif self.mode == 'matches':
              self.mode_config = {
                 "mode_name": "matches",
-                "window_title": f"Просмотр совпадений [Портреты -> Группы] - {photo_session}",
+                "window_title_template": "Просмотр совпадений [Портреты -> Группы] - {}",
                 "name_prefix_logic": lambda cid: f"{int(cid):02d}-" if str(cid).isdigit() else "",
             }
         else:
             raise ValueError(f"Неизвестный режим работы: {self.mode}")
+
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Используем self.photo_session ---
+        self.setWindowTitle(self.mode_config["window_title_template"].format(self.photo_session))
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
         self.predefined_cluster_names: List[str] = []
         try:
@@ -95,10 +116,11 @@ class MainWindow(QWidget):
         except Exception as e:
             logger.error(f"Ошибка при загрузке или парсинге predefined_names.json: {e}")
 
-        self.data_manager = ClusterDataManager(
-            self.data_dir / "info_portrait_faces.json",
-            self.data_dir / "info_group_faces.json",
-        )
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Инициализация DataManager ---
+        # DataManager инициализируется явными путями
+        group_json_for_dm = self.group_json_path_initial if self.mode != 'matches' else None
+        self.data_manager = ClusterDataManager(self.portrait_json_path, group_json_for_dm)
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
         self.active_cluster_id: Optional[str] = None
         self.preview_pixmaps: Dict[str, QPixmap] = {}
@@ -117,6 +139,49 @@ class MainWindow(QWidget):
         self.init_ui()
         self._load_and_display_data()
 
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Автоматическая загрузка данных для режима 'matches' ---
+        # Автоматическая загрузка групповых данных по умолчанию в режиме 'matches'
+        if self.mode == 'matches':
+            if self.group_json_path_initial and self.group_json_path_initial.is_file():
+                logger.info("Автоматическая загрузка данных о совпадениях по умолчанию...")
+                self._load_and_process_group_data(self.group_json_path_initial)
+            else:
+                logger.warning(
+                    "Файл info_group_faces.json по умолчанию не найден или не указан. "
+                    "Загрузите файл вручную через контекстное меню."
+                )
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---    
+
+
+    def _load_and_process_group_data(self, group_json_path: Path):
+        """
+        Универсальный метод для загрузки и обработки нового файла 
+        info_group_faces.json.
+        """
+        if self.data_manager.reload_group_data(group_json_path):
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
+            self.current_group_json_path = group_json_path
+            
+            # Пересчитываем все зависимые пути и имена на основе нового файла
+            group_analysis_dir = self.current_group_json_path.parent
+            group_output_dir = group_analysis_dir.parent
+            group_session_dir = group_output_dir.parent
+            self.photo_session = group_analysis_dir.name.replace("Analysis_", "")
+            self.session_name = group_session_dir.name
+            
+            self.group_images_dir = group_analysis_dir / "JPG"
+            
+            self.setWindowTitle(self.mode_config["window_title_template"].format(self.photo_session))
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+            
+            logger.info(f"Успешно загружен файл: {group_json_path.name}")
+            logger.info(f"Папка с групповыми фото изменена на: {self.group_images_dir}")
+            
+            self._refresh_left_panel()
+        else:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить или обработать файл:\n{group_json_path}")
+
+
     def _center_on_screen(self):
         try:
             screen_geometry = self.screen().geometry()
@@ -128,7 +193,7 @@ class MainWindow(QWidget):
             logger.warning(f"Не удалось центрировать окно на экране: {e}")
 
     def init_ui(self):
-        self.setWindowTitle(self.mode_config["window_title"])
+        #self.setWindowTitle(self.mode_config["window_title"])
         self.setGeometry(0, 0, 1350, 900)
 
         main_layout = QVBoxLayout(self)
@@ -251,8 +316,21 @@ class MainWindow(QWidget):
         config_map = { 'face': {'mode_name': 'face'}, 'location': {'mode_name': 'location'} }
         return self.data_manager.get_files_for_cluster(config_map[self.mode], cluster_id)
 
-    def _get_image_path(self, filename: str) -> Path:
-        return self.flat_images_dir / filename
+
+    # --- НАЧАЛО НОВОГО МЕТОДА ---
+    def _get_image_path(self, filename: str, image_type: str) -> Path:
+        """
+        Возвращает полный путь к файлу изображения, используя корректную
+        директорию в зависимости от типа (портрет или группа).
+        """
+        if image_type == 'portrait':
+            return self.portrait_images_dir / filename
+        elif image_type == 'group' and self.group_images_dir:
+            return self.group_images_dir / filename
+        # Фоллбэк, если group_images_dir еще не задан или тип неизвестен
+        return self.portrait_images_dir / filename
+    # --- КОНЕЦ НОВОГО МЕТОДА ---
+
 
     def _find_file_globally(self, filename: str) -> Optional[Path]:
         file_stem = Path(filename).stem
@@ -303,11 +381,25 @@ class MainWindow(QWidget):
                 continue
 
             faces = clusters[label]
-            cluster_name = faces[0].effective_name if faces else f"Кластер {label}"
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
+            # В режиме 'matches' имя берется из кэша data_manager,
+            # который заполняется либо из portrait_faces, либо при перезагрузке.
+            if self.mode == 'matches':
+                cluster_name = self.data_manager._cluster_id_to_name_cache.get(label)
+                if not cluster_name and faces: # Если в кэше нет, берем из данных портрета
+                    cluster_name = faces[0].child_name
+                if not cluster_name: cluster_name = f"Кластер {label}" # Фоллбэк
+            else:
+                cluster_name = faces[0].effective_name if faces else f"Кластер {label}"
 
             preview_path = Path()
             if faces:
-                preview_path = self._get_image_path(faces[0].filename)
+                # Превью для левой панели ВСЕГДА берем из портретов
+                preview_path = self._get_image_path(faces[0].filename, 'portrait')
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+
+
 
             from _lib.editor_delegates import PREVIEW_SIZE
             pixmap = QPixmap(str(preview_path))
@@ -315,11 +407,17 @@ class MainWindow(QWidget):
                 pixmap = pixmap.scaled(PREVIEW_SIZE, PREVIEW_SIZE, Qt.AspectRatioMode.KeepAspectRatio)
 
             self.preview_pixmaps[label] = pixmap
+            
+            
 
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
             if self.mode == 'matches':
                 count = len(self.data_manager.get_group_matches_for_cluster(label))
             else:
                 count = len(self.data_manager.get_files_for_cluster(self.mode_config, label))
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+
 
             item_data = { "id": label, "name": cluster_name, "count": count,
                           "pixmap": pixmap, "is_changed": self.data_manager.is_cluster_changed(self.mode_config["mode_name"], label) }
@@ -397,12 +495,15 @@ class MainWindow(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, {"filename": item_data["filename"]})
             self.image_list_widget.addItem(item)
 
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
         if uncached_tasks:
+            image_type_for_gallery = 'group' if self.mode == 'matches' else 'portrait'
             full_tasks = [
-                {**task, "full_path": self._get_image_path(task["filename"])}
+                {**task, "full_path": self._get_image_path(task["filename"], image_type_for_gallery)}
                 for task in uncached_tasks
             ]
             self._start_file_reading(full_tasks)
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
     def _stop_file_reader_if_running(self):
         if hasattr(self, 'file_reader_thread') and self.file_reader_thread and self.file_reader_thread.isRunning():
@@ -546,41 +647,78 @@ class MainWindow(QWidget):
             logger.warning(f"Файл {current_filename} не найден в списке файлов для просмотра.")
             return
 
-        image_paths = [self._get_image_path(fname) for fname in all_filenames]
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
+        image_type_for_viewer = 'group' if self.mode == 'matches' else 'portrait'
+        image_paths = [self._get_image_path(fname, image_type_for_viewer) for fname in all_filenames]
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
         viewer = ImageViewer(image_paths, all_filenames, current_index, self)
         viewer.exec()
 
-    def show_cluster_context_menu(self, pos):
-        if self.mode == 'matches':
-            return
 
-        item = self.cluster_list_widget.itemAt(pos)
+# analize/cluster_editor/run_cluster_editor.py -> class MainWindow
+
+    def show_cluster_context_menu(self, pos):
+# --- НАЧАло ИЗМЕНЕНИЯ ---
         menu = QMenu(self)
 
-        create_action = menu.addAction("Создать кластер")
-        menu.addSeparator()
-        rename_action = menu.addAction("Переименовать")
-        delete_action = menu.addAction("Удалить кластер")
-
-        if not item:
-            rename_action.setEnabled(False)
-            delete_action.setEnabled(False)
+        if self.mode == 'matches':
+            load_action = menu.addAction("Загрузить групповые данные (info_group_faces.json)...")
+            load_action.triggered.connect(self._load_group_data_action)
         else:
-            cluster_data = item.data(Qt.ItemDataRole.UserRole)
-            is_empty = cluster_data.get("count", 0) == 0
-            is_special = cluster_data.get("id") in ["-1", "group"]
+            item = self.cluster_list_widget.itemAt(pos)
+            create_action = menu.addAction("Создать кластер")
+            menu.addSeparator()
+            rename_action = menu.addAction("Переименовать")
+            delete_action = menu.addAction("Удалить кластер")
 
-            rename_action.setEnabled(not is_special)
-            delete_action.setEnabled(is_empty and not is_special)
+            if not item:
+                rename_action.setEnabled(False)
+                delete_action.setEnabled(False)
+            else:
+                cluster_data = item.data(Qt.ItemDataRole.UserRole)
+                is_empty = cluster_data.get("count", 0) == 0
+                is_special = cluster_data.get("id") in ["-1", "group"]
 
-        action = menu.exec(self.cluster_list_widget.mapToGlobal(pos))
+                rename_action.setEnabled(not is_special)
+                delete_action.setEnabled(is_empty and not is_special)
 
-        if action == create_action:
-            self._create_cluster_action()
-        elif action == rename_action and item:
-            self._rename_cluster_action(item)
-        elif action == delete_action and item:
-            self._delete_cluster_action(item)
+            action = menu.exec(self.cluster_list_widget.mapToGlobal(pos))
+
+            if action == create_action:
+                self._create_cluster_action()
+            elif action == rename_action and item:
+                self._rename_cluster_action(item)
+            elif action == delete_action and item:
+                self._delete_cluster_action(item)
+            return  # Завершаем, чтобы не вызывать exec() еще раз ниже
+        
+        # Этот вызов сработает только для режима 'matches'
+        menu.exec(self.cluster_list_widget.mapToGlobal(pos))
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+
+
+    @Slot()
+    def _load_group_data_action(self):
+        """
+        Открывает диалог выбора 'info_group_faces.json' и инициирует
+        перезагрузку данных.
+        """
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
+        start_dir = str(self.data_dir)
+        filepath, _ = QFileDialog.getOpenFileName(
+            self,
+            "Выберите файл с данными групповых фото",
+            start_dir,
+            "JSON files (info_group_faces.json)"
+        )
+
+        if filepath:
+            self._load_and_process_group_data(Path(filepath))
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+
 
     @Slot(QListWidgetItem)
     def _rename_cluster_action(self, item: QListWidgetItem):
@@ -685,8 +823,23 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "Внимание", "Выберите портретный кластер для экспорта совпадений.")
 
 
+# analize/cluster_editor/run_cluster_editor.py -> class MainWindow
+
     def _start_export(self, cluster_ids: List[str]):
-        base_output_dir = self.data_dir.parent / self.session_name / f"Выбор_Фото_{self.photo_session}_{self.mode}"
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
+        # Всегда вычисляем путь экспорта на основе АКТУАЛЬНЫХ данных
+        if self.current_group_json_path:
+            group_analysis_dir = self.current_group_json_path.parent
+            group_output_dir = group_analysis_dir.parent
+            
+            # self.session_name уже актуален, так что используем его
+            base_output_dir = group_output_dir / self.session_name / f"Выбор_Фото_{self.photo_session}_{self.mode}"
+        else:
+            # Фоллбэк, если по какой-то причине групповой путь не задан
+            base_output_dir = self.data_dir.parent / self.session_name / f"Выбор_Фото_{self.photo_session}_{self.mode}"
+
+        logger.info(f"Экспорт будет выполнен в: {base_output_dir}")
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
         tasks = []
         for cid in cluster_ids:
@@ -696,6 +849,9 @@ class MainWindow(QWidget):
             disk_folder_name = cluster_data["name"]
             output_folder = base_output_dir / disk_folder_name
 
+            # Определяем, из какой папки брать изображения для экспорта
+            image_type_for_export = 'group' if self.mode == 'matches' else 'portrait'
+            
             if self.mode == 'matches':
                 filenames = self.data_manager.get_group_matches_for_cluster(cid)
             else:
@@ -703,7 +859,7 @@ class MainWindow(QWidget):
 
             for fname in filenames:
                 tasks.append({
-                    "source_path": self._get_image_path(fname),
+                    "source_path": self._get_image_path(fname, image_type_for_export),
                     "output_path": output_folder / Path(fname).name,
                     "child_name": cluster_data["name"].split('-', 1)[-1].strip()
                 })
@@ -734,6 +890,7 @@ class MainWindow(QWidget):
         self.export_thread.started.connect(self.export_worker.run)
         self.export_thread.start()
 
+
     @Slot(str)
     def _on_export_finished(self, message: str):
         self.status_progress_bar.reset(); self.status_progress_bar.setFormat("")
@@ -742,36 +899,72 @@ class MainWindow(QWidget):
             self.export_thread.quit(); self.export_thread.wait()
 
     def _perform_save(self) -> bool:
-        if not self.data_manager.save_data():
-            QMessageBox.critical(self, "Ошибка", "Не удалось сохранить JSON.")
-            return False
+            """
+            Выполняет сохранение данных JSON и, в режиме 'location',
+            обновляет переменную контекста PySM.
 
-        self._refresh_left_panel()
+            Returns:
+                bool: True в случае успеха, иначе False.
+            """
+            if not self.data_manager.save_data():
+                QMessageBox.critical(self, "Ошибка", "Не удалось сохранить JSON.")
+                return False
 
-        if self.mode == 'location' and IS_MANAGED_RUN:
-            location_names = self.data_manager.get_all_location_names()
-            additional_system_names = [
-                "additional_photo_A5", "additional_photo_A4", "main_portrait",
-                "additional_portrait_01", "additional_portrait_02",
-                "additional_portrait_03", "additional_portrait_04"
-            ]
-            combined_names = set(location_names)
-            combined_names.update(additional_system_names)
-            final_location_list = sorted(list(combined_names))
-            pysm_context.set("sys_location_name", final_location_list)
-            logger.info("Список имен локаций (с добавлением системных) сохранен в 'sys_location_name'.")
+            self._refresh_left_panel()
 
-        return True
+            # --- ИЗМЕНЕНИЕ: Обновлена логика сохранения в контекст ---
+            if self.mode == 'location' and IS_MANAGED_RUN:
+                # 1. Создаем словарь для локаций с файлами-представителями
+                location_previews: Dict[str, str] = {}
+                
+                # 2. Получаем актуальные кластеры
+                clusters = self.data_manager.get_clusters(self.mode_config)
+                
+                # 3. Заполняем словарь реальными данными
+                for cluster_id, faces in clusters.items():
+                    if faces:  # Убеждаемся, что кластер не пустой
+                        location_name = faces[0].effective_name
+                        first_filename = faces[0].filename
+                        if location_name and first_filename:
+                            location_previews[location_name] = Path(first_filename).name
+
+                # 4. Определяем список системных имен
+                additional_system_names = [
+                    "portrait_A6",
+                    "portrait_A5",
+                    "portrait_A4"
+                ]
+                
+                # 5. Добавляем системные имена с пустым значением, если их еще нет
+                for name in additional_system_names:
+                    if name not in location_previews:
+                        location_previews[name] = ""
+                
+                # 6. Сохраняем итоговый словарь в переменную контекста
+                pysm_context.set("sys_location_name", location_previews)
+                logger.info("Словарь 'имя локации: файл-представитель' сохранен в 'sys_location_name'.")
+
+            return True
 
     def _save_changes(self):
         if self.mode == 'matches':
-            output_path = self.data_dir / "matches_portrait_to_group.json"
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
+            if self.current_group_json_path:
+                output_path = self.current_group_json_path.parent / "matches_portrait_to_group.json"
+                logger.info(f"Файл совпадений будет сохранен в: {output_path.parent}")
+            else:
+                # Этот фоллбэк сработает, если в режиме matches изначально не было группового JSON
+                # и пользователь ничего не загрузил.
+                logger.warning("Путь к групповому JSON не определен. Сохранение в директорию по умолчанию.")
+                output_path = self.data_dir / "matches_portrait_to_group.json"
+
             success, message = self.data_manager.generate_and_save_matches_json(output_path)
             if success:
                 QMessageBox.information(self, "Успех", message)
             else:
                 QMessageBox.critical(self, "Ошибка", message)
             return
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
         if not self.data_manager.has_changes():
             QMessageBox.information(self, "Инфо", "Нет изменений для сохранения.")
@@ -813,59 +1006,81 @@ class MainWindow(QWidget):
                 QMessageBox.critical(self, "Ошибка", "Не удалось сохранить данные. Выход отменен.")
                 event.ignore()
 
-if __name__ == "__main__":
+
+def get_config() -> argparse.Namespace:
+    """
+    Определяет и парсит аргументы скрипта с помощью PySM ConfigResolver.
+    """
     parser = argparse.ArgumentParser(description="Редактор кластеров изображений.")
+    arg_prefix = "ce_"
+
+    parser.add_argument(
+        f"--{arg_prefix}portrait_json", type=str, default="",
+        help="Путь к файлу info_portrait_faces.json (эталонные данные)."
+    )
+    parser.add_argument(
+        f"--{arg_prefix}group_json", type=str, default="",
+        help="Путь к файлу info_group_faces.json (данные для анализа/по умолчанию)."
+    )
     parser.add_argument(
         "--mode", type=str, choices=["face", "location", "matches"], default="face",
-        help="Режим работы: 'face' (по лицам), 'location' (по локациям), 'matches' (совпадения)."
+        help="Режим работы: 'face', 'location' или 'matches'."
     )
-    args = parser.parse_args()
 
+    
+    return ConfigResolver(parser).resolve_all()
+
+
+
+if __name__ == "__main__":
+    cli_config = get_config()
+    arg_prefix = "ce_"
+    
     log_level = "INFO"
     if IS_MANAGED_RUN and pysm_context:
         log_level = pysm_context.get("sys_log_level", "INFO")
-
     logging.basicConfig(
         level=getattr(logging, log_level.upper(), logging.INFO),
         format="%(message)s", stream=sys.stdout
     )
 
-    if IS_MANAGED_RUN:
-        export_status = 0
-        pysm_context.set("var_jpg_move", export_status)
-
-    if not IS_MANAGED_RUN:
-        msg = "Критическая ошибка: Скрипт требует запуска из среды PySM."
-        logging.critical(msg)
-        if 'QApplication' in locals() and QApplication.instance():
-             QMessageBox.critical(None, "Ошибка запуска", msg)
-        else:
-            print(msg, file=sys.stderr)
-        sys.exit(1)
-
     app = QApplication.instance() or QApplication(sys.argv)
-    theme_api.apply_theme_to_app(app)
-
-    session_path_str = pysm_context.get("wf_session_path")
-    session_name = pysm_context.get("wf_session_name")
-    photo_session = pysm_context.get("wf_photo_session")
-
-    if not all([session_path_str, session_name, photo_session]):
-        QMessageBox.critical(None, "Ошибка контекста", "Не удалось получить необходимые переменные (wf_...) из контекста PySM.")
-        sys.exit(1)
+    if IS_MANAGED_RUN:
+        theme_api.apply_theme_to_app(app)
 
     try:
-        base_path = Path(session_path_str) / session_name
-        data_dir = base_path / "Output" / f"Analysis_{photo_session}"
-        images_dir = data_dir / "JPG"
+        portrait_json_str = getattr(cli_config, f"{arg_prefix}portrait_json")
+        group_json_str = getattr(cli_config, f"{arg_prefix}group_json")
 
-        if not data_dir.is_dir(): data_dir.mkdir(parents=True, exist_ok=True)
-        if not images_dir.is_dir(): images_dir.mkdir(parents=True, exist_ok=True)
+        if not portrait_json_str or not group_json_str:
+            raise ValueError("Пути к portrait_json и group_json должны быть указаны.")
 
-    except Exception as e:
-        QMessageBox.critical(None, "Ошибка путей", f"Не удалось инициализировать директории:\n{e}")
+        portrait_json_path = Path(portrait_json_str)
+        group_json_path = Path(group_json_str)
+
+        if not portrait_json_path.is_file():
+            raise FileNotFoundError(f"Файл с портретами не найден: {portrait_json_path}")
+        if not group_json_path.is_file():
+            raise FileNotFoundError(f"Файл с группами не найден: {group_json_path}")
+
+
+    except (ValueError, FileNotFoundError) as e:
+        msg = f"Ошибка проверки входных данных:\n{e}"
+        logger.critical(msg)
+        QMessageBox.critical(None, "Критическая ошибка", msg)
         sys.exit(1)
+    
+    try:
 
-    window = MainWindow(data_dir, images_dir, photo_session, session_name, args.mode)
-    window.show()
-    sys.exit(app.exec())
+        window = MainWindow(
+            portrait_json_path=portrait_json_path,
+            group_json_path=group_json_path,
+            mode=cli_config.mode
+        )
+
+        window.show()
+        sys.exit(app.exec())
+    except Exception as e:
+        logger.critical(f"Непредвиденная ошибка при запуске приложения: {e}", exc_info=True)
+        QMessageBox.critical(None, "Непредвиденная ошибка", f"Произошла критическая ошибка:\n{traceback.format_exc()}")
+        sys.exit(1)

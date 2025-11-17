@@ -637,39 +637,47 @@ class FileSelectorWindow(QMainWindow):
     """Главное окно приложения с графическим интерфейсом."""
 
     def __init__(self, config: Namespace):
-        """Инициализирует окно, пути, виджеты и обработчики."""
-        super().__init__()
-        self.config = config
-        self.final_status = 1
+            """Инициализирует окно, пути, виджеты и обработчики."""
+            super().__init__()
+            self.config = config
+            self.final_status = 1
 
-        session_paths = construct_session_paths()
-        self.source_dir = session_paths.get("source")
-        self.base_dest_dir = session_paths.get("dest")
-        self.final_dest_dir: Optional[pathlib.Path] = None
+            session_paths = construct_session_paths()
+            self.source_dir = session_paths.get("source")
+            self.base_dest_dir = session_paths.get("dest")
+            self.final_dest_dir: Optional[pathlib.Path] = None
 
-        context_paths = construct_context_paths()
-        self.info_faces_path = context_paths.get("info_faces_path")
-        self.log_file_path = context_paths.get("operations_log_path")
+            context_paths = construct_context_paths()
+            self.info_faces_path = context_paths.get("info_faces_path")
+            self.log_file_path = context_paths.get("operations_log_path")
 
-        self.operations_log = read_operations_log(self.log_file_path)
-        self.session_presets = []
-        if IS_MANAGED_RUN and pysm_context:
-            presets = pysm_context.get("sys_location_name", [])
-            if isinstance(presets, list):
-                self.session_presets = presets
-            else:
-                logger.warning("Переменная контекста 'sys_location_name' не является списком.")
+            self.operations_log = read_operations_log(self.log_file_path)
+            self.session_presets = []
+            if IS_MANAGED_RUN and pysm_context:
+                # --- ИСПРАВЛЕНИЕ: Имя переменной приведено к единообразию ---
+                presets = pysm_context.get("sys_location_name", [])
+                
+                if isinstance(presets, dict):
+                    # Если это новый формат (словарь), извлекаем ключи
+                    self.session_presets = list(presets.keys())
+                    logger.info(f"Загружено {len(self.session_presets)} пресетов локаций из словаря.")
+                elif isinstance(presets, list):
+                    # Оставляем обработку старого формата (списка) для обратной совместимости
+                    self.session_presets = presets
+                    logger.info(f"Загружено {len(self.session_presets)} пресетов локаций из списка.")
+                else:
+                    logger.warning("Переменная контекста 'sys_location_name' имеет неожиданный тип.")
 
-        self._load_theme_colors()
-        self._load_icons()
-        self._init_ui()
-        self._init_worker()
+            self._load_theme_colors()
+            self._load_icons()
+            self._init_ui()
+            self._init_worker()
 
-        if IS_MANAGED_RUN and (not self.source_dir or not self.base_dest_dir):
-            QMessageBox.critical(
-                self, "Критическая ошибка", "Не удалось сформировать пути для сессии..."
-            )
-            self._set_ui_busy(True, "Ошибка: пути сессии не сформированы.")
+            if IS_MANAGED_RUN and (not self.source_dir or not self.base_dest_dir):
+                QMessageBox.critical(
+                    self, "Критическая ошибка", "Не удалось сформировать пути для сессии..."
+                )
+                self._set_ui_busy(True, "Ошибка: пути сессии не сформированы.")
 
     def _load_theme_colors(self):
         """Загружает цвета из API тем с резервными значениями."""

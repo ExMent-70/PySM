@@ -180,7 +180,10 @@ QHeaderView::section {
 }
 QHeaderView::section:!last-of-type { border-right: 1px solid @borderColor; }
 
-QTableWidget { gridline-color: @borderColorGrid; }
+QTableWidget { 
+	gridline-color: @borderColorGrid; 
+}
+
 QTableWidget::item { padding: 2px; border: none; color: @textColor; }
 QTableWidget::item:selected { background-color: @accentColorSelection; color: @textColorOnAccent; }
 QTableWidget QWidget { background-color: transparent; padding: 0px; margin: 0px; }

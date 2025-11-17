@@ -13,9 +13,18 @@ from .data_models import ImageRecord, Face
 logger = logging.getLogger(__name__)
 
 class ClusterDataManager:
-    def __init__(self, portrait_json_path: Path, group_json_path: Path):
+    def __init__(self, portrait_json_path: Path, group_json_path: Optional[Path] = None):
+        """
+        Инициализирует менеджер данных.
+
+        Args:
+            portrait_json_path: Путь к JSON с данными о портретах (эталон).
+            group_json_path (Optional): Путь к JSON с данными о группах.
+                                        Необязателен для режима просмотра совпадений.
+        """
         self.portrait_json_path = portrait_json_path
         self.group_json_path = group_json_path
+
         self.records: Dict[str, ImageRecord] = {}
         self.newly_created_clusters: List[Dict] = []
         self._cluster_indices: Dict[str, Dict[str, List[str]]] = {
@@ -68,25 +77,89 @@ class ClusterDataManager:
         return any(record.is_changed for record in self.records.values())
 
     def load_data(self) -> tuple[bool, str]:
-        if not self.portrait_json_path.is_file() or not self.group_json_path.is_file():
-            return False, "Один или оба JSON-файла ('info_...') не найдены."
+# --- НАЧАЛО ИЗМЕНЕНИЯ ---
+        if not self.portrait_json_path.is_file():
+            return False, "Эталонный JSON-файл ('info_portrait_faces.json') не найден."
+        
         self.records.clear()
         try:
+            # Загрузка портретов обязательна всегда
             with open(self.portrait_json_path, 'r', encoding='utf-8') as f:
                 items = ijson.kvitems(f, '', use_float=True)
                 for filename, data in items:
                     self.records[filename] = ImageRecord.from_dict(filename, 'portrait', dict(data))
-            with open(self.group_json_path, 'r', encoding='utf-8') as f:
-                items = ijson.kvitems(f, '', use_float=True)
-                for filename, data in items:
-                    self.records[filename] = ImageRecord.from_dict(filename, 'group', dict(data))
+            
+            # Загрузка групп опциональна и зависит от наличия пути
+            if self.group_json_path and self.group_json_path.is_file():
+                with open(self.group_json_path, 'r', encoding='utf-8') as f:
+                    items = ijson.kvitems(f, '', use_float=True)
+                    for filename, data in items:
+                        self.records[filename] = ImageRecord.from_dict(filename, 'group', dict(data))
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
         except Exception as e:
             return False, f"Ошибка при потоковом чтении данных:\n\n{e}\n\n{traceback.format_exc()}"
         
         self._build_indices(after_load=True)
-        self._build_matches_index()
+        # В режиме 'matches' индекс будет построен позже, при загрузке файла.
+        # В других режимах он построится из 'info_group_faces.json'.
+        self._build_matches_index() 
         logger.info(f"Загружено {len(self.records)} записей об изображениях. Построены индексы.")
         return True, ""
+
+
+# analize/cluster_editor/_lib/data_manager.py -> class ClusterDataManager
+
+    # --- НАЧАЛО НОВОГО МЕТОДА ---
+    def reload_group_data(self, group_json_path: Path) -> bool:
+        """
+        Перезагружает данные о групповых фотографиях из нового источника.
+
+        Args:
+            group_json_path: Путь к новому файлу 'info_group_faces.json'.
+
+        Returns:
+            True в случае успеха, иначе False.
+        """
+        if not group_json_path.is_file():
+            logger.error(f"Файл групповых данных не найден: {group_json_path}")
+            return False
+
+        # Шаг 1: Удаляем все старые записи, относящиеся к группам
+        filenames_to_delete = [
+            fname for fname, record in self.records.items() 
+            if record.original_image_type == 'group'
+        ]
+        for fname in filenames_to_delete:
+            del self.records[fname]
+        
+        logger.debug(f"Удалено {len(filenames_to_delete)} старых записей о групповых фото.")
+
+        # Шаг 2: Загружаем новые данные из указанного файла
+        try:
+            with open(group_json_path, 'r', encoding='utf-8') as f:
+                items = ijson.kvitems(f, '', use_float=True)
+                new_records_count = 0
+                for filename, data in items:
+                    self.records[filename] = ImageRecord.from_dict(filename, 'group', dict(data))
+                    new_records_count += 1
+            
+            logger.info(f"Загружено {new_records_count} новых записей о групповых фото.")
+
+        except Exception as e:
+            logger.error(f"Ошибка при чтении нового файла групповых данных: {e}")
+            # В случае ошибки, лучше полностью очистить записи, чтобы избежать несоответствий
+            self.records.clear()
+            return False
+
+        # Шаг 3: Полностью перестраиваем все индексы
+        self._build_indices(after_load=True)
+        self._build_matches_index()
+        logger.info("Все внутренние индексы успешно перестроены.")
+        return True
+    # --- КОНЕЦ НОВОГО МЕТОДА ---
+
+
 
     def save_data(self) -> bool:
         try:

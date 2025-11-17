@@ -62,9 +62,16 @@ def get_config():
     )
 
     if IS_MANAGED_RUN:
+        parser.add_argument(
+            "--dlg_path", 
+            type=str,
+            help="Расшифрованный путь к файлу или папке",
+            default=""
+        )
         resolver = ConfigResolver(parser)
         config = argparse.Namespace()
         config.dlg_open_var = resolver.get("dlg_open_var")
+        config.dlg_path = resolver.get(config.dlg_open_var)
         config.dlg_open_type = resolver.get("dlg_open_type")
         config.dlg_open_title = resolver.get("dlg_open_title")
         config.dlg_open_filter = resolver.get("dlg_open_filter")
@@ -86,7 +93,7 @@ def main():
     # Логика определения начальной директории
     initial_dir = ""
     if IS_MANAGED_RUN and pysm_context:
-        existing_path_str = pysm_context.get(config.dlg_open_var)
+        existing_path_str = config.dlg_path
         if existing_path_str and os.path.exists(existing_path_str):
             if os.path.isfile(existing_path_str):
                 initial_dir = os.path.dirname(existing_path_str)

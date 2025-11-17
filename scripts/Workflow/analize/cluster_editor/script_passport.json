@@ -1,12 +1,24 @@
 {
-  "description": "TODO\n1. Проверить как изменяется жанр фото: group_photo или portrait при перемещении фото из/в групповой клстер\n\nИнтерактивный GUI-редактор для визуальной проверки и исправления результатов кластеризации.\n<br><b>Поддерживаемые режимы:</b>\n<br> • <b>face</b>: редактирование кластеров лиц.\n<br> • <b>location</b>: редактирование кластеров локаций.\n<br> • <b>matches</b>: просмотр совпадений (групповые фото для каждого портретного кластера).\n<div style=\" {theme.tooltip_instance_args_block}\">\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>base_dir} / Output / Analysis_{wf_photo_session}</i>\n<b>images_dir</b> = <i>{data_dir} / JPG</i>\n</div>",
+  "description": "Интерактивный GUI-редактор для визуальной проверки и исправления результатов кластеризации.\n<br><b>Поддерживаемые режимы:</b>\n<br> • <b>face</b>: редактирование кластеров лиц.\n<br> • <b>location</b>: редактирование кластеров локаций.\n<br> • <b>matches</b>: просмотр совпадений (групповые фото для каждого портретного кластера).\n\n<br><b>Важно:</b> Скрипт требует явного указания путей к файлам `info_portrait_faces.json` и `info_group_faces.json`. В режиме `matches` позволяет динамически загружать разные `info_group_faces.json` для анализа.",
   "category": "Утилиты",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.3.0",
+  "version": "3.1.0",
   "command_line_args_meta": {
+    "ce_portrait_json": {
+      "type": "file_path",
+      "description": "Путь к файлу info_portrait_faces.json, который будет использоваться как источник эталонных портретных кластеров.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json"
+    },
+    "ce_group_json": {
+      "type": "file_path",
+      "description": "Путь к файлу info_group_faces.json, который будет загружен по умолчанию для анализа.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json"
+    },
     "mode": {
       "type": "choice",
-      "description": "Определяет режим работы редактора: 'face' (редактирование кластеров лиц), 'location' (редактирование кластеров локаций) или 'matches' (просмотр совпадений).",
+      "description": "Определяет режим работы редактора.",
       "required": true,
       "default": "face",
       "choices": [
