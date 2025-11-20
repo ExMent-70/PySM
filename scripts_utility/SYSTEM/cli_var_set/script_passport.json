@@ -1,0 +1,45 @@
+{
+  "description": "Устанавливает значение переменной контекста напрямую через аргументы командной строки с возможностью валидации.",
+  "category": "Системные утилиты",
+  "author": "Ваше Имя (адаптация)",
+  "version": "2025.11.19",
+  "command_line_args_meta": {
+    "set_var_name": {
+      "type": "string",
+      "description": "Имя переменной контекста, в которую будет сохранено значение.",
+      "required": true,
+      "default": "user_var"
+    },
+    "set_var_value": {
+      "type": "string",
+      "description": "Текстовое значение, которое нужно сохранить.",
+      "required": true
+    },
+    "set_valid_type": {
+      "type": "choice",
+      "description": "Тип проверки для значения. Если проверка не пройдена, скрипт завершится с ошибкой.",
+      "required": true,
+      "default": "none",
+      "choices": [
+        "none",
+        "not_empty",
+        "filename_txt",
+        "integer",
+        "positive_integer",
+        "float",
+        "email",
+        "custom"
+      ]
+    },
+    "set_custom_regexp": {
+      "type": "string",
+      "description": "Ваш шаблон регулярного выражения (для типа 'custom').",
+      "required": false
+    },
+    "set_custom_regexp_desc": {
+      "type": "string_multiline",
+      "description": "Текст ошибки, выводимый в лог при неудачной валидации (для типа 'custom').",
+      "required": false
+    }
+  }
+}

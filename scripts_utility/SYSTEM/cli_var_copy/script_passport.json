@@ -1,0 +1,25 @@
+{
+  "description": "Копирует значение и тип одной переменной контекста в другую.",
+  "category": "Системные утилиты",
+  "author": "Ваше Имя (адаптация)",
+  "version": "2025.11.19",
+  "command_line_args_meta": {
+    "copy_source_var": {
+      "type": "string",
+      "description": "Имя исходной переменной, значение которой нужно скопировать.",
+      "required": true,
+      "default": ""
+    },
+    "copy_target_var": {
+      "type": "string",
+      "description": "Имя целевой переменной, в которую будет записан результат.",
+      "required": true,
+      "default": ""
+    },
+    "copy_fail_if_missing": {
+      "type": "bool",
+      "description": "Если включено, скрипт завершится с ошибкой, если исходная переменная не найдена.",
+      "required": false
+    }
+  }
+}

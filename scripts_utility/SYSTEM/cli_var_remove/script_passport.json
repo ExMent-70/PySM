@@ -1,0 +1,19 @@
+{
+  "description": "Удаляет указанную переменную из контекста.",
+  "category": "Системные утилиты",
+  "author": "Ваше Имя (адаптация)",
+  "version": "2025.11.19",
+  "command_line_args_meta": {
+    "remove_var_name": {
+      "type": "string",
+      "description": "Имя переменной для удаления. Введите значение 'all' (без кавычек) для удаления ВСЕХ переменных.",
+      "required": true,
+      "default": ""
+    },
+    "remove_fail_if_missing": {
+      "type": "bool",
+      "description": "Если включено, скрипт завершится с ошибкой, если переменная не найдена.",
+      "required": false
+    }
+  }
+}
