@@ -457,7 +457,7 @@
     "file_dialog": {
       "export_set_title": "Export Set As...",
       "import_set_title": "Import Set From...",
-      "snippet_filter": "Snippet files (*.snip);;All files (*)"
+      "snippet_filter": "Script Set files (*.set);;All files (*)"
     },	
     "path_update": {
       "log_info": {

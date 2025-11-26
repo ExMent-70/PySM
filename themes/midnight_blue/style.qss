@@ -78,12 +78,15 @@ QDialogButtonBox QPushButton { padding: 6px 20px; }
 QToolBar {
     background-color: @bgColorBase;
     border-bottom: 1px solid @borderColor;
-    padding: 2px; spacing: 5px;
+    padding: 2px; 
+    spacing: 5px;
 }
+
 QToolBar QToolButton {
     background-color: transparent; border: 1px solid transparent; padding: 5px;
     border-radius: 5px; margin: 2px;
 }
+
 QToolBar QToolButton:hover {
     background-color: @bgColorHover;
     border: 1px solid @borderColor;
@@ -108,8 +111,9 @@ QToolBar QToolButton::menu-arrow:open { border-top: none; border-bottom: 2px sol
 QLineEdit, QTextEdit, QPlainTextEdit {
     background-color: @bgColorContainer;
     border: 1px solid @borderColor;
-    border-radius: 5px; padding: 4px;
-}
+    border-radius: 5px; 
+    padding: 4px;}
+
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
     border: 1px solid @accentColor;
 }
@@ -126,13 +130,15 @@ QPlainTextEdit:disabled, QPlainTextEdit:read-only {
 QGroupBox {
     background-color: @bgColorContainer;
     border: 1px solid @borderColor;
-    border-radius: 6px; margin-top: 15px;
+    border-radius: 6px; 
+    margin-top: 15px;
 }
 QGroupBox[isDirty="true"] { border: 2px solid @borderColorDirty; }
 QGroupBox[isDirty="true"]::title { color: @borderColorDirty; }
 QGroupBox::title {
     subcontrol-origin: margin; subcontrol-position: top center;
-    padding: 0 5px; top: 5px; color: @textColorGroupBoxTitle;
+    padding: 0 5px; top: 5px; 
+    color: @textColorGroupBoxTitle;
 }
 
 QTabWidget::pane {
@@ -141,24 +147,35 @@ QTabWidget::pane {
     border-radius: 6px; margin-top: -1px;
 }
 QTabBar::tab {
-    background: @bgColorBase; color: @textColor;
-    border: 1px solid @borderColor; border-bottom: none;
+    background: @bgColorBase; 
+    color: @textColor;
+    border: 1px solid @borderColor; 
+    border-bottom: none;
     padding: 7px 15px;
     border-top-left-radius: 5px; border-top-right-radius: 5px;
 }
 QTabBar::tab:selected {
-    background: @bgColorContainer; font-weight: bold; margin-bottom: -1px;
+    background: @bgColorContainer; 
     color: @textColorSecondary;
+    font-weight: bold; 
+    margin-bottom: -1px;
 }
-QTabBar::tab:!selected:hover { background: @bgColorHover; }
+QTabBar::tab:!selected:hover {
+	background: @bgColorHover;
+}
 
 QToolBox::tab {
-    background: @bgColorHover; border: 1px solid @borderColor; border-radius: 5px;
-    color: @textColorSecondary; padding: 6px; font-weight: bold;
+    background: @bgColorHover; 
+    border: 1px solid @borderColor; 
+    border-radius: 5px;
+    color: @textColorSecondary; 
+    padding: 6px; font-weight: bold;
 }
 QToolBox::tab:selected, QToolBox::tab:hover {
-    background: @accentColor; color: @textColorOnAccent;
+    background: @accentColor; 
+    color: @textColorOnAccent;
 }
+
 QToolBox QWidget, QToolBox QTextEdit { background-color: @bgColorContainer; color: @textColor; border: none; }
 
 

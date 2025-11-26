@@ -71,12 +71,12 @@ class AppController(QObject):
         self.config_manager = config_manager_instance or ConfigManager()
 
         # Определяем и создаем директорию для сниппетов
-        self.snippets_dir = APPLICATION_ROOT_DIR / "script_collections" / "snippets"
+        self.snippets_dir = APPLICATION_ROOT_DIR / "script_collections" / "script_sets"
         try:
             self.snippets_dir.mkdir(parents=True, exist_ok=True)
         except OSError as e:
             logger.error(
-                f"Не удалось создать директорию для сниппетов '{self.snippets_dir}': {e}"
+                f"Не удалось создать директорию для наборов скриптов '{self.snippets_dir}': {e}"
             )
 
         # --- ИЗМЕНЕНИЕ: Инициализация ThemeManager ---

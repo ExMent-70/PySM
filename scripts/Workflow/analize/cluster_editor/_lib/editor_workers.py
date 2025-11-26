@@ -304,7 +304,8 @@ class ExportWorker(QObject):
                 
                 name_bbox = draw_main.textbbox((0, 0), child_name, font=font_main)
                 name_width, name_height = name_bbox[2] - name_bbox[0], name_bbox[3] - name_bbox[1]
-                name_pos = ((base_image.width - name_width) / 2, (base_image.height - name_height) / 2 - 20)
+                name_pos = ((base_image.width - name_width) / 2, (base_image.height - name_height) / 2 + 340)
+                #name_pos = ((base_image.width - name_width) / 2, (base_image.height - name_height) / 2 - 20)
                 draw_main.text(name_pos, child_name, font=font_main, fill="white", stroke_width=3, stroke_fill="black")
 
                 num_bbox = draw_main.textbbox((0, 0), file_number, font=font_main)

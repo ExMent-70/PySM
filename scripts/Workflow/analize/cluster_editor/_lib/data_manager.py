@@ -265,30 +265,46 @@ class ClusterDataManager:
     def get_all_location_names(self) -> List[str]:
         return sorted({r.location_name for r in self.records.values() if r.location_name})
 
+
     def generate_and_save_matches_json(self, output_path: Path) -> tuple[bool, str]:
         output_data = {}
+        
+        # Шаг 1: Получаем ПОЛНЫЙ список всех портретных кластеров (кроме служебных)
+        all_portrait_cluster_ids = [
+            cid for cid in self._cluster_indices['face'].keys() 
+            if cid not in ["-1", "group"]
+        ]
+        
         try:
-            sorted_cluster_ids = sorted(self.matches_index.keys(), key=int)
+            # Сортируем ID как числа, если это возможно, для красивого вывода
+            sorted_cluster_ids = sorted(all_portrait_cluster_ids, key=int)
         except ValueError:
-            sorted_cluster_ids = sorted(self.matches_index.keys())
+            sorted_cluster_ids = sorted(all_portrait_cluster_ids)
 
+        # Шаг 2: Итерируемся по ВСЕМ портретным кластерам
         for cluster_id in sorted_cluster_ids:
-            matches = self.matches_index.get(cluster_id)
-            if not matches: continue
+            # Получаем совпадения (может быть пустым списком)
+            matches = self.matches_index.get(cluster_id, [])
             
+            # Получаем имя кластера (логика остается прежней)
             child_name = self._cluster_id_to_name_cache.get(cluster_id)
             if not child_name:
                 files = self._cluster_indices['face'].get(cluster_id, [])
                 if files and self.records.get(files[0]) and self.records[files[0]].faces:
                     child_name = self.records[files[0]].faces[0].child_name
-            if not child_name: child_name = f"Кластер {cluster_id}"
+            if not child_name: 
+                child_name = f"Кластер {cluster_id}"
             
+            # Формируем список групповых фото. Если совпадений нет, он будет пустым.
             group_photos = [{"filename": fn, "min_distance": dist, "num_faces": 1} for fn, dist in matches]
+            
+            # Создаем запись в итоговом файле ВСЕГДА
             output_data[cluster_id] = {
                 "child_name": child_name.split('-', 1)[-1] if child_name.startswith("0") else child_name,
                 "group_photos": group_photos
             }
 
+        # Шаг 3: Сохраняем результат
         try:
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, 'w', encoding='utf-8') as f:

@@ -457,7 +457,7 @@
     "file_dialog": {
       "export_set_title": "Экспортировать набор как...",
       "import_set_title": "Импортировать набор из...",
-	  "snippet_filter": "Файлы сниппетов (*.snip);;Все файлы (*)"
+	  "snippet_filter": "Файлы наборов (*.set);;Все файлы (*)"
     },	
     "path_update": {
       "log_info": {

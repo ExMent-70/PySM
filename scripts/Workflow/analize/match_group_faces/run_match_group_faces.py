@@ -20,7 +20,7 @@ import logging
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Optional
 
 import numpy as np
 from scipy.spatial.distance import cdist
@@ -72,12 +72,13 @@ class GroupMatchingProcess:
             f"<b>{self.match_threshold}</b>"
         )
 
+
     def run(
         self,
         p_embeds: np.ndarray,
         p_index: Dict[str, int],
-        g_embeds: np.ndarray,
-        g_index: Dict[str, int],
+        g_embeds: Optional[np.ndarray],
+        g_index: Optional[Dict[str, int]],
         manager: JsonDataManager,
         output_dir: Path,
     ) -> bool:
@@ -102,14 +103,16 @@ class GroupMatchingProcess:
         if not centroids:
             logger.warning(
                 "Не удалось вычислить центроиды (нет валидных кластеров). "
-                "Сопоставление отменено."
+                "Отчет будет содержать только имена кластеров."
             )
-            return True  # Штатная ситуация, не ошибка.
 
-        # Шаг 2: Сопоставление каждого группового лица с эталонами.
-        self._match_faces(g_embeds, g_index, centroids, cluster_to_name, manager)
+        # Шаг 2: Сопоставление, только если есть групповые данные.
+        if g_embeds is not None and g_index is not None and centroids:
+            self._match_faces(g_embeds, g_index, centroids, cluster_to_name, manager)
+        else:
+            logger.info("Групповые эмбеддинги отсутствуют, этап сопоставления пропущен.")
 
-        # Шаг 3: Формирование и сохранение итогового отчета.
+        # Шаг 3: Формирование и сохранение итогового отчета (выполняется всегда).
         self._save_match_report(manager, output_dir)
 
         logger.info("Сопоставление групповых лиц успешно завершено.")
@@ -215,11 +218,13 @@ class GroupMatchingProcess:
                 }
             manager.update_face(filename, face_idx, update_data, data_type="group")
 
+
     def _save_match_report(self, manager: JsonDataManager, output_dir: Path):
         """
         Формирует и сохраняет сводный JSON-отчет о результатах сопоставления.
 
         Отчет имеет структуру: {id_кластера: {child_name, group_photos: [...]}}.
+        Включает все портретные кластеры, даже если для них нет совпадений.
 
         Args:
             manager: Менеджер JSON с обновленными данными.
@@ -254,13 +259,15 @@ class GroupMatchingProcess:
                 for fname, dists in data["group_photos"].items()
                 if dists
             ]
-            if photos_list:
-                final_report[label] = {
-                    "child_name": data["child_name"],
-                    "group_photos": sorted(
-                        photos_list, key=lambda x: x.get("min_distance") or float("inf")
-                    ),
-                }
+            
+            # Запись для кластера создается всегда.
+            # Если совпадений нет, 'group_photos' будет пустым списком.
+            final_report[label] = {
+                "child_name": data["child_name"],
+                "group_photos": sorted(
+                    photos_list, key=lambda x: x.get("min_distance") or float("inf")
+                ),
+            }
 
         output_path = output_dir / "matches_portrait_to_group.json"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -348,9 +355,11 @@ def main():
         if p_embeds is None or p_index is None:
             logger.error(f"Эталонные эмбеддинги не найдены в {portrait_embeddings_dir}.")
             sys.exit(1)
+        
+        # Убираем прерывание выполнения, если групповых эмбеддингов нет
         if g_embeds is None or g_index is None:
-            logger.warning(f"Групповые эмбеддинги не найдены в {group_embeddings_dir}.")
-            sys.exit(0)
+            logger.warning(f"Групповые эмбеддинги не найдены в {group_embeddings_dir}. Сопоставление не будет производиться.")
+            # Скрипт продолжит выполнение, g_embeds и g_index будут None
 
         json_manager = JsonDataManager(
             portrait_json_path=portrait_json_path, group_json_path=group_json_path

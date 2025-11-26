@@ -95,6 +95,7 @@ QToolBar {
     padding: 2px;
     spacing: 5px;
 }
+
 QToolBar QToolButton {
     background-color: transparent; border: 1px solid transparent; padding: 5px;
     border-radius: 5px; margin: 2px;
@@ -128,6 +129,7 @@ QLineEdit, QTextEdit, QPlainTextEdit {
     border-radius: 5px;
     padding: 4px;
 }
+
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {
     border: 1px solid @accentColor;
 }
