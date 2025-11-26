@@ -1099,8 +1099,8 @@ class AppController(QObject):
             return
 
         # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
-        # Используем новое расширение .snip и новую директорию по умолчанию
-        suggested_filename = f"{set_node.name}.snip"
+        # Используем новое расширение .set и новую директорию по умолчанию
+        suggested_filename = f"{set_node.name}.set"
         start_dir = self.snippets_dir
 
         file_path, _ = QFileDialog.getSaveFileName(
