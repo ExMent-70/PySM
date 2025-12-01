@@ -941,7 +941,8 @@ class MainWindow(QWidget):
                         location_previews[name] = ""
                 
                 # 6. Сохраняем итоговый словарь в переменную контекста
-                pysm_context.set("sys_location_name", location_previews)
+                current_location_name = "sys_location_name_"+self.photo_session
+                pysm_context.set(current_location_name, location_previews)
                 logger.info("Словарь 'имя локации: файл-представитель' сохранен в 'sys_location_name'.")
 
             return True

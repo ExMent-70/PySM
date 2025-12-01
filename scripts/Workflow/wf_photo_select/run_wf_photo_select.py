@@ -14,7 +14,7 @@
 3.  Используя внешний JSON-файл ('info_portrait_faces.json'), сопоставляет
     номера фотографий с именами людей.
 4.  Позволяет пользователю выбрать имя "сессии копирования" из списка,
-    предоставленного переменной контекста 'sys_location_name'.
+    предоставленного переменной контекста 'sys_location_name_{wf_photo_session}'.
 5.  Копирует или перемещает найденные файлы в целевую папку, создавая
     подпапку с именем сессии и переименовывая файлы по шаблону
     '<Имя Человека>-<Номер>.<расширение>'.
@@ -655,7 +655,11 @@ class FileSelectorWindow(QMainWindow):
             self.session_presets = []
             if IS_MANAGED_RUN and pysm_context:
                 # --- ИСПРАВЛЕНИЕ: Имя переменной приведено к единообразию ---
-                presets = pysm_context.get("sys_location_name", [])
+                photo_session = pysm_context.get("wf_photo_session","")
+                current_location_name = "sys_location_name"
+                if photo_session != "":                       
+                    current_location_name = "sys_location_name"+"_"+photo_session
+                presets = pysm_context.get(current_location_name, [])
                 
                 if isinstance(presets, dict):
                     # Если это новый формат (словарь), извлекаем ключи
