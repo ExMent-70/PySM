@@ -28,3 +28,6 @@ table_status_not_found = "color: #ffffff; background-color: #c0392b;"
 tooltip_arg_value = "color: #0078d7;"
 tooltip_instance_args_block = "background-color: #e8f5e9; padding: 5px; border-radius: 5px; border: 1px solid #d0e8d2;"
 tooltip_script_args_block = "background-color: #e5f1fb; padding: 5px; border-radius: 5px; border: 1px solid #d0e0f0;"
+table_background_base = "color: #252526;"
+table_background_alternate = "color: #2d2d30;"
+

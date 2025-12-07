@@ -1,145 +1,191 @@
 <!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Список класса {{ class_name }}</title>
-    <style>
-        /* Стили для отображения в браузере */
-        body {
-            font-family: 'Times New Roman', Times, serif;
-            font-size: 14pt;
-            width: 210mm; /* Для примерного вида в браузере */
-            margin: auto;
-        }
-        .header, .footer {
-            margin-bottom: 5px;
-            text-align: center;
-
-        }
-        .class-name {
-            font-size: 16pt;
-            font-weight: bold;
-            text-align: center;
-            margin: 10px 0;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid black;
-        }
-        th, td {
-            border: 1px solid black;
-            padding: 5px;
-            text-align: left;
-            vertical-align: middle;
-        }
-        th {
-            background-color: #f2f2f2;
-            font-weight: bold;
-            text-align: center;
-        }
-        /* Центрирование для номеров и цены. Порядок не меняется, так как он соответствует визуальному порядку столбцов */
-        td:nth-child(1), td:nth-child(2), td:nth-child(5) {
-            text-align: center;
-        }
-        .total-row td {
-            font-weight: bold;
-        }
-        .signatures {
-            margin-top: 20px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .signer {
-            display: inline-block;
-            text-align: center;
-        }
-        .signer-name {
-             margin-right: 150px;
-        }
-        .signature-line {
-            border-bottom: 1px solid black;
-            width: 200px;
-            margin-top: 30px;
-        }
-        .signature-caption {
-            font-size: 10pt;
-        }
-
-        /* СТИЛИ СПЕЦИАЛЬНО ДЛЯ ПЕЧАТИ */
-        @media print {
-            @page {
-                size: A4;
-                margin: 15mm;
-            }
-
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <title>Список класса {{ class_name }}</title>
+        <style>
+            /* Стили для отображения в браузере */
             body {
-                margin: 0;
-                font-size: 12pt;
-                -webkit-print-color-adjust: exact; 
-                print-color-adjust: exact;
+                font-family: 'Times New Roman', Times, serif;
+                font-size: 14pt;
+                width: 210mm;
+                margin: auto;
+            }
+            .header, .footer {
+                margin-bottom: 5px;
+                text-align: center;
+            }
+            .class-name {
+                font-size: 16pt;
+                font-weight: bold;
+                text-align: center;
+                margin: 10px 0;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                border: 1px solid black;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 5px;
+                text-align: left;
+                vertical-align: middle;
+            }
+            th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+                text-align: center;
+            }
+            /* Центрирование узких столбцов */
+            td:nth-child(1), td:nth-child(2), td:nth-child(5) {
+                text-align: center;
+            }
+            .total-row td {
+                font-weight: bold;
+            }
+            .signatures {
+                margin-top: 20px;
+                display: flex;
+                justify-content: space-between;
+            }
+            .signer {
+                display: inline-block;
+                text-align: center;
+            }
+            .signer-name {
+                 margin-right: 150px;
+            }
+            .signature-line {
+                border-bottom: 1px solid black;
+                width: 200px;
+                margin-top: 30px;
+            }
+            .signature-caption {
+                font-size: 10pt;
             }
             
-            .no-print {
-                display: none;
+            /* --- Стили детализации заказа --- */
+            .main-service-price {
+                color: #444;
+                font-size: 0.95em;
             }
-        }
-    </style>
-</head>
-<body>
+            .extras-container {
+                margin-top: 4px;
+                font-size: 0.85em;
+                border-top: 1px dotted #999;
+                padding-top: 2px;
+            }
+            .extras-title {
+                font-style: italic;
+                color: #333;
+            }
+            .extras-item {
+                margin-left: 5px;
+            }
+            .extras-calc {
+                color: #444;
+            }
+            .extras-comment {
+                font-size: 0.9em;
+                color: #666;
+                font-style: italic;
+            }
 
-    <div class="header">
-        <p>Приложение №1 к договору №______-25/26 от «_____» __________ 202__ г.</p>
-        <p>Количество и вид заказываемой фотопродукции</p>
-    </div>
+            /* СТИЛИ СПЕЦИАЛЬНО ДЛЯ ПЕЧАТИ */
+            @media print {
+                @page {
+                    size: A4;
+                    margin: 15mm;
+                }
+                body {
+                    margin: 0;
+                    font-size: 12pt;
+                    -webkit-print-color-adjust: exact; 
+                    print-color-adjust: exact;
+                }
+                .no-print { display: none; }
+                tr { page-break-inside: avoid; }
+            }
+        </style>
+    </head>
+    <body>
 
-    <div class="class-name">{{ class_name }}</div>
-
-    <table>
-        <thead>
-            <!-- --- ИЗМЕНЕНИЕ 1: Меняем местами заголовки столбцов --- -->
-            <tr>
-                <th>№ съемки</th>
-                <th>№</th>
-                <th>Фамилия, имя</th>
-                <th>Вид фотопродукции</th>
-                <th>Цена (руб)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for student in students %}
-            <tr>
-                <!-- --- ИЗМЕНЕНИЕ 2: Меняем местами данные в ячейках --- -->
-                <td>{{ student.get('shoot_order', '') }}</td>
-                <td>{{ student.alpha_order }}</td>
-                <td>{{ student.surname }} {{ student.name }}</td>
-                <td>{{ student.service_type }}</td>
-                <td>{{ student.service_cost }}</td>
-            </tr>
-            {% endfor %}
-            <tr class="total-row">
-                <td colspan="4" style="text-align: right; border: none;">Итого</td>
-                <td style="text-align: center;">{{ total_cost }}</td>
-            </tr>
-        </tbody>
-    </table>
-    
-    <div class="footer">
-        <p>Стоимость аренды фотостудии _________________________________</p>
-    </div>
-
-    <div class="signatures">
-        <div class="signer">
-            ЗАКАЗЧИК
-            <div class="signature-line"></div>
-            <div class="signature-caption">(подпись)</div>
+        <div class="header">
+            <p>Приложение №1 к договору №______-25/26 от «_____» __________ 202__ г.</p>
+            <p>Количество и вид заказываемой фотопродукции</p>
         </div>
-        <div class="signer signer-name">
-             ИСПОЛНИТЕЛЬ
-            <div class="signature-line"></div>
-            <div class="signature-caption">(подпись)</div>
-        </div>
-    </div>
 
-</body>
-</html>
+        <div class="class-name">{{ class_name }}</div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 10%;">№ съемки</th>
+                    <th style="width: 5%;">№</th>
+                    <th style="width: 35%;">Фамилия, имя</th>
+                    <th style="width: 40%;">Вид фотопродукции</th>
+                    <th style="width: 10%;">Итого (руб)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.get('shoot_order', '') }}</td>
+                    <td>{{ student.alpha_order }}</td>
+                    <td><b>{{ student.surname }}</b> {{ student.name }}</td>
+                    <td>
+                        <!-- 1. Основная услуга -->
+                        <div>
+                            {{ student.service_type }} 
+                            <span class="main-service-price">({{ student.service_cost }} руб.)</span>
+                        </div>
+                        
+                        <!-- 2. Дополнительные услуги -->
+                        {% if student.extra_services %}
+                        <div class="extras-container">
+                            <span class="extras-title">Дополнительно:</span>
+                            {% for ex in student.extra_services %}
+                            <div class="extras-item">
+                                + {{ ex.name }} 
+                                <span class="extras-calc">
+                                    ({{ ex.qty }} шт. x {{ ex.cost }} = {{ ex.qty * ex.cost }} руб.)
+                                </span>
+                                {% if ex.comment %}
+                                <span class="extras-comment">({{ ex.comment }})</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <!-- 3. Итоговая сумма по строке -->
+                    <td>{{ student.row_total }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td colspan="4" style="text-align: right; border: none;">Итого к оплате:</td>
+                    <td style="text-align: center;">{{ total_cost }}</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="footer">
+            <p>Стоимость аренды фотостудии _________________________________</p>
+        </div>
+
+        <div class="signatures">
+            <div class="signer">
+                ЗАКАЗЧИК
+                <div class="signature-line"></div>
+                <div class="signature-caption">(подпись)</div>
+            </div>
+            <div class="signer signer-name">
+                 ИСПОЛНИТЕЛЬ
+                <div class="signature-line"></div>
+                <div class="signature-caption">(подпись)</div>
+            </div>
+        </div>
+
+    </body>
+    </html>

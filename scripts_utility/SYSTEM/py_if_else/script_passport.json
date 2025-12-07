@@ -1,8 +1,8 @@
 {
   "description": "Скрипт управляет  потоком выполнения в наборах PyScriptManager. Он работает как логический шлюз: проверяет условие и, в зависимости от результата, направляет выполнение по одной из двух веток (\"Then\" или \"Else\").",
   "category": "Управление потоком",
-  "author": "AI Assistant",
-  "version": "1.1.0",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2025.11.11",
   "command_line_args_meta": {
     "if-variable-name": {
       "type": "string",

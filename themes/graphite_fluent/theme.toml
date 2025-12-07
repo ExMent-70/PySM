@@ -27,3 +27,6 @@ table_status_not_found = "color: #c0392b; background-color: #c0392b;"
 tooltip_arg_value = "color: #00C7BD;"
 tooltip_instance_args_block = "background-color: rgba(0, 162, 154, 0.1); border-left: 3px solid #00A29A; padding: 5px;"
 tooltip_script_args_block = "background-color: rgba(74, 74, 74, 0.2); border-left: 3px solid #4A4A4A; padding: 5px;"
+table_background_base = "color: #202020;"
+table_background_alternate = "color: #2D2D2D;"
+

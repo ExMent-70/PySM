@@ -24,6 +24,7 @@ pynvml
 pypiwin32
 pymorphy3
 PySide6
+pycryptodome
 rawpy
 regex
 safetensors

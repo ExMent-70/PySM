@@ -37,28 +37,32 @@ except ImportError:
     pymorphy3 = None
 
 try: 
-    from ipymarkup.palette import Palette, Color, material, Rgb
-    from ipymarkup.span import format_span_box_markup
+    from ipymarkup.palette import Palette, Color, Rgb
 except ImportError: 
-    format_span_box_markup, Palette, Color, material, Rgb = None, None, None, None, None
+    Palette, Color, Rgb = None, None, None
 
 try: 
     from pysm_lib import pysm_context 
     from pysm_lib import theme_api
     from pysm_lib.pysm_context import ConfigResolver 
+    from pysm_lib.pysm_theme_api import format_ipymarkup_box, set_widget_class
     IS_MANAGED_RUN = True
 except ImportError: 
-    IS_MANAGED_RUN, pysm_context, ConfigResolver = False, None, None
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    IS_MANAGED_RUN, pysm_context, ConfigResolver, theme_api, format_ipymarkup_box, set_widget_class = False, None, None, None, None, None
+
+
+
 
 try:
     from PySide6.QtCore import (Qt, QAbstractTableModel, QModelIndex, QEvent, Signal, QUrl, QPoint, QTimer)
-    from PySide6.QtGui import (QAction, QKeySequence, QDesktopServices, QBrush, QColor)
+    from PySide6.QtGui import (QAction, QKeySequence, QDesktopServices, QBrush, QColor, QPalette)
     # --- НАЧАЛО ИЗМЕНЕНИЙ ---
     from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
                                    QSplitter, QLabel, QLineEdit, QTextEdit, QTableView, QPushButton, QHeaderView,
                                    QComboBox, QMenu, QStyle, QTabWidget, QTextBrowser, QStyledItemDelegate,
                                    QAbstractItemDelegate, QFileDialog, QMessageBox, QDialog, QTableWidget,
-                                   QTableWidgetItem, QDialogButtonBox)
+                                   QTableWidgetItem, QDialogButtonBox, QSpinBox)
     # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 except ImportError: print("Ошибка: для работы этого скрипта требуется PySide6.", file=sys.stderr); sys.exit(1)
@@ -109,49 +113,49 @@ def simple_parse_text(text: str) -> List[Dict[str, Any]]:
 class SmartParser:
     def __init__(
         self,
-        surname_color: Optional[Color] = None,
-        name_color: Optional[Color] = None,
-        fio_color: Optional[Color] = None,
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Теперь принимаем простые HEX-строки
+        surname_style: Dict[str, str],
+        name_style: Dict[str, str],
+        fio_style: Dict[str, str],
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
     ):
         """
-        Инициализирует парсер, принимая готовые объекты цвета ipymarkup.
-
-        Args:
-            surname_color (Optional[Color]): Объект цвета для "Фамилии".
-            name_color (Optional[Color]): Объект цвета для "Имени".
-            fio_color (Optional[Color]): Объект цвета для "ФИО".
+        Инициализирует парсер, принимая словари со стилями.
         """
         self.morph, self.extractor, self.palette = None, None, None
         self.normalization_dict = {}
-        # Явные HEX-коды для надежной работы с Qt (могут быть использованы в будущем)
-        self.SURNAME_COLOR_HEX = "#e3f2fd"
-        self.NAME_COLOR_HEX = "#e8f5e9"
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Извлекаем HEX-коды из словарей, предоставляя fallback
+        self.SURNAME_COLOR_HEX = surname_style.get("background-color", "#e3f2fd")
+        self.NAME_COLOR_HEX = name_style.get("background-color", "#e8f5e9")
 
-        if Palette and Color and material:
-            # 1. Используем переданные цвета, если они есть.
-            # 2. Если цвета не переданы (None), создаем их по умолчанию (fallback).
-            final_surname_color = surname_color or Color(
-                "Фамилия",
-                background=material("Blue", "50"),
-                border=material("Blue", "100"),
-                text=material("Blue", "900"),
-            )
-            final_name_color = name_color or Color(
-                "Имя",
-                background=material("Green", "50"),
-                border=material("Green", "100"),
-                text=material("Green", "900"),
-            )
-            final_fio_color = fio_color or Color(
-                "ФИО",
-                background=material("Orange", "50"),
-                border=material("Orange", "100"),
-                text=material("Orange", "900"),
-            )
+        if Palette and Color and Rgb:
+            try:
+                # Создаем объекты цвета ipymarkup, оборачивая HEX-коды в Rgb()
+                final_surname_color = Color(
+                    "Фамилия",
+                    background=Rgb(self.SURNAME_COLOR_HEX),
+                    border=Rgb(surname_style.get("border-color", "#bbdefb")),
+                    text=Rgb(surname_style.get("color", "#0d47a1")),
+                )
+                final_name_color = Color(
+                    "Имя",
+                    background=Rgb(self.NAME_COLOR_HEX),
+                    border=Rgb(name_style.get("border-color", "#c8e6c9")),
+                    text=Rgb(name_style.get("color", "#1b5e20")),
+                )
+                final_fio_color = Color(
+                    "ФИО",
+                    background=Rgb(fio_style.get("background-color", "#fff3e0")),
+                    border=Rgb(fio_style.get("border-color", "#ffe0b2")),
+                    text=Rgb(fio_style.get("color", "#e65100")),
+                )
+                self.palette = Palette([final_surname_color, final_name_color, final_fio_color])
+            except (ValueError, TypeError) as e:
+                print(f"IPYMARKUP INIT ERROR: {e}", file=sys.stderr)
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
-            self.palette = Palette([final_surname_color, final_name_color, final_fio_color])
-
-        # Остальная логика инициализации остается без изменений
         if pymorphy3 and NamesExtractor:
             try:
                 self.morph = pymorphy3.MorphAnalyzer()
@@ -232,15 +236,24 @@ class SmartParser:
             except Exception:
                 spans.append((match.start, match.stop, "ФИО"))
 
+
         # ШАГ 2: Генерация HTML-разметки
         markup_html = ""
-        if format_span_box_markup and self.palette:
-            try: markup_html = "".join(format_span_box_markup(text, spans, palette=self.palette))
-            except Exception as e: print(f"IPYMARKUP ERROR: {e}")
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        if format_ipymarkup_box and self.palette:
+            try:
+                # Используем исправленную функцию из API
+                markup_html = format_ipymarkup_box(text, spans, palette=self.palette)
+            except Exception as e:
+                print(f"IPYMARKUP ERROR: {e}")
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+
         
-        # ШАГ 3: Парсинг HTML для извлечения цветов (надежный метод)
+        # ШАГ 3: Парсинг HTML для извлечения цветов
         if BeautifulSoup and markup_html:
             background_regex = re.compile(r"background:\s*([^;]+)")
+            color_regex = re.compile(r"color:\s*([^;]+)")
             soup = BeautifulSoup(markup_html, 'html.parser')
             all_color_spans = soup.find_all('span', style=background_regex)
             
@@ -249,17 +262,30 @@ class SmartParser:
                     span1 = all_color_spans[i * 2]
                     span2 = all_color_spans[i * 2 + 1]
 
-                    match1 = background_regex.search(span1.get('style', ''))
-                    color1 = match1.group(1).strip() if match1 else None
+                    style1 = span1.get('style', '')
+                    style2 = span2.get('style', '')
+
+                    # Извлекаем цвет фона
+                    match1_bg = background_regex.search(style1)
+                    color1_bg = match1_bg.group(1).strip() if match1_bg else None
+                    match2_bg = background_regex.search(style2)
+                    # --- НАЧАЛО ИЗМЕНЕНИЙ: Исправлена опечатка ---
+                    color2_bg = match2_bg.group(1).strip() if match2_bg else None
+                    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
                     
-                    match2 = background_regex.search(span2.get('style', ''))
-                    color2 = match2.group(1).strip() if match2 else None
-                    
-                    # Присваиваем цвета в том порядке, в котором они идут в HTML
-                    person_data['color1'] = color1
-                    person_data['color2'] = color2
+                    # Извлекаем цвет текста
+                    match1_fg = color_regex.search(style1)
+                    color1_fg = match1_fg.group(1).strip() if match1_fg else None
+                    match2_fg = color_regex.search(style2)
+                    color2_fg = match2_fg.group(1).strip() if match2_fg else None
+
+                    # Присваиваем цвета
+                    person_data['color1'] = color1_bg
+                    person_data['color1_fg'] = color1_fg
+                    person_data['color2'] = color2_bg
+                    person_data['color2_fg'] = color2_fg
             else:
-                print(f"ПРЕДУПРЕЖДЕНИЕ: Рассинхронизация парсера. Найдено людей: {len(parsed_data)}, цветных блоков: {len(all_color_spans)}. Раскраска отменена.")
+                print(f"ПРЕДУПРЕЖДЕНИЕ: Рассинхронизация парсера. Раскраска отменена.")
 
         return parsed_data, markup_html
 
@@ -267,17 +293,50 @@ class SmartParser:
 # ==============================================================================
 class StudentTableModel(QAbstractTableModel):
     row_focus_requested = Signal(int, int)
-    COL_SHOOT_ORDER, COL_ALPHA_ORDER, COL_SURNAME, COL_NAME, COL_SERVICE, COL_COST = range(6)
-    EDITABLE_COLUMNS = {COL_SHOOT_ORDER, COL_SURNAME, COL_NAME, COL_SERVICE, COL_COST}
-    SORTABLE_COLUMNS = {COL_SHOOT_ORDER, COL_SURNAME}
+
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    # Изменен порядок и состав колонок: добавлены COL_EXTRAS, COL_TOTAL. Удален явный COL_COST (теперь он часть логики)
+    COL_SHOOT_ORDER, COL_ALPHA_ORDER, COL_SURNAME, COL_NAME, COL_SERVICE, COL_EXTRAS, COL_TOTAL = range(7)
+    
+    # COL_TOTAL вычислимый, поэтому он не входит в EDITABLE_COLUMNS для прямого редактирования
+    EDITABLE_COLUMNS = {COL_SHOOT_ORDER, COL_SURNAME, COL_NAME, COL_SERVICE}
+    
+    # Добавляем возможность сортировки по Итого
+    SORTABLE_COLUMNS = {COL_SHOOT_ORDER, COL_SURNAME, COL_TOTAL}
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
     NAME_VALIDATION_PATTERN = re.compile(r"^[\p{L}\s-]+\Z", flags=re.UNICODE)
 
-    def __init__(self, data: List[Dict[str, Any]] = None, services: Dict[str, int] = None):
+    def __init__(self, data: List[Dict[str, Any]] = None, services: Dict[str, int] = None,
+                 surname_style: Dict[str, str] = None, name_style: Dict[str, str] = None,
+                 base_bg_color: QColor = None, alternate_bg_color: QColor = None):
         super().__init__()
         self._data = data or []
         self.services = services or {}
-        self._headers = ["№ съемки", "№ п/п", "Фамилия", "Имя", "Услуга", "Стоимость"]
-        self._brush_cache: Dict[str, QBrush] = {}
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Обновленные заголовки
+        self._headers = ["№ съемки", "№ п/п", "Фамилия", "Имя", "Услуга", "Доп.", "Итого"]
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+        surname_style = surname_style or {}
+        name_style = name_style or {}
+
+        # Сохраняем эталонные цвета фона для сравнения
+        self.SURNAME_BG_HEX = surname_style.get("background-color", "#e3f2fd")
+        self.NAME_BG_HEX = name_style.get("background-color", "#e8f5e9")
+
+        # Создаем готовые кисти для цвета текста
+        self.surname_fg_brush = QBrush(QColor(surname_style.get("color", "#0d47a1")))
+        self.name_fg_brush = QBrush(QColor(name_style.get("color", "#1b5e20")))
+
+        # Создаем кисти для ручной отрисовки "зебры"
+        self.base_bg_brush = QBrush(base_bg_color) if base_bg_color else QBrush()
+        self.alternate_bg_brush = QBrush(alternate_bg_color) if alternate_bg_color else QBrush()
+
+        # Кэш для кистей фона от парсера
+        self._bg_brush_cache: Dict[str, QBrush] = {}
+        
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int: return len(self._data)
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int: return len(self._headers)
@@ -285,64 +344,128 @@ class StudentTableModel(QAbstractTableModel):
         if role == Qt.DisplayRole and orientation == Qt.Horizontal: return self._headers[section]
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
-        if not index.isValid(): return None
-        row, col, d = index.row(), index.column(), self._data[index.row()]
-        if role in [Qt.DisplayRole, Qt.EditRole]:
-            return d.get(["shoot_order", "alpha_order", "surname", "name", "service_type", "service_cost"][col], "")
-        elif role == Qt.BackgroundRole:
-            color_hex = d.get("color1") if col == self.COL_SURNAME else d.get("color2") if col == self.COL_NAME else None
-            if color_hex:
-                if color_hex in self._brush_cache: return self._brush_cache[color_hex]
-                brush = QBrush(QColor(color_hex))
-                self._brush_cache[color_hex] = brush
-                return brush
-
-    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
-        if role != Qt.ItemDataRole.EditRole or not index.isValid():
-            return False
-
-        row, col, row_data = index.row(), index.column(), self._data[index.row()]
-        try:
-            if col == self.COL_SHOOT_ORDER:
-                if not str(value).strip():
-                    row_data["shoot_order"] = ""
+            if not index.isValid():
+                return None
+                
+            row, col, d = index.row(), index.column(), self._data[index.row()]
+            
+            if role in [Qt.DisplayRole, Qt.EditRole]:
+                # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+                if col == self.COL_SHOOT_ORDER: return d.get("shoot_order", "")
+                elif col == self.COL_ALPHA_ORDER: return d.get("alpha_order", "")
+                elif col == self.COL_SURNAME: return d.get("surname", "")
+                elif col == self.COL_NAME: return d.get("name", "")
+                elif col == self.COL_SERVICE: return d.get("service_type", "")
+                
+                # Новая логика для колонки "Доп. услуги" - показываем количество
+                elif col == self.COL_EXTRAS:
+                    extras = d.get("extra_services", [])
+                    return f"{len(extras)} шт." if extras else ""
+                
+                # Новая логика для колонки "Итого" - вычисляем на лету
+                elif col == self.COL_TOTAL:
+                    return str(self._calculate_total_cost(d))
+                # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+                return ""
+            
+            if role == Qt.BackgroundRole:
+                # Сначала проверяем, есть ли у нас специальный цвет от парсера
+                color_hex = d.get("color1") if col == self.COL_SURNAME else d.get("color2") if col == self.COL_NAME else None
+                
+                if color_hex:
+                    # Если есть - рисуем им
+                    if color_hex in self._bg_brush_cache:
+                        return self._bg_brush_cache[color_hex]
+                    brush = QBrush(QColor(color_hex))
+                    self._bg_brush_cache[color_hex] = brush
+                    return brush
                 else:
-                    new_val = int(value)
-                    if new_val <= 0:
-                        raise ValidationError("Номер съемки должен быть > 0.")
-                    if new_val > self.rowCount():
-                        raise ValidationError(f"Номер не может быть > {self.rowCount()}.")
-                    if any(
-                        i != row and s.get("shoot_order") == new_val
-                        for i, s in enumerate(self._data)
-                    ):
-                        raise ValidationError(f"Номер '{new_val}' уже используется.")
-                    row_data["shoot_order"] = new_val
-            elif col in [self.COL_SURNAME, self.COL_NAME]:
-                val_str = str(value).strip()
-                if not val_str or not self.NAME_VALIDATION_PATTERN.match(val_str):
-                    raise ValidationError("Поле должно содержать только буквы и дефис.")
-                row_data["surname" if col == self.COL_SURNAME else "name"] = val_str
-                # УДАЛЯЕМ вызов sort_and_refocus отсюда
-            elif col == self.COL_SERVICE:
-                if (cost := self.services.get(str(value))) is not None:
-                    row_data["service_type"], row_data["service_cost"] = str(value), cost
-                    self.dataChanged.emit(index, self.index(row, self.COL_COST), [role])
+                    # Если специального цвета нет - рисуем "зебру" вручную
+                    return self.alternate_bg_brush if row % 2 else self.base_bg_brush
+            
+            elif role == Qt.ForegroundRole:
+                # Сначала проверяем, есть ли специальный цвет текста от парсера
+                color_hex_fg = d.get("color1_fg") if col == self.COL_SURNAME else d.get("color2_fg") if col == self.COL_NAME else None
+                if color_hex_fg:
+                    # Если есть - рисуем им
+                    # (кэш для цвета текста не используется, т.к. их всего два)
+                    return QBrush(QColor(color_hex_fg))
+
+                # Если спец. цвета текста нет, то ничего не возвращаем (return None),
+                # чтобы Qt использовал цвет текста по умолчанию для темы
+                
+            return None
+
+        
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.ItemDataRole.EditRole) -> bool:
+            if role != Qt.ItemDataRole.EditRole or not index.isValid():
+                return False
+
+            row, col, row_data = index.row(), index.column(), self._data[index.row()]
+            try:
+                if col == self.COL_SHOOT_ORDER:
+                    if not str(value).strip():
+                        row_data["shoot_order"] = ""
+                    else:
+                        new_val = int(value)
+                        if new_val <= 0:
+                            raise ValidationError("Номер съемки должен быть > 0.")
+                        if new_val > self.rowCount():
+                            raise ValidationError(f"Номер не может быть > {self.rowCount()}.")
+                        if any(
+                            i != row and s.get("shoot_order") == new_val
+                            for i, s in enumerate(self._data)
+                        ):
+                            raise ValidationError(f"Номер '{new_val}' уже используется.")
+                        row_data["shoot_order"] = new_val
+                elif col in [self.COL_SURNAME, self.COL_NAME]:
+                    val_str = str(value).strip()
+                    if not val_str or not self.NAME_VALIDATION_PATTERN.match(val_str):
+                        raise ValidationError("Поле должно содержать только буквы и дефис.")
+                    row_data["surname" if col == self.COL_SURNAME else "name"] = val_str
+                    
+                elif col == self.COL_SERVICE:
+                    if (cost := self.services.get(str(value))) is not None:
+                        row_data["service_type"] = str(value)
+                        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+                        row_data["service_cost"] = cost
+                        # При изменении услуги должна перерисоваться колонка "Итого" (COL_TOTAL)
+                        # COL_COST (старый индекс) больше не существует как отдельная колонка
+                        self.dataChanged.emit(index, self.index(row, self.COL_TOTAL), [role])
+                        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+                    else:
+                        return False
+                
+                # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+                # Редактирование COL_COST удалено, так как это поле теперь вычисляемое
+                # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
                 else:
                     return False
-            elif col == self.COL_COST:
-                new_cost = int(value)
-                if new_cost < 0:
-                    raise ValidationError("Стоимость не может быть < 0.")
-                row_data["service_cost"] = new_cost
-            else:
-                return False
-        except (ValueError, TypeError, ValidationError) as e:
-            raise ValidationError(str(e)) from e
+            except (ValueError, TypeError, ValidationError) as e:
+                raise ValidationError(str(e)) from e
 
-        self.dataChanged.emit(index, index, [role])
-        return True
+            self.dataChanged.emit(index, index, [role])
+            return True
 
+# --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    def _calculate_total_cost(self, row_data: Dict[str, Any]) -> int:
+        """Внутренний метод: Считает полную стоимость: база + допы."""
+        base = row_data.get("service_cost", 0)
+        extras = row_data.get("extra_services", [])
+        # extra_services - это список словарей вида {"cost": 100, "qty": 2, ...}
+        extra_sum = sum(item.get("cost", 0) * item.get("qty", 1) for item in extras)
+        return base + extra_sum
+
+    def update_extras(self, row: int, extras: List[Dict[str, Any]]):
+        """Обновляет список доп. услуг для строки и уведомляет таблицу."""
+        if 0 <= row < len(self._data):
+            self._data[row]["extra_services"] = extras
+            # Обновляем колонки "Доп" и "Итого", так как изменение допов влияет на обе
+            idx_extras = self.index(row, self.COL_EXTRAS)
+            idx_total = self.index(row, self.COL_TOTAL)
+            self.dataChanged.emit(idx_extras, idx_total, [Qt.DisplayRole])
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
   
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         flags = super().flags(index)
@@ -364,8 +487,14 @@ class StudentTableModel(QAbstractTableModel):
         if 0 <= row < len(self._data):
             d = self._data[row]
             d['name'], d['surname'] = d['surname'], d['name']
+            
+            # --- НАЧАЛО ИЗМЕНЕНИЙ: Меняем местами и фон, и цвет текста ---
             if 'color1' in d and 'color2' in d:
                 d['color1'], d['color2'] = d['color2'], d['color1']
+            if 'color1_fg' in d and 'color2_fg' in d:
+                d['color1_fg'], d['color2_fg'] = d['color2_fg'], d['color1_fg']
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+                
             self.dataChanged.emit(self.index(row, self.COL_SURNAME), self.index(row, self.COL_NAME))
             return True
         return False
@@ -387,17 +516,33 @@ class StudentTableModel(QAbstractTableModel):
 
     def update_data(self, data: List[Dict[str, Any]]):
         self.beginResetModel(); self._data = data; self.endResetModel()
+
     def get_all_data(self) -> List[Dict[str, Any]]: return self._data
+
     def insert_row(self, r: int, data: Dict[str, Any]):
         self.beginInsertRows(QModelIndex(), r, r); self._data.insert(r, data); self.endInsertRows()
+
     def remove_rows(self, rows: List[int]):
         for r in sorted(rows, reverse=True):
             if 0 <= r < len(self._data): self.beginRemoveRows(QModelIndex(), r, r); del self._data[r]; self.endRemoveRows()
+
     def _renumber_alpha_order_internal(self):
         for i, row in enumerate(self._data, 1): row["alpha_order"] = i
+
     def update_all_services(self, s_type: str, s_cost: int):
-        for row in self._data: row["service_type"], row["service_cost"] = s_type, s_cost
-        self.dataChanged.emit(self.index(0, self.COL_SERVICE), self.index(self.rowCount() - 1, self.COL_COST))
+            """Обновляет тип услуги и базовую стоимость для всех строк."""
+            for row in self._data:
+                row["service_type"], row["service_cost"] = s_type, s_cost
+                
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # Уведомляем таблицу, что изменились данные от колонки "Услуга" до колонки "Итого"
+            # (вместо удаленной COL_COST используем COL_TOTAL)
+            if self.rowCount() > 0:
+                self.dataChanged.emit(
+                    self.index(0, self.COL_SERVICE), 
+                    self.index(self.rowCount() - 1, self.COL_TOTAL)
+                )
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 # 5. БЛОК: Кастомный делегат
 # ==============================================================================
@@ -543,6 +688,164 @@ class ServicesEditorDialog(QDialog):
         return services
 
 
+class ExtraServicesDialog(QDialog):
+    """
+    Диалоговое окно для редактирования списка дополнительных услуг.
+    Использует обычные текстовые поля для ввода цены.
+    """
+    def __init__(self, current_extras: List[Dict[str, Any]], services_dict: Dict[str, int], parent: QWidget = None):
+        super().__init__(parent)
+        self.setWindowTitle("Дополнительные услуги")
+        self.setMinimumSize(600, 400)
+        
+        # Словарь {Название: Цена}
+        self.services_dict = services_dict or {}
+        self.available_services = list(self.services_dict.keys())
+        
+        try:
+            self.extras_data = json.loads(json.dumps(current_extras))
+        except Exception:
+            self.extras_data = []
+
+        self.layout = QVBoxLayout(self)
+        
+        # Таблица
+        self.table = QTableWidget()
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["Услуга", "Кол-во", "Цена (за шт.)", "Комментарий"])
+        
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed) # Фиксируем ширину цены
+        self.table.setColumnWidth(2, 100)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        
+        self.table.setAlternatingRowColors(True)
+        self.layout.addWidget(self.table)
+
+        # Панель кнопок
+        tb_layout = QHBoxLayout()
+        add_btn = QPushButton("Добавить услугу")
+        add_btn.clicked.connect(self._add_row)
+        del_btn = QPushButton("Удалить выделенные")
+        del_btn.clicked.connect(self._remove_row)
+        tb_layout.addWidget(add_btn); tb_layout.addWidget(del_btn); tb_layout.addStretch()
+        self.layout.addLayout(tb_layout)
+
+        # Кнопки диалога
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        self.button_box.button(QDialogButtonBox.StandardButton.Save).setText("Сохранить")
+        self.button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Отмена")
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        self.layout.addWidget(self.button_box)
+
+        self._populate_table()
+
+    def _populate_table(self):
+        self.table.setRowCount(0)
+        for item in self.extras_data:
+            self._add_row_ui(item)
+
+    def _add_row(self):
+        default_item = {"name": "", "qty": 1, "cost": 0, "comment": ""}
+        self._add_row_ui(default_item)
+
+    def _add_row_ui(self, item_data: Dict[str, Any]):
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+
+        # 1. Услуга (ComboBox)
+        combo = QComboBox()
+        combo.setEditable(True) 
+        combo.addItems(self.available_services)
+        combo.setCurrentText(str(item_data.get("name", "")))
+        self.table.setCellWidget(row, 0, combo)
+
+        # 2. Количество (SpinBox) - оставляем, так как удобно для счетчика
+        sb_qty = QSpinBox()
+        sb_qty.setRange(1, 999)
+        sb_qty.setValue(int(item_data.get("qty", 1)))
+        self.table.setCellWidget(row, 1, sb_qty)
+
+        # 3. Цена (QLineEdit) - ИЗМЕНЕНИЕ: Обычное поле ввода вместо SpinBox
+        le_cost = QLineEdit()
+        le_cost.setText(str(item_data.get("cost", 0)))
+        # Можно добавить Placeholder
+        le_cost.setPlaceholderText("0")
+        self.table.setCellWidget(row, 2, le_cost)
+
+        # 4. Комментарий (LineEdit)
+        le_comment = QLineEdit(str(item_data.get("comment", "")))
+        self.table.setCellWidget(row, 3, le_comment)
+        
+        # Подключаем сигнал изменения текста в комбобоксе
+        combo.currentTextChanged.connect(self._on_service_changed)
+
+    def _on_service_changed(self, text: str):
+        """
+        Обработчик изменения названия услуги.
+        Ищет QLineEdit цены в той же строке и обновляет его текст.
+        """
+        sender_widget = self.sender()
+        if not isinstance(sender_widget, QComboBox):
+            return
+
+        # Ищем строку
+        target_row = -1
+        for r in range(self.table.rowCount()):
+            if self.table.cellWidget(r, 0) == sender_widget:
+                target_row = r
+                break
+        
+        if target_row == -1:
+            return
+
+        service_name = text.strip()
+        
+        # Если имя есть в нашем справочнике - обновляем цену
+        if service_name in self.services_dict:
+            price = self.services_dict[service_name]
+            
+            # Получаем виджет цены (теперь это QLineEdit)
+            le_cost = self.table.cellWidget(target_row, 2)
+            if isinstance(le_cost, QLineEdit):
+                le_cost.setText(str(price))
+
+    def _remove_row(self):
+        curr = self.table.currentRow()
+        if curr >= 0: self.table.removeRow(curr)
+
+    def get_data(self) -> List[Dict[str, Any]]:
+        """
+        Сбор данных. Преобразуем текст из QLineEdit цены в число.
+        """
+        result = []
+        for r in range(self.table.rowCount()):
+            combo = self.table.cellWidget(r, 0)
+            sb_qty = self.table.cellWidget(r, 1)
+            le_cost = self.table.cellWidget(r, 2) # Это теперь QLineEdit
+            le_comment = self.table.cellWidget(r, 3)
+            
+            if combo and sb_qty and le_cost:
+                name = combo.currentText().strip()
+                if not name: continue
+                
+                # Безопасное преобразование цены
+                try:
+                    cost_val = int(le_cost.text().strip())
+                except ValueError:
+                    cost_val = 0
+
+                result.append({
+                    "name": name, 
+                    "qty": sb_qty.value(), 
+                    "cost": cost_val, 
+                    "comment": le_comment.text() if le_comment else ""
+                })
+        return result
+
 # 8. БЛОК: Диалог редактирования словаря имен
 # ==============================================================================
 class NamesEditorDialog(QDialog):
@@ -633,6 +936,8 @@ class NamesEditorDialog(QDialog):
         return names_dict
 
 
+
+
 # 6. БЛОК: Основное окно
 # ==============================================================================
 class ClassListEditor(QMainWindow):
@@ -653,12 +958,11 @@ class ClassListEditor(QMainWindow):
         self._load_services()
 
         # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        self._load_theme_colors() # Загружаем цвета
-        # Передаем цвета в конструктор SmartParser
+        self._load_theme_colors()
         self.smart_parser = SmartParser(
-            surname_color=self.surname_color,
-            name_color=self.name_color,
-            fio_color=self.fio_color,
+            surname_style=self.surname_style,
+            name_style=self.name_style,
+            fio_style=self.fio_style,
         )
         # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
@@ -666,48 +970,41 @@ class ClassListEditor(QMainWindow):
 
     # --- НАЧАЛО ИЗМЕНЕНИЙ ---
     def _load_theme_colors(self):
-        """Загружает цвета из API тем с резервными значениями."""
+        """Загружает цвета из API тем."""
         if IS_MANAGED_RUN and theme_api:
-            # Используем get_ipymarkup_color для получения готовых объектов
-            self.surname_color = theme_api.get_ipymarkup_color(
+            # Стили для ipymarkup
+            self.surname_style = theme_api.get_parsed_style(
                 "markup_surname",
-                defaults={
-                    "background-color": "#e3f2fd",
-                    "border-color": "#bbdefb",
-                    "color": "#0d47a1",
-                },
+                "background-color: #e3f2fd; border-color: #bbdefb; color: #0d47a1;",
             )
-            self.name_color = theme_api.get_ipymarkup_color(
+            self.name_style = theme_api.get_parsed_style(
                 "markup_name",
-                defaults={
-                    "background-color": "#e8f5e9",
-                    "border-color": "#c8e6c9",
-                    "color": "#1b5e20",
-                },
+                "background-color: #e8f5e9; border-color: #c8e6c9; color: #1b5e20;",
             )
-            self.fio_color = theme_api.get_ipymarkup_color(
+            self.fio_style = theme_api.get_parsed_style(
                 "markup_fio",
-                defaults={
-                    "background-color": "#fff3e0",
-                    "border-color": "#ffe0b2",
-                    "color": "#e65100",
-                },
+                "background-color: #fff3e0; border-color: #ffe0b2; color: #e65100;",
             )
-            # Присваиваем HEX-коды для совместимости с QColor, если нужно
-            self.SURNAME_COLOR_HEX = (
-                theme_api.get_parsed_style("markup_surname").get("background-color", "#e3f2fd")
+            
+            # --- НАЧАЛО ИЗМЕНЕНИЙ: Загружаем цвета для "зебры" ---
+            self.table_base_bg_color = theme_api.get_qcolor(
+                "table_background_base", "color", "#ffffff"
             )
-            self.NAME_COLOR_HEX = (
-                theme_api.get_parsed_style("markup_name").get("background-color", "#e8f5e9")
+            self.table_alternate_bg_color = theme_api.get_qcolor(
+                "table_background_alternate", "color", "#f6f6f6"
             )
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         else:
-            # Для автономного запуска цвета будут None, и сработает fallback
-            self.surname_color, self.name_color, self.fio_color = None, None, None
-            self.SURNAME_COLOR_HEX = "#e3f2fd"
-            self.NAME_COLOR_HEX = "#e8f5e9"
-    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
-
+            # Резервные значения для автономного запуска
+            self.surname_style = {"background-color": "#e3f2fd", "border-color": "#bbdefb", "color": "#0d47a1"}
+            self.name_style = {"background-color": "#e8f5e9", "border-color": "#c8e6c9", "color": "#1b5e20"}
+            self.fio_style = {"background-color": "#fff3e0", "border-color": "#ffe0b2", "color": "#e65100"}
+            
+            # --- НАЧАЛО ИЗМЕНЕНИЙ: Резервные QColor для "зебры" ---
+            self.table_base_bg_color = QColor("#ffffff")
+            self.table_alternate_bg_color = QColor("#f6f6f6")
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
     def _init_ui(self) -> None:
         """Инициализирует и компонует все виджеты интерфейса."""
@@ -723,39 +1020,7 @@ class ClassListEditor(QMainWindow):
 
         self._create_top_panel(main_layout)
         self._create_main_panels(main_layout)
-        self.left_tabs.setStyleSheet(
-            """
-            /* Стиль для неактивной вкладки */
-            QTabBar::tab:!selected {
-                background-color: #ffc300;
-                color: #000000;
-                border-bottom: none;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                padding: 6px 12px;
-                margin-right: 2px;
-            }
-
-            /* Стиль для неактивной вкладки при наведении */
-            QTabBar::tab:!selected:hover {
-                color: #ffffff;
-                font: bold;
-            }
-
-            /* Стиль для активной (выбранной) вкладки */
-            QTabBar::tab:selected {
-                background-color: #ffffff;
-                font: bold;                
-                border: 1px solid #c0c0c0;
-                border-bottom: 1px solid white; /* "Сливается" с фоном */
-                margin-bottom: -1px; /* Сдвиг для эффекта слияния */
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                padding: 6px 12px;
-            }
-
-            """
-        )        
+        
 
         self.statusBar().showMessage("Готово")
 
@@ -814,40 +1079,50 @@ class ClassListEditor(QMainWindow):
 
 
     def _create_actions(self) -> None:
-        """Создает QAction для повторного использования в меню и горячих клавишах."""
-        # --- ИЗМЕНЕНИЯ ЗДЕСЬ ---
-        # Мы будем добавлять текст шортката динамически, поэтому убираем его отсюда
-        self.add_row_action = QAction("Добавить строку", self)
-        self.add_row_action.triggered.connect(self._add_new_row)
+            """Создает QAction для повторного использования в меню и горячих клавишах."""
+            self.add_row_action = QAction("Добавить строку", self)
+            self.add_row_action.triggered.connect(self._add_new_row)
 
-        self.delete_rows_action = QAction("Удалить выделенные строки", self)
-        self.delete_rows_action.triggered.connect(self._delete_selected_rows)
+            self.delete_rows_action = QAction("Удалить выделенные строки", self)
+            self.delete_rows_action.triggered.connect(self._delete_selected_rows)
 
-        self.swap_names_action = QAction("Поменять Имя/Фамилию", self)
-        self.swap_names_action.triggered.connect(self._swap_current_row_names)
+            self.swap_names_action = QAction("Поменять Имя/Фамилию", self)
+            self.swap_names_action.triggered.connect(self._swap_current_row_names)
+
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            self.edit_extras_action = QAction("Редактировать доп. услуги", self)
+            self.edit_extras_action.triggered.connect(self._open_extra_services_editor)
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
     def keyPressEvent(self, event: QEvent) -> None:
-        """Перехватывает нажатия клавиш на уровне всего окна."""
-        if self.processed_table.hasFocus():
-            # Обработка Ctrl+N для добавления строки
-            if event.key() == Qt.Key.Key_N and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-                self._add_new_row()
-                event.accept()
-                return
+            """Перехватывает нажатия клавиш на уровне всего окна."""
+            if self.processed_table.hasFocus():
+                # Обработка Ctrl+N для добавления строки
+                if event.key() == Qt.Key.Key_N and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                    self._add_new_row()
+                    event.accept()
+                    return
 
-            # Обработка клавиши Delete
-            if event.key() == Qt.Key.Key_Delete:
-                self._delete_selected_rows()
-                event.accept()
-                return
-            
-            # Обработка сочетания Ctrl+T
-            if event.key() == Qt.Key.Key_T and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-                self._swap_current_row_names()
-                event.accept()
-                return
+                # Обработка клавиши Delete
+                if event.key() == Qt.Key.Key_Delete:
+                    self._delete_selected_rows()
+                    event.accept()
+                    return
+                
+                # Обработка сочетания Ctrl+T
+                if event.key() == Qt.Key.Key_T and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                    self._swap_current_row_names()
+                    event.accept()
+                    return
 
-        super().keyPressEvent(event)
+                # --- НАЧАЛО ИЗМЕНЕНИЙ: Используем Ctrl+E вместо Ctrl+A ---
+                if event.key() == Qt.Key.Key_E and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+                    self._open_extra_services_editor()
+                    event.accept()
+                    return
+                # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+            super().keyPressEvent(event)
 
 
 
@@ -1002,35 +1277,56 @@ class ClassListEditor(QMainWindow):
         markup_layout.addWidget(self.markup_browser)
         self.left_tabs.addTab(markup_tab, "Результат разбора")
         
+
     def _create_table_view(self, parent_layout: QVBoxLayout) -> None:
-        """Создает и настраивает таблицу для отображения списка."""
-        self.table_model = StudentTableModel(services=self.SERVICES)
-        self.table_model.dataChanged.connect(self._on_data_changed)
-        self.table_model.rowsInserted.connect(self._update_summary_info)
-        self.table_model.rowsRemoved.connect(self._update_summary_info)
-        self.table_model.row_focus_requested.connect(self._handle_row_focus_request_async)
-        
-        self.processed_table = QTableView()
-        self.processed_table.setModel(self.table_model)
-        self.processed_table.setAlternatingRowColors(True)
-        delegate = EnterKeyDelegate(self.processed_table, services=list(self.SERVICES.keys()))
-        self.processed_table.setItemDelegate(delegate)
-        self.processed_table.setSortingEnabled(True)
-        self.processed_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.processed_table.customContextMenuRequested.connect(self._show_table_context_menu)
-        
-        header = self.processed_table.horizontalHeader()
-        modes = {
-            StudentTableModel.COL_SHOOT_ORDER: QHeaderView.ResizeMode.ResizeToContents,
-            StudentTableModel.COL_ALPHA_ORDER: QHeaderView.ResizeMode.ResizeToContents,
-            StudentTableModel.COL_COST: QHeaderView.ResizeMode.ResizeToContents,
-            StudentTableModel.COL_SURNAME: QHeaderView.ResizeMode.Stretch,
-            StudentTableModel.COL_NAME: QHeaderView.ResizeMode.Stretch,
-            StudentTableModel.COL_SERVICE: QHeaderView.ResizeMode.Stretch,
-        }
-        for col, mode in modes.items():
-            header.setSectionResizeMode(col, mode)
-        parent_layout.addWidget(self.processed_table)
+            """Создает и настраивает таблицу для отображения списка."""
+            self.processed_table = QTableView()
+            self.processed_table.setAlternatingRowColors(False)
+
+            palette = self.processed_table.palette()
+            
+            self.table_model = StudentTableModel(
+                services=self.SERVICES,
+                surname_style=self.surname_style,
+                name_style=self.name_style,
+                base_bg_color=self.table_base_bg_color,
+                alternate_bg_color=self.table_alternate_bg_color
+            )
+            
+            self.table_model.dataChanged.connect(self._on_data_changed)
+            self.table_model.rowsInserted.connect(self._update_summary_info)
+            self.table_model.rowsRemoved.connect(self._update_summary_info)
+            self.table_model.row_focus_requested.connect(self._handle_row_focus_request_async)
+            
+            self.processed_table.setModel(self.table_model)
+            
+            delegate = EnterKeyDelegate(self.processed_table, services=list(self.SERVICES.keys()))
+            self.processed_table.setItemDelegate(delegate)
+            self.processed_table.setSortingEnabled(True)
+            self.processed_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.processed_table.customContextMenuRequested.connect(self._show_table_context_menu)
+            
+            header = self.processed_table.horizontalHeader()
+            
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            modes = {
+                StudentTableModel.COL_SHOOT_ORDER: QHeaderView.ResizeMode.ResizeToContents,
+                StudentTableModel.COL_ALPHA_ORDER: QHeaderView.ResizeMode.ResizeToContents,
+                # COL_COST заменен на COL_TOTAL
+                StudentTableModel.COL_TOTAL: QHeaderView.ResizeMode.ResizeToContents,
+                # Добавлена настройка для COL_EXTRAS
+                StudentTableModel.COL_EXTRAS: QHeaderView.ResizeMode.ResizeToContents,
+                StudentTableModel.COL_SURNAME: QHeaderView.ResizeMode.Stretch,
+                StudentTableModel.COL_NAME: QHeaderView.ResizeMode.Stretch,
+                StudentTableModel.COL_SERVICE: QHeaderView.ResizeMode.Stretch,
+            }
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+            
+            for col, mode in modes.items():
+                header.setSectionResizeMode(col, mode)
+                
+            parent_layout.addWidget(self.processed_table)
+
 
     def _create_summary_panel(self, parent_layout: QVBoxLayout) -> None:
         """Создает панель с итоговой информацией (количество, сумма)."""
@@ -1091,35 +1387,67 @@ class ClassListEditor(QMainWindow):
         self.statusBar().showMessage(f"Найдено: {len(students)}", 5000)
         self._is_dirty = True
 
-    def _show_table_context_menu(self, pos: QPoint) -> None:
-        menu = QMenu()
-        
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        # Формируем текст с "горячей клавишей" и устанавливаем его для QAction
-        # \t (табуляция) автоматически выровняет шорткат по правому краю
-        self.add_row_action.setText("Добавить строку\tCtrl+N")
-        menu.addAction(self.add_row_action)
-        
-        if self.processed_table.selectionModel().hasSelection():
-            menu.addSeparator()
 
-            current_row = self.processed_table.currentIndex().row()
-            # Устанавливаем основной текст
-            self.swap_names_action.setText(f"Поменять Имя/Фамилию (строка {current_row + 1})\tCtrl+T")
-            menu.addAction(self.swap_names_action)
+    def _show_table_context_menu(self, pos: QPoint) -> None:
+            menu = QMenu()
             
-            self.delete_rows_action.setText("Удалить выделенные строки\tDelete")
-            menu.addAction(self.delete_rows_action)
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+            self.add_row_action.setText("Добавить строку\tCtrl+N")
+            menu.addAction(self.add_row_action)
             
-        menu.exec(self.processed_table.viewport().mapToGlobal(pos))
+            if self.processed_table.selectionModel().hasSelection():
+                menu.addSeparator()
+
+                current_row = self.processed_table.currentIndex().row()
+                self.swap_names_action.setText(f"Поменять Имя/Фамилию (строка {current_row + 1})\tCtrl+T")
+                menu.addAction(self.swap_names_action)
+                
+                # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+                # Обновляем подсказку на Ctrl+E
+                self.edit_extras_action.setText("Редактировать доп. услуги...\tCtrl+E")
+                menu.addAction(self.edit_extras_action)
+                # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+                
+                self.delete_rows_action.setText("Удалить выделенные строки\tDelete")
+                menu.addAction(self.delete_rows_action)
+                
+            menu.exec(self.processed_table.viewport().mapToGlobal(pos))
+
+
+    def _open_extra_services_editor(self) -> None:
+            """Открывает диалог доп. услуг для текущего студента."""
+            idx = self.processed_table.currentIndex()
+            if not idx.isValid(): return
+            
+            row = idx.row()
+            raw_data_list = self.table_model.get_all_data()
+            student_data = raw_data_list[row]
+            current_extras = student_data.get("extra_services", [])
+            
+            # --- ВАЖНО: Передаем ВЕСЬ СЛОВАРЬ (self.SERVICES), а не keys() ---
+            dialog = ExtraServicesDialog(current_extras, self.SERVICES, self)
+            
+            if dialog.exec():
+                new_extras = dialog.get_data()
+                self.table_model.update_extras(row, new_extras)
+                self._is_dirty = True
+                self._update_summary_info()
+
 
     def _add_new_row(self) -> None:
         """Добавляет новую строку, корректно управляя выделением и фокусом."""
-        s_color = self.smart_parser.SURNAME_COLOR_HEX
-        n_color = self.smart_parser.NAME_COLOR_HEX
-        data = {"surname": "Ученик", "name": "Новый", "color1": s_color, "color2": n_color, "service_type": self.service_type_combo.currentText(), "service_cost": self.SERVICES.get(self.service_type_combo.currentText(), 0)}
-        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ: Создаем полный словарь данных ---
+        data = {
+            "surname": "Ученик",
+            "name": "Новый",
+            "color1": self.smart_parser.SURNAME_COLOR_HEX,
+            "color2": self.smart_parser.NAME_COLOR_HEX,
+            "color1_fg": self.surname_style.get("color", "#000000"),
+            "color2_fg": self.name_style.get("color", "#000000"),
+            "service_type": self.service_type_combo.currentText(),
+            "service_cost": self.SERVICES.get(self.service_type_combo.currentText(), 0),
+        }
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
         # Вставляем строку
         self.table_model.insert_row(self.table_model.rowCount(), data)
         # Сортируем
@@ -1128,18 +1456,13 @@ class ClassListEditor(QMainWindow):
         try:
             # Находим новый индекс после сортировки
             new_idx = self.table_model.get_all_data().index(data)
-
-            # --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
-            # Вызываем _handle_row_focus_request с флагом очистки выделения
             self._handle_row_focus_request(new_idx, StudentTableModel.COL_SURNAME, clear_selection=True)
-            # --- КОНЕЦ ИЗМЕНЕНИЯ ---
-
-        except ValueError: 
-            pass # Если не нашли, ничего страшного
+        except ValueError:
+            pass
 
         self._is_dirty = True
         self._update_summary_info()
-        
+      
     def _delete_selected_rows(self) -> None:
         rows = sorted(list(set(i.row() for i in self.processed_table.selectionModel().selectedIndexes())))
         if rows and QMessageBox.question(self, "Подтверждение", f"Удалить {len(rows)} строк?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
@@ -1214,12 +1537,29 @@ class ClassListEditor(QMainWindow):
 
     def _load_from_file(self, path: pathlib.Path) -> None:
         try:
-            with open(path, 'r', encoding='utf-8') as f: data = json.load(f)            
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
             self.class_name_input.setText(data.get("class_name", path.stem))
-
             self.service_type_combo.setCurrentText(data.get("service_type", next(iter(self.SERVICES))))
+            
+            students = data.get("students", [])
+            
+            # --- НАЧАЛО ИЗМЕНЕНИЙ: Обогащаем загруженные данные цветами из темы ---
+            surname_bg = self.smart_parser.SURNAME_COLOR_HEX
+            name_bg = self.smart_parser.NAME_COLOR_HEX
+            surname_fg = self.surname_style.get("color", "#000000")
+            name_fg = self.name_style.get("color", "#000000")
 
-            self.table_model.update_data(data.get("students", []))
+            for student in students:
+                # По умолчанию считаем, что в файле порядок верный: Фамилия, затем Имя
+                student['color1'] = surname_bg
+                student['color1_fg'] = surname_fg
+                student['color2'] = name_bg
+                student['color2_fg'] = name_fg
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+            self.table_model.update_data(students)
             self.table_model.sort(StudentTableModel.COL_SURNAME)
 
             self.config.wf_dest_dir = str(path.parent)
@@ -1266,21 +1606,257 @@ class ClassListEditor(QMainWindow):
             self.statusBar().showMessage(f"CSV сохранен: {pathlib.Path(path_str).name}", 5000)
         except Exception as e: QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить CSV:\n{e}")
 
-    def _save_html(self, save_as: bool = False) -> Optional[pathlib.Path]:
-        if not jinja2: return None
-        path = self._get_default_filepath('html') if not save_as else None
-        if not path:
-            path_str, _ = QFileDialog.getSaveFileName(self, "Сохранить HTML как...", str(self._get_default_filepath('html') or ''), "HTML (*.html)")
-            if not path_str: return None
-            path = pathlib.Path(path_str)
-        context = {"class_name": self.class_name_input.text(), "students": self.table_model.get_all_data(), "total_cost": sum(s.get('service_cost', 0) for s in self.table_model.get_all_data())}
-        try:
+
+    def _ensure_updated_template(self) -> None:
+            """
+            Создает или перезаписывает файл шаблона _list_template.html.
+            Версия с детализацией стоимости (База + Допы).
+            """
+            template_content = """<!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <title>Список класса {{ class_name }}</title>
+        <style>
+            /* Стили для отображения в браузере */
+            body {
+                font-family: 'Times New Roman', Times, serif;
+                font-size: 14pt;
+                width: 210mm;
+                margin: auto;
+            }
+            .header, .footer {
+                margin-bottom: 5px;
+                text-align: center;
+            }
+            .class-name {
+                font-size: 16pt;
+                font-weight: bold;
+                text-align: center;
+                margin: 10px 0;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                border: 1px solid black;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 5px;
+                text-align: left;
+                vertical-align: middle;
+            }
+            th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+                text-align: center;
+            }
+            /* Центрирование узких столбцов */
+            td:nth-child(1), td:nth-child(2), td:nth-child(5) {
+                text-align: center;
+            }
+            .total-row td {
+                font-weight: bold;
+            }
+            .signatures {
+                margin-top: 20px;
+                display: flex;
+                justify-content: space-between;
+            }
+            .signer {
+                display: inline-block;
+                text-align: center;
+            }
+            .signer-name {
+                 margin-right: 150px;
+            }
+            .signature-line {
+                border-bottom: 1px solid black;
+                width: 200px;
+                margin-top: 30px;
+            }
+            .signature-caption {
+                font-size: 10pt;
+            }
+            
+            /* --- Стили детализации заказа --- */
+            .main-service-price {
+                color: #444;
+                font-size: 0.95em;
+            }
+            .extras-container {
+                margin-top: 4px;
+                font-size: 0.85em;
+                border-top: 1px dotted #999;
+                padding-top: 2px;
+            }
+            .extras-title {
+                font-style: italic;
+                color: #333;
+            }
+            .extras-item {
+                margin-left: 5px;
+            }
+            .extras-calc {
+                color: #444;
+            }
+            .extras-comment {
+                font-size: 0.9em;
+                color: #666;
+                font-style: italic;
+            }
+
+            /* СТИЛИ СПЕЦИАЛЬНО ДЛЯ ПЕЧАТИ */
+            @media print {
+                @page {
+                    size: A4;
+                    margin: 15mm;
+                }
+                body {
+                    margin: 0;
+                    font-size: 12pt;
+                    -webkit-print-color-adjust: exact; 
+                    print-color-adjust: exact;
+                }
+                .no-print { display: none; }
+                tr { page-break-inside: avoid; }
+            }
+        </style>
+    </head>
+    <body>
+
+        <div class="header">
+            <p>Приложение №1 к договору №______-25/26 от «_____» __________ 202__ г.</p>
+            <p>Количество и вид заказываемой фотопродукции</p>
+        </div>
+
+        <div class="class-name">{{ class_name }}</div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 10%;">№ съемки</th>
+                    <th style="width: 5%;">№</th>
+                    <th style="width: 35%;">Фамилия, имя</th>
+                    <th style="width: 40%;">Вид фотопродукции</th>
+                    <th style="width: 10%;">Итого (руб)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.get('shoot_order', '') }}</td>
+                    <td>{{ student.alpha_order }}</td>
+                    <td><b>{{ student.surname }}</b> {{ student.name }}</td>
+                    <td>
+                        <!-- 1. Основная услуга -->
+                        <div>
+                            {{ student.service_type }} 
+                            <span class="main-service-price">({{ student.service_cost }} руб.)</span>
+                        </div>
+                        
+                        <!-- 2. Дополнительные услуги -->
+                        {% if student.extra_services %}
+                        <div class="extras-container">
+                            <span class="extras-title">Дополнительно:</span>
+                            {% for ex in student.extra_services %}
+                            <div class="extras-item">
+                                + {{ ex.name }} 
+                                <span class="extras-calc">
+                                    ({{ ex.qty }} шт. x {{ ex.cost }} = {{ ex.qty * ex.cost }} руб.)
+                                </span>
+                                {% if ex.comment %}
+                                <span class="extras-comment">({{ ex.comment }})</span>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <!-- 3. Итоговая сумма по строке -->
+                    <td>{{ student.row_total }}</td>
+                </tr>
+                {% endfor %}
+                <tr class="total-row">
+                    <td colspan="4" style="text-align: right; border: none;">Итого к оплате:</td>
+                    <td style="text-align: center;">{{ total_cost }}</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="footer">
+            <p>Стоимость аренды фотостудии _________________________________</p>
+        </div>
+
+        <div class="signatures">
+            <div class="signer">
+                ЗАКАЗЧИК
+                <div class="signature-line"></div>
+                <div class="signature-caption">(подпись)</div>
+            </div>
+            <div class="signer signer-name">
+                 ИСПОЛНИТЕЛЬ
+                <div class="signature-line"></div>
+                <div class="signature-caption">(подпись)</div>
+            </div>
+        </div>
+
+    </body>
+    </html>"""
+            
             template_path = pathlib.Path(__file__).parent / "_list_template.html"
-            template = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path.parent)).get_template(template_path.name)
-            with open(path, 'w', encoding='utf-8') as f: f.write(template.render(context))
-            self.statusBar().showMessage(f"HTML сохранен: {path.name}", 5000)
-            return path
-        except Exception as e: QMessageBox.critical(self, "Ошибка", f"Не удалось создать HTML:\n{e}"); return None
+            try:
+                with open(template_path, 'w', encoding='utf-8') as f:
+                    f.write(template_content)
+            except Exception as e:
+                print(f"Warning: Could not update template file: {e}", file=sys.stderr)
+
+
+    def _save_html(self, save_as: bool = False) -> Optional[pathlib.Path]:
+            if not jinja2: return None
+            
+            # 1. Проверяем и обновляем файл шаблона, если нужно
+            self._ensure_updated_template()
+
+            path = self._get_default_filepath('html') if not save_as else None
+            if not path:
+                path_str, _ = QFileDialog.getSaveFileName(self, "Сохранить HTML как...", str(self._get_default_filepath('html') or ''), "HTML (*.html)")
+                if not path_str: return None
+                path = pathlib.Path(path_str)
+            
+            # 2. Подготовка данных для шаблона
+            # Нам нужно добавить поле 'row_total' для каждого студента, 
+            # чтобы шаблон мог его просто вывести.
+            all_data = self.table_model.get_all_data()
+            students_prepared = []
+            global_total = 0
+
+            for s in all_data:
+                # Делаем копию словаря, чтобы не менять реальные данные в модели
+                s_copy = s.copy()
+                
+                # Считаем итог по строке
+                row_cost = self.table_model._calculate_total_cost(s)
+                s_copy['row_total'] = row_cost
+                
+                # Считаем глобальный итог
+                global_total += row_cost
+                
+                students_prepared.append(s_copy)
+
+            context = {
+                "class_name": self.class_name_input.text(),
+                "students": students_prepared,
+                "total_cost": global_total
+            }
+            
+            try:
+                template_path = pathlib.Path(__file__).parent / "_list_template.html"
+                template = jinja2.Environment(loader=jinja2.FileSystemLoader(template_path.parent)).get_template(template_path.name)
+                with open(path, 'w', encoding='utf-8') as f: f.write(template.render(context))
+                self.statusBar().showMessage(f"HTML сохранен: {path.name}", 5000)
+                return path
+            except Exception as e: QMessageBox.critical(self, "Ошибка", f"Не удалось создать HTML:\n{e}"); return None
 
     def _save_for_processing(self) -> None:
         if self.table_model.rowCount() == 0: return
@@ -1308,9 +1884,15 @@ class ClassListEditor(QMainWindow):
             QMessageBox.warning(self, "Ошибка", "Не удалось открыть HTML-файл в браузере.")
 
     def _update_summary_info(self, *args: Any) -> None:
-        data = self.table_model.get_all_data()
-        self.summary_label_count.setText(f"Всего учеников: {len(data)}")
-        self.summary_label_total_cost.setText(f"Итоговая сумма: {sum(s.get('service_cost', 0) for s in data)} руб.")
+            data = self.table_model.get_all_data()
+            
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # Считаем сумму с учетом доп. услуг, используя логику модели
+            total_sum = sum(self.table_model._calculate_total_cost(s) for s in data)
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+            
+            self.summary_label_count.setText(f"Всего учеников: {len(data)}")
+            self.summary_label_total_cost.setText(f"Итоговая сумма: {total_sum} руб.")
 
     def add_link(self) -> None:
         if IS_MANAGED_RUN and pysm_context and self.config.wf_dest_dir:

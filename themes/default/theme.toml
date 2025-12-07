@@ -27,8 +27,14 @@ delegate_changed_indicator = "color: #f0ad4e;"
 delegate_preview_background = "color: #bbbbbb;"
 delegate_secondary_text = "color: #555555;"
 delegate_drop_target_border = "color: #c0392b;"
-markup_number = "background-color: #27ae60; border-color: #bbdefb; color: #ffffff;"
 table_status_found = "color: #ffffff; background-color: #27ae60;"
 table_status_not_found = "color: #ffffff; background-color: #c0392b;"
-markup_surname = "background-color: #e3f2fd; border-color: #bbdefb; color: #1565c0;"
-markup_name = "background-color: #e8f5e9; border-color: #c8e6c9; color: #ffffff;"
+markup_number = "background-color: #27ae60; border-color: #bbdefb; color: #ffffff;"
+# Стиль для подсветки Фамилии в парсере
+markup_surname = "background-color: #e3f2fd; border-color: #bbdefb; color: #0d47a1;"
+# Стиль для подсветки Имени в парсере
+markup_name = "background-color: #888888; border-color: #c8e6c9; color: #eeeeee;"
+# Стиль для подсветки неразобранного ФИО в парсере
+markup_fio = "background-color: #fff3e0; border-color: #ffe0b2; color: #e65100;"
+table_background_base = "color: #ffffff;"
+table_background_alternate = "color: #f6f6f6;"
