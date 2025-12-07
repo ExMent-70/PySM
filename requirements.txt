@@ -20,7 +20,6 @@ photoshop-python-api
 psd-tools
 psutil
 pydantic
-pynvml
 pypiwin32
 pymorphy3
 PySide6

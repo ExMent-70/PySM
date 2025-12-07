@@ -124,7 +124,8 @@ def main():
         # --- Определение пути для поиска зависимостей ---
         search_target = None
         if config.inst_search_path:
-            candidate = config.inst_search_path.resolve()
+            # ИСПРАВЛЕНИЕ: Оборачиваем строку в pathlib.Path перед вызовом resolve()
+            candidate = pathlib.Path(config.inst_search_path).resolve()
             if candidate.exists(): search_target = candidate
 
         if not search_target and IS_MANAGED_RUN and pysm_context:
@@ -133,7 +134,8 @@ def main():
                 search_target = pathlib.Path(path_from_context).resolve()
 
         if not search_target:
-            search_target = pathlib.Path('.').resolve()
+            search_target = pathlib.Path('.').resolve()            
+            
 
         logging.info(f"\n<b>Определение параметров установки зависимостей</b>")
         if search_target.is_file():
