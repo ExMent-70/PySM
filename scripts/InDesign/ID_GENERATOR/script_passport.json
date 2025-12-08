@@ -1,0 +1,69 @@
+{
+  "description": "Скрипт генерирует на основе шаблона многостраничный файл InDesign, заполняя персональные развороты для каждой персоны, указанной в JSON-файле.",
+  "category": "InDesign",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2025.11.03",
+  "command_line_args_meta": {
+    "template": {
+      "type": "string",
+      "description": "Имя переменной контекста, содержащей данные о выбранном шаблоне (включая карту сопоставления).",
+      "required": true,
+      "default": "var_template_name"
+    },
+    "output_file": {
+      "type": "file_path",
+      "description": "Путь для сохранения итогового многостраничного файла InDesign (если не указан, генерируется автоматически).",
+      "required": false,
+      "default": ""
+    },
+    "data_json_file": {
+      "type": "file_path",
+      "description": "Путь к JSON-файлу с данными о персонах и фотографиях.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json"
+    },
+    "source_photos_dir": {
+      "type": "dir_path",
+      "description": "Путь к корневой папке, содержащей все папки с фотографиями.",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}"
+    },
+    "placeholder_image": {
+      "type": "file_path",
+      "description": "Путь к файлу-заглушке, если фото не найдено (опционально).",
+      "required": false,
+      "default": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png"
+    },
+    "validate": {
+      "type": "bool",
+      "description": "Запустить только режим валидации, без создания итогового файла.",
+      "required": false,
+      "default": false
+    },
+    "generation_mode": {
+      "type": "choice",
+      "description": "Режим генерации. 'auto' - режим определяется типом шаблона. 'sheet' - разворот на человека. 'photo' - разворот на фото. 'vignette' - общая виньетка. 'personal_vignette' - персональные развороты с общей виньеткой.",
+      "required": false,
+      "default": "auto",
+      "choices": [
+        "sheet",
+        "photo",
+        "vignette",
+        "personal_vignette",
+        "auto"
+      ]
+    },
+    "magic_word": {
+      "type": "string",
+      "description": "Приоритетное слово в имени файла (например, 'Base') для выбора основной фотографии из нескольких.",
+      "required": false,
+      "default": "База"
+    },
+    "face_scale": {
+      "type": "float",
+      "description": "Целевой масштаб лица относительно высоты рамки (от 0.1 до 1.0). Используется в режимах 'vignette' и 'personal_vignette'.",
+      "required": false,
+      "default": 0.8
+    }
+  }
+}

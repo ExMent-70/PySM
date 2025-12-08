@@ -1,0 +1,30 @@
+{
+  "description": "Обновляет систему PySM и скрипты до последней версии из GitHub репозитория.",
+  "category": "Системные",
+  "author": "System",
+  "version": "1.0",
+  "command_line_args_meta": {
+    "repo_url": {
+      "type": "str",
+      "description": "URL ZIP-архива (по умолчанию main ветка)",
+      "required": true,
+      "default": "https://github.com/ExMent-70/PySM/archive/refs/heads/main.zip"
+    },
+    "target_dir": {
+      "type": "dir_path",
+      "description": "Папка установки (оставьте пустым для обновления текущей)",
+      "required": false
+    },
+    "token": {
+      "type": "str",
+      "description": "GitHub Token (если репозиторий приватный)",
+      "required": false
+    },
+    "no_backup": {
+      "type": "bool",
+      "description": "Отключить создание бэкапа перед обновлением",
+      "required": false,
+      "default": false
+    }
+  }
+}

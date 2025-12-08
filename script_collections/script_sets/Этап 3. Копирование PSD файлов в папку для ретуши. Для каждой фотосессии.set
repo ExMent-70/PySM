@@ -1,0 +1,91 @@
+{
+  "type": "script_set",
+  "id": "setnode_126531c78b8b",
+  "name": "Этап 3. Копирование PSD файлов в папку для ретуши. Для каждой фотосессии",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_790d968b/Workflow/analize/wf_photo_select2",
+      "instance_id": "instance_035d761ea86d",
+      "name": "Отметить фотографии выбранные клиентами",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {}
+    },
+    {
+      "id": "root_790d968b/Workflow/wf_session_open",
+      "instance_id": "instance_9313dfc9080c",
+      "name": "Запуск Capture One для цветокоррекции выбранных фотографий",
+      "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nЦветокоррекция фотографий, отобранных клиентом, и их экспорт в формат PSD для дальнейшей ретуши.\n\nПри экспорте используйте рецепт <b>_PSD_8bit_</b>\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "__wf_session_file_path": {
+          "value": "{wf_session_path}/{wf_session_name}/{wf_session_name}.cosessiondb",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_msg",
+      "instance_id": "instance_f4d992293417",
+      "name": "СООБЩЕНИЕ: Завершение работы в Capture One",
+      "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nПодтверждение экспорта из Capture One (с помощью рецепта <b>_PSD_8bit_</b>) фотографий выбранных для ретуши \n\nЕсли эта операция еще не выполнена, то не запускайте скрипт или нажмите кнопку <b>Нет</b>\nПереходить к следующему скрипту не рекомендуется!\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_msg_var": {
+          "value": "var_user_choice",
+          "enabled": true
+        },
+        "dlg_msg_type": {
+          "value": "yes_no",
+          "enabled": true
+        },
+        "dlg_msg_title": {
+          "value": "Подтверждение",
+          "enabled": true
+        },
+        "dlg_msg_message": {
+          "value": "Для продолжения работы необходимо выполнить экспорт\nотобранных для ретуши фотографий в формат PSD.\n\nВы уверены, что хотите продолжить?",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/dir_operation",
+      "instance_id": "instance_e08d77c07f44",
+      "name": "Перемещение файлов PSD в папку Альбом",
+      "description": "<div style=\" {theme.script_description}\">При работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b></div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "do_source_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/{wf_session_name}",
+          "enabled": true
+        },
+        "do_dest_dir": {
+          "value": "{wf_psd_path}/{wf_session_name}",
+          "enabled": true
+        },
+        "do_mode": {
+          "value": "move",
+          "enabled": true
+        },
+        "do_on_conflict": {
+          "value": "overwrite",
+          "enabled": true
+        },
+        "do_copy_base_folder": {
+          "value": false,
+          "enabled": true
+        },
+        "do_include": {
+          "value": "*.psd",
+          "enabled": true
+        },
+        "all_threads": {
+          "value": "8",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

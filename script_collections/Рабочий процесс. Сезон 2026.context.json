@@ -1,11 +1,4 @@
 {
-  "var_Hello": {
-    "type": "string",
-    "value": "Андрей",
-    "description": null,
-    "read_only": false,
-    "choices": null
-  },
   "wf_session_path": {
     "type": "dir_path",
     "value": "G:/2026_Capture_One_Session",
@@ -34,13 +27,6 @@
     "read_only": false,
     "choices": null
   },
-  "var_user_choice": {
-    "type": "string",
-    "value": "yes",
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
-  },
   "wf_photo_session": {
     "type": "choice",
     "value": "SCHOOL",
@@ -54,13 +40,6 @@
       "STREET",
       "STUDIO"
     ]
-  },
-  "dlg_msg_user_var": {
-    "type": "string",
-    "value": "yes",
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
   },
   "sys_log_level": {
     "type": "string",
@@ -114,13 +93,6 @@
       "main_portrait",
       "portrait_cover"
     ],
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
-  },
-  "var_use_claster_editor": {
-    "type": "string",
-    "value": "cancel",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null

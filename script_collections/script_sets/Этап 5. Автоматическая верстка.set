@@ -1,0 +1,132 @@
+{
+  "type": "script_set",
+  "id": "setnode_703f13d95ceb",
+  "name": "Этап 5. Автоматическая верстка",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/SYSTEM/py_if_else",
+      "instance_id": "instance_9bf58f38fe64",
+      "name": "УСЛОВИЕ: Проверка КАТАЛОГА ШАБЛОНОВ",
+      "description": "<div style=\" {theme.script_description}\">\nСкрипт проверяет наличие переменной <b>wf_idsgn_catalog</b>, которая содержит путь к каталогу шаблонов InDesign.\n\nЕсли переменная не существует, то программа предлагает выбрать файл-каталог шаблонов.\nЕсли переменная существует, то запускается скрипт каталогизатор.\n</div>",
+      "silent_mode": true,
+      "command_line_args": {
+        "if-variable-name": {
+          "value": "wf_idsgn_catalog",
+          "enabled": true
+        },
+        "if-operator": {
+          "value": "равно",
+          "enabled": true
+        },
+        "if-comparison-value": {
+          "value": "None",
+          "enabled": true
+        },
+        "then-instance-id": {
+          "value": "instance_beac224cfbd2",
+          "enabled": true
+        },
+        "else-instance-id": {
+          "value": "instance_ed8f24cf2de0",
+          "enabled": true
+        },
+        "clear-variable": {
+          "value": false,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_open",
+      "instance_id": "instance_beac224cfbd2",
+      "name": "БЛОК ИСТИНА: Открыть файл-каталог шаблонов InDesign",
+      "description": "<div style=\" {theme.markup_number}\">\nСкрипт запускается если не выбран каталог шаблонов InDesign.\n</div>\n<div style=\" {theme.script_description}\">\nСкрипт открывает диалоговое окно для выбора пути к файлу-каталогу шаблонов InDesign.\n\nВыбранный путь сохраняется в переменную контекста <b>wf_idsgn_catalog</b>.\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_open_var": {
+          "value": "wf_idsgn_catalog",
+          "enabled": true
+        },
+        "dlg_open_type": {
+          "value": "file",
+          "enabled": true
+        },
+        "dlg_open_title": {
+          "value": "Выберите файл-каталог шаблонов InDesign",
+          "enabled": true
+        },
+        "dlg_open_filter": {
+          "value": "*.template",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/InDesign/idsgn_catalog",
+      "instance_id": "instance_ed8f24cf2de0",
+      "name": "Выбрать шаблон оформления",
+      "description": "<div style=\" {theme.script_description}\">\nСкрипт для выбора шаблона InDesign, который будет использован в скрипте автоматической верстки.\n\nВсе параметры выбранного шаблона сохраняются в переменной контекста <b>var_template_name</b>.\n\nДля работы скрипта путь к каталогу шаблонов должен быть предварительно сохранен в переменной <b>wf_idsgn_catalog</b>.\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "idsgn_catalog": {
+          "value": "{wf_idsgn_catalog}",
+          "enabled": true
+        },
+        "idsgn_template_var": {
+          "value": "var_template_name",
+          "enabled": true
+        },
+        "idsgn_msg": {
+          "value": "Выберите шаблон для генерации разворота",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/InDesign/idsgn_spread_generator",
+      "instance_id": "instance_9397624da254",
+      "name": "Создать разворот альбома",
+      "description": "<div style=\" {theme.script_description}\">\nСкрипт на основе шаблона, сохраненного в переменной <b>var_template_name</b>, генерирует многостраничный файл InDesign, заполняя персональные развороты для каждой ученика.\n\nВ данном Экземпляре скрипта пути к JSON-файлу с информацией об учениках, папке с фотографиями вычисляются автоматически на основании переменных контекста:\n- {wf_session_path}\n- {wf_psd_path}\n- {wf_session_name}\n- {wf_photo_session}\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "template": {
+          "value": "var_template_name",
+          "enabled": true
+        },
+        "output_file": {
+          "value": "",
+          "enabled": false
+        },
+        "data_json_file": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
+          "enabled": true
+        },
+        "source_photos_dir": {
+          "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
+          "enabled": true
+        },
+        "placeholder_image": {
+          "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/placeholder.png",
+          "enabled": true
+        },
+        "validate": {
+          "value": false,
+          "enabled": true
+        },
+        "generation_mode": {
+          "value": "auto",
+          "enabled": true
+        },
+        "magic_word": {
+          "value": "База",
+          "enabled": true
+        },
+        "face_scale": {
+          "value": 0.8,
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

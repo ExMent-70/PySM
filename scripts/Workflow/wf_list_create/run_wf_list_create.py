@@ -1046,9 +1046,9 @@ class ClassListEditor(QMainWindow):
             "Сохранить список как...": lambda: self._save_list(save_as=True),
             "-2": None,
             "Сохранить HTML как...": lambda: self._save_html(save_as=True),
-            "Сохранить как CSV...": self._save_csv,
+            "Сохранить CSV как...": self._save_csv,
             "-3": None,
-            "Экспортировать для обработки": self._save_for_processing,
+            "Сохранить как имена кластеров": self._save_for_processing,
             "-4": None,
             "Печать HTML": (self._print_html, QKeySequence.StandardKey.Print),
             "-5": None,
@@ -1591,20 +1591,59 @@ class ClassListEditor(QMainWindow):
         except Exception as e: QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}"); return False
 
     def _save_csv(self, save_as: bool = True) -> None:
-        if self.table_model.rowCount() == 0: return
-        path_str: Optional[str] = None
-        if save_as:
-            path_str, _ = QFileDialog.getSaveFileName(self, "Сохранить как CSV...", str(self._get_default_filepath('csv') or ''), "CSV (*.csv)")
-        else:
-            if path_obj := self._get_default_filepath('csv'): path_str = str(path_obj)
-        if not path_str: return
-        fieldnames = ["shoot_order", "alpha_order", "surname", "name", "service_type", "service_cost"]
-        try:
-            with open(path_str, 'w', newline='', encoding='utf-16') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=';')
-                writer.writeheader(); writer.writerows(self.table_model.get_all_data())
-            self.statusBar().showMessage(f"CSV сохранен: {pathlib.Path(path_str).name}", 5000)
-        except Exception as e: QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить CSV:\n{e}")
+            if self.table_model.rowCount() == 0: return
+            
+            # 1. Получение пути сохранения
+            path_str: Optional[str] = None
+            if save_as:
+                path_str, _ = QFileDialog.getSaveFileName(self, "Сохранить как CSV...", str(self._get_default_filepath('csv') or ''), "CSV (*.csv)")
+            else:
+                if path_obj := self._get_default_filepath('csv'): path_str = str(path_obj)
+            if not path_str: return
+
+            # 2. Определение полей CSV (добавлены extra_services и total_cost)
+            fieldnames = ["shoot_order", "alpha_order", "surname", "name", "service_type", "service_cost", "extra_services", "total_cost"]
+            
+            # 3. Подготовка данных (превращаем сложные структуры в плоские строки)
+            rows_to_write = []
+            for student in self.table_model.get_all_data():
+                # Формируем читаемую строку с доп. услугами
+                extras_list = student.get("extra_services", [])
+                extras_str = ""
+                if extras_list:
+                    # Пример формата: "Услуга1 (1x100); Услуга2 (2x500)"
+                    items = []
+                    for ex in extras_list:
+                        comment = f" [{ex.get('comment')}]" if ex.get('comment') else ""
+                        items.append(f"{ex.get('name')} ({ex.get('qty')}x{ex.get('cost')}){comment}")
+                    extras_str = "; ".join(items)
+
+                # Вычисляем итог с помощью метода модели
+                total = self.table_model._calculate_total_cost(student)
+
+                # Собираем словарь для записи
+                row = {
+                    "shoot_order": student.get("shoot_order", ""),
+                    "alpha_order": student.get("alpha_order", ""),
+                    "surname": student.get("surname", ""),
+                    "name": student.get("name", ""),
+                    "service_type": student.get("service_type", ""),
+                    "service_cost": student.get("service_cost", 0),
+                    "extra_services": extras_str,
+                    "total_cost": total
+                }
+                rows_to_write.append(row)
+
+            # 4. Запись файла
+            try:
+                # Используем utf-16 и разделитель ';', чтобы Excel в Windows корректно открывал кириллицу
+                with open(path_str, 'w', newline='', encoding='utf-16') as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=';')
+                    writer.writeheader()
+                    writer.writerows(rows_to_write)
+                self.statusBar().showMessage(f"CSV сохранен: {pathlib.Path(path_str).name}", 5000)
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить CSV:\n{e}")
 
 
     def _ensure_updated_template(self) -> None:
@@ -1758,7 +1797,6 @@ class ClassListEditor(QMainWindow):
                         <!-- 2. Дополнительные услуги -->
                         {% if student.extra_services %}
                         <div class="extras-container">
-                            <span class="extras-title">Дополнительно:</span>
                             {% for ex in student.extra_services %}
                             <div class="extras-item">
                                 + {{ ex.name }} 

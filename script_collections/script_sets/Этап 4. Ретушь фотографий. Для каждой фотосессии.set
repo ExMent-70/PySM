@@ -1,0 +1,71 @@
+{
+  "type": "script_set",
+  "id": "setnode_60ce2dd8eafe",
+  "name": "Этап 4. Ретушь фотографий. Для каждой фотосессии",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_790d968b/Photoshop/ps_photoshop_launch",
+      "instance_id": "instance_01b21a59c26b",
+      "name": "Фотошоп - Запустить",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "photoshop_app_dir": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_action_batch_set_select",
+      "instance_id": "instance_19153327e6ef",
+      "name": "Экшен - Универсальный пакетный запуск",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_mode": {
+          "value": "selected_file_folder",
+          "enabled": true
+        },
+        "ps_file_path": {
+          "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}/11.psd",
+          "enabled": true
+        },
+        "ps_recursive": {
+          "value": true,
+          "enabled": true
+        },
+        "ps_action_set": {
+          "value": null,
+          "enabled": true
+        },
+        "ps_action_name": {
+          "value": null,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_document_close",
+      "instance_id": "instance_5b09b6b7f51f",
+      "name": "Закрыть файл-пресет",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "ps_document_name": {
+          "value": null,
+          "enabled": false
+        },
+        "ps_force_close": {
+          "value": true,
+          "enabled": true
+        },
+        "ps_save_on_close": {
+          "value": false,
+          "enabled": false
+        }
+      }
+    }
+  ]
+}

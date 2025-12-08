@@ -1,0 +1,180 @@
+{
+  "type": "script_set",
+  "id": "setnode_a5a33ba3f733",
+  "name": "Этап 2.1. Анализ RAW-файлов",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_790d968b/Workflow/analize/export_to_jpeg",
+      "instance_id": "instance_056415bb2b37",
+      "name": "1. Конвертировать RAW в JPEG",
+      "description": "<div style=\"{theme.script_description}\">\n<b>Первый шаг в конвейере анализа изображений</b> \nСкрипт, конвертирует исходные файлы изображений (RAW или PSD) в формат JPEG для последующего анализа другими скриптами.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}:\n\n<b>base_dir</b> =<i> {wf_session_path} / {wf_session_name}</i>\n<b>input_dir</b> =<i> {base_dir} / Capture / {wf_photo_session}</i>\n<b>output_dir</b> =<i> {base_dir} / Output / Analysis_{wf_photo_session}  / JPG</i>\n\nЕсли ваши изображения уже в формате JPG, то данный скрипт можно не запускать.\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "a_r2j_image_type": {
+          "value": "raw",
+          "enabled": true
+        },
+        "a_r2j_preview_size": {
+          "value": "2048",
+          "enabled": true
+        },
+        "a_r2j_jpeg_quality": {
+          "value": "90",
+          "enabled": true
+        },
+        "all_threads": {
+          "value": "12",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/img2mask",
+      "instance_id": "instance_df6cf3b238ac",
+      "name": "2. Создание маски фона",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "img_rmbg_input_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG",
+          "enabled": true
+        },
+        "img_rmbg_output_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG/Masks",
+          "enabled": true
+        },
+        "img_rmbg_processor_type": {
+          "value": "birefnet",
+          "enabled": true
+        },
+        "img_rmbg_model_rmbg": {
+          "value": "RMBG-2.0",
+          "enabled": true
+        },
+        "img_rmbg_model_birefnet": {
+          "value": "BiRefNet-portrait",
+          "enabled": true
+        },
+        "img_rmbg_background": {
+          "value": "Solid",
+          "enabled": true
+        },
+        "img_rmbg_mask_blur": {
+          "value": "1",
+          "enabled": true
+        },
+        "img_rmbg_mask_offset": {
+          "value": "-1",
+          "enabled": true
+        },
+        "img_rmbg_save_options": {
+          "value": [
+            "image"
+          ],
+          "enabled": true
+        },
+        "img_rmbg_invert_mask": {
+          "value": true,
+          "enabled": true
+        },
+        "img_rmbg_fast_refine": {
+          "value": true,
+          "enabled": true
+        },
+        "img_rmbg_threads": {
+          "value": "12",
+          "enabled": true
+        },
+        "img_rmbg_sensitivity": {
+          "value": "0.5",
+          "enabled": true
+        },
+        "img_rmbg_img_scale": {
+          "value": "0",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/analyze_faces",
+      "instance_id": "instance_60a18a35131a",
+      "name": "3. Найти лица на фотографиях. Вычислить эмбединги",
+      "description": "<div style=\" {theme.script_description}\">\n<b>Второй по очереди (но главный по сути) скрипт в конвейере анализа изображений</b> \nСкрипт анализуирует изображения в формате JPG, распознает на них лица людей и переводит их в векторный формат (вычисляет эмбединги). Результаты анализа сохраняются в JSON и NPY-файлы (отдельно для портретных и групповых фотографий).\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>output_dir</b> = <i>{base_dir} / Output / Analysis_{photo_session}</i>\n<b>input_dir</b> = <i>{output_dir} / JPG</i>\n\nСкрипт работает с файлами JPG, поэтому RAW и PSD файлы необходимо предварительно конвертировать.\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "a_af_config_file": {
+          "value": "config.toml",
+          "enabled": true
+        },
+        "all_threads": {
+          "value": 0,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/cluster_portraits",
+      "instance_id": "instance_753793ea03f6",
+      "name": "4. Кластеризация портретных фотографий",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "a_cp_portrait_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+          "enabled": true
+        },
+        "a_cp_names_file": {
+          "value": "{wf_session_path}/{wf_session_name}/{wf_photo_session}_{wf_children_file_name}",
+          "enabled": true
+        },
+        "a_cp_config": {
+          "value": "config.toml",
+          "enabled": true
+        },
+        "a_cp_algorithm": {
+          "value": "dbscan",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/cluster_locations",
+      "instance_id": "instance_cf03a01e1a57",
+      "name": "5. Группировать фотографии по локациям",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "a_cl_config_file": {
+          "value": "config.toml",
+          "enabled": true
+        },
+        "a_cl_cluster_eps": {
+          "value": 0.14,
+          "enabled": true
+        },
+        "a_cl_location_prompts": {
+          "value": null,
+          "enabled": true
+        },
+        "all_threads": {
+          "value": 0,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/analyze_keypoints",
+      "instance_id": "instance_278a5fe79351",
+      "name": "6. Анализ атрибутов лица",
+      "description": "<div style=\" {theme.script_description}\">\n<b>Четвертый (<i>НЕОБАЗЯТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт, на основании вычисленных ключевых точек <i>landmark_2d_106</i> и <i>landmark_3d_68</i>, анализирует атрибуты лица/головы: состояние глаз (открыты/закрыты) и рта (открыт/закрыт), поворота и наклона (вправо/влево/вверх/вниз).\nИнформация добавляется в файл JSON созданный скриптом №2.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i> \n<b>data_dir</b> = <i>{base} / Output / Analysis_{wf_photo_session}</i>\n\nЕсли эти данные не нужны, то скрипт можно удалить из рабочеого процесса\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "a_ak_config_file": {
+          "value": "config.toml",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

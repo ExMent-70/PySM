@@ -25,157 +25,251 @@
       "description": null,
       "children": [
         {
-          "type": "script_set",
-          "id": "setnode_e1ff3c2be2ae",
-          "name": "Настройка ГЛОБАЛЬНЫХ переменных. Один раз в начале сезона",
-          "description": null,
-          "script_entries": [
-            {
-              "id": "root_7617c03c/GUI/gui_dialog_open",
-              "instance_id": "instance_30ac56e9b595",
-              "name": "ВВОД: Выбрать базовую папку для всех RAW-файлов/сессий Capture One",
-              "description": "Скрипт создает переменную <i>wf_session_path</i> в Контексте Коллекции и записывает в неё путь к папке, в которой будут создаваться папки для RAW-файлов и/или сессии Capture One. \nДля каждого класса создается своя папка/сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. \nТакой подход к хранению RAW-файлов/организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
-              "silent_mode": false,
-              "command_line_args": {
-                "dlg_open_var": {
-                  "value": "wf_session_path",
-                  "enabled": true
-                },
-                "dlg_open_type": {
-                  "value": "directory",
-                  "enabled": true
-                },
-                "dlg_open_title": {
-                  "value": "Выбрать базовую папку для всех RAW-файлов/сессий Capture One",
-                  "enabled": true
-                },
-                "dlg_open_filter": {
-                  "value": "Все файлы (*.*)",
-                  "enabled": true
-                }
-              }
-            },
-            {
-              "id": "root_7617c03c/GUI/gui_dialog_open",
-              "instance_id": "instance_2ab0c0f56d21",
-              "name": "ВВОД: Выбрать базовую папку для PSD-файлов",
-              "description": "Скрипт создает переменную wf_psd_path в Контексте Коллекции и записывает в неё путь к папке, в которой, следующие скрипты будут создавать сессии Capture One. Для каждой съемки обычно создается своя сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. Такой подход к организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
-              "silent_mode": false,
-              "command_line_args": {
-                "dlg_open_var": {
-                  "value": "wf_psd_path",
-                  "enabled": true
-                },
-                "dlg_open_type": {
-                  "value": "directory",
-                  "enabled": true
-                },
-                "dlg_open_title": {
-                  "value": "Выбрать базовую папку для PSD-файлов (в нее будут скопированны PSD-файлы текущей сессии)",
-                  "enabled": true
-                },
-                "dlg_open_filter": {
-                  "value": "Все файлы (*.*)",
-                  "enabled": true
-                }
-              }
-            },
-            {
-              "id": "root_7617c03c/GUI/gui_dialog_input",
-              "instance_id": "instance_40d66d7d01cf",
-              "name": "ВВОД: Имя файла со списком для фотосессии",
-              "description": null,
-              "silent_mode": false,
-              "command_line_args": {
-                "dlg_input_var": {
-                  "value": "wf_children_file_name",
-                  "enabled": true
-                },
-                "dlg_input_title": {
-                  "value": "Ввод значения",
-                  "enabled": true
-                },
-                "dlg_input_msg": {
-                  "value": "Введите имя файла, со списком для фотосессии.\n\nНапример, children.txt",
-                  "enabled": true
-                },
-                "dlg_input_dvalue": {
-                  "value": "children.txt",
-                  "enabled": true
-                },
-                "dlg_input_valid_type": {
-                  "value": "filename_txt",
-                  "enabled": true
-                },
-                "dlg_input_custom_regexp": {
-                  "value": null,
-                  "enabled": true
-                },
-                "dlg_input_custom_regexp_desc": {
-                  "value": null,
-                  "enabled": true
-                }
-              }
-            },
-            {
-              "id": "root_7617c03c/GUI/gui_dialog_open",
-              "instance_id": "instance_139a21fe57eb",
-              "name": "ВВОД: Файл-каталог шаблонов InDesign",
-              "description": null,
-              "silent_mode": false,
-              "command_line_args": {
-                "dlg_open_var": {
-                  "value": "var_idsgn_catalog",
-                  "enabled": true
-                },
-                "dlg_open_type": {
-                  "value": "file",
-                  "enabled": true
-                },
-                "dlg_open_title": {
-                  "value": "Выберите файл-каталог шаблонов InDesign",
-                  "enabled": true
-                },
-                "dlg_open_filter": {
-                  "value": "*.template",
-                  "enabled": true
-                }
-              }
-            }
-          ]
-        },
-        {
           "type": "set_folder",
-          "id": "foldernode_7dfd7df949b8",
-          "name": "Рабочий процесс",
+          "id": "foldernode_ed0b0245cc56",
+          "name": "Системные скрипты",
           "description": null,
           "children": [
             {
               "type": "script_set",
-              "id": "setnode_129d93601927",
-              "name": "Этап 1. Общая информация",
+              "id": "setnode_ba9af3f0de5e",
+              "name": "Проверка GPU",
               "description": null,
               "script_entries": [
                 {
-                  "id": "root_7617c03c/SYSTEM/log_report",
-                  "instance_id": "instance_162596c2f183",
-                  "name": "Информационная панель",
+                  "id": "root_7617c03c/SYSTEM/py_gpu_doctor",
+                  "instance_id": "instance_7b8affa5db63",
+                  "name": "py_gpu_doctor",
                   "description": null,
-                  "silent_mode": true,
+                  "silent_mode": false,
+                  "command_line_args": {}
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/py_tensorrt_doctor",
+                  "instance_id": "instance_f71f03810ae3",
+                  "name": "py_tensorrt_doctor",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {}
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/py_torch_doctor",
+                  "instance_id": "instance_c83f034f0cd7",
+                  "name": "py_torch_doctor",
+                  "description": null,
+                  "silent_mode": false,
                   "command_line_args": {}
                 }
               ]
             },
             {
               "type": "script_set",
-              "id": "setnode_d4012f141647",
-              "name": "Этап 2. Настройка ЛОКАЛЬНЫХ переменных. Один раз для каждого класса/группы",
+              "id": "setnode_98b499c3bae7",
+              "name": "Обновление PySM и установка скриптов",
+              "description": null,
+              "script_entries": [
+                {
+                  "id": "root_7617c03c/SYSTEM/pysm_updater",
+                  "instance_id": "instance_65e54835465c",
+                  "name": "Обновить PySM и скрипты",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {
+                    "repo_url": {
+                      "value": "https://github.com/ExMent-70/PySM/archive/refs/heads/main.zip",
+                      "enabled": true
+                    },
+                    "target_dir": {
+                      "value": null,
+                      "enabled": false
+                    },
+                    "token": {
+                      "value": null,
+                      "enabled": false
+                    },
+                    "no_backup": {
+                      "value": false,
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/py_install_req",
+                  "instance_id": "instance_1415d8de3149",
+                  "name": "Обновить Python-зависимости",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {
+                    "inst_search_path": {
+                      "value": "",
+                      "enabled": true
+                    },
+                    "inst_python_interpreter": {
+                      "value": "",
+                      "enabled": true
+                    },
+                    "inst_upgrade": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "inst_verbose": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "inst_analyze_only": {
+                      "value": false,
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/get_pc_hwid",
+                  "instance_id": "instance_f66a0acc2190",
+                  "name": "Определить HWID компьютера пользователя",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {}
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "set_folder",
+          "id": "foldernode_79e18534eb9e",
+          "name": "Рабочий процесс",
+          "description": null,
+          "children": [
+            {
+              "type": "script_set",
+              "id": "setnode_9dd8d7bc1cce",
+              "name": "Настройка ГЛОБАЛЬНЫХ переменных. Один раз в начале сезона",
+              "description": null,
+              "script_entries": [
+                {
+                  "id": "root_7617c03c/GUI/gui_dialog_open",
+                  "instance_id": "instance_fd3d2558ddc4",
+                  "name": "ПЕРЕМЕННАЯ: Выбрать базовую папку для всех RAW-файлов/сессий Capture One",
+                  "description": "Скрипт создает переменную <i>wf_session_path</i> в Контексте Коллекции и записывает в неё путь к папке, в которой будут создаваться папки для RAW-файлов и/или сессии Capture One. \nДля каждого класса создается своя папка/сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. \nТакой подход к хранению RAW-файлов/организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
+                  "silent_mode": false,
+                  "command_line_args": {
+                    "dlg_open_var": {
+                      "value": "wf_session_path",
+                      "enabled": true
+                    },
+                    "dlg_open_type": {
+                      "value": "directory",
+                      "enabled": true
+                    },
+                    "dlg_open_title": {
+                      "value": "Выбрать базовую папку для всех RAW-файлов/сессий Capture One",
+                      "enabled": true
+                    },
+                    "dlg_open_filter": {
+                      "value": "Все файлы (*.*)",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_dialog_open",
+                  "instance_id": "instance_4c3a5a88efa5",
+                  "name": "ПЕРЕМЕННАЯ: Выбрать базовую папку для PSD-файлов",
+                  "description": "Скрипт создает переменную wf_psd_path в Контексте Коллекции и записывает в неё путь к папке, в которой, следующие скрипты будут создавать сессии Capture One. Для каждой съемки обычно создается своя сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. Такой подход к организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
+                  "silent_mode": false,
+                  "command_line_args": {
+                    "dlg_open_var": {
+                      "value": "wf_psd_path",
+                      "enabled": true
+                    },
+                    "dlg_open_type": {
+                      "value": "directory",
+                      "enabled": true
+                    },
+                    "dlg_open_title": {
+                      "value": "Выбрать базовую папку для PSD-файлов (в нее будут скопированны PSD-файлы текущей сессии)",
+                      "enabled": true
+                    },
+                    "dlg_open_filter": {
+                      "value": "Все файлы (*.*)",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_dialog_input",
+                  "instance_id": "instance_6915d9b97e80",
+                  "name": "ПЕРЕМЕННАЯ: Имя файла со списком для фотосессии",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {
+                    "dlg_input_var": {
+                      "value": "wf_children_file_name",
+                      "enabled": true
+                    },
+                    "dlg_input_title": {
+                      "value": "Ввод значения",
+                      "enabled": true
+                    },
+                    "dlg_input_msg": {
+                      "value": "Введите имя файла, со списком для фотосессии.\n\nНапример, children.txt",
+                      "enabled": true
+                    },
+                    "dlg_input_dvalue": {
+                      "value": "children.txt",
+                      "enabled": true
+                    },
+                    "dlg_input_valid_type": {
+                      "value": "filename_txt",
+                      "enabled": true
+                    },
+                    "dlg_input_custom_regexp": {
+                      "value": null,
+                      "enabled": true
+                    },
+                    "dlg_input_custom_regexp_desc": {
+                      "value": null,
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_dialog_open",
+                  "instance_id": "instance_08bed1ebf5ef",
+                  "name": "ПЕРЕМЕННАЯ: Файл-каталог шаблонов InDesign",
+                  "description": null,
+                  "silent_mode": false,
+                  "command_line_args": {
+                    "dlg_open_var": {
+                      "value": "wf_idsgn_catalog",
+                      "enabled": true
+                    },
+                    "dlg_open_type": {
+                      "value": "file",
+                      "enabled": true
+                    },
+                    "dlg_open_title": {
+                      "value": "Выберите файл-каталог шаблонов InDesign",
+                      "enabled": true
+                    },
+                    "dlg_open_filter": {
+                      "value": "*.template",
+                      "enabled": true
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "script_set",
+              "id": "setnode_6e6401c1c392",
+              "name": "Настройка ЛОКАЛЬНЫХ переменных. Один раз для каждого класса(группы)",
               "description": null,
               "script_entries": [
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_input",
-                  "instance_id": "instance_63b97554f0f6",
-                  "name": "ВВОД: Указать школу/параллель/класс",
+                  "instance_id": "instance_166a6bcc46df",
+                  "name": "ПЕРЕМЕННАЯ: Указать школу/параллель/класс",
                   "description": null,
                   "silent_mode": false,
                   "command_line_args": {
@@ -211,7 +305,7 @@
                 },
                 {
                   "id": "root_790d968b/Workflow/wf_session_create",
-                  "instance_id": "instance_8ff1bcf532d4",
+                  "instance_id": "instance_a5f254cb0a97",
                   "name": "Создать сессию Capture One",
                   "description": null,
                   "silent_mode": false,
@@ -236,7 +330,7 @@
                 },
                 {
                   "id": "root_790d968b/Workflow/wf_list_create",
-                  "instance_id": "instance_4d093c9b6e18",
+                  "instance_id": "instance_bd1b3ed26f40",
                   "name": "Создать и распечатать список класса/группы",
                   "description": null,
                   "silent_mode": false,
@@ -260,972 +354,975 @@
               ]
             },
             {
-              "type": "script_set",
-              "id": "setnode_2f3808d39a4f",
-              "name": "Этап 3. Подготовка  RAW-файлов. Для каждой фотосессии",
+              "type": "set_folder",
+              "id": "foldernode_5a501f2575ca",
+              "name": "Этапы",
               "description": null,
-              "script_entries": [
+              "children": [
                 {
-                  "id": "root_7617c03c/GUI/gui_dialog_open",
-                  "instance_id": "instance_90225786020e",
-                  "name": "ВВОД: Выбрать карту памяти с исходными RAW-файлами",
+                  "type": "script_set",
+                  "id": "setnode_0c76bfcfd542",
+                  "name": "Этап 1. Подготовка  RAW-файлов. Для каждой фотосессии",
                   "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "dlg_open_var": {
-                      "value": "wf_raw_path",
-                      "enabled": true
+                  "script_entries": [
+                    {
+                      "id": "root_7617c03c/GUI/gui_dialog_choice",
+                      "instance_id": "instance_fd471fea6282",
+                      "name": "Выбор съемки (портретная, студийная, школьная и т.д.)",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "dlg_choice_var": {
+                          "value": "wf_photo_session",
+                          "enabled": true
+                        },
+                        "dlg_choice_title": {
+                          "value": "Выбор съемки",
+                          "enabled": true
+                        },
+                        "dlg_choice_message": {
+                          "value": "Если договором предусмотрено несколько съемок\n(например: портретная, студийная, школьная и т.д.),\nукажите название текущей съемки.\n\nВыберите название съемки в выпадающем списке:\n",
+                          "enabled": true
+                        },
+                        "dlg_choice_list": {
+                          "value": [
+                            "PORTRAIT",
+                            "SCHOOL",
+                            "SEPTEMBER1",
+                            "STREET",
+                            "STUDIO"
+                          ],
+                          "enabled": true
+                        },
+                        "dlg_choice_dvalue": {
+                          "value": "",
+                          "enabled": false
+                        }
+                      }
                     },
-                    "dlg_open_type": {
-                      "value": "directory",
-                      "enabled": true
+                    {
+                      "id": "root_7617c03c/GUI/gui_dialog_msg",
+                      "instance_id": "instance_289529716c9a",
+                      "name": "СООБЩЕНИЕ: Вставить карту памяти в компьютер",
+                      "description": null,
+                      "silent_mode": true,
+                      "command_line_args": {
+                        "dlg_msg_var": {
+                          "value": "var_user_choice",
+                          "enabled": true
+                        },
+                        "dlg_msg_type": {
+                          "value": "yes_no",
+                          "enabled": true
+                        },
+                        "dlg_msg_title": {
+                          "value": "Подтверждение",
+                          "enabled": true
+                        },
+                        "dlg_msg_message": {
+                          "value": "Не забудьте вставить карту памяти с RAW файлами в картридер вашего компьютера.\n\nОперация копирования займет некоторое время.\nВы готовы продолжить?",
+                          "enabled": true
+                        }
+                      }
                     },
-                    "dlg_open_title": {
-                      "value": "Выбрать карту памяти с исходными RAW-файлами",
-                      "enabled": true
+                    {
+                      "id": "root_7617c03c/GUI/gui_dialog_open",
+                      "instance_id": "instance_97a5109459be",
+                      "name": "ДИАЛОГ: Выбрать карту памяти с исходными RAW-файлами",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "dlg_open_var": {
+                          "value": "wf_raw_path",
+                          "enabled": true
+                        },
+                        "dlg_open_type": {
+                          "value": "directory",
+                          "enabled": true
+                        },
+                        "dlg_open_title": {
+                          "value": "Выбрать карту памяти с исходными RAW-файлами",
+                          "enabled": true
+                        },
+                        "dlg_open_filter": {
+                          "value": "Все файлы (*.*)",
+                          "enabled": true
+                        }
+                      }
                     },
-                    "dlg_open_filter": {
-                      "value": "Все файлы (*.*)",
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Workflow/wf_list_create",
+                      "instance_id": "instance_5430738be9bb",
+                      "name": "Добавить порядковый номер съемки в список класса/группы",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "wf_dest_dir": {
+                          "value": "{wf_psd_path}/{wf_session_name}",
+                          "enabled": true
+                        },
+                        "wf_output_txt_file": {
+                          "value": "{wf_session_path}/{wf_session_name}/{wf_photo_session}_{wf_children_file_name}",
+                          "enabled": true
+                        },
+                        "wf_autosave_formats": {
+                          "value": [
+                            "html",
+                            "txt"
+                          ],
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_7617c03c/SYSTEM/dir_operation",
+                      "instance_id": "instance_4e1042d5f120",
+                      "name": "Копирование файлов RAW в папку сессии",
+                      "description": "<div style=\" {theme.script_description}\">При работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b></div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "do_source_dir": {
+                          "value": "{wf_raw_path}",
+                          "enabled": true
+                        },
+                        "do_dest_dir": {
+                          "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
+                          "enabled": true
+                        },
+                        "do_mode": {
+                          "value": "copy",
+                          "enabled": true
+                        },
+                        "do_on_conflict": {
+                          "value": "overwrite",
+                          "enabled": true
+                        },
+                        "do_copy_base_folder": {
+                          "value": false,
+                          "enabled": true
+                        },
+                        "do_include": {
+                          "value": "*.cr3",
+                          "enabled": true
+                        },
+                        "all_threads": {
+                          "value": "12",
+                          "enabled": true
+                        }
+                      }
                     }
-                  }
+                  ]
                 },
                 {
-                  "id": "root_7617c03c/GUI/gui_dialog_choice",
-                  "instance_id": "instance_33b00fb96058",
-                  "name": "Выбор съемки (портретная, студийная, школьная и т.д.)",
+                  "type": "script_set",
+                  "id": "setnode_2d9191cafd07",
+                  "name": "Этап 2.1. Анализ RAW-файлов",
                   "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "dlg_choice_var": {
-                      "value": "wf_photo_session",
-                      "enabled": true
+                  "script_entries": [
+                    {
+                      "id": "root_790d968b/Workflow/analize/export_to_jpeg",
+                      "instance_id": "instance_2541c04a995a",
+                      "name": "1. Конвертировать RAW в JPEG",
+                      "description": "<div style=\"{theme.script_description}\">\n<b>Первый шаг в конвейере анализа изображений</b> \nСкрипт, конвертирует исходные файлы изображений (RAW или PSD) в формат JPEG для последующего анализа другими скриптами.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}:\n\n<b>base_dir</b> =<i> {wf_session_path} / {wf_session_name}</i>\n<b>input_dir</b> =<i> {base_dir} / Capture / {wf_photo_session}</i>\n<b>output_dir</b> =<i> {base_dir} / Output / Analysis_{wf_photo_session}  / JPG</i>\n\nЕсли ваши изображения уже в формате JPG, то данный скрипт можно не запускать.\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "a_r2j_image_type": {
+                          "value": "raw",
+                          "enabled": true
+                        },
+                        "a_r2j_preview_size": {
+                          "value": "2048",
+                          "enabled": true
+                        },
+                        "a_r2j_jpeg_quality": {
+                          "value": "90",
+                          "enabled": true
+                        },
+                        "all_threads": {
+                          "value": "12",
+                          "enabled": true
+                        }
+                      }
                     },
-                    "dlg_choice_title": {
-                      "value": "Выбор съемки",
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/img2mask",
+                      "instance_id": "instance_c302eb9737de",
+                      "name": "2. Создание маски фона",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "img_rmbg_input_dir": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG",
+                          "enabled": true
+                        },
+                        "img_rmbg_output_dir": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG/Masks",
+                          "enabled": true
+                        },
+                        "img_rmbg_processor_type": {
+                          "value": "birefnet",
+                          "enabled": true
+                        },
+                        "img_rmbg_model_rmbg": {
+                          "value": "RMBG-2.0",
+                          "enabled": true
+                        },
+                        "img_rmbg_model_birefnet": {
+                          "value": "BiRefNet-portrait",
+                          "enabled": true
+                        },
+                        "img_rmbg_background": {
+                          "value": "Solid",
+                          "enabled": true
+                        },
+                        "img_rmbg_mask_blur": {
+                          "value": "1",
+                          "enabled": true
+                        },
+                        "img_rmbg_mask_offset": {
+                          "value": "-1",
+                          "enabled": true
+                        },
+                        "img_rmbg_save_options": {
+                          "value": [
+                            "image"
+                          ],
+                          "enabled": true
+                        },
+                        "img_rmbg_invert_mask": {
+                          "value": true,
+                          "enabled": true
+                        },
+                        "img_rmbg_fast_refine": {
+                          "value": true,
+                          "enabled": true
+                        },
+                        "img_rmbg_threads": {
+                          "value": "12",
+                          "enabled": true
+                        },
+                        "img_rmbg_sensitivity": {
+                          "value": "0.5",
+                          "enabled": true
+                        },
+                        "img_rmbg_img_scale": {
+                          "value": "0",
+                          "enabled": true
+                        }
+                      }
                     },
-                    "dlg_choice_message": {
-                      "value": "Если договором предусмотрено несколько съемок\n(например: портретная, студийная, школьная и т.д.),\nукажите название текущей съемки.\n\nВыберите название съемки в выпадающем списке:\n",
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Workflow/analize/analyze_faces",
+                      "instance_id": "instance_a8c39a1c7ee6",
+                      "name": "3. Найти лица на фотографиях. Вычислить эмбединги",
+                      "description": "<div style=\" {theme.script_description}\">\n<b>Второй по очереди (но главный по сути) скрипт в конвейере анализа изображений</b> \nСкрипт анализуирует изображения в формате JPG, распознает на них лица людей и переводит их в векторный формат (вычисляет эмбединги). Результаты анализа сохраняются в JSON и NPY-файлы (отдельно для портретных и групповых фотографий).\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>output_dir</b> = <i>{base_dir} / Output / Analysis_{photo_session}</i>\n<b>input_dir</b> = <i>{output_dir} / JPG</i>\n\nСкрипт работает с файлами JPG, поэтому RAW и PSD файлы необходимо предварительно конвертировать.\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "a_af_config_file": {
+                          "value": "config.toml",
+                          "enabled": true
+                        },
+                        "all_threads": {
+                          "value": 0,
+                          "enabled": true
+                        }
+                      }
                     },
-                    "dlg_choice_list": {
-                      "value": [
-                        "PORTRAIT",
-                        "SCHOOL",
-                        "SEPTEMBER1",
-                        "STREET",
-                        "STUDIO"
-                      ],
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Workflow/analize/cluster_portraits",
+                      "instance_id": "instance_42266e06529f",
+                      "name": "4. Кластеризация портретных фотографий",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "a_cp_portrait_json": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+                          "enabled": true
+                        },
+                        "a_cp_names_file": {
+                          "value": "{wf_session_path}/{wf_session_name}/{wf_photo_session}_{wf_children_file_name}",
+                          "enabled": true
+                        },
+                        "a_cp_config": {
+                          "value": "config.toml",
+                          "enabled": true
+                        },
+                        "a_cp_algorithm": {
+                          "value": "dbscan",
+                          "enabled": true
+                        }
+                      }
                     },
-                    "dlg_choice_dvalue": {
-                      "value": "",
-                      "enabled": false
+                    {
+                      "id": "root_790d968b/Workflow/analize/cluster_locations",
+                      "instance_id": "instance_506298540e45",
+                      "name": "5. Группировать фотографии по локациям",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "a_cl_config_file": {
+                          "value": "config.toml",
+                          "enabled": true
+                        },
+                        "a_cl_cluster_eps": {
+                          "value": 0.14,
+                          "enabled": true
+                        },
+                        "a_cl_location_prompts": {
+                          "value": null,
+                          "enabled": true
+                        },
+                        "all_threads": {
+                          "value": 0,
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_790d968b/Workflow/analize/analyze_keypoints",
+                      "instance_id": "instance_bd422c54312e",
+                      "name": "6. Анализ атрибутов лица",
+                      "description": "<div style=\" {theme.script_description}\">\n<b>Четвертый (<i>НЕОБАЗЯТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт, на основании вычисленных ключевых точек <i>landmark_2d_106</i> и <i>landmark_3d_68</i>, анализирует атрибуты лица/головы: состояние глаз (открыты/закрыты) и рта (открыт/закрыт), поворота и наклона (вправо/влево/вверх/вниз).\nИнформация добавляется в файл JSON созданный скриптом №2.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i> \n<b>data_dir</b> = <i>{base} / Output / Analysis_{wf_photo_session}</i>\n\nЕсли эти данные не нужны, то скрипт можно удалить из рабочеого процесса\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "a_ak_config_file": {
+                          "value": "config.toml",
+                          "enabled": true
+                        }
+                      }
                     }
-                  }
+                  ]
                 },
                 {
-                  "id": "root_790d968b/Workflow/wf_list_create",
-                  "instance_id": "instance_0e547d7c03ff",
-                  "name": "Добавить порядковый номер съемки в список класса/группы",
+                  "type": "script_set",
+                  "id": "setnode_4f936306fd96",
+                  "name": "Этап 2.3. Ручное редактирование кластеров",
                   "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "wf_dest_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}",
-                      "enabled": true
+                  "script_entries": [
+                    {
+                      "id": "root_7617c03c/GUI/gui_dialog_msg",
+                      "instance_id": "instance_ca9fc37081fd",
+                      "name": "СООБЩЕНИЕ: Запустить редактор кластеров?",
+                      "description": "<div style=\" {theme.script_description}\">\nСкрипт показывает диалоговое окно  для запуска/пропуска скриптов редактирования кластеров:\n- YES - последовательно запускаются скрипты редактирования кластеров портретных фотографий, кластеров локация и др.\n- NO  - скрипты редактирования кластеров пропускаются, выполнение текущего блока завершается\n\nВыбор пользователя сохраняется в переменной контекста <b>var_use_claster_editor</b>\n</div>",
+                      "silent_mode": true,
+                      "command_line_args": {
+                        "dlg_msg_var": {
+                          "value": "var_use_claster_editor",
+                          "enabled": true
+                        },
+                        "dlg_msg_type": {
+                          "value": "yes_no",
+                          "enabled": true
+                        },
+                        "dlg_msg_title": {
+                          "value": "Подтверждение",
+                          "enabled": true
+                        },
+                        "dlg_msg_message": {
+                          "value": "Следующий скрипт в очереди Редактор кластеров.\n\nВы хотите изменить структуру кластеров и/или экспортировать \nфотографии и отправить их родителями для выбора портретов?",
+                          "enabled": true
+                        }
+                      }
                     },
-                    "wf_output_txt_file": {
-                      "value": "{wf_session_path}/{wf_session_name}/{wf_photo_session}_{wf_children_file_name}",
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Workflow/analize/cluster_editor",
+                      "instance_id": "instance_695438502727",
+                      "name": "Редактировать портретные кластеры",
+                      "description": "<div style=\" {theme.script_description}\">\nСкрипт позволяет визуально, в ручном режиме, редактировать кластеры ПОРТРЕТНЫХ фотографий (просматривать и удалять фотографии кластера, перемещать их из одного кластера в другой, изменять название кластера). \n\nДополнительно в скрипте реализован экспорт изображений в формат JPG с водяными знаками. При экспорте переменной контекста <b>var_jpg_move</b> присваивается значение <b>yes</b>\n<b>var_jpg_move = yes</b>\n\nПути к рабочим папкам формируется из переменных контекста: \n- {wf_session_path}, \n- {wf_session_name}, \n- {wf_photo_session},\n- {wf_children_file_name}.\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "ce_portrait_json": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+                          "enabled": true
+                        },
+                        "ce_group_json": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+                          "enabled": true
+                        },
+                        "mode": {
+                          "value": "face",
+                          "enabled": true
+                        }
+                      }
                     },
-                    "wf_autosave_formats": {
-                      "value": [
-                        "html",
-                        "txt"
-                      ],
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Workflow/analize/cluster_editor",
+                      "instance_id": "instance_355076ddd213",
+                      "name": "Редактировать кластеры локаций",
+                      "description": "<div style=\" {theme.script_description}\">\nСкрипт позволяет визуально, в ручном режиме, редактировать кластеры ЛОКАЦИЙ (просматривать и удалять фотографии кластера, перемещать их из одного кластера в другой, изменять название кластера). \n\nДополнительно в скрипте реализован экспорт изображений в формат JPG с водяными знаками. При экспорте переменной контекста <b>var_jpg_move</b> присваивается значение <b>yes</b>\n<b>var_jpg_move = yes</b>\n\nПути к рабочим папкам формируется из переменных контекста: \n- {wf_session_path}, \n- {wf_session_name}, \n- {wf_photo_session},\n- {wf_children_file_name}.\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "ce_portrait_json": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+                          "enabled": true
+                        },
+                        "ce_group_json": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+                          "enabled": true
+                        },
+                        "mode": {
+                          "value": "location",
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_7617c03c/SYSTEM/py_if_else",
+                      "instance_id": "instance_2fc4d244e10e",
+                      "name": "УСЛОВИЕ 1: Проверка наличия портретных фотографий (да/нет)",
+                      "description": "<div style=\" {theme.script_description}\">\nПроверка переменной контекста <b>var_another_session</b>\n\nВ зависимости от значения переменной выбирается  режим работы скрипта просмотра и экспорта фотографий из списка [ПОРТРЕТ-Групповые фотографии].\n\nЕсли значение равно:\n- YES - используются ПОРТРЕТЫ ТЕКУЩЕЙ ФОТОСЕССИИ (<b>БЛОК ИСТИНА</b>)\n- NO  - используются ЭТАЛОННЫЕ ПОРТРЕТЫ (<b>БЛОК ЛОЖЬ</b>)\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "if-variable-name": {
+                          "value": "var_another_session",
+                          "enabled": true
+                        },
+                        "if-operator": {
+                          "value": "равно",
+                          "enabled": true
+                        },
+                        "if-comparison-value": {
+                          "value": "yes",
+                          "enabled": true
+                        },
+                        "then-instance-id": {
+                          "value": "instance_698f648d2679",
+                          "enabled": true
+                        },
+                        "else-instance-id": {
+                          "value": "instance_bf622a030abc",
+                          "enabled": true
+                        },
+                        "clear-variable": {
+                          "value": false,
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_790d968b/Workflow/analize/cluster_editor",
+                      "instance_id": "instance_698f648d2679",
+                      "name": "БЛОК ИСТИНА: Просмотр и экспорт списка [ПОРТРЕТ-Групповые фотографии]",
+                      "description": "<div style=\" {theme.markup_number}\">\nЭкземпляр скрипта запускается в случае, когда  в текущей фотосессии ЕСТЬ портретные фотографии\n</div>\n<div style=\" {theme.script_description}\">\nЗапуск Редактора кластеров в режиме просмотра фотографий  [ПОРТРЕТ-Групповые фотографии]\n\nДля идентификации людей на групповых фотографиях текущей фотосессии <b>{wf_photo_session}</b> используются ПОРТРЕТЫ текущей фотосессии.\n\n\nДополнительно в скрипте реализован экспорт изображений в формат JPG с водяными знаками. При экспорте переменной контекста <b>var_jpg_move</b> присваивается значение <b>yes</b>\n<b>var_jpg_move = yes</b>\n\nПути к рабочим папкам формируется из переменных контекста: \n- {wf_session_path}, \n- {wf_session_name}, \n- {wf_photo_session}\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "ce_portrait_json": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+                          "enabled": true
+                        },
+                        "ce_group_json": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+                          "enabled": true
+                        },
+                        "mode": {
+                          "value": "matches",
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_7617c03c/GUI/gui_dialog_goto",
+                      "instance_id": "instance_792a9db0b62f",
+                      "name": "БЛОК ИСТИНА: Завершение блока",
+                      "description": "<div style=\" {theme.markup_number}\">\nФинальный скрипт <b>БЛОКА ИСТИНА</b> в скрипте управления <b>УСЛОВИЕ1</b>\n</div>\n<div style=\" {theme.script_description}\">\nСкрипт выполняет переход к первому скрипту после блока <b>БЛОКА ЛОЖЬ</b>\n</div>",
+                      "silent_mode": true,
+                      "command_line_args": {
+                        "dlg_goto_title": {
+                          "value": "Выбор следующего действия",
+                          "enabled": true
+                        },
+                        "dlg_goto_message": {
+                          "value": "Выберите скрипт, к которому нужно перейти:",
+                          "enabled": true
+                        },
+                        "dlg_goto_script_id": {
+                          "value": "instance_083ff0675826",
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_790d968b/Workflow/analize/cluster_editor",
+                      "instance_id": "instance_bf622a030abc",
+                      "name": "БЛОК ЛОЖЬ: Просмотр и экспорт списка [ЭТАЛОННЫЙ ПОРТРЕТ-Групповые фотографии]",
+                      "description": "<div style=\" {theme.status_error}\">\nЭкземпляр скрипта запускается в случае, когда  в текущей фотосессии НЕТ портретных фотографий\n</div>\n<div style=\" {theme.script_description}\">\nЗапуск Редактора кластеров в режиме просмотра фотографий  [ЭТАЛОННЫЙ ПОРТРЕТ-Групповые фотографии]\n\nДля идентификации людей на групповых фотографиях текущей фотосессии <b>{wf_photo_session}</b> используются ПОРТРЕТЫ эталонной фотосессии <b>{wf_portrait_session}</b>\n\nДополнительно в скрипте реализован экспорт изображений в формат JPG с водяными знаками. При экспорте переменной контекста <b>var_jpg_move</b> присваивается значение <b>yes</b>\n<b>var_jpg_move = yes</b>\n\nПути к рабочим папкам формируется из переменных контекста: \n- {wf_session_path}, \n- {wf_session_name}, \n- {wf_photo_session},\n- {wf_portrait_session}\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "ce_portrait_json": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_portrait_session}/info_portrait_faces.json",
+                          "enabled": true
+                        },
+                        "ce_group_json": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+                          "enabled": true
+                        },
+                        "mode": {
+                          "value": "matches",
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_7617c03c/SYSTEM/py_if_else",
+                      "instance_id": "instance_083ff0675826",
+                      "name": "УСЛОВИЕ 2: Наличие миниатюр с водяными знаками (да/нет)",
+                      "description": "<div style=\" {theme.script_description}\">\nСкрипт проверяет переменную <b>var_jpg_move</b>, которая содержит информацию о выполнении операции экспорта фотографий в файлы JPG с водяными знаками.\n\nЕсли <b>var_jpg_move = yes</b>, то запускается скрипт перемещения файлов  JPG на Яндекс-диск (для отправки родителям)\n</div>",
+                      "silent_mode": true,
+                      "command_line_args": {
+                        "if-variable-name": {
+                          "value": "var_jpg_move",
+                          "enabled": true
+                        },
+                        "if-operator": {
+                          "value": "равно",
+                          "enabled": true
+                        },
+                        "if-comparison-value": {
+                          "value": "1",
+                          "enabled": true
+                        },
+                        "then-instance-id": {
+                          "value": "instance_f82a3defce6d",
+                          "enabled": true
+                        },
+                        "else-instance-id": {
+                          "value": "instance_bc39769fde8b",
+                          "enabled": true
+                        },
+                        "clear-variable": {
+                          "value": true,
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_7617c03c/SYSTEM/dir_operation",
+                      "instance_id": "instance_f82a3defce6d",
+                      "name": "БЛОК ИСТИНА: Перемещение файлов JPG в папку для выбора",
+                      "description": "<div style=\" {theme.markup_number}\">\nЭкземпляр скрипта запускается если раньше была выполнена операция экспорта фотографий в файлы JPG с водяными знаками.\nПеременная контекста <i>var_jpg_move = yes</i>\n</div>\n<div style=\" {theme.script_description}\">\nСкрипт перемещает отсортированные папки с файлами JPG (c потретными и/или фотографиями с водяными знаками) на Яндекс-диск.\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "do_source_dir": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/{wf_session_name}",
+                          "enabled": true
+                        },
+                        "do_dest_dir": {
+                          "value": "{wf_psd_path}/{wf_session_name}",
+                          "enabled": true
+                        },
+                        "do_mode": {
+                          "value": "move",
+                          "enabled": true
+                        },
+                        "do_on_conflict": {
+                          "value": "overwrite",
+                          "enabled": true
+                        },
+                        "do_copy_base_folder": {
+                          "value": false,
+                          "enabled": true
+                        },
+                        "do_include": {
+                          "value": "*.jpg",
+                          "enabled": true
+                        },
+                        "all_threads": {
+                          "value": "8",
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_7617c03c/SYSTEM/cli_var_remove",
+                      "instance_id": "instance_bc39769fde8b",
+                      "name": "Удаление переменной var_jpg_move (есть файлы для перемещения)",
+                      "description": "Удаление переменной var_jpg_move.\nПеременная автоматически создается при любом экспорте файлов в Редакторе кластеров.",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "remove_var_name": {
+                          "value": "var_jpg_move",
+                          "enabled": true
+                        },
+                        "remove_fail_if_missing": {
+                          "value": null,
+                          "enabled": false
+                        }
+                      }
                     }
-                  }
+                  ]
                 },
                 {
-                  "id": "root_7617c03c/SYSTEM/dir_operation",
-                  "instance_id": "instance_51b89ea5bf5d",
-                  "name": "Копирование файлов RAW в папку сессии",
-                  "description": "<div style=\" {theme.script_description}\">При работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b></div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "do_source_dir": {
-                      "value": "{wf_raw_path}",
-                      "enabled": true
-                    },
-                    "do_dest_dir": {
-                      "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "do_mode": {
-                      "value": "copy",
-                      "enabled": true
-                    },
-                    "do_on_conflict": {
-                      "value": "overwrite",
-                      "enabled": true
-                    },
-                    "do_copy_base_folder": {
-                      "value": false,
-                      "enabled": true
-                    },
-                    "do_include": {
-                      "value": "*.cr3",
-                      "enabled": true
-                    },
-                    "all_threads": {
-                      "value": "8",
-                      "enabled": true
-                    }
-                  }
-                }
-              ]
-            },
-            {
-              "type": "script_set",
-              "id": "setnode_65525fefd866",
-              "name": "Этап 4.1. Анализ RAW-файлов",
-              "description": null,
-              "script_entries": [
-                {
-                  "id": "root_790d968b/Workflow/analize/export_to_jpeg",
-                  "instance_id": "instance_701650ad9829",
-                  "name": "1. Конвертировать RAW в JPEG",
-                  "description": "<div style=\"{theme.script_description}\">\n<b>Первый шаг в конвейере анализа изображений</b> \nСкрипт, конвертирует исходные файлы изображений (RAW или PSD) в формат JPEG для последующего анализа другими скриптами.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}:\n\n<b>base_dir</b> =<i> {wf_session_path} / {wf_session_name}</i>\n<b>input_dir</b> =<i> {base_dir} / Capture / {wf_photo_session}</i>\n<b>output_dir</b> =<i> {base_dir} / Output / Analysis_{wf_photo_session}  / JPG</i>\n\nЕсли ваши изображения уже в формате JPG, то данный скрипт можно не запускать.\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "a_r2j_image_type": {
-                      "value": "raw",
-                      "enabled": true
-                    },
-                    "a_r2j_preview_size": {
-                      "value": "1024",
-                      "enabled": true
-                    },
-                    "a_r2j_jpeg_quality": {
-                      "value": "90",
-                      "enabled": true
-                    },
-                    "all_threads": {
-                      "value": "12",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/img2mask",
-                  "instance_id": "instance_9ce755e8a67c",
-                  "name": "2. Создание маски фона",
+                  "type": "script_set",
+                  "id": "setnode_d7d1ceea30b1",
+                  "name": "Этап 2.4. Генерация файлов XMP и HTML",
                   "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "img_rmbg_input_dir": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG",
-                      "enabled": true
+                  "script_entries": [
+                    {
+                      "id": "root_790d968b/Workflow/analize/wf_raw_create_xmp",
+                      "instance_id": "instance_36a0615730ad",
+                      "name": "Создать XMP-файлы",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "all_threads": {
+                          "value": 8,
+                          "enabled": true
+                        }
+                      }
                     },
-                    "img_rmbg_output_dir": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG/Masks",
-                      "enabled": true
-                    },
-                    "img_rmbg_processor_type": {
-                      "value": "birefnet",
-                      "enabled": true
-                    },
-                    "img_rmbg_model_rmbg": {
-                      "value": "RMBG-2.0",
-                      "enabled": true
-                    },
-                    "img_rmbg_model_birefnet": {
-                      "value": "BiRefNet-portrait",
-                      "enabled": true
-                    },
-                    "img_rmbg_background": {
-                      "value": "Solid",
-                      "enabled": true
-                    },
-                    "img_rmbg_mask_blur": {
-                      "value": "1",
-                      "enabled": true
-                    },
-                    "img_rmbg_mask_offset": {
-                      "value": "-1",
-                      "enabled": true
-                    },
-                    "img_rmbg_save_options": {
-                      "value": [
-                        "image"
-                      ],
-                      "enabled": true
-                    },
-                    "img_rmbg_invert_mask": {
-                      "value": true,
-                      "enabled": true
-                    },
-                    "img_rmbg_fast_refine": {
-                      "value": true,
-                      "enabled": true
-                    },
-                    "img_rmbg_threads": {
-                      "value": "12",
-                      "enabled": true
-                    },
-                    "img_rmbg_sensitivity": {
-                      "value": "0.5",
-                      "enabled": true
-                    },
-                    "img_rmbg_img_scale": {
-                      "value": "0",
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Workflow/analize/generate_report",
+                      "instance_id": "instance_a267ae93b68d",
+                      "name": "Создать HTML-отчет",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {}
                     }
-                  }
+                  ]
                 },
                 {
-                  "id": "root_790d968b/Workflow/analize/analyze_faces",
-                  "instance_id": "instance_870b8301365d",
-                  "name": "3. Найти лица на фотографиях. Вычислить эмбединги",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Второй по очереди (но главный по сути) скрипт в конвейере анализа изображений</b> \nСкрипт анализуирует изображения в формате JPG, распознает на них лица людей и переводит их в векторный формат (вычисляет эмбединги). Результаты анализа сохраняются в JSON и NPY-файлы (отдельно для портретных и групповых фотографий).\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>output_dir</b> = <i>{base_dir} / Output / Analysis_{photo_session}</i>\n<b>input_dir</b> = <i>{output_dir} / JPG</i>\n\nСкрипт работает с файлами JPG, поэтому RAW и PSD файлы необходимо предварительно конвертировать.\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "a_af_config_file": {
-                      "value": "config.toml",
-                      "enabled": true
-                    },
-                    "all_threads": {
-                      "value": 0,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow/analize/cluster_faces",
-                  "instance_id": "instance_a2870942d739",
-                  "name": "4. Группировать портретные фотографии",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Третий скрипт в конвейере анализа изображений</b> \nСкрипт объединяет похожие портретные фотографии в кластеры и идентифицирует людей на групповых фотографиях.\nЕсли задан список фотографируемых, то присваивает кластерами имена в соответствии со списком.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output / Analysis_{wf_photo_session}</i>\n<b>children_file</b> = <i>{base_dir} / {wf_photo_session}_{wf_children_file_name}</i>\n\nДля работы необходимы эмбединги (векторные представления лиц), полученные предыдущим скриптом анализа.\n</div>\n",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "a_cf_algorithm": {
-                      "value": "dbscan",
-                      "enabled": true
-                    },
-                    "a_cf_config_file": {
-                      "value": "config.toml",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow/analize/cluster_locations",
-                  "instance_id": "instance_bd112dc4769d",
-                  "name": "5. Группировать фотографии по локациям",
+                  "type": "script_set",
+                  "id": "setnode_2e69841270a0",
+                  "name": "Этап 3. Копирование PSD файлов в папку для ретуши. Для каждой фотосессии",
                   "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "a_cl_config_file": {
-                      "value": "config.toml",
-                      "enabled": true
+                  "script_entries": [
+                    {
+                      "id": "root_790d968b/Workflow/analize/wf_photo_select2",
+                      "instance_id": "instance_88638eba99d1",
+                      "name": "Отметить фотографии выбранные клиентами",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {}
                     },
-                    "a_cl_cluster_eps": {
-                      "value": 0.14,
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Workflow/wf_session_open",
+                      "instance_id": "instance_f44f07f95aa2",
+                      "name": "Запуск Capture One для цветокоррекции выбранных фотографий",
+                      "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nЦветокоррекция фотографий, отобранных клиентом, и их экспорт в формат PSD для дальнейшей ретуши.\n\nПри экспорте используйте рецепт <b>_PSD_8bit_</b>\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "__wf_session_file_path": {
+                          "value": "{wf_session_path}/{wf_session_name}/{wf_session_name}.cosessiondb",
+                          "enabled": true
+                        }
+                      }
                     },
-                    "a_cl_location_prompts": {
-                      "value": [],
-                      "enabled": true
+                    {
+                      "id": "root_7617c03c/GUI/gui_dialog_msg",
+                      "instance_id": "instance_f59d2b8068ec",
+                      "name": "СООБЩЕНИЕ: Завершение работы в Capture One",
+                      "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nПодтверждение экспорта из Capture One (с помощью рецепта <b>_PSD_8bit_</b>) фотографий выбранных для ретуши \n\nЕсли эта операция еще не выполнена, то не запускайте скрипт или нажмите кнопку <b>Нет</b>\nПереходить к следующему скрипту не рекомендуется!\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "dlg_msg_var": {
+                          "value": "var_user_choice",
+                          "enabled": true
+                        },
+                        "dlg_msg_type": {
+                          "value": "yes_no",
+                          "enabled": true
+                        },
+                        "dlg_msg_title": {
+                          "value": "Подтверждение",
+                          "enabled": true
+                        },
+                        "dlg_msg_message": {
+                          "value": "Для продолжения работы необходимо выполнить экспорт\nотобранных для ретуши фотографий в формат PSD.\n\nВы уверены, что хотите продолжить?",
+                          "enabled": true
+                        }
+                      }
                     },
-                    "all_threads": {
-                      "value": 0,
-                      "enabled": true
+                    {
+                      "id": "root_7617c03c/SYSTEM/dir_operation",
+                      "instance_id": "instance_476f19adc682",
+                      "name": "Перемещение файлов PSD в папку Альбом",
+                      "description": "<div style=\" {theme.script_description}\">При работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b></div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "do_source_dir": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/{wf_session_name}",
+                          "enabled": true
+                        },
+                        "do_dest_dir": {
+                          "value": "{wf_psd_path}/{wf_session_name}",
+                          "enabled": true
+                        },
+                        "do_mode": {
+                          "value": "move",
+                          "enabled": true
+                        },
+                        "do_on_conflict": {
+                          "value": "overwrite",
+                          "enabled": true
+                        },
+                        "do_copy_base_folder": {
+                          "value": false,
+                          "enabled": true
+                        },
+                        "do_include": {
+                          "value": "*.psd",
+                          "enabled": true
+                        },
+                        "all_threads": {
+                          "value": "8",
+                          "enabled": true
+                        }
+                      }
                     }
-                  }
+                  ]
                 },
                 {
-                  "id": "root_790d968b/Workflow/analize/analyze_keypoints",
-                  "instance_id": "instance_39e895b5f988",
-                  "name": "6. Анализ атрибутов лица",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Четвертый (<i>НЕОБАЗЯТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт, на основании вычисленных ключевых точек <i>landmark_2d_106</i> и <i>landmark_3d_68</i>, анализирует атрибуты лица/головы: состояние глаз (открыты/закрыты) и рта (открыт/закрыт), поворота и наклона (вправо/влево/вверх/вниз).\nИнформация добавляется в файл JSON созданный скриптом №2.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i> \n<b>data_dir</b> = <i>{base} / Output / Analysis_{wf_photo_session}</i>\n\nЕсли эти данные не нужны, то скрипт можно удалить из рабочеого процесса\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "a_ak_config_file": {
-                      "value": "config.toml",
-                      "enabled": true
-                    }
-                  }
-                }
-              ]
-            },
-            {
-              "type": "script_set",
-              "id": "setnode_8316d21f5fdc",
-              "name": "Этап 4.2. Ручное редактирование кластеров",
-              "description": null,
-              "script_entries": [
-                {
-                  "id": "root_7617c03c/GUI/gui_dialog_msg",
-                  "instance_id": "instance_f67de4932175",
-                  "name": "СООБЩЕНИЕ: Запустить редактор кластеров",
+                  "type": "script_set",
+                  "id": "setnode_120eb53dcfae",
+                  "name": "Этап 4. Ретушь фотографий. Для каждой фотосессии",
                   "description": null,
-                  "silent_mode": true,
-                  "command_line_args": {
-                    "dlg_msg_var": {
-                      "value": "var_use_claster_editor",
-                      "enabled": true
+                  "script_entries": [
+                    {
+                      "id": "root_790d968b/Photoshop/ps_photoshop_launch",
+                      "instance_id": "instance_d0c6fd47db88",
+                      "name": "Фотошоп - Запустить",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "photoshop_app_dir": {
+                          "value": null,
+                          "enabled": false
+                        }
+                      }
                     },
-                    "dlg_msg_type": {
-                      "value": "yes_no_cancel",
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Photoshop/ps_action_batch_set_select",
+                      "instance_id": "instance_cf22475fc8a7",
+                      "name": "Экшен - Универсальный пакетный запуск",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "ps_mode": {
+                          "value": "selected_file_folder",
+                          "enabled": true
+                        },
+                        "ps_file_path": {
+                          "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}/11.psd",
+                          "enabled": true
+                        },
+                        "ps_recursive": {
+                          "value": true,
+                          "enabled": true
+                        },
+                        "ps_action_set": {
+                          "value": null,
+                          "enabled": true
+                        },
+                        "ps_action_name": {
+                          "value": null,
+                          "enabled": true
+                        }
+                      }
                     },
-                    "dlg_msg_title": {
-                      "value": "Подтверждение",
-                      "enabled": true
-                    },
-                    "dlg_msg_message": {
-                      "value": "Следующий скрипт в очереди Редактор кластеров.\n\nВы хотите изменить структуру кластеров и/или экспортировать \nфотографии и отправить их родителями для выбора портретов?",
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Photoshop/ps_document_close",
+                      "instance_id": "instance_dfad2563eb89",
+                      "name": "Закрыть файл-пресет",
+                      "description": null,
+                      "silent_mode": true,
+                      "command_line_args": {
+                        "ps_document_name": {
+                          "value": null,
+                          "enabled": false
+                        },
+                        "ps_force_close": {
+                          "value": true,
+                          "enabled": true
+                        },
+                        "ps_save_on_close": {
+                          "value": false,
+                          "enabled": false
+                        }
+                      }
                     }
-                  }
+                  ]
                 },
                 {
-                  "id": "root_7617c03c/SYSTEM/py_if_else",
-                  "instance_id": "instance_6ded9af10549",
-                  "name": "УСЛОВИЕ: Запуск Редактора кластеров (да/нет/отмена)",
-                  "description": "<div style=\" {theme.status_error}\">\nЕсли выбран режим РУЧНОГО редактирования кластеров, то запускается соответствующий редактор, в противном случае продолжается анализ фотографий.\n</div>",
-                  "silent_mode": true,
-                  "command_line_args": {
-                    "if-variable-name": {
-                      "value": "var_use_claster_editor",
-                      "enabled": true
-                    },
-                    "if-operator": {
-                      "value": "равно",
-                      "enabled": true
-                    },
-                    "if-comparison-value": {
-                      "value": "yes",
-                      "enabled": true
-                    },
-                    "then-instance-id": {
-                      "value": "instance_be3729dd9a27",
-                      "enabled": true
-                    },
-                    "else-instance-id": {
-                      "value": "instance_3fd661e2d3da",
-                      "enabled": true
-                    },
-                    "clear-variable": {
-                      "value": true,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow/analize/cluster_editor",
-                  "instance_id": "instance_be3729dd9a27",
-                  "name": "1. Ручное редактирование портретных кластеров",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Третий+ (<i>дополнительный, но НЕОБЯЗАТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт позволяет визуально, в ручном режиме, редактировать кластеры портретных фотографий (просматривать и удалять фотографии кластера, перемещать их из одного кластера в другой, изменять название кластера). \n\nДополнительно в скрипте реализован минимальный функционал редактирования изображение и его экспорта с водяными знаками. \n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output /  Analysis_{wf_photo_session}</i>\n<b>images_dir</b> = <i>{data_dir} / JPG</i>\n<b>sorted_dir</b> = <i>{base_dir} / Output /  Claster_{photo_session}</i>\n\nСкрипт не будет работать, если предварительно не отработал скирпт №3\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "mode": {
-                      "value": "face",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow/analize/cluster_editor",
-                  "instance_id": "instance_8aace3ce0a61",
-                  "name": "2. Ручное редактирование кластеров локаций",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Третий+ (<i>дополнительный, но НЕОБЯЗАТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт позволяет визуально, в ручном режиме, редактировать кластеры портретных фотографий (просматривать и удалять фотографии кластера, перемещать их из одного кластера в другой, изменять название кластера). \n\nДополнительно в скрипте реализован минимальный функционал редактирования изображение и его экспорта с водяными знаками. \n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output /  Analysis_{wf_photo_session}</i>\n<b>images_dir</b> = <i>{data_dir} / JPG</i>\n<b>sorted_dir</b> = <i>{base_dir} / Output /  Claster_{photo_session}</i>\n\nСкрипт не будет работать, если предварительно не отработал скирпт №3\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "mode": {
-                      "value": "location",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow/analize/cluster_editor",
-                  "instance_id": "instance_a2003c242df0",
-                  "name": "3. Просмотр и экспорт списка [Портрет-Групповые фотографии]",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Третий+ (<i>дополнительный, но НЕОБЯЗАТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт позволяет визуально, в ручном режиме, редактировать кластеры портретных фотографий (просматривать и удалять фотографии кластера, перемещать их из одного кластера в другой, изменять название кластера). \n\nДополнительно в скрипте реализован минимальный функционал редактирования изображение и его экспорта с водяными знаками. \n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name}, {wf_photo_session} и {wf_children_file_name}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output /  Analysis_{wf_photo_session}</i>\n<b>images_dir</b> = <i>{data_dir} / JPG</i>\n<b>sorted_dir</b> = <i>{base_dir} / Output /  Claster_{photo_session}</i>\n\nСкрипт не будет работать, если предварительно не отработал скирпт №3\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "mode": {
-                      "value": "matches",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/py_if_else",
-                  "instance_id": "instance_9cffe227fc38",
-                  "name": "УСЛОВИЕ: Наличие миниатюр с водяными знаками (да/нет)",
-                  "description": "<div style=\" {theme.status_error}\">\nЕсли экспортированы портреты с водяными знаками, то переместить фотографии на Яндекс-диск, для отправки родителям\n</div>",
-                  "silent_mode": true,
-                  "command_line_args": {
-                    "if-variable-name": {
-                      "value": "var_jpg_move",
-                      "enabled": true
-                    },
-                    "if-operator": {
-                      "value": "равно",
-                      "enabled": true
-                    },
-                    "if-comparison-value": {
-                      "value": "1",
-                      "enabled": true
-                    },
-                    "then-instance-id": {
-                      "value": "instance_ea25cd5e03db",
-                      "enabled": true
-                    },
-                    "else-instance-id": {
-                      "value": "instance_3fd661e2d3da",
-                      "enabled": true
-                    },
-                    "clear-variable": {
-                      "value": true,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/dir_operation",
-                  "instance_id": "instance_ea25cd5e03db",
-                  "name": "3. Перемещение файлов JPG в папку для отбора",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Третий++ (<i>дополнительный, но НЕОБЯЗАТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт перемещает/копирует отсортированные папки с потретными фотографиями на Яндекс-диск\n\nПри работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b>\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "do_source_dir": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/{wf_session_name}",
-                      "enabled": true
-                    },
-                    "do_dest_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}",
-                      "enabled": true
-                    },
-                    "do_mode": {
-                      "value": "move",
-                      "enabled": true
-                    },
-                    "do_on_conflict": {
-                      "value": "overwrite",
-                      "enabled": true
-                    },
-                    "do_copy_base_folder": {
-                      "value": false,
-                      "enabled": true
-                    },
-                    "do_include": {
-                      "value": "*.jpg",
-                      "enabled": true
-                    },
-                    "all_threads": {
-                      "value": "8",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/log_report",
-                  "instance_id": "instance_3fd661e2d3da",
-                  "name": "4. Промежуточный отчёт",
+                  "type": "script_set",
+                  "id": "setnode_29f0462f6c77",
+                  "name": "Этап 5. Автоматическая верстка",
                   "description": null,
-                  "silent_mode": true,
-                  "command_line_args": {}
-                }
-              ]
-            },
-            {
-              "type": "script_set",
-              "id": "setnode_24d3f81a8abd",
-              "name": "Этап 4.3. Создание отчетов",
-              "description": null,
-              "script_entries": [
-                {
-                  "id": "root_790d968b/Workflow/analize/wf_raw_create_xmp",
-                  "instance_id": "instance_ff2a03b77dd3",
-                  "name": "1. Создать XMP файлы",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Пятый (<i>НЕОБАЗЯТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт создает XMP файл для каждого изображения в папке фотосессии. В XMP файл сохраняется наиболее важная информация полученная в ходе анализа: портретная или групповая фотография, имя фотографируемого, его пол, атрибуты лица и др.\nЭти данные видны в любых программах читающих XMP файлы (Capture One, ACR  и др.)\n\nЕсли эти данные не нужны, то скрипт можно удалить из рабочеого процесса\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "all_threads": {
-                      "value": "12",
-                      "enabled": true
+                  "script_entries": [
+                    {
+                      "id": "root_7617c03c/SYSTEM/py_if_else",
+                      "instance_id": "instance_80b97d553220",
+                      "name": "УСЛОВИЕ: Проверка КАТАЛОГА ШАБЛОНОВ",
+                      "description": "<div style=\" {theme.script_description}\">\nСкрипт проверяет наличие переменной <b>wf_idsgn_catalog</b>, которая содержит путь к каталогу шаблонов InDesign.\n\nЕсли переменная не существует, то программа предлагает выбрать файл-каталог шаблонов.\nЕсли переменная существует, то запускается скрипт каталогизатор.\n</div>",
+                      "silent_mode": true,
+                      "command_line_args": {
+                        "if-variable-name": {
+                          "value": "wf_idsgn_catalog",
+                          "enabled": true
+                        },
+                        "if-operator": {
+                          "value": "равно",
+                          "enabled": true
+                        },
+                        "if-comparison-value": {
+                          "value": "None",
+                          "enabled": true
+                        },
+                        "then-instance-id": {
+                          "value": "instance_f16d635107a2",
+                          "enabled": true
+                        },
+                        "else-instance-id": {
+                          "value": "instance_4213938c8403",
+                          "enabled": true
+                        },
+                        "clear-variable": {
+                          "value": false,
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_7617c03c/GUI/gui_dialog_open",
+                      "instance_id": "instance_f16d635107a2",
+                      "name": "БЛОК ИСТИНА: Открыть файл-каталог шаблонов InDesign",
+                      "description": "<div style=\" {theme.markup_number}\">\nСкрипт запускается если не выбран каталог шаблонов InDesign.\n</div>\n<div style=\" {theme.script_description}\">\nСкрипт открывает диалоговое окно для выбора пути к файлу-каталогу шаблонов InDesign.\n\nВыбранный путь сохраняется в переменную контекста <b>wf_idsgn_catalog</b>.\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "dlg_open_var": {
+                          "value": "wf_idsgn_catalog",
+                          "enabled": true
+                        },
+                        "dlg_open_type": {
+                          "value": "file",
+                          "enabled": true
+                        },
+                        "dlg_open_title": {
+                          "value": "Выберите файл-каталог шаблонов InDesign",
+                          "enabled": true
+                        },
+                        "dlg_open_filter": {
+                          "value": "*.template",
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_790d968b/InDesign/idsgn_catalog",
+                      "instance_id": "instance_4213938c8403",
+                      "name": "Выбрать шаблон оформления",
+                      "description": "<div style=\" {theme.script_description}\">\nСкрипт для выбора шаблона InDesign, который будет использован в скрипте автоматической верстки.\n\nВсе параметры выбранного шаблона сохраняются в переменной контекста <b>var_template_name</b>.\n\nДля работы скрипта путь к каталогу шаблонов должен быть предварительно сохранен в переменной <b>wf_idsgn_catalog</b>.\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "idsgn_catalog": {
+                          "value": "{wf_idsgn_catalog}",
+                          "enabled": true
+                        },
+                        "idsgn_template_var": {
+                          "value": "var_template_name",
+                          "enabled": true
+                        },
+                        "idsgn_msg": {
+                          "value": "Выберите шаблон для генерации разворота",
+                          "enabled": true
+                        }
+                      }
+                    },
+                    {
+                      "id": "root_790d968b/InDesign/idsgn_spread_generator",
+                      "instance_id": "instance_242a402ee01a",
+                      "name": "Создать разворот альбома",
+                      "description": "<div style=\" {theme.script_description}\">\nСкрипт на основе шаблона, сохраненного в переменной <b>var_template_name</b>, генерирует многостраничный файл InDesign, заполняя персональные развороты для каждой ученика.\n\nВ данном Экземпляре скрипта пути к JSON-файлу с информацией об учениках, папке с фотографиями вычисляются автоматически на основании переменных контекста:\n- {wf_session_path}\n- {wf_psd_path}\n- {wf_session_name}\n- {wf_photo_session}\n</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "template": {
+                          "value": "var_template_name",
+                          "enabled": true
+                        },
+                        "output_file": {
+                          "value": "",
+                          "enabled": false
+                        },
+                        "data_json_file": {
+                          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
+                          "enabled": true
+                        },
+                        "source_photos_dir": {
+                          "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
+                          "enabled": true
+                        },
+                        "placeholder_image": {
+                          "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/placeholder.png",
+                          "enabled": true
+                        },
+                        "validate": {
+                          "value": false,
+                          "enabled": true
+                        },
+                        "generation_mode": {
+                          "value": "auto",
+                          "enabled": true
+                        },
+                        "magic_word": {
+                          "value": "База",
+                          "enabled": true
+                        },
+                        "face_scale": {
+                          "value": 0.8,
+                          "enabled": true
+                        }
+                      }
                     }
-                  }
+                  ]
                 },
                 {
-                  "id": "root_790d968b/Workflow/analize/generate_report",
-                  "instance_id": "instance_80832d32c374",
-                  "name": "2. Создать HTML отчет",
-                  "description": "<div style=\" {theme.script_description}\">\n<b>Седьмой (<i>НЕОБАЗЯТЕЛЬНЫЙ</i>) скрипт в конвейере анализа изображений</b> \nСкрипт создает интерактивный HTML-отчет для визуальной проверки результатов кластеризации и сопоставления лиц.\n\nЕсли отчет не нужен, то скрипт можно удалить из рабочеого процесса\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {}
-                }
-              ]
-            },
-            {
-              "type": "script_set",
-              "id": "setnode_248fdda481cb",
-              "name": "Этап 5. Копирование PSD файлов в папку для ретуши. Для каждой фотосессии",
-              "description": null,
-              "script_entries": [
-                {
-                  "id": "root_790d968b/Workflow/wf_photo_select",
-                  "instance_id": "instance_5525708ac99d",
-                  "name": "Отметить фотографии выбранные клиентами",
-                  "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nСкрипт извлекает из произвольного текста, предоставленного организатором, 4-значные номера выбранных фотографий.\nИщет соответствующие RAW файлы в папке фотосесии и копирует/<b>перемещает</b> их в подпапку 'Select'.\n\n\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "__fs_mode": {
-                      "value": "copy",
-                      "enabled": true
-                    },
-                    "__fs_on_conflict": {
-                      "value": "skip",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow/wf_session_open",
-                  "instance_id": "instance_48647e45b869",
-                  "name": "Запуск Capture One для цветокоррекции выбранных фотографий",
-                  "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nЦветокоррекция фотографий, отобранных клиентом, и их экспорт в формат PSD для дальнейшей ретуши.\n\nПри экспорте используйте рецепт <b>_PSD_8bit_</b>\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "__wf_session_file_path": {
-                      "value": "{wf_session_path}/{wf_session_name}/{wf_session_name}.cosessiondb",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/GUI/gui_dialog_msg",
-                  "instance_id": "instance_c41a04b578c0",
-                  "name": "СООБЩЕНИЕ: Завершение работы в Capture One",
-                  "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nПодтверждение экспорта из Capture One (с помощью рецепта <b>_PSD_8bit_</b>) фотографий выбранных для ретуши \n\nЕсли эта операция еще не выполнена, то не запускайте скрипт или нажмите кнопку <b>Нет</b>\nПереходить к следующему скрипту не рекомендуется!\n</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "dlg_msg_var": {
-                      "value": "var_user_choice",
-                      "enabled": true
-                    },
-                    "dlg_msg_type": {
-                      "value": "yes_no",
-                      "enabled": true
-                    },
-                    "dlg_msg_title": {
-                      "value": "Подтверждение",
-                      "enabled": true
-                    },
-                    "dlg_msg_message": {
-                      "value": "Для продолжения работы необходимо выполнить экспорт\nотобранных для ретуши фотографий в формат PSD.\n\nВы уверены, что хотите продолжить?",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/dir_operation",
-                  "instance_id": "instance_42c666c6cd59",
-                  "name": "Перемещение файлов PSD в папку Альбом",
-                  "description": "<div style=\" {theme.script_description}\">При работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b></div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "do_source_dir": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/{wf_session_name}",
-                      "enabled": true
-                    },
-                    "do_dest_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}",
-                      "enabled": true
-                    },
-                    "do_mode": {
-                      "value": "move",
-                      "enabled": true
-                    },
-                    "do_on_conflict": {
-                      "value": "overwrite",
-                      "enabled": true
-                    },
-                    "do_copy_base_folder": {
-                      "value": false,
-                      "enabled": true
-                    },
-                    "do_include": {
-                      "value": "*.psd",
-                      "enabled": true
-                    },
-                    "all_threads": {
-                      "value": "8",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow/wf_csv_generate",
-                  "instance_id": "instance_9031f2d69054",
-                  "name": "Создать CSV файл для InDesign",
+                  "type": "script_set",
+                  "id": "setnode_a975c198e3ea",
+                  "name": "Этап 6. Завершение работы. Один раз для каждого класса(группы)",
                   "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "__wf_psd_path": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото",
-                      "enabled": true
+                  "script_entries": [
+                    {
+                      "id": "root_790d968b/Photoshop/ps_photoshop_launch",
+                      "instance_id": "instance_1604ac8cf1f2",
+                      "name": "Фотошоп - Запустить",
+                      "description": null,
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "photoshop_app_dir": {
+                          "value": null,
+                          "enabled": false
+                        }
+                      }
                     },
-                    "wf_csv_file_name": {
-                      "value": "",
-                      "enabled": false
-                    },
-                    "wf_portrait_folders": {
-                      "value": [
-                        "Портрет0",
-                        "Портрет1",
-                        "Портрет2"
-                      ],
-                      "enabled": true
+                    {
+                      "id": "root_790d968b/Photoshop/ps_document_archive",
+                      "instance_id": "instance_4d7bea43f01c",
+                      "name": "Подготовка PSD файлов к хранению. Сохранение JPG файлов",
+                      "description": "<div style=\" {theme.script_description}\">Скрипт сливает все слои в документе (кроме слоя <i>Background</i>) в новый слой с именем <b>_ФИНАЛЬНЫЙ_СЛОЙ_</b> , и сохраняет результат в  исходный файл. \nДополнительно, в отдельную папку, выполняется сохранение JPG-файла.</div>",
+                      "silent_mode": false,
+                      "command_line_args": {
+                        "ps_source_folder": {
+                          "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/",
+                          "enabled": true
+                        },
+                        "ps_output_folder": {
+                          "value": "{wf_psd_path}/{wf_session_name}/Выпускникам",
+                          "enabled": true
+                        },
+                        "ps_action_set": {
+                          "value": "PySM_Actions",
+                          "enabled": true
+                        },
+                        "ps_action_name": {
+                          "value": "PySM_RETUCHE_ARCHIVE",
+                          "enabled": true
+                        },
+                        "ps_recursive": {
+                          "value": true,
+                          "enabled": true
+                        }
+                      }
                     }
-                  }
-                }
-              ]
-            },
-            {
-              "type": "script_set",
-              "id": "setnode_60ce2dd8eafe",
-              "name": "Этап 6. Ретушь фотографий. Для каждой фотосессии",
-              "description": null,
-              "script_entries": [
-                {
-                  "id": "root_790d968b/Photoshop/ps_photoshop_launch",
-                  "instance_id": "instance_01b21a59c26b",
-                  "name": "Фотошоп - Запустить",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "photoshop_app_dir": {
-                      "value": null,
-                      "enabled": false
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Photoshop/ps_action_batch_set_select",
-                  "instance_id": "instance_19153327e6ef",
-                  "name": "Экшен - Универсальный пакетный запуск",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "ps_mode": {
-                      "value": "selected_file_folder",
-                      "enabled": true
-                    },
-                    "ps_file_path": {
-                      "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/Школа8_1д_класс/Альбом/Фото/SCHOOL/Дополнительное фото А5/Арабжаева Сарана-9573.psd",
-                      "enabled": true
-                    },
-                    "ps_recursive": {
-                      "value": true,
-                      "enabled": true
-                    },
-                    "ps_action_set": {
-                      "value": null,
-                      "enabled": true
-                    },
-                    "ps_action_name": {
-                      "value": null,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Photoshop/ps_document_close",
-                  "instance_id": "instance_5b09b6b7f51f",
-                  "name": "Закрыть файл-пресет",
-                  "description": null,
-                  "silent_mode": true,
-                  "command_line_args": {
-                    "ps_document_name": {
-                      "value": null,
-                      "enabled": false
-                    },
-                    "ps_force_close": {
-                      "value": true,
-                      "enabled": true
-                    },
-                    "ps_save_on_close": {
-                      "value": false,
-                      "enabled": false
-                    }
-                  }
-                }
-              ]
-            },
-            {
-              "type": "script_set",
-              "id": "setnode_27cd685bb66f",
-              "name": "Этап 7. Автоматическая верстка",
-              "description": null,
-              "script_entries": [
-                {
-                  "id": "root_7617c03c/GUI/gui_dialog_open",
-                  "instance_id": "instance_1ac49931aa3a",
-                  "name": "ВВОД: Выбор каталога шаблонов InDesign",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "dlg_open_var": {
-                      "value": "var_idsgn_catalog",
-                      "enabled": true
-                    },
-                    "dlg_open_type": {
-                      "value": "file",
-                      "enabled": true
-                    },
-                    "dlg_open_title": {
-                      "value": "Выберите файл-каталог шаблонов InDesign",
-                      "enabled": true
-                    },
-                    "dlg_open_filter": {
-                      "value": "*.template",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/GUI/gui_dialog_msg",
-                  "instance_id": "instance_72577cadb9c0",
-                  "name": "СООБЩЕНИЕ: Автоматическая генерация разворотов",
-                  "description": null,
-                  "silent_mode": true,
-                  "command_line_args": {
-                    "dlg_msg_var": {
-                      "value": "var_avto_generate",
-                      "enabled": true
-                    },
-                    "dlg_msg_type": {
-                      "value": "yes_no_cancel",
-                      "enabled": true
-                    },
-                    "dlg_msg_title": {
-                      "value": "Подтверждение",
-                      "enabled": true
-                    },
-                    "dlg_msg_message": {
-                      "value": "Данный блок скриптов предназначен для быстрой верстки персональных разворотов альбомов.\n\nВы готовы начать работы?",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/py_if_else",
-                  "instance_id": "instance_d2411aa33f15",
-                  "name": "УСЛОВИЕ: Создать новый разворот (да/нет/отмена)",
-                  "description": "<div style=\" {theme.status_error}\">\nЕсли выбран режим РУЧНОГО редактирования кластеров, то запускается соответствующий редактор, в противном случае продолжается анализ фотографий.\n</div>",
-                  "silent_mode": true,
-                  "command_line_args": {
-                    "if-variable-name": {
-                      "value": "var_avto_generate",
-                      "enabled": true
-                    },
-                    "if-operator": {
-                      "value": "равно",
-                      "enabled": true
-                    },
-                    "if-comparison-value": {
-                      "value": "yes",
-                      "enabled": true
-                    },
-                    "then-instance-id": {
-                      "value": "instance_b2eec42c20b7",
-                      "enabled": true
-                    },
-                    "else-instance-id": {
-                      "value": "instance_d684a046d05c",
-                      "enabled": true
-                    },
-                    "clear-variable": {
-                      "value": true,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/InDesign/idsgn_catalog",
-                  "instance_id": "instance_b2eec42c20b7",
-                  "name": "Выбрать шаблон оформления",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "idsgn_catalog": {
-                      "value": "{var_idsgn_catalog}",
-                      "enabled": true
-                    },
-                    "idsgn_template_var": {
-                      "value": "var_album_demo",
-                      "enabled": true
-                    },
-                    "idsgn_msg": {
-                      "value": "Выберите шаблон для генерации разворота",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/InDesign/idsgn_spread_generator",
-                  "instance_id": "instance_f0435ebc4871",
-                  "name": "Создать разворот альбома",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "template": {
-                      "value": "var_album_demo",
-                      "enabled": true
-                    },
-                    "output_file": {
-                      "value": "",
-                      "enabled": false
-                    },
-                    "data_json_file": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
-                      "enabled": true
-                    },
-                    "source_photos_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "placeholder_image": {
-                      "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/placeholder.png",
-                      "enabled": true
-                    },
-                    "validate": {
-                      "value": false,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/GUI/gui_dialog_msg",
-                  "instance_id": "instance_953c16899e39",
-                  "name": "СООБЩЕНИЕ: Продолжить автоматическую генерацию разворотов",
-                  "description": null,
-                  "silent_mode": true,
-                  "command_line_args": {
-                    "dlg_msg_var": {
-                      "value": "var_avto_generate",
-                      "enabled": true
-                    },
-                    "dlg_msg_type": {
-                      "value": "yes_no_cancel",
-                      "enabled": true
-                    },
-                    "dlg_msg_title": {
-                      "value": "Подтверждение",
-                      "enabled": true
-                    },
-                    "dlg_msg_message": {
-                      "value": "Скрипт завершил генерацию персонального разворота.\n\nВы хотите создать еще один разворот?",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/py_if_else",
-                  "instance_id": "instance_15b3b3da69e5",
-                  "name": "УСЛОВИЕ: Создать еще один разворот (да/нет)",
-                  "description": "<div style=\" {theme.status_error}\">\nЕсли выбран режим РУЧНОГО редактирования кластеров, то запускается соответствующий редактор, в противном случае продолжается анализ фотографий.\n</div>",
-                  "silent_mode": true,
-                  "command_line_args": {
-                    "if-variable-name": {
-                      "value": "var_avto_generate",
-                      "enabled": true
-                    },
-                    "if-operator": {
-                      "value": "равно",
-                      "enabled": true
-                    },
-                    "if-comparison-value": {
-                      "value": "yes",
-                      "enabled": true
-                    },
-                    "then-instance-id": {
-                      "value": "instance_b2eec42c20b7",
-                      "enabled": true
-                    },
-                    "else-instance-id": {
-                      "value": "instance_d684a046d05c",
-                      "enabled": true
-                    },
-                    "clear-variable": {
-                      "value": true,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/log_report",
-                  "instance_id": "instance_d684a046d05c",
-                  "name": "Завершение работы",
-                  "description": null,
-                  "silent_mode": true,
-                  "command_line_args": {}
-                }
-              ]
-            },
-            {
-              "type": "script_set",
-              "id": "setnode_7ac251360f2d",
-              "name": "Этап X. Завершение работы. Один раз для каждого класса/группы",
-              "description": null,
-              "script_entries": [
-                {
-                  "id": "root_790d968b/Photoshop/ps_photoshop_launch",
-                  "instance_id": "instance_43c3ed35961d",
-                  "name": "Фотошоп - Запустить",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "photoshop_app_dir": {
-                      "value": null,
-                      "enabled": false
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Photoshop/ps_document_archive",
-                  "instance_id": "instance_af30a4d67ea0",
-                  "name": "Подготовка PSD файлов к хранению. Сохранение JPG файлов",
-                  "description": "<div style=\" {theme.script_description}\">Скрипт сливает все слои в документе (кроме слоя <i>Background</i>) в новый слой с именем <b>_ФИНАЛЬНЫЙ_СЛОЙ_</b> , и сохраняет результат в  исходный файл. \nДополнительно, в отдельную папку, выполняется сохранение JPG-файла.</div>",
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "ps_source_folder": {
-                      "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/ШколаТур_9а_класс/Альбом/Фото",
-                      "enabled": true
-                    },
-                    "ps_output_folder": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Выпускникам",
-                      "enabled": true
-                    },
-                    "ps_action_set": {
-                      "value": "PySM_Actions",
-                      "enabled": true
-                    },
-                    "ps_action_name": {
-                      "value": "PySM_RETUCHE_ARCHIVE",
-                      "enabled": true
-                    },
-                    "ps_recursive": {
-                      "value": true,
-                      "enabled": true
-                    }
-                  }
+                  ]
                 }
               ]
             }
@@ -1237,85 +1334,6 @@
           "name": "Демонстрация работы отдельных скриптов",
           "description": null,
           "children": [
-            {
-              "type": "script_set",
-              "id": "setnode_3a6f019bdcaa",
-              "name": "Системные скрипты",
-              "description": null,
-              "script_entries": [
-                {
-                  "id": "root_7617c03c/SYSTEM/py_analyze_imports",
-                  "instance_id": "instance_449e6bff74ff",
-                  "name": "Создать файл requirements.txt",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "ai_scan_directory": {
-                      "value": "X:/repos/pysm/scripts_utility/SYSTEM",
-                      "enabled": true
-                    },
-                    "ai_output_directory": {
-                      "value": "../../../_Analize",
-                      "enabled": true
-                    },
-                    "ai_generate_requirements_only": {
-                      "value": false,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/install_requirements",
-                  "instance_id": "instance_a0d0aaddfd2f",
-                  "name": "Установить пакеты из файла requirements.txt",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "req_requirements_file": {
-                      "value": "X:/repos/pysm/requirements.txt",
-                      "enabled": true
-                    },
-                    "req_python_interpreter": {
-                      "value": null,
-                      "enabled": false
-                    },
-                    "req_upgrade": {
-                      "value": null,
-                      "enabled": false
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/py_install_req",
-                  "instance_id": "instance_e1bd2adac082",
-                  "name": "py_install_req",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "inst_search_path": {
-                      "value": "",
-                      "enabled": true
-                    },
-                    "inst_python_interpreter": {
-                      "value": "",
-                      "enabled": true
-                    },
-                    "inst_upgrade": {
-                      "value": false,
-                      "enabled": true
-                    },
-                    "inst_verbose": {
-                      "value": false,
-                      "enabled": true
-                    },
-                    "inst_analyze_only": {
-                      "value": false,
-                      "enabled": true
-                    }
-                  }
-                }
-              ]
-            },
             {
               "type": "script_set",
               "id": "setnode_c5bc89897709",
@@ -1505,31 +1523,6 @@
                     },
                     "do_threads": {
                       "value": "8",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/GUI/gui_dialog_msg",
-                  "instance_id": "instance_f8ced9dc7abb",
-                  "name": "Завершение работы",
-                  "description": null,
-                  "silent_mode": false,
-                  "command_line_args": {
-                    "variable_name": {
-                      "value": "var_user_choice",
-                      "enabled": true
-                    },
-                    "dialog_type": {
-                      "value": "ok",
-                      "enabled": true
-                    },
-                    "title": {
-                      "value": "Подтверждение",
-                      "enabled": true
-                    },
-                    "message": {
-                      "value": "Вы выполнили все скрипты в данном наборе!",
                       "enabled": true
                     }
                   }

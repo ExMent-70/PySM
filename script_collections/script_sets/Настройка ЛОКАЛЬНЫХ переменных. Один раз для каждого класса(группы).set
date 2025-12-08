@@ -1,0 +1,93 @@
+{
+  "type": "script_set",
+  "id": "setnode_cf70a86321d6",
+  "name": "Настройка ЛОКАЛЬНЫХ переменных. Один раз для каждого класса(группы)",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_input",
+      "instance_id": "instance_ded28b75fa5d",
+      "name": "ПЕРЕМЕННАЯ: Указать школу/параллель/класс",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_input_var": {
+          "value": "wf_session_name",
+          "enabled": true
+        },
+        "dlg_input_title": {
+          "value": "Ввод значения",
+          "enabled": true
+        },
+        "dlg_input_msg": {
+          "value": "Укажите название школы, параллель и класс.\n\nНапример, Школа56_4а_класс",
+          "enabled": true
+        },
+        "dlg_input_dvalue": {
+          "value": "Школа56_4а_класс",
+          "enabled": true
+        },
+        "dlg_input_valid_type": {
+          "value": "not_empty",
+          "enabled": true
+        },
+        "dlg_input_custom_regexp": {
+          "value": null,
+          "enabled": false
+        },
+        "dlg_input_custom_regexp_desc": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/wf_session_create",
+      "instance_id": "instance_1f6676632c0f",
+      "name": "Создать сессию Capture One",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "wf_session_name": {
+          "value": "{wf_session_name}",
+          "enabled": true
+        },
+        "wf_raw_path": {
+          "value": "{wf_raw_path}",
+          "enabled": true
+        },
+        "wf_session_path": {
+          "value": "{wf_session_path}",
+          "enabled": true
+        },
+        "wf_copy_threads": {
+          "value": 8,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/wf_list_create",
+      "instance_id": "instance_1b563ad01069",
+      "name": "Создать и распечатать список класса/группы",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "wf_dest_dir": {
+          "value": "{wf_psd_path}/{wf_session_name}",
+          "enabled": true
+        },
+        "wf_output_txt_file": {
+          "value": "{wf_session_path}/{wf_session_name}/{wf_photo_session}_{wf_children_file_name}",
+          "enabled": true
+        },
+        "wf_autosave_formats": {
+          "value": [
+            "html"
+          ],
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

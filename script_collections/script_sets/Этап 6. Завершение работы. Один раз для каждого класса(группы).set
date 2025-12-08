@@ -1,0 +1,50 @@
+{
+  "type": "script_set",
+  "id": "setnode_7ac251360f2d",
+  "name": "Этап 6. Завершение работы. Один раз для каждого класса(группы)",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_790d968b/Photoshop/ps_photoshop_launch",
+      "instance_id": "instance_43c3ed35961d",
+      "name": "Фотошоп - Запустить",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "photoshop_app_dir": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_document_archive",
+      "instance_id": "instance_af30a4d67ea0",
+      "name": "Подготовка PSD файлов к хранению. Сохранение JPG файлов",
+      "description": "<div style=\" {theme.script_description}\">Скрипт сливает все слои в документе (кроме слоя <i>Background</i>) в новый слой с именем <b>_ФИНАЛЬНЫЙ_СЛОЙ_</b> , и сохраняет результат в  исходный файл. \nДополнительно, в отдельную папку, выполняется сохранение JPG-файла.</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_source_folder": {
+          "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/",
+          "enabled": true
+        },
+        "ps_output_folder": {
+          "value": "{wf_psd_path}/{wf_session_name}/Выпускникам",
+          "enabled": true
+        },
+        "ps_action_set": {
+          "value": "PySM_Actions",
+          "enabled": true
+        },
+        "ps_action_name": {
+          "value": "PySM_RETUCHE_ARCHIVE",
+          "enabled": true
+        },
+        "ps_recursive": {
+          "value": true,
+          "enabled": true
+        }
+      }
+    }
+  ]
+}
