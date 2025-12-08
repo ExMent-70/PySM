@@ -14,7 +14,7 @@
       "type": "string",
       "description": "Имя переменной контекста PySM, в которую будет сохранена информация о выбранном шаблоне.",
       "required": false,
-      "default": "var_album_cover"
+      "default": "var_template_name"
     },
     "idsgn_msg": {
       "type": "string",

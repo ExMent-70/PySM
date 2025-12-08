@@ -110,5 +110,46 @@
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
+  },
+  "wf_idsgn_catalog": {
+    "type": "file_path",
+    "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/catalog.template",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_album_cover": {
+    "type": "json",
+    "value": {
+      "id": "a44cbe31-d923-4454-8687-d0a922b4ca86",
+      "name": "Персональная обложка (портрет + горизонтальное фото)",
+      "category": "Обложки",
+      "template_path": "templates/01-Черный_бархат/01_Cover_03.idml",
+      "placeholder_map": {
+        "photo_cover_01": "group_photo_all_02",
+        "portrait": "portrait_cover"
+      },
+      "generation_mode": "sheet"
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_template_name": {
+    "type": "json",
+    "value": {
+      "id": "1ed7fb6a-9045-456e-931c-8a8c0e6ec30b",
+      "name": "Персональная обложка (портрет + вертикальное фото)",
+      "category": "Обложки",
+      "template_path": "templates/01-Черный_бархат/01_02_Cover.idml",
+      "placeholder_map": {
+        "photo_cover_01": "group_photo_v_01",
+        "portrait": "portrait"
+      },
+      "generation_mode": "sheet"
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
   }
 }
