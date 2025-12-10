@@ -274,3 +274,21 @@ QDialog#JsonEditorDialog QPushButton:hover, QDialog#MultilineTextDialog QPushBut
 QInputDialog QPushButton:hover {
     background-color: @bgColorHover;
 }
+
+/* Стили для нового диалога выбора экземпляра */
+QDialog#InstanceSelectionDialog {
+    background-color: @bgColorDialog;
+    color: @textColor;
+}
+QDialog#InstanceSelectionDialog QLineEdit {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+    border-radius: 5px;
+    padding: 4px;
+}
+QDialog#InstanceSelectionDialog QListWidget {
+    background-color: @bgColorContainer;
+}
+QDialog#InstanceSelectionDialog QPushButton {
+    min-width: 80px;
+}

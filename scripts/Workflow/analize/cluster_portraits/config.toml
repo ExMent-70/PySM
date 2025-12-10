@@ -8,7 +8,7 @@
 # Параметры для алгоритма DBSCAN
 [clustering.portrait.dbscan]
 eps = 0.25
-min_samples = 10
+min_samples = 3
 metric = "cosine"
 
 # Параметры для алгоритма HDBSCAN

@@ -201,9 +201,23 @@ class ClusterDataManager:
         logger.info("Изменения успешно сохранены.")
         return True
 
+
+    def _strip_name_prefix(self, name: str) -> str:
+        """
+        Удаляет числовой префикс 'NN-' из имени, если он есть.
+        Пример: '01-Иванов Иван' -> 'Иванов Иван'
+        """
+        if name and '-' in name and name.split('-', 1)[0].isdigit():
+            return name.split('-', 1)[1]
+        return name
+
+
     def move_images_to_cluster(self, mode_config: Dict, target_id: str, target_name: str, filenames: List[str]):
         is_face_mode = mode_config["mode_name"] == 'face'
         new_id_val = int(target_id) if target_id.isdigit() else None
+        
+        # "Чистим" имя от UI-префикса перед сохранением в модель
+        clean_target_name = self._strip_name_prefix(target_name)
         
         for filename in filenames:
             record = self.records.get(filename)
@@ -219,25 +233,29 @@ class ClusterDataManager:
                         record.image_type = 'portrait'
                     if record.faces:
                         record.faces[0].cluster_label = new_id_val
-                        record.faces[0].child_name = target_name
+                        record.faces[0].child_name = clean_target_name
             else:
                 record.location_cluster = new_id_val
                 record.location_name = target_name
         
         self._build_indices()
 
+
+
     def rename_cluster(self, mode_config: Dict, cluster_id: str, new_name: str):
         is_face_mode = mode_config["mode_name"] == 'face'
-        prefix = mode_config["name_prefix_logic"](cluster_id)
-        final_new_name = prefix + new_name
-
+        
         files_to_rename = self.get_files_for_cluster(mode_config, cluster_id)
         for filename in files_to_rename:
             record = self.records[filename]
             if is_face_mode:
-                if record.faces: record.faces[0].child_name = final_new_name
+                if record.faces: 
+                    # Присваиваем "чистое" имя, которое пришло в аргументе
+                    record.faces[0].child_name = new_name
             else:
-                record.location_name = final_new_name
+                # Для локаций префикса нет, поэтому логика остается прежней
+                record.location_name = new_name
+
     
     def is_cluster_changed(self, mode_name: str, cluster_id: str) -> bool:
         if any(c['id'] == cluster_id for c in self.newly_created_clusters):
