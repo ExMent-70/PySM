@@ -1,3 +1,4 @@
+# cluster_locations/config_loader.py
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -9,7 +10,10 @@ logger = logging.getLogger(__name__)
 
 class PathsConfig(BaseModel):
     model_root: str = "../../../../_BIN"
-    clip_model_onnx: str = "models/CLIP/ViT-B-32.onnx"
+    # Обновил дефолт на ViT-L-14 согласно вашему запросу
+    clip_model_onnx: str = "models/CLIP/ViT-L-14.onnx"
+    # Новый параметр для пути к токенизатору
+    tokenizer_path: str = "models/tokenizer/clip-vit-large-patch14"
 
 class ProviderConfig(BaseModel):
     provider_name: Optional[str] = None
@@ -18,10 +22,13 @@ class ProviderConfig(BaseModel):
 
 class ModelParamsConfig(BaseModel):
     input_size: List[int] = Field(default=[224, 224])
+    # Новый параметр для суффикса маски
+    mask_suffix: str = "_BiRefNet-portrait_output.jpg"
 
 class ClusteringConfig(BaseModel):
     min_samples: int = 2
     metric: str = "cosine"
+    eps: float = 0.14
 
 class ClassificationConfig(BaseModel):
     match_threshold: float = 0.25
@@ -41,8 +48,10 @@ class ConfigManager:
 
     def _load_and_validate(self) -> Dict[str, Any]:
         if not self.config_path.is_file():
-            logger.error(f"Файл конфигурации не найден: {self.config_path.resolve()}")
-            raise FileNotFoundError(f"Config file not found: {self.config_path.resolve()}")
+            # Если конфига нет, используем дефолтные значения
+            logger.warning(f"Файл конфигурации не найден: {self.config_path}. Используются значения по умолчанию.")
+            return AppConfig().model_dump(mode="python")
+            
         try:
             config_data = toml.load(self.config_path)
             validated_config = AppConfig(**config_data).model_dump(mode="python")
@@ -56,14 +65,20 @@ class ConfigManager:
             raise
 
     def _resolve_paths(self):
+        """Преобразует относительные пути в абсолютные."""
         base_dir = self.config_path.parent
-        model_root = Path(self.config["paths"]["model_root"])
-        if not model_root.is_absolute():
-            self.config["paths"]["model_root"] = str((base_dir / model_root).resolve())
         
-        trt_cache = Path(self.config["provider"]["tensorRT_cache_path"])
-        if not trt_cache.is_absolute():
-            self.config["provider"]["tensorRT_cache_path"] = str((base_dir / trt_cache).resolve())
+        # Список путей, которые нужно разрешить
+        paths_to_resolve = [
+            ("paths", "model_root"),
+            ("provider", "tensorRT_cache_path")
+        ]
+        
+        for section, key in paths_to_resolve:
+            path_str = self.config[section][key]
+            path = Path(path_str)
+            if not path.is_absolute():
+                self.config[section][key] = str((base_dir / path).resolve())
 
     def get(self, key_path: str, default: Any = None) -> Any:
         keys = key_path.split('.')

@@ -1,7 +1,7 @@
 api_image_description = "color: #6c757d; font-size: 11pt; font-style: italic; background-color: transparent; padding: 2px;"
 api_link = "color: #0077b6; font-size: 12pt; text-decoration: underline; font-weight: normal;"
 api_link_error = "color: #e74c3c; font-size: 12pt; text-decoration: line-through; font-weight: normal;"
-collection_info = "background-color: #e8f0fe; padding: 5px; border-radius: 3px;"
+collection_info = "color: #000000; background-color: #e8f0fe; padding: 5px; border-radius: 3px;"
 console_background = "background-color: #ffffff;"
 runner_info = "color: #808080; font-style: italic;"
 script_arg_value = "color: #005a9e;"

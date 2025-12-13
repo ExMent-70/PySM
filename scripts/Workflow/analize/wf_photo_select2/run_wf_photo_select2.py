@@ -173,6 +173,43 @@ def write_operations_log(log_path: pathlib.Path, data: Dict):
         logger.error(f"Ошибка записи лога: {e}")
 
 
+def get_config() -> Namespace:
+    """
+    Определяет и парсит аргументы командной строки.
+
+    Args:
+        Нет
+
+    Returns:
+        Namespace: Объект с распарсенными аргументами командной строки.
+    """
+    parser = argparse.ArgumentParser(
+        description="Выборка, тегирование и переименование файлов по номерам из текста."
+    )
+
+    parser.add_argument(
+        "--min-digits",
+        type=int,
+        default=4,
+        dest="min_digits",
+        help="Минимальное количество цифр в номере для поиска (по умолчанию: 4).",
+    )
+    parser.add_argument(
+        "--max-digits",
+        type=int,
+        default=4,
+        dest="max_digits",
+        help="Максимальное количество цифр в номере для поиска (по умолчанию: 4).",
+    )
+
+    if IS_MANAGED_RUN and ConfigResolver:
+        return ConfigResolver(parser).resolve_all()
+
+    # В автономном режиме, возвращаем значения по умолчанию, если аргументы не переданы
+    args, _ = parser.parse_known_args()
+    return args
+
+
 # 3. БЛОК: Модель данных GUI (TreeModel)
 # ==============================================================================
 class TreeItem:
@@ -278,19 +315,27 @@ class Worker(QThread):
     operation_finished = Signal(int, int) # processed, total
     error_occurred = Signal(str)
 
+
     def __init__(self):
         super().__init__()
         self.task = ""
         self.text_to_parse = ""
         self.source_dir: Optional[pathlib.Path] = None
         self.info_faces_path: Optional[pathlib.Path] = None
-        self.target_location_name = "" 
+        self.target_location_name = ""
         self.numbers_to_find = []
         self.search_results = []
         self.faces_data = {}
         self.log_data = {}
         self.markup_color = None
-        self.do_rename = True # По умолчанию включено
+        self.do_rename = True
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Добавляем атрибуты для хранения длины номеров
+        self.min_digits: int = 4
+        self.max_digits: int = 4
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
 
     def run(self):
         try:
@@ -301,21 +346,54 @@ class Worker(QThread):
             logger.error(f"Error in worker: {e}", exc_info=True)
             self.error_occurred.emit(str(e))
 
+
     def _task_parse(self):
+        """Извлекает числовые последовательности из текста."""
         logger.info("Парсинг текста...")
-        matches = list(re.finditer(r"(\d{4})", self.text_to_parse))
+
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # 1. Валидация и корректировка параметров
+        min_d = max(1, self.min_digits)  # Минимум 1 цифра
+        max_d = max(1, self.max_digits)
+
+        if min_d > max_d:
+            min_d, max_d = max_d, min_d  # Меняем местами, если перепутаны
+            logger.warning(
+                f"Значение min-digits ({self.min_digits}) больше max-digits ({self.max_digits}). "
+                "Параметры автоматически поменялись местами."
+            )
+
+        # 2. Динамическое формирование регулярного выражения
+        if min_d == max_d:
+            regex = r"(\d{%d})" % min_d
+            desc = f"{min_d}-значных номеров"
+        else:
+            regex = r"(\d{%d,%d})" % (min_d, max_d)
+            desc = f"номеров длиной от {min_d} до {max_d} цифр"
+
+        logger.info(f"Используется шаблон для поиска: {regex}")
+
+        # 3. Поиск с новым RegExp
+        matches = list(re.finditer(regex, self.text_to_parse))
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
         numbers = sorted(list({m.group(1) for m in matches}))
-        
+
+        logger.info(f"Найдено <b>{len(numbers)}</b> уникальных {desc}:")
+        if numbers:
+            logger.info(f"<i>{numbers}</i>\n")
+
         html = ""
         if format_ipymarkup_box and Palette:
             palette = Palette([self.markup_color]) if self.markup_color else None
             spans = [(m.start(), m.end(), "") for m in matches]
             try:
                 html = format_ipymarkup_box(self.text_to_parse, spans, palette=palette)
-            except Exception: html = "<p>Ошибка визуализации</p>"
+            except Exception:
+                html = "<p>Ошибка визуализации</p>"
         else:
             html = "<p>Визуализация недоступна</p>"
-        
+
         self.parse_finished.emit(numbers, html)
 
     def _task_search(self):
@@ -425,8 +503,9 @@ class Worker(QThread):
 # 5. БЛОК: Главное окно
 # ==============================================================================
 class FileSelectorWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, config: Namespace):
         super().__init__()
+        self.config = config
         self.final_status = 1
         
         paths = construct_session_paths()
@@ -525,8 +604,8 @@ class FileSelectorWindow(QMainWindow):
             self.combo_presets.setEnabled(False)
 
         # Чекбокс переименования
-        self.chk_rename = QCheckBox("Переименовать файлы")
-        self.chk_rename.setChecked(True)
+        self.chk_rename = QCheckBox("Переименовать выбранные файлы (не рекомендуется)")
+        self.chk_rename.setChecked(False)
 
         bot_layout.addWidget(self.btn_parse)
         bot_layout.addWidget(self.btn_search)
@@ -575,6 +654,8 @@ class FileSelectorWindow(QMainWindow):
         self._set_ui_busy(True, "Парсинг...")
         self.worker.task = "parse"
         self.worker.text_to_parse = txt
+        self.worker.min_digits = getattr(self.config, 'min_digits', 4)
+        self.worker.max_digits = getattr(self.config, 'max_digits', 4)
         self.worker.start()
 
     def on_parse_done(self, numbers, html):
@@ -662,10 +743,11 @@ class FileSelectorWindow(QMainWindow):
 # 6. БЛОК: Запуск
 # ==============================================================================
 def main():
+    config = get_config()
     app = QApplication.instance() or QApplication(sys.argv)
     if IS_MANAGED_RUN and theme_api: theme_api.apply_theme_to_app(app)
     
-    win = FileSelectorWindow()
+    win = FileSelectorWindow(config)
     win.show()
     
     code = app.exec()

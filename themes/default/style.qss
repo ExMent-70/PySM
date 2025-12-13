@@ -106,14 +106,21 @@ QLineEdit, QTextEdit, QPlainTextEdit {
     border-radius: 5px; padding: 4px;
 }
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus { border: 1px solid @accentColor; }
-QLineEdit:disabled, QLineEdit:read-only,
-QTextEdit:disabled, QTextEdit:read-only,
-QPlainTextEdit:disabled, QPlainTextEdit:read-only {
+
+QLineEdit:disabled, 
+QTextEdit:disabled, 
+QPlainTextEdit:disabled {
     background-color: @bgColorBase;
     color: @textColorDisabled;
     border: 1px solid @borderColor;
 }
 
+QLineEdit:read-only,
+QTextEdit:read-only,
+QPlainTextEdit:read-only {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+}
 
 /* --- [5] КОНТЕЙНЕРЫ (QGroupBox, QTabWidget, QToolBox) --- */
 QGroupBox {

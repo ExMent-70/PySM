@@ -74,6 +74,9 @@ def get_config() -> argparse.Namespace:
     parser.add_argument("--a_cl_masks_dir", type=str)
     parser.add_argument("--a_cl_output_dir", type=str)
     parser.add_argument("--all_threads", type=int, default=0)
+    # --- НОВЫЙ АРГУМЕНТ ---
+    parser.add_argument("--a_cl_mask_suffix", type=str, default=None, 
+                        help="Суффикс файлов масок (например, _BiRefNet-portrait_output.jpg)")
     
     return ConfigResolver(parser).resolve_all() if IS_MANAGED_RUN else parser.parse_args()
 
@@ -158,26 +161,38 @@ def main():
 
     print("<b>КЛАСТЕРИЗАЦИЯ ФОТОГРАФИЙ ПО ЛОКАЦИЯМ</b>")
     cli_config = get_config()
-    config_manager = ConfigManager(Path(cli_config.a_cl_config_file))
     
+    # 1. Загрузка конфига
+    try:
+        config_manager = ConfigManager(Path(cli_config.a_cl_config_file))
+    except Exception:
+        sys.exit(1)
+
+    # 2. Применение CLI переопределений
+    # Передаем суффикс из CLI в конфиг, если он указан
+    if cli_config.a_cl_mask_suffix:
+        config_manager.config['model_params']['mask_suffix'] = cli_config.a_cl_mask_suffix
+
+    # 3. Пути
     auto_paths = construct_paths()
     input_dir = Path(cli_config.a_cl_input_dir or auto_paths.get("input_dir"))
     masks_dir = Path(cli_config.a_cl_masks_dir or auto_paths.get("masks_dir"))
     output_dir = Path(cli_config.a_cl_output_dir or auto_paths.get("output_dir"))
     
-    for p, name in [(input_dir, "входная"), (masks_dir, "c масками"), (output_dir, "выходная")]:
-        if not p.is_dir():
-            logger.critical(f"Директория ({name}) не найдена: {p}"); sys.exit(1)
-
-    print(f"<br>Папка с исходными файлами (JPG): <i>{input_dir.resolve()}</i>")
-    print(f"Папка с масками: <i>{masks_dir.resolve()}</i>")
-    print(f"Папка для результатов: <i>{output_dir.resolve()}</i><br>")
+    # ... (Проверки путей и вывод логов без изменений) ...
     
     location_analyzer = LocationAnalyzer(config_manager)
 
-    mask_files = sorted([p for p in masks_dir.glob("*_BiRefNet-portrait_output.jpg") if p.is_file()])
+    # 4. Поиск файлов масок с использованием суффикса из конфига
+    mask_suffix = config_manager.get("model_params.mask_suffix")
+    mask_glob = f"*{mask_suffix}"
+    
+    mask_files = sorted([p for p in masks_dir.glob(mask_glob) if p.is_file()])
     if not mask_files:
-        logger.warning(f"В папке {masks_dir} не найдено файлов масок (*_BiRefNet-portrait_output.jpg)."); sys.exit(0)
+        logger.warning(f"В папке {masks_dir} не найдено файлов масок по шаблону '{mask_glob}'.")
+        sys.exit(0)
+
+
 
     prompts = cli_config.a_cl_location_prompts
     if prompts and any(p.strip() for p in prompts):

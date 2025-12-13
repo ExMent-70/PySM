@@ -1,4 +1,4 @@
-# analize/match_group_faces/match_group_faces.py
+# analize/match_group_faces/run_match_group_faces.py
 """
 Идентифицирует лица на групповых фотографиях путем их сопоставления
 с ранее созданными и именованными портретными кластерами.
@@ -20,7 +20,7 @@ import logging
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Tuple, Optional
+from typing import Any, Dict, Tuple, Optional, List
 
 import numpy as np
 from scipy.spatial.distance import cdist
@@ -34,7 +34,6 @@ try:
         sys.path.insert(0, str(project_root))
 except NameError:
     # __file__ не определен, например, в интерактивной среде.
-    # Предполагаем, что пути уже настроены.
     pass
 
 # Импорт обязательных модулей проекта и PySM
@@ -72,7 +71,6 @@ class GroupMatchingProcess:
             f"<b>{self.match_threshold}</b>"
         )
 
-
     def run(
         self,
         p_embeds: np.ndarray,
@@ -97,6 +95,7 @@ class GroupMatchingProcess:
             True в случае успешного завершения, иначе False.
         """
         # Шаг 1: Создание "галереи эталонов" из портретов.
+        # Теперь с учетом нормализации векторов для корректного косинусного расстояния.
         centroids, cluster_to_name = self._calculate_centroids(
             p_embeds, p_index, manager
         )
@@ -110,7 +109,10 @@ class GroupMatchingProcess:
         if g_embeds is not None and g_index is not None and centroids:
             self._match_faces(g_embeds, g_index, centroids, cluster_to_name, manager)
         else:
-            logger.info("Групповые эмбеддинги отсутствуют, этап сопоставления пропущен.")
+            if g_embeds is None:
+                logger.info("Групповые эмбеддинги отсутствуют, этап сопоставления пропущен.")
+            elif not centroids:
+                logger.info("Нет эталонов для сравнения.")
 
         # Шаг 3: Формирование и сохранение итогового отчета (выполняется всегда).
         self._save_match_report(manager, output_dir)
@@ -128,6 +130,9 @@ class GroupMatchingProcess:
         метаданные из JSON (имя кластера, имя файла) с фактическими векторами
         лиц через индексный файл.
 
+        В этой версии добавлена L2-нормализация центроидов, так как простое усреднение
+        уменьшает длину вектора, что искажает косинусное расстояние.
+
         Args:
             p_embeds: Массив всех портретных эмбеддингов.
             p_index: Словарь {имя_файла: индекс_в_массиве_эмбеддингов}.
@@ -142,7 +147,11 @@ class GroupMatchingProcess:
         cluster_to_name: Dict[int, str] = {}
 
         for filename, data in manager.portrait_data.items():
-            face = data.get("faces", [{}])[0]
+            face_list = data.get("faces", [])
+            if not face_list:
+                continue
+            
+            face = face_list[0]
             label = face.get("cluster_label")
 
             if label is not None and label != -1:
@@ -154,11 +163,24 @@ class GroupMatchingProcess:
                             "child_name", f"Unknown_{label}"
                         )
 
-        centroids = {
-            label: p_embeds[indices].mean(axis=0)
-            for label, indices in labels_by_cluster.items()
-            if indices
-        }
+        centroids: Dict[int, np.ndarray] = {}
+        
+        for label, indices in labels_by_cluster.items():
+            if not indices:
+                continue
+            
+            # 1. Вычисляем среднее арифметическое
+            cluster_vectors = p_embeds[indices]
+            mean_vector = cluster_vectors.mean(axis=0)
+            
+            # 2. L2-нормализация (ВАЖНОЕ ИСПРАВЛЕНИЕ)
+            # Векторы должны лежать на единичной гиперсфере для корректного CDIST (Cosine)
+            norm = np.linalg.norm(mean_vector)
+            if norm > 1e-6:
+                centroids[label] = mean_vector / norm
+            else:
+                centroids[label] = mean_vector
+
         logger.info(
             f"Вычислено <b>{len(centroids)}</b> центроидов для сопоставления."
         )
@@ -190,6 +212,7 @@ class GroupMatchingProcess:
         metric = self.config.get("clustering.portrait.dbscan.metric", "cosine")
 
         # Вычисляем матрицу расстояний: строки - групповые лица, столбцы - эталоны.
+        # Используется scipy.spatial.distance.cdist для максимальной производительности.
         distances = cdist(g_embeds, centroid_matrix, metric=metric)
 
         # Находим индекс и значение минимального расстояния для каждой строки.
@@ -197,27 +220,33 @@ class GroupMatchingProcess:
         min_distances = np.min(distances, axis=1)
 
         index_to_key = {v: k for k, v in g_index.items()}
+        
+        # Используем tqdm для отображения прогресса
         for i in tqdm(range(len(g_embeds)), desc="Сопоставление групповых лиц"):
-            filename, face_idx_str = index_to_key[i].split("::")
-            face_idx = int(face_idx_str)
+            key = index_to_key[i]
+            try:
+                # Безопасное разделение ключа
+                filename, face_idx_str = key.split("::")
+                face_idx = int(face_idx_str)
+            except ValueError:
+                logger.warning(f"Пропущен некорректный ключ индекса: {key}")
+                continue
 
             best_label = centroid_labels[best_match_indices[i]]
             min_dist = min_distances[i]
 
-            if min_dist < self.match_threshold:
-                update_data = {
-                    "matched_portrait_cluster_label": int(best_label),
-                    "matched_child_name": cluster_to_name.get(best_label, "Unknown"),
-                    "match_distance": float(min_dist),
-                }
-            else:
-                update_data = {
-                    "matched_portrait_cluster_label": None,
-                    "matched_child_name": "No Match",
-                    "match_distance": float(min_dist),
-                }
-            manager.update_face(filename, face_idx, update_data, data_type="group")
+            update_data: Dict[str, Any] = {
+                "match_distance": float(min_dist)
+            }
 
+            if min_dist < self.match_threshold:
+                update_data["matched_portrait_cluster_label"] = int(best_label)
+                update_data["matched_child_name"] = cluster_to_name.get(best_label, "Unknown")
+            else:
+                update_data["matched_portrait_cluster_label"] = None
+                update_data["matched_child_name"] = "No Match"
+            
+            manager.update_face(filename, face_idx, update_data, data_type="group")
 
     def _save_match_report(self, manager: JsonDataManager, output_dir: Path):
         """
@@ -235,10 +264,12 @@ class GroupMatchingProcess:
         )
 
         for data in manager.portrait_data.values():
-            face = data.get("faces", [{}])[0]
-            label, name = face.get("cluster_label"), face.get("child_name")
-            if label is not None and label != -1:
-                report[str(label)]["child_name"] = name
+            face_list = data.get("faces", [])
+            if face_list:
+                face = face_list[0]
+                label, name = face.get("cluster_label"), face.get("child_name")
+                if label is not None and label != -1:
+                    report[str(label)]["child_name"] = name
 
         for filename, data in manager.group_data.items():
             for face in data.get("faces", []):
@@ -250,15 +281,16 @@ class GroupMatchingProcess:
         # Преобразование в финальный, более чистый формат JSON
         final_report = {}
         for label, data in report.items():
-            photos_list = [
-                {
-                    "filename": fname,
-                    "min_distance": min(d for d in dists if d is not None),
-                    "num_faces": len(dists),
-                }
-                for fname, dists in data["group_photos"].items()
-                if dists
-            ]
+            photos_list = []
+            for fname, dists in data["group_photos"].items():
+                # Фильтруем None значения, если они вдруг попали
+                valid_dists = [d for d in dists if d is not None]
+                if valid_dists:
+                    photos_list.append({
+                        "filename": fname,
+                        "min_distance": min(valid_dists),
+                        "num_faces": len(valid_dists),
+                    })
             
             # Запись для кластера создается всегда.
             # Если совпадений нет, 'group_photos' будет пустым списком.
@@ -271,8 +303,11 @@ class GroupMatchingProcess:
 
         output_path = output_dir / "matches_portrait_to_group.json"
         output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # ensure_ascii=False для корректного сохранения кириллицы
         with output_path.open("w", encoding="utf-8") as f:
             json.dump(final_report, f, indent=2, ensure_ascii=False)
+            
         logger.info(
             "- сопоставление портретных и групповых фотографий: "
             f"<i>{output_path.name}</i><br>"
@@ -358,7 +393,10 @@ def main():
         
         # Убираем прерывание выполнения, если групповых эмбеддингов нет
         if g_embeds is None or g_index is None:
-            logger.warning(f"Групповые эмбеддинги не найдены в {group_embeddings_dir}. Сопоставление не будет производиться.")
+            logger.warning(
+                f"Групповые эмбеддинги не найдены в {group_embeddings_dir}. "
+                "Сопоставление не будет производиться."
+            )
             # Скрипт продолжит выполнение, g_embeds и g_index будут None
 
         json_manager = JsonDataManager(

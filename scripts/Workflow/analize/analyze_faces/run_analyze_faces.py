@@ -18,7 +18,7 @@ import sys
 import cv2
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 import numpy as np
 import json
 
@@ -33,6 +33,7 @@ try:
     from _common.json_data_manager import JsonDataManager
     # Импорт компонентов локальной библиотеки
     from analyze_faces.face_lib import ConfigManager, FaceAnalyzer
+    from analyze_faces.face_lib.result_writer import AnalysisResultWriter    
     
     # Импорт PySM
     from pysm_lib import pysm_context
@@ -105,151 +106,101 @@ def get_config() -> argparse.Namespace:
         return ConfigResolver(parser).resolve_all()
     return parser.parse_args()
 
-def main():
-    log_level = "INFO" 
-    if IS_MANAGED_RUN and pysm_context:
-        log_level = pysm_context.get("sys_log_level", "INFO")
-    
-    logging.basicConfig(
-        level=getattr(logging, log_level.upper(), logging.INFO),
-        format="%(message)s",
-        stream=sys.stdout
-    )
+# --- Новая вспомогательная функция ---
+def load_and_process_task(analyzer: FaceAnalyzer, image_path: Path) -> Tuple[str, Any]:
+    """
+    Функция-воркер для треда.
+    1. Читает файл (I/O)
+    2. Вызывает анализ (CPU/GPU)
+    """
+    try:
+        # Чтение с поддержкой Unicode путей
+        with open(image_path, "rb") as f:
+            img_buffer = np.frombuffer(f.read(), np.uint8)
+        img = cv2.imdecode(img_buffer, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            logger.warning(f"Не удалось декодировать изображение: {image_path.name}")
+            return image_path.name, (None, None, None)
+            
+        return image_path.name, analyzer.analyze_image(img, image_path.name)
+    except Exception as e:
+        logger.error(f"Ошибка загрузки файла {image_path.name}: {e}")
+        return image_path.name, (None, None, None)
 
-    """Основная функция-оркестратор."""
+
+def main():
+    log_level = pysm_context.get("sys_log_level", "INFO") if IS_MANAGED_RUN and pysm_context else "INFO"
+    logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO), format="%(message)s", stream=sys.stdout)
+
     logger.info("<b>ПОИСК ЛИЦ НА ФОТОГРАФИЯХ</b>")
     cli_config = get_config()
 
-    # 1. Загрузка статичной конфигурации моделей
-    config_path = Path(cli_config.a_af_config_file)
+    # 1. Загрузка конфига
     try:
-        config_manager = ConfigManager(config_path)
-    except (FileNotFoundError, ValidationError) as e:
-        logger.critical(f"Не удалось загрузить или провалидировать конфигурацию: {e}")
+        config_manager = ConfigManager(Path(cli_config.a_af_config_file))
+    except Exception as e:
+        logger.critical(f"Ошибка конфига: {e}")
         sys.exit(1)
 
-
-    # Переопределение det_thresh из CLI, если он был указан
     if cli_config.a_af_det_thresh is not None:
-        old_thresh = config_manager.get('model.det_thresh')
-        new_thresh = cli_config.a_af_det_thresh
-        config_manager.config['model']['det_thresh'] = new_thresh
-        logger.info(
-            f"Параметр 'det_thresh' переопределен значением из командной строки: "
-            f"<b>{old_thresh} -> {new_thresh}</b>"
-        )
+        config_manager.config['model']['det_thresh'] = cli_config.a_af_det_thresh
 
-    # 2. Получение и валидация динамических путей из контекста
+    # 2. Пути
     paths = construct_analysis_paths()
-    input_dir = paths.get("input")
-    output_dir = paths.get("output")
-    
-    if not input_dir or not output_dir:
-        # Сообщение об ошибке уже выведено в construct_analysis_paths
-        sys.exit(1)
-
-    if not input_dir.is_dir():
-        logger.critical(f"Входная директория не найдена: {input_dir}")
+    input_dir, output_dir = paths.get("input"), paths.get("output")
+    if not input_dir or not output_dir or not input_dir.is_dir():
+        logger.critical(f"Проблема с путями: input={input_dir}, output={output_dir}")
         sys.exit(1)
     
-    try:
-        output_dir.mkdir(parents=True, exist_ok=True)
-    except OSError as e:
-        logger.critical(f"Не удалось создать выходную папку {output_dir}: {e}")
-        sys.exit(1)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"<br>Вход: <i>{input_dir.resolve()}</i>")
+    logger.info(f"Выход: <i>{output_dir.resolve()}</i><br>")
 
-    # 3. Инициализация компонентов с разделенными конфигурациями
-    logger.info(f"<br>Папка с исходными файлами (JPG):")
-    logger.info(f"<i>{input_dir.resolve()}</i>")
-    logger.info(f"Папка с результатами анализа:")
-    logger.info(f"<i>{output_dir.resolve()}</i><br>")
-
+    # 3. Инициализация компонентов
     face_analyzer = FaceAnalyzer(config_manager, output_dir_override=output_dir)
+    result_writer = AnalysisResultWriter(output_dir) # Инициализируем наш новый класс
     
-    # 4. Поиск файлов и запуск обработки
+    # 4. Поиск файлов
     image_files = sorted([p for p in input_dir.glob("*.jpg") if p.is_file()])
     if not image_files:
-        logger.warning(f"В папке {input_dir} не найдено JPEG-файлов для анализа.")
+        logger.warning("JPEG-файлы не найдены.")
         sys.exit(0)
 
-    logger.info(f"Найдено <b>{len(image_files)} изображений</b> для анализа.")
+    num_workers = cli_config.all_threads or (os.cpu_count() or 4)
+    logger.info(f"Потоков: <b>{num_workers}</b>. Найдено <b>{len(image_files)}</b> изображений.")
 
-    num_workers = cli_config.all_threads
-    if not num_workers or num_workers <= 0:
-        num_workers = os.cpu_count() or 4
-        logger.info(f"Используется автоматическое количество потоков: <b>{num_workers}</b>")
-
-    # 5. Основной цикл обработки
-    logger.info(f"\nПри первом запуске скрипта будет выполнено кеширование моделей ONNX")
-    logger.info(f"Кеширование может занять довольно много времени")
+    # 5. Основной цикл
+    logger.info(f"\nКеширование моделей ONNX...")
     
-    portrait_meta: Dict[str, Any] = {}
-    group_meta: Dict[str, Any] = {}
-    portrait_embeddings: List[np.ndarray] = []
-    group_embeddings: List[np.ndarray] = []
-    portrait_index: Dict[str, int] = {}
-    group_index: Dict[str, int] = {} 
-
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        futures = {executor.submit(face_analyzer.analyze_image, path): path for path in image_files}
+        # Запускаем задачи через новую функцию-обертку
+        futures = {executor.submit(load_and_process_task, face_analyzer, path): path for path in image_files}
         progress = tqdm(futures.items(), total=len(image_files), desc="Анализ изображений")
         
         for future, path in progress:
-            result_meta, result_embeddings, original_shape = future.result()
+            filename, (result_meta, result_embeddings, original_shape) = future.result()
             
-            if not result_meta or not result_embeddings:
-                continue
+            if result_meta and result_embeddings:
+                # Делегируем сохранение в ResultWriter
+                result_writer.add_result(filename, result_meta, result_embeddings, original_shape)
 
-            is_portrait = len(result_meta) == 1
-            file_data = {
-                "filename": path.name,
-                "faces": result_meta,
-                "original_shape": original_shape
-            }
-
-            if is_portrait:
-                portrait_meta[path.name] = file_data
-                portrait_index[path.name] = len(portrait_embeddings)
-                portrait_embeddings.append(result_embeddings[0])
-            else:
-                group_meta[path.name] = file_data
-                for i, embedding in enumerate(result_embeddings):
-                    key = f"{path.name}::{i}"
-                    group_index[key] = len(group_embeddings)
-                    group_embeddings.append(embedding)
-
-    # 6. Сохранение результатов
-    embeddings_dir = output_dir / "_Embeddings"
-    embeddings_dir.mkdir(exist_ok=True)
-    
+    # 6. Сохранение (через ResultWriter)
     json_manager = JsonDataManager(
         portrait_json_path=output_dir / "info_portrait_faces.json",
         group_json_path=output_dir / "info_group_faces.json"
     )
-    json_manager.portrait_data = portrait_meta
-    json_manager.group_data = group_meta
-    json_manager.save_data()
-
-    if portrait_embeddings:
-        np.save(embeddings_dir / "portrait_embeddings.npy", np.array(portrait_embeddings))
-        with open(embeddings_dir / "portrait_index.json", "w") as f:
-            json.dump(portrait_index, f, indent=2)
-
-    if group_embeddings:
-        np.save(embeddings_dir / "group_embeddings.npy", np.array(group_embeddings))
-        with open(embeddings_dir / "group_index.json", "w") as f:
-            json.dump(group_index, f, indent=2)
+    result_writer.save_all(json_manager)
             
-    # 7. Освобождение ресурсов
+    # 7. Завершение
     face_analyzer.shutdown()
 
-    logger.info(f"<br>Поиск лиц на фотографиях завершен. Найдено <b>{len(portrait_meta)}</b> портретных и <b>{len(group_meta)}</b> групповых фотографий.<br>")
-    
-    pysm_context.log_link(url_or_path=str(input_dir), text="Открыть папку с исходными файлами (файлы JPG)")
-    pysm_context.log_link(url_or_path=str(output_dir), text="Открыть папку с обработанными данными (файлы JSON)<br>")
+    logger.info(f"<br>Завершено. Портретов: <b>{len(result_writer.portrait_meta)}</b>, Групповых: <b>{len(result_writer.group_meta)}</b>.<br>")
+    pysm_context.log_link(str(input_dir), "Исходные файлы")
+    pysm_context.log_link(str(output_dir), "Результаты")
     print(" ", file=sys.stderr)
 
-    
+   
 
 # --- Блок 4: Точка входа ---
 # ==============================================================================

@@ -83,49 +83,40 @@ class FaceAnalyzer:
             print("PYSM_CONSOLE_BLOCK_END")
 
 
-    def analyze_image(self, image_path: Path) -> Tuple[Optional[List[Dict]], Optional[List[np.ndarray]], Optional[Tuple[int, int]]]:
+    def analyze_image(self, image: np.ndarray, filename: str) -> Tuple[Optional[List[Dict]], Optional[List[np.ndarray]], Optional[Tuple[int, int]]]:
         """
-        Выполняет полный цикл анализа для одного изображения.
-
-        Returns:
-            Кортеж (список метаданных, список эмбеддингов, форма_изображения) или (None, None, None).
+        Выполняет полный цикл анализа для уже загруженного изображения.
+        
+        Args:
+            image: Изображение в формате BGR (numpy array).
+            filename: Имя файла для логирования и отладки.
         """
         original_shape: Optional[Tuple[int, int]] = None
         try:
-            # Блок 1: Надежная загрузка изображения с Unicode-путями
-            try:
-                with open(image_path, "rb") as f:
-                    img_buffer = np.frombuffer(f.read(), np.uint8)
-                img = cv2.imdecode(img_buffer, cv2.IMREAD_COLOR)
-            except Exception as read_err:
-                logger.error(f"Ошибка чтения или декодирования файла {image_path.name}: {read_err}")
+            if image is None:
+                logger.error(f"В метод анализа передано пустое изображение: {filename}")
                 return None, None, None
 
-            if img is None:
-                logger.error(f"Не удалось загрузить изображение (imdecode вернул None): {image_path.name}")
-                return None, None, None
-
-            original_shape = img.shape[:2]
+            original_shape = image.shape[:2]
             
             # Масштабирование для первичной детекции
             scale = min(self.det_size[1] / original_shape[0], self.det_size[0] / original_shape[1])
             if scale < 1.0:
                 new_h, new_w = int(original_shape[0] * scale), int(original_shape[1] * scale)
-                img_resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+                img_resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
             else:
-                img_resized = img
+                img_resized = image
                 new_h, new_w = original_shape
 
             # Первичная детекция
             initial_faces = self.analyzer.get(img_resized)
             if not initial_faces:
-                logger.info(f"Лица не найдены на изображении: {image_path.name}")
+                # logger.debug(f"Лица не найдены: {filename}") # Снизил уровень лога, чтобы не спамить
                 return None, None, original_shape
             
             # Фильтрация по порогу уверенности
             initial_faces = [f for f in initial_faces if f.det_score >= self.det_thresh]
             if not initial_faces:
-                logger.info(f"Лица с недостаточной уверенностью отброшены на: {image_path.name}")
                 return None, None, original_shape
                 
             processed_face_data_list: List[Dict] = []
@@ -134,9 +125,9 @@ class FaceAnalyzer:
             for idx, face_initial in enumerate(initial_faces):
                 result = self._process_single_face(
                     face_initial=face_initial,
-                    full_image=img,
+                    full_image=image,
                     resized_shape_for_det=(new_h, new_w),
-                    filename=image_path.name,
+                    filename=filename,
                     face_index=idx
                 )
                 if result:
@@ -150,8 +141,7 @@ class FaceAnalyzer:
             return processed_face_data_list, processed_face_embeddings_list, original_shape
 
         except Exception as e:
-            logger.error(f"Не удалось обработать изображение {image_path.name}: {e}", exc_info=True)
-            # Возвращаем shape даже при ошибке, если он был определен
+            logger.error(f"Не удалось обработать изображение {filename}: {e}", exc_info=True)
             return None, None, original_shape
             
 

@@ -44,7 +44,7 @@
       "default": false
     },
     "do_include": {
-      "type": "string_multiline",
+      "type": "list",
       "description": "Паттерны для включения файлов (glob-синтаксис, каждый с новой строки). Пример: *.jpg",
       "required": true,
       "default": "*"
