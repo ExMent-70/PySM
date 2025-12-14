@@ -47,7 +47,11 @@
       "type": "list",
       "description": "Паттерны для включения файлов (glob-синтаксис, каждый с новой строки). Пример: *.jpg",
       "required": true,
-      "default": "*"
+      "default": [
+        "*",
+        "*.jpg",
+        "*.jpeg"
+      ]
     },
     "all_threads": {
       "type": "int",

@@ -1943,6 +1943,19 @@ class ClassListEditor(QMainWindow):
             print(" ", file=sys.stderr)
 
     def closeEvent(self, event: QEvent) -> None:
+        # 1. Проверяем, нужно ли принудительно создать файл для обработки
+        # Необходимо для фотосессий без портретных кадров
+        output_path_str = self.config.wf_output_txt_file
+        if output_path_str:
+            output_path = pathlib.Path(output_path_str)
+            # Если файла нет И в таблице есть данные для сохранения
+            if not output_path.exists() and self.table_model.rowCount() > 0:
+                # Показываем сообщение в статус-баре для ясности
+                self.statusBar().showMessage(f"Создание файла для обработки: {output_path.name}...")
+                # Принудительно вызываем сохранение
+                self._save_for_processing()
+                # Можно добавить небольшую задержку или дождаться завершения, но для простоты пока так
+
         if not self._is_dirty:
             self.add_link()
             event.accept()
