@@ -2,15 +2,23 @@
 
 import logging
 import shutil
+import sys
 from pathlib import Path
 from typing import Tuple, Optional, Dict, List
 
 import cv2
 import numpy as np
 import onnxruntime as ort
+import requests  # Для скачивания моделей
 
 from .config_loader import ConfigManager
 from _common.onnx_manager import ONNXModelManager
+
+# Пытаемся импортировать tqdm для красивого прогресс-бара, иначе заглушка
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, **kwargs): return iterable
 
 try:
     from transformers import CLIPTokenizer
@@ -23,6 +31,12 @@ logger = logging.getLogger(__name__)
 IMAGENET_MEAN_RGB = np.array([0.48145466, 0.4578275, 0.40821073], dtype=np.float32)
 IMAGENET_STD_RGB = np.array([0.26862954, 0.26130258, 0.27577711], dtype=np.float32)
 
+# Ссылки на модели
+MODEL_URLS = {
+    "ViT-L-14.onnx": "https://getfile.dokpub.com/yandex/get/https://disk.yandex.ru/d/Rqfo48sIngLSFg",
+    "ViT-B-32.onnx": "https://getfile.dokpub.com/yandex/get/https://disk.yandex.ru/d/OL0eh6Pe-0MnHw"
+}
+
 class LocationAnalyzer:
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
@@ -31,7 +45,7 @@ class LocationAnalyzer:
 
         self.onnx_manager = ONNXModelManager(self.config_manager.get('provider', {}))
         
-        # Данные для токенизатора
+        # Данные для токенизатора и модели
         self.model_root = Path(self.config_manager.get("paths.model_root"))
         self.tokenizer_rel_path = self.config_manager.get("paths.tokenizer_path")
         
@@ -46,6 +60,11 @@ class LocationAnalyzer:
     def _initialize_clip_model(self) -> Tuple[ort.InferenceSession, Dict[str, str], Dict[str, str]]:
         clip_model_path = self.model_root / self.config_manager.get("paths.clip_model_onnx")
         
+        # --- БЛОК СКАЧИВАНИЯ ---
+        if not clip_model_path.exists():
+            self._download_model_if_needed(clip_model_path)
+        # -----------------------
+
         print("PYSM_CONSOLE_BLOCK_START")       
         session = self.onnx_manager.get_session(clip_model_path)
         print("PYSM_CONSOLE_BLOCK_END")        
@@ -53,7 +72,6 @@ class LocationAnalyzer:
         if not session:
             raise RuntimeError(f"Не удалось инициализировать модель CLIP из {clip_model_path}")
         
-        # (Логика определения входов/выходов осталась прежней)
         available_inputs = [inp.name for inp in session.get_inputs()]
         required_input_names = {
             "pixel_values": ["pixel_values", "image"],
@@ -79,6 +97,48 @@ class LocationAnalyzer:
 
         return session, found_input_names, found_output_names
 
+    def _download_model_if_needed(self, local_path: Path):
+        """Скачивает модель, если она отсутствует и есть ссылка."""
+        filename = local_path.name
+        url = MODEL_URLS.get(filename)
+        
+        if not url:
+            logger.error(f"Файл модели {filename} не найден локально и для него нет ссылки для скачивания.")
+            raise FileNotFoundError(f"Model file not found: {local_path}")
+            
+        logger.info(f"Модель {filename} не найдена. Начинаю скачивание...")
+        print(f"Скачивание модели {filename}...")
+        
+        try:
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Streaming download
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            total_size = int(response.headers.get('content-length', 0))
+            
+            block_size = 8192
+            
+            with open(local_path, 'wb') as f, tqdm(
+                desc=filename,
+                total=total_size,
+                unit='iB',
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as bar:
+                for chunk in response.iter_content(chunk_size=block_size):
+                    size = f.write(chunk)
+                    bar.update(size)
+                    
+            logger.info(f"Модель успешно скачана и сохранена в {local_path}")
+            
+        except Exception as e:
+            logger.error(f"Ошибка при скачивании модели {filename}: {e}")
+            # Удаляем частично скачанный файл, чтобы не было corrupted model
+            if local_path.exists():
+                local_path.unlink()
+            raise
+
     def _preprocess_image(self, image: np.ndarray) -> np.ndarray:
         resized_img = cv2.resize(image, self.input_size, interpolation=cv2.INTER_CUBIC)
         rgb_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
@@ -90,18 +150,21 @@ class LocationAnalyzer:
     def get_image_embedding(self, mask_path: Path) -> Optional[Tuple[Path, np.ndarray]]:
         if not self.session: return None
         try:
-            # --- ИЗМЕНЕНИЕ: Гибкий поиск оригинального файла ---
-            # Используем removesuffix (Python 3.9+) для безопасного удаления суффикса
-            original_filename = mask_path.name.removesuffix(self.mask_suffix) + ".jpg"
+            # Гибкий поиск оригинального файла
+            original_filename = mask_path.name.replace(self.mask_suffix, "") + ".jpg"
+            # Если replace не сработал (суффикс не совпал точно), используем fallback
+            if original_filename == mask_path.name + ".jpg":
+                 # Попробуем просто отбросить расширение и суффикс "грубо", если нужно, но пока оставим так
+                 pass
+
             original_photo_path = mask_path.parent.parent / original_filename
 
             if not original_photo_path.exists():
-                # Фоллбэк: попробуем просто заменить, если removesuffix не сработал (например, суффикса не было)
-                # или если расширение оригинального файла другое (например, .jpeg)
-                logger.debug(f"Файл {original_filename} не найден, пробую альтернативный поиск.")
-                return None
+                 # Вторая попытка для разных расширений
+                 original_photo_path = mask_path.parent.parent / (mask_path.name.replace(self.mask_suffix, "") + ".jpeg")
+                 if not original_photo_path.exists():
+                    return None
             
-            # --- Чтение изображения ---
             with open(mask_path, "rb") as f:
                 img_buffer = np.frombuffer(f.read(), np.uint8)
             img = cv2.imdecode(img_buffer, cv2.IMREAD_COLOR)
@@ -165,7 +228,7 @@ class LocationAnalyzer:
         Инициализирует токенизатор: ищет локально, иначе качает и сохраняет.
         """
         local_tokenizer_path = self.model_root / self.tokenizer_rel_path
-        hf_model_name = "openai/clip-vit-large-patch14" # Соответствует ViT-L-14
+        hf_model_name = "openai/clip-vit-large-patch14" 
 
         print("Инициализация токенизатора CLIP...")
         
@@ -183,7 +246,7 @@ class LocationAnalyzer:
                 logger.info(f"Токенизатор сохранен в {local_tokenizer_path}")
                 
         except Exception as e:
-            print("PYSM_CONSOLE_BLOCK_END") # На случай ошибки внутри блока
+            print("PYSM_CONSOLE_BLOCK_END") 
             logger.critical(f"Ошибка загрузки токенизатора: {e}")
             raise
 

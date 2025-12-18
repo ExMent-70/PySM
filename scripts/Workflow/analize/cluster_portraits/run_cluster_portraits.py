@@ -223,14 +223,34 @@ def main():
         if not json_manager.load_data():
             sys.exit(1)
 
-        # Чтение имен (UTF-8)
-        try:
-            with names_file_path.open("r", encoding="utf-8") as f:
-                children_list = [line.strip() for line in f if line.strip()]
-            logger.info(f"Загружено имен: <b>{len(children_list)}</b>")
-        except FileNotFoundError:
-            logger.error(f"Файл имен не найден: {names_file_path}")
-            sys.exit(1)
+
+
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Блок чтения имен ---
+        # Чтение имен (UTF-8) с фоллбэком на children.txt
+        children_list = []
+        target_names_file = names_file_path
+
+        if not target_names_file.is_file():
+            logger.warning(f"Файл имен не найден по указанному пути: {target_names_file}")
+            fallback_file = target_names_file.parent / "children.txt"
+            logger.info(f"Попытка загрузить файл по умолчанию: {fallback_file.name}")
+            target_names_file = fallback_file
+
+        if target_names_file.is_file():
+            try:
+                with target_names_file.open("r", encoding="utf-8") as f:
+                    children_list = [line.strip() for line in f if line.strip()]
+                logger.info(f"Загружен список из <b>{len(children_list)}</b> имен из файла: {target_names_file.name}")
+            except Exception as e:
+                logger.error(f"Ошибка при чтении файла имен {target_names_file}: {e}")
+                # Не прерываем выполнение, просто список будет пустым
+        else:
+            logger.warning(
+                "Файл с именами не найден. "
+                "Имена для кластеров будут сгенерированы автоматически (Unknown_...)."
+            )
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
 
         # 3. Запуск процесса
         algorithm = getattr(cli_config, f"{arg_prefix}algorithm")

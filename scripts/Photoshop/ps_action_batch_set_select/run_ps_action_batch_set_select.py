@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 import os
+import time  # <--- ДОБАВЛЕН ИМПОРТ
 from argparse import Namespace
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -17,11 +18,13 @@ except ImportError:
     IS_MANAGED_RUN = False
     ConfigResolver, pysm_context = None, None
     class TqdmMock:
-        def __init__(self, i, *a, **kw): self.i = i
-        def __iter__(self): return iter(self.i)
+        def __init__(self, *args, **kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
         @staticmethod
         def write(m, *a, **kw): print(m)
         def set_description(self, *a, **kw): pass
+        def update(self, n=1): pass
     tqdm = TqdmMock
 
 # Импорт ключевых зависимостей и GUI
@@ -39,14 +42,14 @@ except ImportError:
     PYSIDE_AVAILABLE = False
 
 
-# 2. БЛОК: Получение конфигурации
+# 2. БЛОК: Получение конфигурации (ИЗМЕНЕН)
 # ==============================================================================
 def get_config() -> Namespace:
     """Определяет аргументы скрипта и получает их значения."""
     parser = argparse.ArgumentParser(
         description="Пакетная обработка файлов с помощью экшена, который можно выбрать интерактивно."
     )
-    # Аргументы из run_ps_action_batch.py
+    # Аргументы для выбора файлов
     parser.add_argument(
         "--ps_mode", type=str, required=True,
         choices=['active_document', 'active_document_folder', 'selected_file', 'selected_file_folder'],
@@ -60,7 +63,7 @@ def get_config() -> Namespace:
         "--ps_recursive", action="store_true", default=False,
         help="Рекурсивный поиск файлов в папках."
     )
-    # Аргументы из run_ps_action_set_select.py (сделаны необязательными)
+    # Аргументы для выбора экшена
     parser.add_argument(
         "--ps_action_set", type=str,
         help="Имя набора экшенов. Если не указано, появится диалог выбора."
@@ -69,6 +72,17 @@ def get_config() -> Namespace:
         "--ps_action_name", type=str,
         help="Имя экшена. Если не указано, появится диалог выбора."
     )
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+    # Аргументы для управления процессом
+    parser.add_argument(
+        "--ps_need_save", action="store_true",
+        help="Нужно ли принудительно сохранять документ после выполнения экшена."
+    )
+    parser.add_argument(
+        "--ps_wait_after_action", type=float, default=1.0,
+        help="Задержка в секундах после выполнения экшена, чтобы Photoshop успел обработать операцию."
+    )
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
 
     if IS_MANAGED_RUN and ConfigResolver:
         return ConfigResolver(parser).resolve_all()
@@ -76,14 +90,14 @@ def get_config() -> Namespace:
         return parser.parse_args()
 
 
-# 3. БЛОК: Вспомогательные функции и классы GUI (из run_ps_action_set_select.py)
+# 3. БЛОК: Вспомогательные функции и классы GUI
 # ==============================================================================
+# ... (код без изменений) ...
 def get_all_actions_js(app: api.Application) -> Dict[str, List[str]]:
     """
     Получает полный список всех наборов и их экшенов, отфильтровывая
     служебные элементы (имена вида __name__).
     """
-    # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
     javascript_code = """
     function getAllActions() {
         var sets = []; var i = 1;
@@ -102,8 +116,6 @@ def get_all_actions_js(app: api.Application) -> Dict[str, List[str]]:
                     actions.push(desc2.getString(stringIDToTypeID("name")));
                 }
             }
-            // КОММЕНТАРИЙ: Не фильтруем пустые наборы здесь, чтобы сохранить их в списке,
-            // если они не служебные. Фильтрацию пустых произведем в Python.
             sets.push({ "name": setName, "actions": actions });
             i++;
         }
@@ -115,21 +127,17 @@ def get_all_actions_js(app: api.Application) -> Dict[str, List[str]]:
         json_result = app.eval_javascript(javascript_code)
         list_of_sets = json.loads(json_result)
         
-        # КОММЕНТАРИЙ: Фильтрация служебных элементов и пустых наборов в Python.
         filtered_data = {}
         for item in list_of_sets:
             set_name = item['name']
-            # Пропускаем служебные наборы
             if set_name.startswith('__') and set_name.endswith('__'):
                 continue
 
-            # Фильтруем служебные экшены внутри набора
             actions = [
                 action for action in item['actions'] 
                 if not (action.startswith('__') and action.endswith('__'))
             ]
             
-            # Добавляем набор в итоговый словарь, только если он содержит экшены
             if actions:
                 filtered_data[set_name] = actions
                 
@@ -137,7 +145,6 @@ def get_all_actions_js(app: api.Application) -> Dict[str, List[str]]:
     except Exception as e:
         tqdm.write(f"Ошибка при получении списка экшенов: {e}")
         return {}
-    # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
 
 class ActionSelectorDialog(QDialog):
     """Класс диалогового окна для выбора экшена."""
@@ -210,12 +217,13 @@ class ActionSelectorDialog(QDialog):
         return (set_item.text() if set_item else None, action_item.text() if action_item else None)
 
 
-# 4. БЛОК: Определение списка файлов (из run_ps_action_batch.py)
+# 4. БЛОК: Определение списка файлов
 # ==============================================================================
+# ... (код без изменений) ...
 def get_files_to_process(config: Namespace, app: api.Application) -> List[str]:
     """На основе режима работы определяет и возвращает список путей к файлам."""
     mode = config.ps_mode
-    print(f"\nРежим работы: <b>{mode}</b>. Подготовка списка файлов")
+    tqdm.write(f"\nОпределение списка файлов для режима: <b>{mode}</b>")
     
     target_folder = None
     if mode == 'active_document':
@@ -234,7 +242,7 @@ def get_files_to_process(config: Namespace, app: api.Application) -> List[str]:
             return []
         try:
             target_folder = Path(app.activeDocument.path)
-            #tqdm.write(f"Целевая папка (из активного документа): {target_folder}")
+            tqdm.write(f"Целевая папка (из активного документа): {target_folder}")
         except COMError:
             tqdm.write("ОШИБКА: Активный документ должен быть сохранен.")
             return []
@@ -255,22 +263,25 @@ def get_files_to_process(config: Namespace, app: api.Application) -> List[str]:
             return []
         target_file = Path(config.ps_file_path)
         if not target_file.is_file():
-            tqdm.write(f"\nФайл {target_file} не найден. Определение рабочей папки...")
-        target_folder = target_file.parent
-        if not os.path.exists(target_folder):
-            tqdm.write(f"Рабочая папка {target_folder} не найдена. Завершение работы...")
-            return []
-  
+            # Если файл не найден, пытаемся использовать его родительскую папку
+            target_folder = target_file.parent
+            if not target_folder.is_dir():
+                tqdm.write(f"ОШИБКА: Файл '{target_file}' не найден, и его родительская папка '{target_folder}' также не существует.")
+                return []
+            tqdm.write(f"ВНИМАНИЕ: Файл '{target_file.name}' не найден, работаем с его родительской папкой: {target_folder}")
+        else:
+            target_folder = target_file.parent
+            tqdm.write(f"Целевая папка (из указанного файла): {target_folder}")
+
     if target_folder:
-        print(f"\n{'Рекурсивный поиск' if config.ps_recursive else 'Поиск'} файлов PSD в папке {target_folder}.")
+        tqdm.write(f"Поиск *.psd в: {target_folder} (Рекурсия: {'Вкл' if config.ps_recursive else 'Выкл'})")
         pattern = "**/*.psd" if config.ps_recursive else "*.psd"
         image_files_paths = list(target_folder.glob(pattern))
         return sorted([str(f) for f in image_files_paths if f.is_file()])
 
     return []
 
-
-# 5. БЛОК: Главная функция-оркестратор
+# 5. БЛОК: Главная функция-оркестратор (ИЗМЕНЕН)
 # ==============================================================================
 def main():
     """Главная функция, управляющая всем процессом."""
@@ -283,57 +294,38 @@ def main():
         tqdm.write("ОШИБКА: Не удалось подключиться к Photoshop."); sys.exit(1)
 
     # ЭТАП 1: Определить, какой экшен выполнять
-    # -------------------------------------------
     action_set, action_name = config.ps_action_set, config.ps_action_name
     
-    # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
-    if action_set and action_name:
-        # Автоматический режим: Проверяем, не пытается ли пользователь запустить служебный экшен.
-        is_service_set = action_set.startswith('__') and action_set.endswith('__')
-        is_service_action = action_name.startswith('__') and action_name.endswith('__')
-        if is_service_set or is_service_action:
-            tqdm.write(f"ОШИБКА: Запуск служебных экшенов или наборов (вида '__имя__') в автоматическом режиме запрещен.")
-            sys.exit(1)
-        
-        # Проверка существования (простой вариант, без вызова JS)
-        print("Автоматический режим: проверка параметров...")
-        # Полную проверку существования можно опустить, т.к. doAction сам вернет ошибку.
-        
-    else:
-        # Интерактивный режим
+    if not (action_set and action_name):
         tqdm.write("\nИмя экшена не указано, переход в интерактивный режим...")
         if not PYSIDE_AVAILABLE:
             tqdm.write("ОШИБКА: PySide6 не найдена, интерактивный режим невозможен."); sys.exit(1)
-            
         actions_data = get_all_actions_js(app)
         if not actions_data:
             tqdm.write("Не удалось получить список экшенов или он пуст."); sys.exit(1)
-            
         q_app = QApplication.instance() or QApplication(sys.argv)
         dialog = ActionSelectorDialog(actions_data, action_set, action_name)
-        
         if dialog.exec() == QDialog.Accepted:
             action_set, action_name = dialog.get_selection()
             if not action_set or not action_name:
                 tqdm.write("Выбор не сделан. Операция отменена."); sys.exit(0)
         else:
             tqdm.write("Операция отменена пользователем."); sys.exit(0)
-    # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
     
-    print(f"\nЗапуск экшена <b>{action_name}</b> из набора <b>{action_set}</b>")
+    tqdm.write(f"Будет выполнен экшен: <b>{action_name}</b> из набора <b>{action_set}</b>")
 
-    # ЭТАП 2: Определить список файлов для обработки
-    # -----------------------------------------------
+    # ЭТАП 2: Определить список файлов
     initial_active_doc_name = app.activeDocument.name if len(app.documents) > 0 else None
     image_files = get_files_to_process(config, app)
 
     if not image_files:
         tqdm.write("\nНе найдено файлов для обработки. Завершение работы."); sys.exit(0)
-        
-    print(f"\nНайдено <b>{len(image_files)}</b> файлов. Начало пакетной обработки.")
+    
+    work_folder = Path(image_files[0]).parent if image_files else None
+    print(f"\nНайдено {len(image_files)} файлов для обработки.")
 
     # ЭТАП 3: Выполнить пакетную обработку
-    # --------------------------------------
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
     with tqdm(total=len(image_files), desc="Обработка", unit="file", dynamic_ncols=True) as progress_bar:
         for full_path in image_files:
             doc = None
@@ -342,24 +334,36 @@ def main():
                 progress_bar.set_description(f"Обработка: {file_name}")
                 doc = app.open(full_path)
                 app.doAction(action_name, action_set)
-                doc.save()
+
+                # Добавляем задержку
+                if config.ps_wait_after_action > 0:
+                    time.sleep(config.ps_wait_after_action)
+
+                # Сохраняем документ, если указан флаг
+                if config.ps_need_save:
+                    doc.save()
+                    
             except Exception as e:
                 tqdm.write(f"\nОШИБКА при обработке '{file_name}': {e}")
             finally:
-                if doc and doc.name != initial_active_doc_name:
-                    doc.close(SaveOptions.DoNotSaveChanges)
+                # Отказоустойчивое закрытие документа
+                if doc:
+                    try:
+                        if doc.name != initial_active_doc_name:
+                            doc.close(SaveOptions.DoNotSaveChanges)
+                    except Exception as close_e:
+                        tqdm.write(f"\nВНИМАНИЕ: Не удалось корректно закрыть '{file_name}'. Возможно, он был изменен экшеном. Ошибка: {close_e}")
+                
                 progress_bar.update(1)
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
 
     print("\n<b>Пакетная обработка завершена.</b>\n")
-    pysm_context.log_link(
-        url_or_path=str(Path(config.ps_file_path).parent), # Передаем строку, а не объект Path
-        text=f"Открыть папку с обработанными файлами PSD",
-        )  
-    print(" ", file=sys.stderr)
-
-
+    if IS_MANAGED_RUN and work_folder:
+        pysm_context.log_link(
+            url_or_path=str(work_folder),
+            text=f"Открыть рабочую папку: {work_folder}",
+        )
     sys.exit(0)
-
 
 # 6. БЛОК: Точка входа
 # ==============================================================================

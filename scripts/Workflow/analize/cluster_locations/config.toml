@@ -16,8 +16,8 @@ tokenizer_path = "models/tokenizer/clip-vit-large-patch14"
 
 [provider]
 # Провайдер ONNX Runtime: 'CUDAExecutionProvider', 'TensorrtExecutionProvider' или 'CPUExecutionProvider'
-# Если оставить пустым (null), будет выбран автоматически.
-provider_name = "CUDAExecutionProvider" 
+# Если оставить пустым, будет выбран автоматически.
+provider_name = "" 
 device_id = 0
 tensorRT_cache_path = "../../../../_BIN/TensorRT_cache"
 
