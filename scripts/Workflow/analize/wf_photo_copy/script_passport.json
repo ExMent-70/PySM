@@ -1,0 +1,68 @@
+{
+  "description": "Универсальный скрипт для пакетной обработки фотографий. Извлекает номера из текста и выполняет выбранный набор операций: обновление XMP-тегов, переименование и/или копирование файлов.\n\n<b>Примеры путей при работе с RAW-файлами</b>\n<b>source_dir</b> = <i>{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}</i>\n<b>dest_dir</b> = <i>{wf_session_path}/{wf_session_name}/Selects/{wf_photo_session}</i>\n\n<b>Примеры путей при работе с JPG-файлами</b>\n<b>source_dir</b> = <i>{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG</i>\n<b>dest_dir</b> = <i>{wf_session_path}/{wf_session_name}/Output/{wf_session_name}/Альбом/Фото/{wf_photo_session}</i><hr>",
+  "category": "Метаданные",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2025.12.12",
+  "command_line_args_meta": {
+    "portrait_json": {
+      "type": "file_path",
+      "description": "Путь к файлу с метаданными портретов (info_portrait_faces.json).",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json"
+    },
+    "group_json": {
+      "type": "file_path",
+      "description": "Путь к файлу с метаданными групповых фото (info_group_faces.json).",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json"
+    },
+    "source_dir": {
+      "type": "dir_path",
+      "description": "Путь к папке с исходными файлами для поиска.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}"
+    },
+    "dest_dir": {
+      "type": "dir_path",
+      "description": "Корневая папка для результатов (обязательна только для операции копирования).",
+      "required": false,
+      "default": "{wf_session_path}/{wf_session_name}/Selects/{wf_photo_session}"
+    },
+    "min_digits": {
+      "type": "int",
+      "description": "Минимальное количество цифр в номере для поиска.",
+      "required": false,
+      "default": 4
+    },
+    "max_digits": {
+      "type": "int",
+      "description": "Максимальное количество цифр в номере для поиска.",
+      "required": false,
+      "default": 4
+    },
+    "exclude_dirs": {
+      "type": "string_multiline",
+      "description": "Список подпапок для исключения из поиска (каждая с новой строки).",
+      "required": false,
+      "default": "Masks"
+    },
+    "update-xmp": {
+      "type": "bool",
+      "description": "Включить операцию обновления XMP-тегов (запись локации).",
+      "required": false,
+      "default": false
+    },
+    "rename-files": {
+      "type": "bool",
+      "description": "Включить операцию переименования файлов при копировании.",
+      "required": false,
+      "default": false
+    },
+    "copy-files": {
+      "type": "bool",
+      "description": "Включить операцию копирования файлов в папку назначения.",
+      "required": false,
+      "default": false
+    }
+  }
+}
