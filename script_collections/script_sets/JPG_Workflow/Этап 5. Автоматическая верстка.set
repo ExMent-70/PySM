@@ -1,12 +1,12 @@
 {
   "type": "script_set",
-  "id": "setnode_703f13d95ceb",
-  "name": "Этап 5. Автоматическая верстка",
+  "id": "setnode_a36d13ad9028",
+  "name": "Этап 6. Автоматическая верстка",
   "description": null,
   "script_entries": [
     {
       "id": "root_7617c03c/SYSTEM/py_if_else",
-      "instance_id": "instance_9bf58f38fe64",
+      "instance_id": "instance_9461220006d4",
       "name": "УСЛОВИЕ: Проверка КАТАЛОГА ШАБЛОНОВ",
       "description": "<div style=\" {theme.script_description}\">\nСкрипт проверяет наличие переменной <b>wf_idsgn_catalog</b>, которая содержит путь к каталогу шаблонов InDesign.\n\nЕсли переменная не существует, то программа предлагает выбрать файл-каталог шаблонов.\nЕсли переменная существует, то запускается скрипт каталогизатор.\n</div>",
       "silent_mode": true,
@@ -24,11 +24,11 @@
           "enabled": true
         },
         "then-instance-id": {
-          "value": "instance_beac224cfbd2",
+          "value": "instance_e7732eaf94e9",
           "enabled": true
         },
         "else-instance-id": {
-          "value": "instance_ed8f24cf2de0",
+          "value": "instance_b09dbc01284d",
           "enabled": true
         },
         "clear-variable": {
@@ -39,7 +39,7 @@
     },
     {
       "id": "root_7617c03c/GUI/gui_dialog_open",
-      "instance_id": "instance_beac224cfbd2",
+      "instance_id": "instance_e7732eaf94e9",
       "name": "БЛОК ИСТИНА: Открыть файл-каталог шаблонов InDesign",
       "description": "<div style=\" {theme.markup_number}\">\nСкрипт запускается если не выбран каталог шаблонов InDesign.\n</div>\n<div style=\" {theme.script_description}\">\nСкрипт открывает диалоговое окно для выбора пути к файлу-каталогу шаблонов InDesign.\n\nВыбранный путь сохраняется в переменную контекста <b>wf_idsgn_catalog</b>.\n</div>",
       "silent_mode": false,
@@ -64,7 +64,7 @@
     },
     {
       "id": "root_790d968b/InDesign/idsgn_catalog",
-      "instance_id": "instance_ed8f24cf2de0",
+      "instance_id": "instance_b09dbc01284d",
       "name": "Выбрать шаблон оформления",
       "description": "<div style=\" {theme.script_description}\">\nСкрипт для выбора шаблона InDesign, который будет использован в скрипте автоматической верстки.\n\nВсе параметры выбранного шаблона сохраняются в переменной контекста <b>var_template_name</b>.\n\nДля работы скрипта путь к каталогу шаблонов должен быть предварительно сохранен в переменной <b>wf_idsgn_catalog</b>.\n</div>",
       "silent_mode": false,
@@ -85,7 +85,7 @@
     },
     {
       "id": "root_790d968b/InDesign/idsgn_spread_generator",
-      "instance_id": "instance_9397624da254",
+      "instance_id": "instance_6aae480672ee",
       "name": "Создать разворот альбома",
       "description": "<div style=\" {theme.script_description}\">\nСкрипт на основе шаблона, сохраненного в переменной <b>var_template_name</b>, генерирует многостраничный файл InDesign, заполняя персональные развороты для каждой ученика.\n\nВ данном Экземпляре скрипта пути к JSON-файлу с информацией об учениках, папке с фотографиями вычисляются автоматически на основании переменных контекста:\n- {wf_session_path}\n- {wf_psd_path}\n- {wf_session_name}\n- {wf_photo_session}\n</div>",
       "silent_mode": false,

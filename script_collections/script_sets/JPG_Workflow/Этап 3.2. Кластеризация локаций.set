@@ -1,0 +1,83 @@
+{
+  "type": "script_set",
+  "id": "setnode_feb80b279576",
+  "name": "Этап 3.2. Кластеризация локаций",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_msg",
+      "instance_id": "instance_b1b056365d2e",
+      "name": "СООБЩЕНИЕ: Запустить редактор кластеров",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_msg_var": {
+          "value": "var_use_claster_editor",
+          "enabled": true
+        },
+        "dlg_msg_type": {
+          "value": "yes_no",
+          "enabled": true
+        },
+        "dlg_msg_title": {
+          "value": "Подтверждение",
+          "enabled": true
+        },
+        "dlg_msg_message": {
+          "value": "Набор скриптов для кластеризации локаций\n\nВыполнение этих скриптов приведёт к созданию и/или изменению следующих файлов:\n- location_embeddings.npy\n- info_group_faces.json\n- info_portrait_faces.json\n\nВы хотите выполнить скрипты входящие в этот набор?",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/cluster_locations",
+      "instance_id": "instance_c5a7382c5192",
+      "name": "Группировать фотографии по локациям",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "a_cl_config_file": {
+          "value": "config.toml",
+          "enabled": true
+        },
+        "a_cl_cluster_eps": {
+          "value": "0.12",
+          "enabled": true
+        },
+        "a_cl_location_prompts": {
+          "value": [],
+          "enabled": true
+        },
+        "a_cl_mask_suffix": {
+          "value": "_BiRefNet-portrait_output.jpg",
+          "enabled": true
+        },
+        "all_threads": {
+          "value": 0,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/cluster_editor",
+      "instance_id": "instance_bb59f50eced1",
+      "name": "Редактировать кластеры локаций",
+      "description": "<div style=\" {theme.script_description}\">\nСкрипт позволяет визуально, в ручном режиме, редактировать кластеры ЛОКАЦИЙ (просматривать и удалять фотографии кластера, перемещать их из одного кластера в другой, изменять название кластера). \n\nДополнительно в скрипте реализован экспорт изображений в формат JPG с водяными знаками. При экспорте переменной контекста <b>var_jpg_move</b> присваивается значение <b>yes</b>\n<b>var_jpg_move = yes</b>\n\nПути к рабочим папкам формируется из переменных контекста: \n- {wf_session_path}, \n- {wf_session_name}, \n- {wf_photo_session},\n- {wf_children_file_name}.\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "ce_portrait_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+          "enabled": true
+        },
+        "ce_group_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+          "enabled": true
+        },
+        "mode": {
+          "value": "location",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

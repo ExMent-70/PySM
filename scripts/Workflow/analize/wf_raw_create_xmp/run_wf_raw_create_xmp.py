@@ -160,6 +160,7 @@ class MetadataProcessor:
         self,
         image_filename: str,
         file_data: Dict[str, Any],
+        landmarks_data: Dict[str, Any],  # Новое: Передаем ландмарки
         photo_type: PhotoType,
         session_name: Optional[str]
     ) -> bool:
@@ -168,46 +169,59 @@ class MetadataProcessor:
         """
         xmp_path = self.image_folder / f"{pathlib.Path(image_filename).stem}.xmp"
         
+        # Слияние данных: основные + ландмарки
+        merged_file_data = self._merge_landmarks(file_data, landmarks_data)
+
         # Инициализация редактора XMP (включает загрузку или создание файла)
         editor = XmpEditor(xmp_path, self.template_content)
 
         # 1. Заполнение базовых полей
-        self._set_base_metadata(editor, image_filename, file_data, photo_type, session_name)
+        self._set_base_metadata(editor, image_filename, merged_file_data, photo_type, session_name)
 
         # 2. Обработка лиц (генерация ключевых слов и SubjectCode)
-        faces = file_data.get(JsonKeys.FACES.value, [])
+        faces = merged_file_data.get(JsonKeys.FACES.value, [])
         is_portrait = (photo_type == PhotoType.PORTRAIT)
         
         face_keywords, subject_codes, persons = self._extract_face_info(faces, photo_type, is_portrait)
 
         # 3. Обновление списков (Bag)
-        # Объединяем базовые ключевые слова (уже добавленные в _set_base_metadata неявно? Нет, там через editor)
-        # В XmpEditor update_bag перезаписывает список (если append=False). 
-        # Нам нужно собрать ВСЕ ключевые слова перед записью.
-        
-        base_keywords = self._get_base_keywords(file_data, photo_type)
+        base_keywords = self._get_base_keywords(merged_file_data, photo_type)
         all_keywords = base_keywords.union(face_keywords)
 
         editor.update_bag("dc", "subject", list(all_keywords), sort=True)
         editor.update_bag("lightroom", "hierarchicalSubject", list(all_keywords), sort=True)
         
-        # SubjectCode сохраняем без сортировки, чтобы landmark был в конце (как в оригинале логика)
+        # SubjectCode сохраняем без сортировки, чтобы landmark был в конце
         editor.update_bag("Iptc4xmpCore", "SubjectCode", subject_codes, sort=False)
         
-        # Для портретов обновляем TransmissionReference
         if is_portrait and persons:
-            # Записываем первое найденное имя или список имен через запятую
-            # В оригинале было "person_identifier" внутри цикла, перезаписывая поле.
-            # Воспроизводим логику: последнее валидное имя победит, или соберем все?
-            # Оригинал: self._update_text_field(..., person_identifier) внутри цикла.
-            # Значит, последнее лицо перетирало предыдущие. Это странно, но сохраним логику или улучшим?
-            # Логичнее записать всех через запятую.
-            valid_persons = [p for p in persons if not p.startswith("Кластер_")] # Обычно в Reference пишут реальные имена
-            if not valid_persons: valid_persons = persons # Если имен нет, пишем кластеры
+            valid_persons = [p for p in persons if not p.startswith("Кластер_")]
+            if not valid_persons: valid_persons = persons
             if valid_persons:
                 editor.set_simple_field("photoshop", "TransmissionReference", ", ".join(valid_persons))
 
         return editor.save()
+
+    def _merge_landmarks(self, file_data: Dict[str, Any], landmarks_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Создает копию данных файла и объединяет их с ландмарками для каждого лица.
+        """
+        if not landmarks_data:
+            return file_data
+            
+        merged = file_data.copy()
+        merged_faces = []
+        
+        land_faces = landmarks_data.get("faces", [])
+        
+        for i, face in enumerate(file_data.get("faces", [])):
+            face_merged = face.copy()
+            if i < len(land_faces):
+                face_merged.update(land_faces[i])
+            merged_faces.append(face_merged)
+            
+        merged["faces"] = merged_faces
+        return merged
 
     def _set_base_metadata(
         self,
@@ -223,12 +237,10 @@ class MetadataProcessor:
         editor.set_simple_field("GettyImagesGIFT", "OriginalFilename", image_filename)
         editor.set_simple_field("Iptc4xmpCore", "IntellectualGenre", photo_type.value)
 
-        # Локация
         location_name = file_data.get(JsonKeys.LOCATION_NAME.value)
         if isinstance(location_name, str) and location_name.strip():
              editor.set_simple_field("Iptc4xmpCore", "Location", location_name.strip())
 
-        # Технические данные первого лица (для совместимости)
         faces = file_data.get(JsonKeys.FACES.value, [])
         if faces and isinstance(faces[0], dict):
             first_face = faces[0]
@@ -314,9 +326,9 @@ class MetadataProcessor:
                 else:
                     codes_for_face.append(str(code))
             
-            codes_for_face.sort() # Сортируем атрибуты лица по алфавиту
+            codes_for_face.sort()
             if landmark_entry:
-                codes_for_face.append(landmark_entry) # Landmark всегда в конце лица
+                codes_for_face.append(landmark_entry)
             
             subject_codes_final.extend(codes_for_face)
 
@@ -346,6 +358,7 @@ class MetadataProcessor:
             if key in ("kps", JsonKeys.LANDMARK_2D_106.value):
                 return ";".join(f"{float(pt[0]):.{p}f},{float(pt[1]):.{p}f}" for pt in data if len(pt) >= 2)
             if key == JsonKeys.LANDMARK_3D_68.value:
+                # В XMP обычно пишут только 2D, но если вдруг, то формат такой же
                 return ";".join(f"{float(pt[0]):.{p}f},{float(pt[1]):.{p}f},{float(pt[2]):.{p}f}" for pt in data if len(pt) >= 3)
             if key == JsonKeys.POSE.value:
                 return ",".join(f"{float(c):.{p}f}" for c in data) if len(data) == 3 else None
@@ -365,7 +378,6 @@ def run_xmp_creation(
 ):
     logger.info(f"Запуск создания XMP. Папка: {image_folder_path}")
     
-    # Создаем процессор один раз, передаем ему шаблон
     processor = MetadataProcessor(image_folder_path, template_content)
 
     all_filenames = json_manager.get_all_filenames("all")
@@ -382,12 +394,18 @@ def run_xmp_creation(
             file_info = json_manager.get_data_with_type(fname)
             if file_info:
                 file_data, raw_photo_type = file_info
+                
+                # Получаем ландмарки из менеджера
+                data_type_str = "portrait" if raw_photo_type == RawPhotoType.PORTRAIT else "group"
+                landmarks_data = json_manager.get_landmarks_data(fname, data_type_str) or {}
+                
                 photo_type = PhotoType.GROUP if raw_photo_type == RawPhotoType.GROUP else PhotoType.PORTRAIT
                 
                 future = executor.submit(
                     processor.process_file,
                     fname,
                     file_data,
+                    landmarks_data,
                     photo_type,
                     session_name
                 )
@@ -395,7 +413,6 @@ def run_xmp_creation(
             else:
                 logger.warning(f"Данные не найдены: {fname}")
 
-        # Прогресс бар
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Обновление XMP"):
             try:
                 if not future.result():
@@ -414,11 +431,9 @@ def main():
         logger.critical("Требуется запуск в среде PySM.")
         sys.exit(1)
 
-    # Загрузка конфигурации
     config = get_config()
     template_content = load_template_content(current_script_path)
 
-    # Получение контекста
     session_path_str = pysm_context.get("wf_session_path")
     session_name = pysm_context.get("wf_session_name")
     photo_session = pysm_context.get("wf_photo_session")
@@ -438,11 +453,15 @@ def main():
         logger.error(f"JSON файлы не найдены в {analysis_path}")
         sys.exit(1)
 
-    # Загрузка данных
+    # 1. Загрузка основных данных
     json_manager = JsonDataManager(portrait_json, group_json)
     if not json_manager.load_data():
         logger.error("Ошибка загрузки JSON данных.")
         sys.exit(1)
+        
+    # 2. Загрузка ландмарков (Тяжелые данные)
+    if not json_manager.load_landmarks("all"):
+        logger.warning("Ландмарки не загружены или отсутствуют. XMP будут созданы без детальной геометрии.")
 
     # Запуск
     run_xmp_creation(

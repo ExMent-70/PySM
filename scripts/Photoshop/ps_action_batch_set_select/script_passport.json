@@ -8,7 +8,7 @@
       "type": "choice",
       "description": "Режим работы: определяет, какие файлы будут обработаны.",
       "required": true,
-      "default": "active_document",
+      "default": "selected_file_folder",
       "choices": [
         "active_document",
         "active_document_folder",
@@ -20,13 +20,14 @@
       "type": "file_path",
       "description": "Путь к файлу (для режимов 'selected_file' и 'selected_file_folder').",
       "required": false,
+      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}/11.psd",
       "filter": "Photoshop Document (*.psd)"
     },
     "ps_recursive": {
       "type": "bool",
       "description": "Искать файлы рекурсивно во вложенных папках.",
       "required": false,
-      "default": false
+      "default": true
     },
     "ps_action_set": {
       "type": "string",
@@ -42,7 +43,7 @@
       "type": "bool",
       "description": "Принудительно сохранять каждый PSD после выполнения экшена.",
       "required": false,
-      "default": false
+      "default": true
     },
     "ps_wait_after_action": {
       "type": "float",

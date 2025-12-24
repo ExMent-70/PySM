@@ -17,6 +17,7 @@ class JsonDataManager:
     """
     Класс для управления чтением, записью и обновлением данных
     в JSON-файлах info_portrait_faces.json и info_group_faces.json.
+    Также поддерживает загрузку "тяжелых" данных ландмарков по требованию.
     """
 
     # --- Блок 1: Инициализация ---
@@ -25,10 +26,6 @@ class JsonDataManager:
         """
         Инициализирует менеджер путями к JSON-файлам.
         Хотя бы один путь должен быть предоставлен.
-
-        Args:
-            portrait_json_path: Путь к файлу с данными портретных фото.
-            group_json_path: Путь к файлу с данными групповых фото.
         """
         if portrait_json_path and not isinstance(portrait_json_path, Path):
             raise TypeError("Путь к JSON портретов должен быть объектом Path.")
@@ -37,10 +34,27 @@ class JsonDataManager:
         if not portrait_json_path and not group_json_path:
             raise ValueError("Необходимо предоставить хотя бы один путь к JSON-файлу.")
 
+        # Основные файлы
         self.portrait_json_path = portrait_json_path.resolve() if portrait_json_path else None
         self.group_json_path = group_json_path.resolve() if group_json_path else None
+        
+        # Данные в памяти
         self.portrait_data: Dict[str, Dict[str, Any]] = {}
         self.group_data: Dict[str, Dict[str, Any]] = {}
+
+        # --- НОВОЕ: Поддержка файлов ландмарков ---
+        # Вычисляем пути к файлам ландмарков автоматически
+        self.portrait_landmarks_path: Optional[Path] = None
+        self.group_landmarks_path: Optional[Path] = None
+        
+        if self.portrait_json_path:
+            self.portrait_landmarks_path = self.portrait_json_path.parent / "info_portrait_landmarks.json"
+        if self.group_json_path:
+            self.group_landmarks_path = self.group_json_path.parent / "info_group_landmarks.json"
+            
+        # Хранилище для ландмарков (загружаются только по требованию)
+        self.portrait_landmarks: Dict[str, Dict[str, Any]] = {}
+        self.group_landmarks: Dict[str, Dict[str, Any]] = {}
 
         logger.debug("<br>JsonDataManager инициализирован.")
 
@@ -48,7 +62,7 @@ class JsonDataManager:
     # ==============================================================================
     def load_data(self) -> bool:
         """
-        Загружает данные из предоставленных при инициализации JSON-файлов в память.
+        Загружает ОСНОВНЫЕ данные из JSON-файлов в память.
 
         Returns:
             True, если загрузка прошла успешно, False при ошибке.
@@ -68,6 +82,40 @@ class JsonDataManager:
             return True
         except (IOError, TypeError, json.JSONDecodeError) as e:
             logger.error(f"Критическая ошибка при загрузке JSON-данных: {e}", exc_info=True)
+            return False
+
+    def load_landmarks(self, data_type: str = "all") -> bool:
+        """
+        Загружает файлы ЛАНДМАРКОВ в память по требованию.
+        
+        Args:
+            data_type: 'portrait', 'group' или 'all'.
+        """
+        try:
+            loaded_msgs = []
+            
+            # Загрузка портретных ландмарков
+            if data_type in ["portrait", "all"] and self.portrait_landmarks_path:
+                if self.portrait_landmarks_path.exists():
+                    self.portrait_landmarks = self._load_single_file(self.portrait_landmarks_path)
+                    loaded_msgs.append(f"ландмарки портретов ({len(self.portrait_landmarks)})")
+                else:
+                    logger.warning(f"Файл ландмарков портретов не найден: {self.portrait_landmarks_path}")
+
+            # Загрузка групповых ландмарков
+            if data_type in ["group", "all"] and self.group_landmarks_path:
+                if self.group_landmarks_path.exists():
+                    self.group_landmarks = self._load_single_file(self.group_landmarks_path)
+                    loaded_msgs.append(f"ландмарки групп ({len(self.group_landmarks)})")
+                else:
+                    logger.warning(f"Файл ландмарков групп не найден: {self.group_landmarks_path}")
+
+            if loaded_msgs:
+                logger.info(f"Дополнительно загружены: {', '.join(loaded_msgs)}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Ошибка при загрузке ландмарков: {e}", exc_info=True)
             return False
 
     def _load_single_file(self, file_path: Path) -> Dict[str, Dict[str, Any]]:
@@ -119,10 +167,10 @@ class JsonDataManager:
             json.dump(data, f, ensure_ascii=False, indent=2)
         logger.debug(f"Файл данных сохранен: {file_path}")
 
-    # --- Блок 3: Методы для доступа и модификации данных (без изменений) ---
+    # --- Блок 3: Методы доступа ---
     # ==============================================================================
     def get_data(self, filename: str) -> Optional[Dict[str, Any]]:
-        """Возвращает полный словарь данных для указанного имени файла."""
+        """Возвращает полный словарь данных (основных) для указанного имени файла."""
         return self.portrait_data.get(filename) or self.group_data.get(filename)
         
     def get_data_with_type(self, filename: str) -> Optional[Tuple[Dict[str, Any], str]]:
@@ -133,10 +181,20 @@ class JsonDataManager:
             return self.portrait_data[filename], "portrait"
         if filename in self.group_data:
             return self.group_data[filename], "group"
-        return None        
+        return None  
+
+    def get_landmarks_data(self, filename: str, data_type: str) -> Optional[Dict[str, Any]]:
+        """
+        Возвращает данные ландмарков для файла, если они были загружены.
+        """
+        if data_type == "portrait":
+            return self.portrait_landmarks.get(filename)
+        elif data_type == "group":
+            return self.group_landmarks.get(filename)
+        return None
 
     def get_face(self, filename: str, face_index: int) -> Optional[Dict[str, Any]]:
-        """Возвращает словарь данных для конкретного лица в указанном файле."""
+        """Возвращает словарь данных для конкретного лица в указанном файле (из основных данных)."""
         file_data = self.get_data(filename)
         if file_data and isinstance(file_data.get("faces"), list):
             if 0 <= face_index < len(file_data["faces"]):
@@ -152,45 +210,17 @@ class JsonDataManager:
             filenames.extend(self.group_data.keys())
         return filenames
 
-    """
-    def update_face(self, filename: str, face_index: int, updates: Dict[str, Any]) -> bool:
-        target_dict = None
-        if filename in self.portrait_data:
-            target_dict = self.portrait_data
-        elif filename in self.group_data:
-            target_dict = self.group_data
-        else:
-            logger.warning(f"Файл '{filename}' не найден для обновления данных лица.")
-            return False
-
-        file_entry = target_dict.get(filename, {})
-        faces = file_entry.get("faces")
-
-        if not isinstance(faces, list) or not (0 <= face_index < len(faces)):
-            logger.warning(f"Некорректный индекс лица {face_index} или структура 'faces' для файла '{filename}'.")
-            return False
-
-        if isinstance(faces[face_index], dict):
-            faces[face_index].update(updates)
-            logger.debug(f"Обновлены данные для лица {face_index} в файле '{filename}': {list(updates.keys())}")
-            return True
-        else:
-            logger.warning(f"Запись лица {face_index} в файле '{filename}' не является словарем.")
-            return False
-    """
-
     def update_face(
         self, filename: str, face_index: int, updates: Dict[str, Any], data_type: str
     ) -> bool:
         """
-        Обновляет поля для указанного лица в словаре заданного типа.
+        Обновляет поля для указанного лица в словаре заданного типа (в основных данных).
 
         Args:
             filename: Имя файла для обновления.
             face_index: Индекс лица в списке "faces".
             updates: Словарь с обновляемыми полями.
             data_type: Тип данных для обновления ('portrait' или 'group').
-                       Этот параметр обязателен для избежания неоднозначности.
         """
         target_dict = None
         
@@ -221,10 +251,6 @@ class JsonDataManager:
 
         if isinstance(faces[face_index], dict):
             faces[face_index].update(updates)
-            logger.debug(
-                f"Обновлены данные для лица {face_index} в файле '{filename}': "
-                f"{list(updates.keys())}"
-            )
             return True
         else:
             logger.warning(
@@ -232,9 +258,8 @@ class JsonDataManager:
             )
             return False
 
-
     def add_file_data(self, filename: str, file_data: Dict[str, Any], is_portrait: bool):
-        """Добавляет или перезаписывает данные для целого файла."""
+        """Добавляет или перезаписывает данные для целого файла (в основные данные)."""
         if not (isinstance(file_data, dict) and "faces" in file_data and isinstance(file_data["faces"], list)):
             logger.error(f"Попытка добавить некорректные данные для файла '{filename}'.")
             return
@@ -248,9 +273,11 @@ class JsonDataManager:
         """Очищает внутренние словари данных."""
         if data_type in ["portrait", "all"]:
             self.portrait_data.clear()
+            self.portrait_landmarks.clear()
             print("Данные портретных файлов очищены из памяти.")
         if data_type in ["group", "all"]:
             self.group_data.clear()
+            self.group_landmarks.clear()
             print("Данные групповых файлов очищены из памяти.")
 
     def get_portrait_filenames_with_children(self) -> Tuple[List[str], List[str]]:

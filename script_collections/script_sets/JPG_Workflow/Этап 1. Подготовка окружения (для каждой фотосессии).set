@@ -1,0 +1,84 @@
+{
+  "type": "script_set",
+  "id": "setnode_7df457e23e5d",
+  "name": "Этап 1. Подготовка окружения (для каждой фотосессии)",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_choice",
+      "instance_id": "instance_396a7945e661",
+      "name": "Выбор съемки (портретная, студийная, школьная и т.д.)",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_choice_var": {
+          "value": "wf_photo_session",
+          "enabled": true
+        },
+        "dlg_choice_title": {
+          "value": "Выбор съемки",
+          "enabled": true
+        },
+        "dlg_choice_message": {
+          "value": "Если договором предусмотрено несколько съемок\n(например: портретная, студийная, школьная и т.д.),\nукажите название текущей съемки.\n\nВыберите название съемки в выпадающем списке:\n",
+          "enabled": true
+        },
+        "dlg_choice_list": {
+          "value": [
+            "PORTRAIT",
+            "SCHOOL",
+            "SEPTEMBER1",
+            "STREET",
+            "STUDIO"
+          ],
+          "enabled": true
+        },
+        "dlg_choice_dvalue": {
+          "value": "",
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/wf_list_create",
+      "instance_id": "instance_c07a0f9a1b32",
+      "name": "Добавить порядковый номер съемки в список класса/группы",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "wf_dest_dir": {
+          "value": "{wf_psd_path}/{wf_session_name}",
+          "enabled": true
+        },
+        "wf_output_txt_file": {
+          "value": "{wf_session_path}/{wf_session_name}/{wf_photo_session}_{wf_children_file_name}",
+          "enabled": true
+        },
+        "wf_autosave_formats": {
+          "value": [
+            "html",
+            "txt"
+          ],
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/cli_var_remove",
+      "instance_id": "instance_b27ce097ef2e",
+      "name": "Удаление переменной var_jpg_move",
+      "description": "<div style=\" {theme.script_description}\">\nУдаление переменной <b>var_jpg_move</b>.\n\nПеременная автоматически создается при любом экспорте файлов в Редакторе кластеров.\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "remove_var_name": {
+          "value": "var_jpg_move",
+          "enabled": true
+        },
+        "remove_fail_if_missing": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    }
+  ]
+}

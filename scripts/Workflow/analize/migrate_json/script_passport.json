@@ -1,0 +1,14 @@
+{
+  "description": "Служебная утилита для оптимизации формата хранения данных. Разделяет существующие монолитные JSON-файлы на два типа:\n1. <b>*_faces.json</b>: Основные легкие данные (имена, атрибуты, bbox).\n2. <b>*_landmarks.json</b>: Тяжелые геометрические данные (106/68 точек).\n\n<div style=\" {theme.tooltip_instance_args_block}\">\nСкрипт автоматически создает резервные копии оригинальных файлов с суффиксом <b>_OLD</b> перед внесением изменений.\n</div>",
+  "category": "Служебные",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2025.12.24",
+  "command_line_args_meta": {
+    "path": {
+      "type": "dir_path",
+      "description": "Путь к папке Analysis_{session}, в которой находятся файлы для конвертации.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
+    }
+  }
+}

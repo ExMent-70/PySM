@@ -1,20 +1,61 @@
 {
   "type": "script_set",
-  "id": "setnode_126531c78b8b",
-  "name": "Этап 3. Копирование PSD файлов в папку для ретуши. Для каждой фотосессии",
+  "id": "setnode_fbb660687519",
+  "name": "Этап 4-RAW. Копирование PSD файлов в папку для ретуши. (для каждой фотосессии)",
   "description": null,
   "script_entries": [
     {
-      "id": "root_790d968b/Workflow/analize/wf_photo_select2",
-      "instance_id": "instance_035d761ea86d",
+      "id": "root_790d968b/Workflow/analize/wf_photo_copy",
+      "instance_id": "instance_17a451a19287",
       "name": "Отметить фотографии выбранные клиентами",
       "description": null,
       "silent_mode": false,
-      "command_line_args": {}
+      "command_line_args": {
+        "portrait_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+          "enabled": true
+        },
+        "group_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+          "enabled": true
+        },
+        "source_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
+          "enabled": true
+        },
+        "dest_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Selects/{wf_photo_session}",
+          "enabled": true
+        },
+        "min_digits": {
+          "value": 4,
+          "enabled": true
+        },
+        "max_digits": {
+          "value": 4,
+          "enabled": true
+        },
+        "exclude_dirs": {
+          "value": "Masks",
+          "enabled": true
+        },
+        "update-xmp": {
+          "value": true,
+          "enabled": true
+        },
+        "rename-files": {
+          "value": false,
+          "enabled": true
+        },
+        "copy-files": {
+          "value": true,
+          "enabled": true
+        }
+      }
     },
     {
       "id": "root_790d968b/Workflow/wf_session_open",
-      "instance_id": "instance_9313dfc9080c",
+      "instance_id": "instance_049c597d1a03",
       "name": "Запуск Capture One для цветокоррекции выбранных фотографий",
       "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nЦветокоррекция фотографий, отобранных клиентом, и их экспорт в формат PSD для дальнейшей ретуши.\n\nПри экспорте используйте рецепт <b>_PSD_8bit_</b>\n</div>",
       "silent_mode": false,
@@ -27,7 +68,7 @@
     },
     {
       "id": "root_7617c03c/GUI/gui_dialog_msg",
-      "instance_id": "instance_f4d992293417",
+      "instance_id": "instance_f7f9699e0da7",
       "name": "СООБЩЕНИЕ: Завершение работы в Capture One",
       "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nПодтверждение экспорта из Capture One (с помощью рецепта <b>_PSD_8bit_</b>) фотографий выбранных для ретуши \n\nЕсли эта операция еще не выполнена, то не запускайте скрипт или нажмите кнопку <b>Нет</b>\nПереходить к следующему скрипту не рекомендуется!\n</div>",
       "silent_mode": false,
@@ -52,7 +93,7 @@
     },
     {
       "id": "root_7617c03c/SYSTEM/dir_operation",
-      "instance_id": "instance_e08d77c07f44",
+      "instance_id": "instance_e0b7c7f38e6a",
       "name": "Перемещение файлов PSD в папку Альбом",
       "description": "<div style=\" {theme.script_description}\">При работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b></div>",
       "silent_mode": false,

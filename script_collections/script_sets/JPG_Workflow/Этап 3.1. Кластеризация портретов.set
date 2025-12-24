@@ -1,0 +1,79 @@
+{
+  "type": "script_set",
+  "id": "setnode_206a0e7eb98a",
+  "name": "Этап 3.1. Кластеризация портретов",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_msg",
+      "instance_id": "instance_714d8c3bb3f9",
+      "name": "СООБЩЕНИЕ: Запустить редактор кластеров",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_msg_var": {
+          "value": "var_use_claster_editor",
+          "enabled": true
+        },
+        "dlg_msg_type": {
+          "value": "yes_no",
+          "enabled": true
+        },
+        "dlg_msg_title": {
+          "value": "Подтверждение",
+          "enabled": true
+        },
+        "dlg_msg_message": {
+          "value": "Набор скриптов для кластеризации портретов\n\nВыполнение этих скриптов приведёт к изменению следующих файлов:\n- info_group_faces.json\n- info_portrait_faces.json\n\nВы хотите выполнить скрипты входящие в этот набор?",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/cluster_portraits",
+      "instance_id": "instance_0784e460a5eb",
+      "name": "Кластеризация портретных фотографий",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "a_cp_portrait_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+          "enabled": true
+        },
+        "a_cp_names_file": {
+          "value": "{wf_session_path}/{wf_session_name}/{wf_photo_session}_{wf_children_file_name}",
+          "enabled": true
+        },
+        "a_cp_config": {
+          "value": "config.toml",
+          "enabled": true
+        },
+        "a_cp_algorithm": {
+          "value": "dbscan",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/cluster_editor",
+      "instance_id": "instance_f8801c958815",
+      "name": "Редактировать портретные кластеры",
+      "description": "<div style=\" {theme.script_description}\">\nСкрипт позволяет визуально, в ручном режиме, редактировать кластеры ПОРТРЕТНЫХ фотографий (просматривать и удалять фотографии кластера, перемещать их из одного кластера в другой, изменять название кластера). \n\nДополнительно в скрипте реализован экспорт изображений в формат JPG с водяными знаками. При экспорте переменной контекста <b>var_jpg_move</b> присваивается значение <b>yes</b>\n<b>var_jpg_move = yes</b>\n\nПути к рабочим папкам формируется из переменных контекста: \n- {wf_session_path}, \n- {wf_session_name}, \n- {wf_photo_session},\n- {wf_children_file_name}.\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "ce_portrait_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+          "enabled": true
+        },
+        "ce_group_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+          "enabled": true
+        },
+        "mode": {
+          "value": "face",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

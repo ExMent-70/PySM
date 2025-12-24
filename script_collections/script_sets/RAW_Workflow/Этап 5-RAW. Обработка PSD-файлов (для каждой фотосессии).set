@@ -1,12 +1,12 @@
 {
   "type": "script_set",
-  "id": "setnode_60ce2dd8eafe",
-  "name": "Этап 4. Ретушь фотографий. Для каждой фотосессии",
+  "id": "setnode_281bf327aab8",
+  "name": "Этап 5-RAW. Обработка PSD-файлов (для каждой фотосессии)",
   "description": null,
   "script_entries": [
     {
       "id": "root_790d968b/Photoshop/ps_photoshop_launch",
-      "instance_id": "instance_01b21a59c26b",
+      "instance_id": "instance_f8f8df4271fa",
       "name": "Фотошоп - Запустить",
       "description": null,
       "silent_mode": false,
@@ -19,7 +19,7 @@
     },
     {
       "id": "root_790d968b/Photoshop/ps_action_batch_set_select",
-      "instance_id": "instance_19153327e6ef",
+      "instance_id": "instance_29465c41c5c9",
       "name": "Экшен - Универсальный пакетный запуск",
       "description": null,
       "silent_mode": false,
@@ -37,18 +37,26 @@
           "enabled": true
         },
         "ps_action_set": {
-          "value": null,
+          "value": "PySM_Actions",
           "enabled": true
         },
         "ps_action_name": {
-          "value": null,
+          "value": "PySM_RETUCHE_RUN",
+          "enabled": true
+        },
+        "ps_need_save": {
+          "value": true,
+          "enabled": true
+        },
+        "ps_wait_after_action": {
+          "value": "2",
           "enabled": true
         }
       }
     },
     {
       "id": "root_790d968b/Photoshop/ps_document_close",
-      "instance_id": "instance_5b09b6b7f51f",
+      "instance_id": "instance_64c133da1bf6",
       "name": "Закрыть файл-пресет",
       "description": null,
       "silent_mode": true,

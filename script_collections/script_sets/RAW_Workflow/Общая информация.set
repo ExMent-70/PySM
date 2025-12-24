@@ -1,0 +1,16 @@
+{
+  "type": "script_set",
+  "id": "setnode_54f4012a426e",
+  "name": "Общая информация",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/SYSTEM/log_report",
+      "instance_id": "instance_e4a691de1fc0",
+      "name": "Информационная панель",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {}
+    }
+  ]
+}

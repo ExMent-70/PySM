@@ -1,0 +1,162 @@
+{
+  "type": "script_set",
+  "id": "setnode_0b43d35c6bb8",
+  "name": "Этап 2-JPG. Обработка JPG-файлов",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_open",
+      "instance_id": "instance_7eed99ee1b6d",
+      "name": "ДИАЛОГ: Выбрать папку с исходными файлами",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_open_var": {
+          "value": "wf_raw_path",
+          "enabled": true
+        },
+        "dlg_open_type": {
+          "value": "directory",
+          "enabled": true
+        },
+        "dlg_open_title": {
+          "value": "Выбрать папку с исходными файлами",
+          "enabled": true
+        },
+        "dlg_open_filter": {
+          "value": "Все файлы (*.*)",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/dir_operation",
+      "instance_id": "instance_f32b2eb2b13e",
+      "name": "Копирование исходных файлов в рабочую папку",
+      "description": "<div style=\" {theme.script_description}\">При работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b></div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "do_source_dir": {
+          "value": "{wf_raw_path}",
+          "enabled": true
+        },
+        "do_dest_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG",
+          "enabled": true
+        },
+        "do_mode": {
+          "value": "copy",
+          "enabled": true
+        },
+        "do_on_conflict": {
+          "value": "overwrite",
+          "enabled": true
+        },
+        "do_copy_base_folder": {
+          "value": false,
+          "enabled": true
+        },
+        "do_include": {
+          "value": [
+            "*",
+            "*.jpg",
+            "*.jpeg"
+          ],
+          "enabled": true
+        },
+        "all_threads": {
+          "value": "12",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/img2mask",
+      "instance_id": "instance_9e8355ea3526",
+      "name": "Создание маски фона",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "img_rmbg_input_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG",
+          "enabled": true
+        },
+        "img_rmbg_output_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG/Masks",
+          "enabled": true
+        },
+        "img_rmbg_processor_type": {
+          "value": "birefnet",
+          "enabled": true
+        },
+        "img_rmbg_model_rmbg": {
+          "value": "RMBG-2.0",
+          "enabled": true
+        },
+        "img_rmbg_model_birefnet": {
+          "value": "BiRefNet-portrait",
+          "enabled": true
+        },
+        "img_rmbg_background": {
+          "value": "Solid",
+          "enabled": true
+        },
+        "img_rmbg_mask_blur": {
+          "value": "1",
+          "enabled": true
+        },
+        "img_rmbg_mask_offset": {
+          "value": "-1",
+          "enabled": true
+        },
+        "img_rmbg_save_options": {
+          "value": [
+            "image"
+          ],
+          "enabled": true
+        },
+        "img_rmbg_invert_mask": {
+          "value": true,
+          "enabled": true
+        },
+        "img_rmbg_fast_refine": {
+          "value": true,
+          "enabled": true
+        },
+        "img_rmbg_threads": {
+          "value": "12",
+          "enabled": true
+        },
+        "img_rmbg_sensitivity": {
+          "value": "0.5",
+          "enabled": true
+        },
+        "img_rmbg_img_scale": {
+          "value": "0",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/analyze_faces",
+      "instance_id": "instance_8434b8270507",
+      "name": "Найти лица на фотографиях. Вычислить эмбединги",
+      "description": "<div style=\" {theme.script_description}\">\n<b>Второй по очереди (но главный по сути) скрипт в конвейере анализа изображений</b> \nСкрипт анализуирует изображения в формате JPG, распознает на них лица людей и переводит их в векторный формат (вычисляет эмбединги). Результаты анализа сохраняются в JSON и NPY-файлы (отдельно для портретных и групповых фотографий).\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>output_dir</b> = <i>{base_dir} / Output / Analysis_{photo_session}</i>\n<b>input_dir</b> = <i>{output_dir} / JPG</i>\n\nСкрипт работает с файлами JPG, поэтому RAW и PSD файлы необходимо предварительно конвертировать.\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "a_af_config_file": {
+          "value": "config.toml",
+          "enabled": true
+        },
+        "all_threads": {
+          "value": 0,
+          "enabled": true
+        },
+        "a_af_det_thresh": {
+          "value": "0.4",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

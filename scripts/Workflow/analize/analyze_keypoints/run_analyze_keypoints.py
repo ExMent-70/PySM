@@ -202,15 +202,37 @@ class KeypointAnalyzer:
         return labels[6]
 
     def analyze_and_update_json(self, json_manager: JsonDataManager, data_type: str, data_dir: Path):
-        data_to_process = json_manager.portrait_data if data_type == "portrait" else json_manager.group_data
-        if not data_to_process:
-            logger.info(f"Нет данных типа '{data_type}' для анализа.")
+        """
+        Анализирует ключевые точки и обновляет JSON.
+        Использует менеджер для загрузки ландмарков.
+        """
+        # 1. Получаем основные данные из менеджера
+        main_data = json_manager.portrait_data if data_type == "portrait" else json_manager.group_data
+        
+        if not main_data:
+            logger.info(f"Нет основных данных типа '{data_type}' для анализа.")
             return
 
+        # 2. Загружаем ландмарки через менеджер
+        if not json_manager.load_landmarks(data_type):
+            logger.warning(f"Не удалось загрузить ландмарки для '{data_type}'. Анализ будет неполным.")
+
         detailed_metrics = []
-        for filename, file_data in tqdm(data_to_process.items(), desc=f"Анализ {data_type} лиц"):
+        
+        # 3. Итерация и слияние данных
+        for filename, file_data in tqdm(main_data.items(), desc=f"Анализ {data_type} лиц"):
+            # Получаем ландмарки из менеджера
+            land_file_entry = json_manager.get_landmarks_data(filename, data_type) or {}
+            land_faces = land_file_entry.get("faces", [])
+            
             for i, face in enumerate(file_data.get("faces", [])):
-                analysis_results = self._analyze_keypoints(face)
+                # Слияние: берем основные данные + ландмарки
+                face_merged = face.copy()
+                if i < len(land_faces):
+                    face_merged.update(land_faces[i])
+                
+                analysis_results = self._analyze_keypoints(face_merged)
+                
                 if analysis_results:
                     simplified_results = {
                         "eye_states": {
@@ -220,12 +242,11 @@ class KeypointAnalyzer:
                         "mouth_state": analysis_results["mouth_state"]["state"],
                         "head_pose": analysis_results["head_pose"]["state"],
                     }
-# --- НАЧАЛО ИЗМЕНЕНИЯ ---
-                    # Явно передаем data_type, который уже известен в этом контексте
+
                     json_manager.update_face(
                         filename, i, {"keypoint_analysis": simplified_results}, data_type=data_type
                     )
-# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
                     detailed_metrics.append(analysis_results)
         
         if detailed_metrics:
@@ -366,6 +387,7 @@ def main():
     analyzer.analyze_and_update_json(json_manager, "portrait", data_dir)
     analyzer.analyze_and_update_json(json_manager, "group", data_dir)
     
+    # Сохраняем основные файлы с результатами анализа
     json_manager.save_data()
     
 

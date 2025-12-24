@@ -1,14 +1,14 @@
 {
   "type": "script_set",
-  "id": "setnode_1418f94bf76e",
+  "id": "setnode_0ae79a257d86",
   "name": "Настройка ГЛОБАЛЬНЫХ переменных. Один раз в начале сезона",
   "description": null,
   "script_entries": [
     {
       "id": "root_7617c03c/GUI/gui_dialog_open",
-      "instance_id": "instance_4805af5092d6",
-      "name": "ПЕРЕМЕННАЯ: Выбрать базовую папку для всех RAW-файлов/сессий Capture One",
-      "description": "Скрипт создает переменную <i>wf_session_path</i> в Контексте Коллекции и записывает в неё путь к папке, в которой будут создаваться папки для RAW-файлов и/или сессии Capture One. \nДля каждого класса создается своя папка/сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. \nТакой подход к хранению RAW-файлов/организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
+      "instance_id": "instance_08736a0c394a",
+      "name": "ПЕРЕМЕННАЯ: Выбрать базовую папку для исходных файлов",
+      "description": "<div style=\" {theme.script_description}\">\nВыбрать <b>общую папку</b>, в которой будут храниться <b>ИСХОДНЫЕ ФАЙЛЫ</b> (обычно RAW или JPG) каждого класса/группы. . \n\nПуть к общей папке сохраняется в переменной <b>{wf_session_path}</b>.\n\nПеременная <b>{wf_session_path}</b> используется для формирования шаблонов путей.\n\n<b>Например:</b>\n<i>- {wf_session_path}/School_32/Capture</i>\n<i>- {wf_session_path}/School_32/children.txt</i>\n</div>",
       "silent_mode": false,
       "command_line_args": {
         "dlg_open_var": {
@@ -31,9 +31,9 @@
     },
     {
       "id": "root_7617c03c/GUI/gui_dialog_open",
-      "instance_id": "instance_cda6b8e1623c",
-      "name": "ПЕРЕМЕННАЯ: Выбрать базовую папку для PSD-файлов",
-      "description": "Скрипт создает переменную wf_psd_path в Контексте Коллекции и записывает в неё путь к папке, в которой, следующие скрипты будут создавать сессии Capture One. Для каждой съемки обычно создается своя сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. Такой подход к организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
+      "instance_id": "instance_6a386c7daea8",
+      "name": "ПЕРЕМЕННАЯ: Выбрать базовую папку для рабочих файлов",
+      "description": "<div style=\" {theme.script_description}\">\nВыбрать <b>общую папку</b>, в которой будут храниться <b>РАБОЧИЕ ФАЙЛЫ</b> (обычно JPG, PSD, INDD и т.д.) каждого класса/группы. \n\nПуть к общей папке сохраняется в переменной <b>{wf_psd_path}</b>.\n\nПеременная <b>{wf_psd_path}</b>  используется для формирования шаблонов путей.\n\n<b>Например:</b>\n<i>- {wf_psd_path}/Школа8_1д/Школа8_1д_класс.list</i>\n<i>- {wf_psd_path}/School_32/Альбом/_ШАБЛОНЫ_</i>\n</div>",
       "silent_mode": false,
       "command_line_args": {
         "dlg_open_var": {
@@ -56,9 +56,9 @@
     },
     {
       "id": "root_7617c03c/GUI/gui_dialog_input",
-      "instance_id": "instance_7741cb89177c",
+      "instance_id": "instance_7cef740fce1f",
       "name": "ПЕРЕМЕННАЯ: Имя файла со списком для фотосессии",
-      "description": null,
+      "description": "<div style=\" {theme.script_description}\">\nВвести <b>имя текстового файла</b> для списка учеников класса (по умолчанию <b>children.txt</b>). \n\nИмя файла сохраняется в переменной <b>{wf_children_file_name}</b>.\n\nПеременная <b>{wf_children_file_name}</b> необходима для работы скриптов кластеризации и используется для формирования шаблонов путей.\n\n<b>Например:</b>\n<i>- {wf_psd_path}/Школа8_1д/{wf_children_file_name}</i>\n</div>",
       "silent_mode": false,
       "command_line_args": {
         "dlg_input_var": {
@@ -93,9 +93,9 @@
     },
     {
       "id": "root_7617c03c/GUI/gui_dialog_open",
-      "instance_id": "instance_b5cac31e1b93",
+      "instance_id": "instance_9db9997018d2",
       "name": "ПЕРЕМЕННАЯ: Файл-каталог шаблонов InDesign",
-      "description": null,
+      "description": "<div style=\" {theme.script_description}\">\nВыбрать <b>каталог шаблонов</b> InDesign (файл с расширением <b>*.template</b>). \n\nПуть к файлу-каталогу сохраняется в переменной <b>{wf_idsgn_catalog}</b>.\n\nПеременная <b>{wf_idsgn_catalog}</b>  необходима для работы скриптов \"Каталог шаблонов\" и \"Автоматическая верстка\" и используется для формирования шаблонов путей. \n</div>",
       "silent_mode": false,
       "command_line_args": {
         "dlg_open_var": {

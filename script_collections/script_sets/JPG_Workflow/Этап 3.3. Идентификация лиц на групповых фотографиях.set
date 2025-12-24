@@ -1,0 +1,214 @@
+{
+  "type": "script_set",
+  "id": "setnode_18326bf5ce42",
+  "name": "Этап 3.3. Идентификация лиц на групповых фотографиях",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_msg",
+      "instance_id": "instance_f66ab09306d7",
+      "name": "СООБЩЕНИЕ: Идентификация людей на групповых фотографиях",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_msg_var": {
+          "value": "var_another_session",
+          "enabled": true
+        },
+        "dlg_msg_type": {
+          "value": "yes_no_cancel",
+          "enabled": true
+        },
+        "dlg_msg_title": {
+          "value": "Блок скриптов для идентификации людей на групповых фотографиях",
+          "enabled": true
+        },
+        "dlg_msg_message": {
+          "value": "Набор скриптов для идентификации людей на групповых фотографиях\n\nВыполнение этих скриптов приведёт к созданию и/или изменению файла: \n- matches_portrait_to_group.json\n\nВыберите режим работы скриптов идентификации:\n\nYES - использовать для идентификации ПОРТРЕТЫ ТЕКУЩЕЙ ФОТОСЕССИИ \n\nNO  - использовать для идентификации ЭТАЛОННЫЕ ПОРТРЕТЫ (если они у вас есть)\n\nCANCEL - отменить выполнение набора скриптов",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/py_if_else",
+      "instance_id": "instance_15184caa123b",
+      "name": "УСЛОВИЕ: Идентифицировать людей используя ПОРТРЕТЫ ТЕКУЩЕЙ фотосессии?",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "if-variable-name": {
+          "value": "var_another_session",
+          "enabled": true
+        },
+        "if-operator": {
+          "value": "равно",
+          "enabled": true
+        },
+        "if-comparison-value": {
+          "value": "yes",
+          "enabled": true
+        },
+        "then-instance-id": {
+          "value": "instance_eeb1e73886e6",
+          "enabled": true
+        },
+        "else-instance-id": {
+          "value": "instance_a014ef9bc002",
+          "enabled": true
+        },
+        "clear-variable": {
+          "value": false,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/match_group_faces",
+      "instance_id": "instance_eeb1e73886e6",
+      "name": "БЛОК ИСТИНА: Идентификация людей на групповых фотографиях используя ПОРТРЕТЫ ТЕКУЩЕЙ фотосессии",
+      "description": "Выполнение этих скриптов приведёт к созданию и/или изменению следующих файлов:\n- info_group_faces.json\n- info_portrait_faces.json\n- matches_portrait_to_group.json",
+      "silent_mode": false,
+      "command_line_args": {
+        "a_mg_portrait_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+          "enabled": true
+        },
+        "a_mg_group_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+          "enabled": true
+        },
+        "a_mg_config": {
+          "value": "config.toml",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/cluster_editor",
+      "instance_id": "instance_8dda36e749f2",
+      "name": "БЛОК ИСТИНА: Просмотр и экспорт списка [ПОРТРЕТ-Групповые фотографии]",
+      "description": "<div style=\" {theme.markup_number}\">\nЭкземпляр скрипта запускается в случае, когда  в текущей фотосессии ЕСТЬ портретные фотографии\n</div>\n<div style=\" {theme.script_description}\">\nЗапуск Редактора кластеров в режиме просмотра фотографий  [ПОРТРЕТ-Групповые фотографии]\n\nДля идентификации людей на групповых фотографиях текущей фотосессии <b>{wf_photo_session}</b> используются ПОРТРЕТЫ текущей фотосессии.\n\n\nДополнительно в скрипте реализован экспорт изображений в формат JPG с водяными знаками. При экспорте переменной контекста <b>var_jpg_move</b> присваивается значение <b>yes</b>\n<b>var_jpg_move = yes</b>\n\nПути к рабочим папкам формируется из переменных контекста: \n- {wf_session_path}, \n- {wf_session_name}, \n- {wf_photo_session}\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "ce_portrait_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_portrait_faces.json",
+          "enabled": true
+        },
+        "ce_group_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+          "enabled": true
+        },
+        "mode": {
+          "value": "matches",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_goto",
+      "instance_id": "instance_1c02c81964f8",
+      "name": "БЛОК ИСТИНА: Завершение блока",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_goto_title": {
+          "value": "Выбор следующего действия",
+          "enabled": true
+        },
+        "dlg_goto_message": {
+          "value": "Выберите скрипт, к которому нужно перейти:",
+          "enabled": true
+        },
+        "dlg_goto_script_id": {
+          "value": "instance_475a2cb05674",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_choice",
+      "instance_id": "instance_a014ef9bc002",
+      "name": "БЛОК ЛОЖЬ: Выбор эталонной ПОРТРЕТНОЙ съемки",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_choice_var": {
+          "value": "wf_portrait_session",
+          "enabled": true
+        },
+        "dlg_choice_title": {
+          "value": "Выбор съемки",
+          "enabled": true
+        },
+        "dlg_choice_message": {
+          "value": "Выберите ЭТАЛОННУЮ съемку с портретными фотографиями \nдля точной идентификации лиц на групповых фотографиях.\n\nВыберите название съемки в выпадающем списке:\n",
+          "enabled": true
+        },
+        "dlg_choice_list": {
+          "value": [
+            "PORTRAIT",
+            "SCHOOL",
+            "SEPTEMBER1",
+            "STREET",
+            "STUDIO"
+          ],
+          "enabled": true
+        },
+        "dlg_choice_dvalue": {
+          "value": "PORTRAIT",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/match_group_faces",
+      "instance_id": "instance_61fc0900156b",
+      "name": "БЛОК ЛОЖЬ: Идентификация людей на групповых фотографиях по ЭТАЛОННЫМ ПОРТРЕТАМ",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "a_mg_portrait_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_portrait_session}/info_portrait_faces.json",
+          "enabled": true
+        },
+        "a_mg_group_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+          "enabled": true
+        },
+        "a_mg_config": {
+          "value": "config.toml",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow/analize/cluster_editor",
+      "instance_id": "instance_1ae9908b4700",
+      "name": "БЛОК ЛОЖЬ: Просмотр и экспорт списка [ЭТАЛОННЫЙ ПОРТРЕТ-Групповые фотографии]",
+      "description": "<div style=\" {theme.status_error}\">\nЭкземпляр скрипта запускается в случае, когда  в текущей фотосессии НЕТ портретных фотографий\n</div>\n<div style=\" {theme.script_description}\">\nЗапуск Редактора кластеров в режиме просмотра фотографий  [ЭТАЛОННЫЙ ПОРТРЕТ-Групповые фотографии]\n\nДля идентификации людей на групповых фотографиях текущей фотосессии <b>{wf_photo_session}</b> используются ПОРТРЕТЫ эталонной фотосессии <b>{wf_portrait_session}</b>\n\nДополнительно в скрипте реализован экспорт изображений в формат JPG с водяными знаками. При экспорте переменной контекста <b>var_jpg_move</b> присваивается значение <b>yes</b>\n<b>var_jpg_move = yes</b>\n\nПути к рабочим папкам формируется из переменных контекста: \n- {wf_session_path}, \n- {wf_session_name}, \n- {wf_photo_session},\n- {wf_portrait_session}\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "ce_portrait_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_portrait_session}/info_portrait_faces.json",
+          "enabled": true
+        },
+        "ce_group_json": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/info_group_faces.json",
+          "enabled": true
+        },
+        "mode": {
+          "value": "matches",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/log_report",
+      "instance_id": "instance_475a2cb05674",
+      "name": "Информационная панель",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {}
+    }
+  ]
+}

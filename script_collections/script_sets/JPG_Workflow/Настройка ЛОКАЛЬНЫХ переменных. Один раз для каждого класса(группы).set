@@ -1,12 +1,12 @@
 {
   "type": "script_set",
-  "id": "setnode_cf70a86321d6",
+  "id": "setnode_3110c1033768",
   "name": "Настройка ЛОКАЛЬНЫХ переменных. Один раз для каждого класса(группы)",
   "description": null,
   "script_entries": [
     {
       "id": "root_7617c03c/GUI/gui_dialog_input",
-      "instance_id": "instance_ded28b75fa5d",
+      "instance_id": "instance_73bdc833891a",
       "name": "ПЕРЕМЕННАЯ: Указать школу/параллель/класс",
       "description": null,
       "silent_mode": false,
@@ -43,7 +43,7 @@
     },
     {
       "id": "root_790d968b/Workflow/wf_session_create",
-      "instance_id": "instance_1f6676632c0f",
+      "instance_id": "instance_796d22da436b",
       "name": "Создать сессию Capture One",
       "description": null,
       "silent_mode": false,
@@ -68,7 +68,7 @@
     },
     {
       "id": "root_790d968b/Workflow/wf_list_create",
-      "instance_id": "instance_1b563ad01069",
+      "instance_id": "instance_3a300f1f96dd",
       "name": "Создать и распечатать список класса/группы",
       "description": null,
       "silent_mode": false,

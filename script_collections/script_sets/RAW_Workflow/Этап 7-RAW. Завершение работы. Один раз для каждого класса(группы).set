@@ -1,12 +1,12 @@
 {
   "type": "script_set",
-  "id": "setnode_7ac251360f2d",
-  "name": "Этап 6. Завершение работы. Один раз для каждого класса(группы)",
+  "id": "setnode_ab5ecc8cfac8",
+  "name": "Этап 7-RAW. Завершение работы. Один раз для каждого класса(группы)",
   "description": null,
   "script_entries": [
     {
       "id": "root_790d968b/Photoshop/ps_photoshop_launch",
-      "instance_id": "instance_43c3ed35961d",
+      "instance_id": "instance_9d43667d6ebe",
       "name": "Фотошоп - Запустить",
       "description": null,
       "silent_mode": false,
@@ -19,7 +19,7 @@
     },
     {
       "id": "root_790d968b/Photoshop/ps_document_archive",
-      "instance_id": "instance_af30a4d67ea0",
+      "instance_id": "instance_ceec72531fd8",
       "name": "Подготовка PSD файлов к хранению. Сохранение JPG файлов",
       "description": "<div style=\" {theme.script_description}\">Скрипт сливает все слои в документе (кроме слоя <i>Background</i>) в новый слой с именем <b>_ФИНАЛЬНЫЙ_СЛОЙ_</b> , и сохраняет результат в  исходный файл. \nДополнительно, в отдельную папку, выполняется сохранение JPG-файла.</div>",
       "silent_mode": false,
