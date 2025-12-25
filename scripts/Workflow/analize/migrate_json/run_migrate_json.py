@@ -25,7 +25,7 @@ except ImportError:
     ConfigResolver = None
 
 def get_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Миграция JSON файлов в новый формат с разделением ландмарков.")
+    parser = argparse.ArgumentParser(description="Конвертация JSON файлов в новый формат с разделением ландмарков.")
     parser.add_argument("--path", type=str, required=True, help="Путь к папке Analysis_{session}, где лежат JSON файлы.")
     
     if IS_MANAGED_RUN and ConfigResolver:
@@ -80,15 +80,15 @@ def split_data(original_data: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str,
 
 def process_file(file_path: Path):
     if not file_path.exists():
-        logger.warning(f"Файл не найден, пропуск: {file_path.name}")
+        logger.warning(f"⚠️ Файл не найден, пропуск: {file_path.name}")
         return
 
-    logger.info(f"Обработка файла: {file_path.name}")
+    logger.info(f"ℹ️ Обработка файла: <i>{file_path.name}</i>")
 
     # 1. Бэкап (переименование)
     backup_path = file_path.parent / f"{file_path.stem}_OLD{file_path.suffix}"
     if backup_path.exists():
-        logger.warning(f"  Бэкап уже существует ({backup_path.name}). Пропуск во избежание перезаписи.")
+        logger.warning(f"⚠️ Файл бэкап <i>{backup_path.name}</i> уже существует. Конвертация отменена.\n")
         return
 
     try:
@@ -98,7 +98,7 @@ def process_file(file_path: Path):
         
         # Переименовываем оригинал в _OLD
         shutil.move(str(file_path), str(backup_path))
-        logger.info(f"  Оригинал переименован в: {backup_path.name}")
+        logger.info(f"ℹ️ Оригинал переименован в: {backup_path.name}")
 
         # 2. Разделение данных
         main_data, landmarks_data, count = split_data(original_data)
@@ -116,28 +116,31 @@ def process_file(file_path: Path):
         # Сохраняем новый Main (с тем же именем, что был оригинал)
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(main_data, f, indent=2, ensure_ascii=False)
-        logger.info(f"  Сохранен основной файл: {file_path.name} (Лиц: {count})")
+        logger.info(f"ℹ️ Сохранен основной файл: <i>{file_path.name}</i> (Лиц: <b>{count})</b>")
 
         # Сохраняем Landmarks
         if landmarks_data:
             with open(landmarks_path, "w", encoding="utf-8") as f:
                 json.dump(landmarks_data, f, indent=2, ensure_ascii=False)
-            logger.info(f"  Сохранен файл ландмарков: {landmarks_path.name}")
+            logger.info(f"ℹ️ Сохранен файл ландмарков: <i>{landmarks_path.name}</i>")
         else:
-            logger.info("  Ландмарки не найдены, дополнительный файл не создан.")
+            logger.info("⚠️ В исходном файле блок landmarks не найден. Дополнительный файл не создан")
 
     except Exception as e:
-        logger.error(f"  Ошибка при обработке {file_path.name}: {e}")
+        logger.error(f"❌ Ошибка при обработке {file_path.name}: {e}")
         # Пытаемся восстановить файл из бэкапа
         if backup_path.exists() and not file_path.exists():
             shutil.move(str(backup_path), str(file_path))
-            logger.info("  Откат изменений выполнен.")
+            logger.info("ℹ️ Откат изменений выполнен.")
+    finally:
+        logger.info("\n")
+        
 
 def main():
     args = get_args()
     
     if not args.path:
-        logger.critical("Не указан путь к папке (--path).")
+        logger.critical("❌ Не указан путь к папке (--path).")
         sys.exit(1)
 
     target_dir = Path(args.path)
@@ -146,12 +149,13 @@ def main():
         logger.critical(f"Директория не найдена: {target_dir}")
         sys.exit(1)
 
-    logger.info(f"Запуск миграции в папке: {target_dir}")
+    logger.info(f"<b>Конвертация в новый формат JSON-файлов в папке:</b>")
+    logger.info(f"<i>{target_dir}</i>\n")
     
     process_file(target_dir / "info_portrait_faces.json")
     process_file(target_dir / "info_group_faces.json")
     
-    logger.info("Миграция завершена.")
+    logger.info("✅ <b>Конвертация файлов завершена</b><br>")
 
 if __name__ == "__main__":
     main()
