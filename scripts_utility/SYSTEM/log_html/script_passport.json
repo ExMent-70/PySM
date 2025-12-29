@@ -1,0 +1,38 @@
+{
+  "description": "Скрипт для вывода произвольной HTML-разметки или содержимого HTML-файла в консоль PySM. Позволяет отображать отформатированный текст, таблицы или кастомные блоки.",
+  "category": "Демонстрация API",
+  "author": "PySM-Developer",
+  "version": "2025.12.28",
+  "command_line_args_meta": {
+    "html_content": {
+      "type": "string_multiline",
+      "description": "Строка, содержащая HTML-код для вывода. Если указан вместе с файлом, будет выведен перед содержимым файла.",
+      "required": false,
+      "default": "<b>Привет</b>"
+    },
+    "html_file": {
+      "type": "file_path",
+      "description": "Путь к файлу (например, .html или .txt), содержимое которого нужно вывести как HTML.",
+      "required": false
+    },
+    "html_align": {
+      "type": "choice",
+      "description": "Горизонтальное выравнивание контейнера с HTML-контентом.",
+      "required": false,
+      "default": "left",
+      "choices": [
+        "left",
+        "center",
+        "right"
+      ]
+    },
+    "html_margin": {
+      "type": "int",
+      "description": "Вертикальный отступ (сверху и снизу) для блока в пикселях.",
+      "required": false,
+      "default": 5,
+      "min_val": 0,
+      "max_val": 100
+    }
+  }
+}

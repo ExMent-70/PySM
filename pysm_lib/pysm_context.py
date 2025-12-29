@@ -417,6 +417,37 @@ class PySMContext:
                 file=sys.stderr,
             )
 
+    # 1. БЛОК: Метод log_html (ДОБАВИТЬ в класс PySMContext)
+    def log_html(
+        self,
+        html_content: str,
+        align: str = "left",
+        margin: int = 5,
+    ) -> None:
+        """
+        Выводит произвольный HTML-контент в консоль PyScriptManager.
+        """
+        try:
+            if not html_content:
+                return
+
+            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ:
+            # Удаляем символы переноса строки, так как передача через stderr
+            # требует, чтобы сообщение с префиксом PYSM_HTML_BLOCK было одной строкой.
+            # Заменяем их на пробелы, чтобы не склеить слова.
+            clean_content = html_content.replace("\n", " ").replace("\r", "")
+
+            styles = f"text-align: {align}; margin-top: {margin}px; margin-bottom: {margin}px;"
+            wrapped_html = f'<div style="{styles}">{clean_content}</div>'
+
+            print(f"PYSM_HTML_BLOCK:{wrapped_html}", file=sys.stderr, flush=True)
+
+        except Exception as e:
+            print(
+                f"PySM API Error: Failed to log HTML content. Reason: {e}",
+                file=sys.stderr,
+            )
+
 
     def get_available_metadata_fields(self) -> List[str]:
         """Возвращает список поддерживаемых полей метаданных."""
