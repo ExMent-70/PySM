@@ -605,6 +605,7 @@ class SorterWindow(QMainWindow):
 
         # Новая кнопка "Закрыть"
         self.btn_close = QPushButton("Закрыть")
+        set_widget_class(self.btn_close, "danger")
         self.btn_close.clicked.connect(self.close)
 
         bottom_layout.addWidget(self.btn_parse)
