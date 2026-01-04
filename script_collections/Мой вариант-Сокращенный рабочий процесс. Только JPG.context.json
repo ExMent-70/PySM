@@ -1,0 +1,176 @@
+{
+  "wf_session_path": {
+    "type": "dir_path",
+    "value": "C:/PySM_Обработка/Исходные файлы",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_psd_path": {
+    "type": "dir_path",
+    "value": "C:/PySM_Обработка/Рабочие файлы",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_session_name": {
+    "type": "string",
+    "value": "Школа_1111_11а",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_raw_path": {
+    "type": "dir_path",
+    "value": "J:/SCHOOL/Новая папка",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_photo_session": {
+    "type": "choice",
+    "value": "SCHOOL",
+    "description": "Имя текущей сессии для записи в метаданные. Обычно устанавливается автоматически.",
+    "read_only": false,
+    "choices": [
+      "",
+      "PORTRAIT",
+      "SCHOOL",
+      "SEPTEMBER1",
+      "STREET",
+      "STUDIO"
+    ]
+  },
+  "sys_log_level": {
+    "type": "string",
+    "value": "INFO",
+    "read_only": true
+  },
+  "wf_children_file_name": {
+    "type": "string",
+    "value": "children.txt",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "enhancer_settings": {
+    "type": "json",
+    "value": {
+      "brightness": 1.12,
+      "contrast": 0.94,
+      "color": 0.97,
+      "sharpness": 1.11
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_portrait_session": {
+    "type": "string",
+    "value": "STUDIO",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_user_choice": {
+    "type": "string",
+    "value": "yes",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_use_claster_editor": {
+    "type": "string",
+    "value": "yes",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_another_session": {
+    "type": "string",
+    "value": "yes",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_idsgn_catalog": {
+    "type": "file_path",
+    "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/catalog.template",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "sys_location_name_SCHOOL": {
+    "type": "json",
+    "value": {
+      "portrait": "IMG_6955.jpg",
+      "portrait_additional_02": "IMG_8008.jpg",
+      "group_photo_03": "IMG_8385.jpg",
+      "-1": "0001.jpg",
+      "group_photo_01": "IMG_8074.jpg",
+      "group_photo_02": "IMG_8363.jpg",
+      "portrait_A6": "",
+      "portrait_A5": "",
+      "portrait_A4": ""
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_template_name": {
+    "type": "json",
+    "value": {
+      "id": "1ed7fb6a-9045-456e-931c-8a8c0e6ec30b",
+      "name": "Персональная обложка (портрет + вертикальное фото)",
+      "category": "Обложки",
+      "template_path": "templates/01-Черный_бархат/01_02_Cover.idml",
+      "placeholder_map": {
+        "photo_cover_01": "group_photo_v_01",
+        "portrait": "portrait"
+      },
+      "generation_mode": "sheet"
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "generated_idml_path": {
+    "type": "string",
+    "value": "E:\\YandexDisk\\ФОТОСЕССИИ\\СЕЗОН_2026\\Школа1111\\Альбом\\_Шаблоны_\\[Школа1111]-[Персональная обложка портрет  вертикальное фото]-[group_photo_v_01-portrait]_02.idml",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_html_text_01": {
+    "type": "string_multiline",
+    "value": "<div style=\"{theme.markup_number}\">\n<h3>Кластеризация локаций</h3>\nПредопределенный список локаций, используемый при кластеризации локаций, хранится в файле <i>predefined_names.json</i> и может быть изменен пользователем.<br><br>\nСкрипт <b>\"Редактор кластеров локаций\"</b> сохраняет список кластеров локаций текущей съемки в переменную <b>sys_location_name_{wf_photo_session}</b><br><br>\n\nЭтот список используется скриптами <b>\"Каталог шаблонов\"</b> и  <b>\"Автоматическая вёрстка\"</b>.\n<br>\n</div>",
+    "description": null,
+    "read_only": false,
+    "choices": null
+  },
+  "wf_html_text_02": {
+    "type": "string_multiline",
+    "value": "<div style=\"{theme.markup_number}\">\n<h3>Кластеризация портретов</h3>\nДля автоматической группировки портретных фотографий (с учётом фамилии и имени)  скрипту <b>\"Кластеризация портретных фотографий\"</b> необходим список учеников.<br>\nУченики в списке должны быть отсортированы по порядковому номеру съемки.<br><br>\nЕсли у вас нет такого списка, то скрипт использует для группировки портретов автоматически созданный список, с номерами<br>\nНомер_01<br>\nНомер_02<br>\nНомер_03<br><br>\n\nПозднее эти номера можно изменить на реальные фамилии и имена в скрипте <b>\"Редактор портретных кластеров\"</b>.\n<br>\n</div>",
+    "description": null,
+    "read_only": false,
+    "choices": null
+  },
+  "pysm_active_theme_name": {
+    "type": "string",
+    "value": "midnight_blue",
+    "description": "System: Name of the active PyScriptManager theme.",
+    "read_only": true
+  },
+  "pysm_sys_info": {
+    "type": "json",
+    "value": {
+      "app_root_dir": "D:\\Test_New\\repos\\PySM",
+      "collection_file_path": "D:\\Test_New\\repos\\PySM\\script_collections\\Мой вариант-Сокращенный рабочий процесс. Только JPG.pysmc",
+      "active_theme_name": "midnight_blue",
+      "log_level": "INFO",
+      "python_interpreter": "D:\\Test_New\\envs\\pysm\\python.exe"
+    },
+    "description": "System: Information about the execution environment.",
+    "read_only": true
+  }
+}
