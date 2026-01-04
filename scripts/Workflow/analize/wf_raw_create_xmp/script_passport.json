@@ -1,8 +1,8 @@
 {
-  "description": "Создает или обновляет XMP-файлы (сайдкары) для изображений. Записывает имена, эмоции, ключевые слова и технические данные.\n<div style=\" {theme.tooltip_instance_args_block}\">\n<b>Оптимизация:</b> Поддерживает новую архитектуру раздельного хранения данных. Автоматически подгружает файлы с детальной геометрией (*_landmarks.json) для формирования полных технических кодов (SubjectCode).\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>analysis_dir</b> = <i>{base_dir} / Output / Analysis_{wf_photo_session}</i>\n<b>target_dir</b> = <i>{base_dir} / Capture / {wf_photo_session}</i>\n</div>",
+  "description": "Создает или обновляет XMP-файлы (сайдкары) для изображений. Записывает имена, эмоции, состояние глаз/рта и ключевые слова.\n<div style=\" {theme.tooltip_instance_args_block}\">\n<b>Оптимизация:</b> Запись детальной геометрии (ландмарок) теперь опциональна и отключена по умолчанию для ускорения работы.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>analysis_dir</b> = <i>{base_dir} / Output / Analysis_{wf_photo_session}</i>\n<b>target_dir</b> = <i>{base_dir} / Capture / {wf_photo_session}</i>\n</div>",
   "category": "Метаданные",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2025.12.24",
+  "version": "2026.01.01",
   "command_line_args_meta": {
     "all_threads": {
       "type": "int",
@@ -11,6 +11,12 @@
       "default": 0,
       "min_val": 0,
       "max_val": 64
+    },
+    "landmark_enable": {
+      "type": "bool",
+      "description": "Включить запись 2D-ландмарок (106 точек) в XMP. Включайте только при необходимости использования плагинов авто-ретуши.",
+      "required": false,
+      "default": false
     }
   }
 }

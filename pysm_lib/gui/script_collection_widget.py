@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt, QSize, Slot, QModelIndex, QMimeData
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QTreeView, QPushButton,
     QAbstractItemView, QStyle, QMessageBox, QComboBox, QLabel, QMenu,
-    QInputDialog, QCheckBox
+    QInputDialog, QCheckBox, QToolButton, QSizePolicy
 )
 from PySide6.QtGui import (
     QStandardItemModel, QStandardItem, QColor, QAction, QBrush, QPalette
@@ -100,71 +100,152 @@ class ScriptCollectionWidget(QWidget):
         self._connect_signals()
         self._update_buttons_state()
 
+
     def _init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        self.collection_groupbox = QGroupBox(self.locale_manager.get("collection_widget.group_title"))
-        collection_layout = QVBoxLayout(self.collection_groupbox)
-        main_layout.addWidget(self.collection_groupbox)
+            main_layout = QVBoxLayout(self)
+            main_layout.setContentsMargins(0, 0, 0, 0)
+            self.collection_groupbox = QGroupBox(self.locale_manager.get("collection_widget.group_title"))
+            collection_layout = QVBoxLayout(self.collection_groupbox)
+            main_layout.addWidget(self.collection_groupbox)
 
-        self.collection_tree_view = QTreeView()
-        self.collection_tree_view.setAlternatingRowColors(True)
-        self.collection_tree_view.setHeaderHidden(True)
-        self.collection_tree_view.setIconSize(QSize(20, 20))
-        self.collection_tree_view.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
-        self.collection_tree_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.collection_tree_view.setDropIndicatorShown(True)
-        self.collection_tree_view.setDragEnabled(True)
-        self.collection_tree_view.setAcceptDrops(True)
-        self.collection_tree_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.collection_tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.collection_tree_view.setUniformRowHeights(True)
+            self.collection_tree_view = QTreeView()
+            self.collection_tree_view.setAlternatingRowColors(True)
+            self.collection_tree_view.setHeaderHidden(True)
+            self.collection_tree_view.setIconSize(QSize(20, 20))
+            self.collection_tree_view.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+            self.collection_tree_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+            self.collection_tree_view.setDropIndicatorShown(True)
+            self.collection_tree_view.setDragEnabled(True)
+            self.collection_tree_view.setAcceptDrops(True)
+            self.collection_tree_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            self.collection_tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.collection_tree_view.setUniformRowHeights(True)
 
-        collection_layout.addWidget(self.collection_tree_view)
-        self.collection_model = CollectionModel()
-        self.collection_tree_view.setModel(self.collection_model)
+            collection_layout.addWidget(self.collection_tree_view)
+            self.collection_model = CollectionModel()
+            self.collection_tree_view.setModel(self.collection_model)
 
-        run_controls_layout = QVBoxLayout()
-        run_controls_layout.setSpacing(5)
-        top_line_layout = QHBoxLayout()
-        self.combo_set_run_mode = QComboBox()
-        self.combo_set_run_mode.addItem(self.locale_manager.get("collection_widget.run_mode_full"), SetRunMode.SEQUENTIAL_FULL)
-        self.combo_set_run_mode.addItem(self.locale_manager.get("collection_widget.run_mode_step"), SetRunMode.SEQUENTIAL_STEP)
-        self.combo_set_run_mode.insertSeparator(2)
-        self.combo_set_run_mode.addItem(self.locale_manager.get("collection_widget.run_mode_conditional_full"), SetRunMode.CONDITIONAL_FULL)
-        self.combo_set_run_mode.addItem(self.locale_manager.get("collection_widget.run_mode_conditional_step"), SetRunMode.CONDITIONAL_STEP)
-        self.combo_set_run_mode.addItem(self.locale_manager.get("collection_widget.run_mode_single"), SetRunMode.SINGLE_FROM_SET)
+            run_controls_layout = QVBoxLayout()
+            run_controls_layout.setSpacing(5)
+            top_line_layout = QHBoxLayout()
 
-        self.btn_run_action = QPushButton(self.locale_manager.get("collection_widget.run_button_run"))
-        self.btn_stop_action = QPushButton(self.locale_manager.get("collection_widget.run_button_stop"))
-        self.btn_stop_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # 1. Используем QPushButton вместо QToolButton для стандартного внешнего вида
+            self.btn_run_action = QPushButton(self.locale_manager.get("collection_widget.run_button_run"))
+            self.btn_run_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+            
+            # 2. Устанавливаем политику размера Preferred, чтобы кнопка НЕ растягивалась
+            self.btn_run_action.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            
+            # 3. Применяем класс акцента (синий цвет), если он поддерживается темой для QPushButton
+            self.btn_run_action.setProperty("class", "accent")
 
-        top_line_layout.addWidget(QLabel(self.locale_manager.get("collection_widget.run_mode_label")))
-        top_line_layout.addWidget(self.combo_set_run_mode, 1)
-        top_line_layout.addWidget(self.btn_run_action)
-        top_line_layout.addWidget(self.btn_stop_action)
+            # 4. Создаем меню
+            self.run_menu = QMenu(self.btn_run_action)
+            
+            self.action_run_full = QAction(self.locale_manager.get("collection_widget.run_mode_conditional_full"), self)
+            self.action_run_step = QAction(self.locale_manager.get("collection_widget.run_mode_conditional_step"), self)
+            self.action_run_single = QAction(self.locale_manager.get("collection_widget.run_mode_single"), self)
+            
+            self.run_menu.addAction(self.action_run_full)
+            self.run_menu.addAction(self.action_run_step)
+            self.run_menu.addSeparator()
+            self.run_menu.addAction(self.action_run_single)
+            
+            # Назначаем меню кнопке. В QPushButton это добавляет стрелочку выпадающего списка.
+            self.btn_run_action.setMenu(self.run_menu)
 
-        run_controls_layout.addLayout(top_line_layout)
-        self.chk_continue_on_error = QCheckBox(self.locale_manager.get("collection_widget.continue_on_error_checkbox"))
-        run_controls_layout.addWidget(self.chk_continue_on_error)
-        collection_layout.addLayout(run_controls_layout)
+            self.btn_stop_action = QPushButton(self.locale_manager.get("collection_widget.run_button_stop"))
+            self.btn_stop_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+
+            # Добавляем кнопки в лейаут.
+            # Добавляем stretch в конце, чтобы прижать кнопки влево, если они не занимают всю ширину
+            top_line_layout.addWidget(self.btn_run_action)
+            top_line_layout.addWidget(self.btn_stop_action)
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+            run_controls_layout.addLayout(top_line_layout)
+            self.chk_continue_on_error = QCheckBox(self.locale_manager.get("collection_widget.continue_on_error_checkbox"))
+            run_controls_layout.addWidget(self.chk_continue_on_error)
+            collection_layout.addLayout(run_controls_layout)
+
 
     def _connect_signals(self):
-        self.collection_tree_view.selectionModel().selectionChanged.connect(self._on_selection_changed)
-        self.collection_tree_view.customContextMenuRequested.connect(self._show_context_menu)
-        self.collection_tree_view.doubleClicked.connect(self._on_double_clicked)
-        self.btn_run_action.clicked.connect(self._on_run_action_clicked)
-        self.btn_stop_action.clicked.connect(self.controller.stop_current_set_run)
-        self.combo_set_run_mode.currentIndexChanged.connect(self._on_run_mode_changed)
-        self.controller.controller_state_updated.connect(self._update_buttons_state)
-        self.controller.script_instance_status_changed.connect(self._on_script_status_changed)
-        self.controller.active_set_node_changed.connect(self.on_active_set_node_changed)
-        self.controller.collection_dirty_state_changed.connect(self.on_collection_dirty_state_changed)
-        self.controller.run_mode_restored.connect(self.on_run_mode_restored)
-        self.collection_tree_view.expanded.connect(self._on_item_expanded)
-        self.collection_tree_view.collapsed.connect(self._on_item_collapsed)
-        self.collection_model.dropMimeData = self._custom_drop_mime_data
-        self.controller.config_updated.connect(self._update_all_tooltips)        
+            self.collection_tree_view.selectionModel().selectionChanged.connect(self._on_selection_changed)
+            self.collection_tree_view.customContextMenuRequested.connect(self._show_context_menu)
+            self.collection_tree_view.doubleClicked.connect(self._on_double_clicked)
+
+            # Новые подключения меню
+            self.action_run_full.triggered.connect(lambda: self._start_run(SetRunMode.CONDITIONAL_FULL))
+            self.action_run_step.triggered.connect(lambda: self._start_run(SetRunMode.CONDITIONAL_STEP))
+            self.action_run_single.triggered.connect(lambda: self._start_run(SetRunMode.SINGLE_FROM_SET))
+            
+            # Клик по кнопке (только для шагов)
+            self.btn_run_action.clicked.connect(self._on_run_button_clicked)
+
+            self.btn_stop_action.clicked.connect(self.controller.stop_current_set_run)
+            
+            # --- УДАЛИТЬ ЭТИ СТРОКИ (они вызывают ошибку) ---
+            # self.combo_set_run_mode.currentIndexChanged.connect(self._on_run_mode_changed)
+            # ------------------------------------------------
+            
+            self.controller.controller_state_updated.connect(self._update_buttons_state)
+            self.controller.script_instance_status_changed.connect(self._on_script_status_changed)
+            self.controller.active_set_node_changed.connect(self.on_active_set_node_changed)
+            self.controller.collection_dirty_state_changed.connect(self.on_collection_dirty_state_changed)
+            
+            # --- УДАЛИТЬ ЭТУ СТРОКУ (сигнал удален из контроллера) ---
+            # self.controller.run_mode_restored.connect(self.on_run_mode_restored)
+            # ---------------------------------------------------------
+            
+            self.collection_tree_view.expanded.connect(self._on_item_expanded)
+            self.collection_tree_view.collapsed.connect(self._on_item_collapsed)
+            self.collection_model.dropMimeData = self._custom_drop_mime_data
+            self.controller.config_updated.connect(self._update_all_tooltips)   
+
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    def _start_run(self, mode: str):
+        """Единая точка входа для запуска из меню."""
+        selected_data = self._get_data_from_selected_item()
+        continue_on_error = self.chk_continue_on_error.isChecked()
+        set_node_id = self.controller.selected_set_node_id
+        
+        # Определение instance_id, если выбран скрипт
+        instance_id = None
+        if isinstance(selected_data, ScriptSetEntryModel):
+            instance_id = selected_data.instance_id
+        
+        # Валидация: выбран ли вообще какой-то набор?
+        if not set_node_id:
+            QMessageBox.warning(self, self.locale_manager.get("collection_widget.run_error.title"), 
+                                self.locale_manager.get("collection_widget.run_error.no_set_selected"))
+            return
+
+        # Валидация: если режим SINGLE, обязательно должен быть выбран скрипт (instance_id)
+        if mode == SetRunMode.SINGLE_FROM_SET and not instance_id:
+            # Текст ошибки: "Для запуска одиночного скрипта выберите конкретный скрипт в списке."
+            # (Используем существующий ключ локализации или fallback)
+            msg = self.locale_manager.get("collection_widget.run_error.no_script_in_set")
+            if "collection_widget" in msg: # Fallback если ключа нет
+                msg = "Для этого режима необходимо выбрать конкретный скрипт, а не папку или набор."
+            
+            QMessageBox.warning(self, self.locale_manager.get("collection_widget.run_error.title"), msg)
+            return
+
+        self.controller.run_script_set(set_node_id, mode, instance_id, continue_on_error)
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+    @Slot()
+    def _on_run_button_clicked(self):
+        """
+        Обрабатывает клик по кнопке. 
+        В состоянии IDLE кнопка работает как меню (InstantPopup), этот слот не вызывается.
+        В состоянии STEP_WAIT кнопка работает как обычная кнопка (Next Step).
+        """
+        if self.controller.is_waiting_for_next_step():
+            self.controller.proceed_to_next_script_in_set_step()
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
 
     @Slot()
     def _update_all_tooltips(self):
@@ -187,10 +268,6 @@ class ScriptCollectionWidget(QWidget):
             if item.hasChildren():
                 self._recursive_tooltip_update(item)
 
-    @Slot(str)
-    def on_run_mode_restored(self, mode_id: str):
-        index = self.combo_set_run_mode.findData(mode_id)
-        if index != -1: self.combo_set_run_mode.setCurrentIndex(index)
 
     @Slot(list, object)
     def on_collection_updated(self, root_nodes: List[SetHierarchyNodeType], node_id_to_select: Optional[str] = None):
@@ -446,65 +523,67 @@ class ScriptCollectionWidget(QWidget):
         self.controller.set_active_script_set_node(node_id_to_activate)
         self._update_buttons_state()
 
-    @Slot(int)
-    def _on_run_mode_changed(self, index: int):
-        if mode_id := self.combo_set_run_mode.itemData(index):
-            self.controller.set_collection_run_mode(mode_id)
-        self._update_buttons_state()
 
-    @Slot()
-    def _on_run_action_clicked(self):
-        if self.controller.is_waiting_for_next_step():
-            self.controller.proceed_to_next_script_in_set_step()
-            return
-
-        selected_data = self._get_data_from_selected_item()
-        run_mode = self.combo_set_run_mode.currentData(Qt.ItemDataRole.UserRole)
-        continue_on_error = self.chk_continue_on_error.isChecked()
-        set_node_id = self.controller.selected_set_node_id
-        instance_id = selected_data.instance_id if isinstance(selected_data, ScriptSetEntryModel) else None
-        
-        if not set_node_id:
-            QMessageBox.warning(self, self.locale_manager.get("collection_widget.run_error.title"), self.locale_manager.get("collection_widget.run_error.no_set_selected"))
-            return
-        if run_mode == SetRunMode.SINGLE_FROM_SET and not instance_id:
-            QMessageBox.warning(self, self.locale_manager.get("collection_widget.run_error.title"), self.locale_manager.get("collection_widget.run_error.no_script_in_set"))
-            return
-
-        self.controller.run_script_set(set_node_id, run_mode, instance_id, continue_on_error)
-
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
     def _update_buttons_state(self):
+        """
+        Обновляет состояние кнопок. Логика блокировки отдельных пунктов меню удалена.
+        """
         current_state = self.controller._app_state
-        collection_was_never_saved = self.controller.current_collection_file_path is None
+        collection_loaded = self.controller.current_collection_file_path is not None
+        
+        # 1. Кнопка Стоп
         self.btn_stop_action.setEnabled(current_state != AppState.IDLE)
 
+        # 2. Кнопка Запуск
         if current_state == AppState.SET_RUNNING_STEP_WAIT:
+            # Режим ожидания шага
             self.btn_run_action.setText(self.locale_manager.get("collection_widget.run_button_next_step"))
             self.btn_run_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekForward))
+            
+            # Убираем меню, чтобы кнопка работала как обычный клик
+            self.btn_run_action.setMenu(None)
             self.btn_run_action.setEnabled(True)
-            self.btn_run_action.setToolTip("")
-        else:
+            self.btn_run_action.setProperty("class", "accent")
+            self.style().polish(self.btn_run_action)
+
+        elif current_state == AppState.IDLE:
+            # Режим простоя
             self.btn_run_action.setText(self.locale_manager.get("collection_widget.run_button_run"))
             self.btn_run_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
-            can_run = (current_state == AppState.IDLE) and self._can_run_based_on_selection()
+            
+            # Возвращаем меню
+            self.btn_run_action.setMenu(self.run_menu)
+            self.btn_run_action.setProperty("class", "accent")
+            self.style().polish(self.btn_run_action)
+            
+            # Логика доступности самой кнопки:
+            # Кнопка активна, если загружена коллекция и выбрано хоть что-то (папка, набор, скрипт)
+            has_selection = self.controller.selected_set_node_id is not None
+            # (selected_set_node_id устанавливается контроллером даже если выбрана папка, 
+            # но для надежности можно проверить наличие данных)
+            selected_data = self._get_data_from_selected_item()
+            is_something_selected = selected_data is not None
+            
+            can_run = collection_loaded and is_something_selected
+            
             self.btn_run_action.setEnabled(can_run)
-            tooltip = self.locale_manager.get("collection_widget.run_tooltip_save_first") if collection_was_never_saved else ""
+            
+            # Сбрасываем блокировку пунктов меню (делаем все активными),
+            # так как проверка теперь внутри _start_run
+            self.action_run_full.setEnabled(True)
+            self.action_run_step.setEnabled(True)
+            self.action_run_single.setEnabled(True)
+            
+            tooltip = self.locale_manager.get("collection_widget.run_tooltip_save_first") if not collection_loaded else ""
             self.btn_run_action.setToolTip(tooltip)
-
-    def _can_run_based_on_selection(self) -> bool:
-        if self.controller.current_collection_file_path is None:
-            return False
-
-        run_mode = self.combo_set_run_mode.currentData(Qt.ItemDataRole.UserRole)
-        selected_data = self._get_data_from_selected_item()
-
-        if run_mode == SetRunMode.SINGLE_FROM_SET:
-            script_info = None
-            if isinstance(selected_data, ScriptSetEntryModel):
-                script_info = self.controller.get_script_info_by_id(selected_data.id)
-            return script_info is not None and script_info.passport_valid
+            
         else:
-            return (self.controller.selected_set_node_id is not None and self.controller.selected_set_node_model is not None and bool(self.controller.selected_set_node_model.script_entries))
+            # Скрипты выполняются (RUNNING) - блокируем кнопку целиком
+            self.btn_run_action.setEnabled(False)
+            self.btn_run_action.setProperty("class", "")
+            self.style().polish(self.btn_run_action)
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 
     @Slot("QPoint")

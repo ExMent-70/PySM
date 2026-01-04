@@ -60,6 +60,7 @@ if not logger.handlers:
     logger.addHandler(stderr_handler)
 
 # Константы
+PYSM_PREFIX = "PySM_"
 ANALYSIS_SUBFOLDER_TEMPLATE = "Output/Analysis_{photo_session}"
 IMAGE_SUBFOLDER_TEMPLATE = "Capture/{photo_session}"
 PORTRAIT_JSON_FILENAME = "info_portrait_faces.json"
@@ -88,8 +89,12 @@ class JsonKeys(str, Enum):
     MATCHED_PORTRAIT_CLUSTER_LABEL = "matched_portrait_cluster_label"
     EMOTION = "emotion_faceonnx"
     GENDER = "gender_faceonnx"
-    LEFT_EYE = "left_eye_state"
-    RIGHT_EYE = "right_eye_state"
+    EYE_LEFT = "eye_left_state"
+    EYE_RIGHT = "eye_right_state"
+    # --- НОВЫЕ КЛЮЧИ ---
+    KEYPOINT_ANALYSIS = "keypoint_analysis"
+    MOUTH_STATE = "mouth_state"
+    # -------------------
     LANDMARK_2D_106 = "landmark_2d_106"
     LANDMARK_3D_68 = "landmark_3d_68"
     EMBEDDING = "embedding"
@@ -129,6 +134,15 @@ def get_config() -> Namespace:
     parser = argparse.ArgumentParser(description="Creates or updates XMP metadata files based on JSON data.")
     parser.add_argument("--all_threads", type=int, default=os.cpu_count() or 4, help="Number of processing threads.")
     
+    # --- ИЗМЕНЕНО: Используем стандартный флаг ---
+    # Если флаг передан, значение будет True. Если нет — False.
+    parser.add_argument(
+        "--landmark_enable", 
+        action="store_true",
+        help="Enable writing 2D landmarks to XMP."
+    )
+    # ---------------------------------------------
+
     if IS_MANAGED_RUN and ConfigResolver:
         return ConfigResolver(parser).resolve_all()
     return parser.parse_args()
@@ -152,15 +166,16 @@ class MetadataProcessor:
     Отвечает за подготовку данных для записи в XMP.
     Преобразует JSON-структуры в списки ключевых слов и атрибутов.
     """
-    def __init__(self, image_folder: pathlib.Path, template_content: Optional[str]):
+    def __init__(self, image_folder: pathlib.Path, template_content: Optional[str], landmark_enable: bool):
         self.image_folder = image_folder
         self.template_content = template_content
+        self.landmark_enable = landmark_enable # Сохраняем настройку
 
     def process_file(
         self,
         image_filename: str,
         file_data: Dict[str, Any],
-        landmarks_data: Dict[str, Any],  # Новое: Передаем ландмарки
+        landmarks_data: Dict[str, Any],
         photo_type: PhotoType,
         session_name: Optional[str]
     ) -> bool:
@@ -169,7 +184,7 @@ class MetadataProcessor:
         """
         xmp_path = self.image_folder / f"{pathlib.Path(image_filename).stem}.xmp"
         
-        # Слияние данных: основные + ландмарки
+        # Слияние данных: основные + ландмарки (если они были загружены)
         merged_file_data = self._merge_landmarks(file_data, landmarks_data)
 
         # Инициализация редактора XMP (включает загрузку или создание файла)
@@ -253,10 +268,10 @@ class MetadataProcessor:
                 editor.set_simple_field("xmpRights", "UsageTerms", self._format_coordinates(JsonKeys.POSE.value, pose))
 
     def _get_base_keywords(self, file_data: Dict[str, Any], photo_type: PhotoType) -> Set[str]:
-        keywords = {photo_type.value}
+        keywords = {PYSM_PREFIX+"GENRE_"+photo_type.value}
         location_name = file_data.get(JsonKeys.LOCATION_NAME.value)
         if isinstance(location_name, str) and location_name.strip():
-            keywords.add(location_name.strip())
+            keywords.add(PYSM_PREFIX+"LOCATION_"+location_name.strip())
         return keywords
 
     def _extract_face_info(
@@ -291,25 +306,32 @@ class MetadataProcessor:
             face_attributes = {'genre': photo_type.value}
             if person_identifier:
                 face_attributes['person'] = person_identifier
-                keywords.add(person_identifier)
+                keywords.add(PYSM_PREFIX+"PERSON_"+person_identifier)
                 persons_found.append(person_identifier)
             
             # Рекурсивное уплощение данных лица
+            # Внимание: keypoint_analysis.mouth_state превратится в ключ "keypoint_analysis_mouth_state"
             self._flatten_face_data(face, face_attributes)
 
             # Дополнительные ключевые слова для портретов
             if is_portrait:
                 if emotion := face_attributes.get(JsonKeys.EMOTION.value):
-                    keywords.add(str(emotion).strip())
+                    keywords.add(PYSM_PREFIX+"EMOTION_"+str(emotion).strip())
                 if gender := face_attributes.get(JsonKeys.GENDER.value):
-                    keywords.add(str(gender))
+                    keywords.add(PYSM_PREFIX+"GENDER_"+str(gender))
                 
-                left_eye = face_attributes.get(JsonKeys.LEFT_EYE.value)
-                right_eye = face_attributes.get(JsonKeys.RIGHT_EYE.value)
-                if left_eye == SpecialValues.EYE_STATE_CLOSED.value and right_eye == SpecialValues.EYE_STATE_CLOSED.value:
-                    keywords.add(SpecialValues.EYES_CLOSED.value)
-                elif left_eye == SpecialValues.EYE_STATE_OPEN.value and right_eye == SpecialValues.EYE_STATE_OPEN.value:
-                    keywords.add(SpecialValues.EYES_OPEN.value)
+                eye_left = face_attributes.get(JsonKeys.EYE_LEFT.value)
+                eye_right = face_attributes.get(JsonKeys.EYE_RIGHT.value)
+                if eye_left == SpecialValues.EYE_STATE_CLOSED.value and eye_right == SpecialValues.EYE_STATE_CLOSED.value:
+                    keywords.add(PYSM_PREFIX+"EYE_"+SpecialValues.EYES_CLOSED.value)
+                elif eye_left == SpecialValues.EYE_STATE_OPEN.value and eye_right == SpecialValues.EYE_STATE_OPEN.value:
+                    keywords.add(PYSM_PREFIX+"EYE_"+SpecialValues.EYES_OPEN.value)
+                
+                # --- ИЗМЕНЕНИЕ: Обработка mouth_state ---
+                flattened_mouth_key = f"{JsonKeys.KEYPOINT_ANALYSIS.value}_{JsonKeys.MOUTH_STATE.value}"
+                if mouth_state := face_attributes.get(flattened_mouth_key):
+                    keywords.add(PYSM_PREFIX + "MOUTH_" + str(mouth_state).strip())
+                # ----------------------------------------
 
             # Генерация SubjectCode строк
             prefix = f"F{face_idx}"
@@ -321,10 +343,14 @@ class MetadataProcessor:
                 if not clean_val: continue
                 
                 code = SubjectCode(key=key, value=clean_val, prefix=prefix)
+                
+                # --- ИЗМЕНЕНИЕ: Фильтрация ландмарок по флагу ---
                 if key == JsonKeys.LANDMARK_2D_106.value:
-                    landmark_entry = str(code)
+                    if self.landmark_enable:
+                        landmark_entry = str(code)
                 else:
                     codes_for_face.append(str(code))
+                # ------------------------------------------------
             
             codes_for_face.sort()
             if landmark_entry:
@@ -358,7 +384,6 @@ class MetadataProcessor:
             if key in ("kps", JsonKeys.LANDMARK_2D_106.value):
                 return ";".join(f"{float(pt[0]):.{p}f},{float(pt[1]):.{p}f}" for pt in data if len(pt) >= 2)
             if key == JsonKeys.LANDMARK_3D_68.value:
-                # В XMP обычно пишут только 2D, но если вдруг, то формат такой же
                 return ";".join(f"{float(pt[0]):.{p}f},{float(pt[1]):.{p}f},{float(pt[2]):.{p}f}" for pt in data if len(pt) >= 3)
             if key == JsonKeys.POSE.value:
                 return ",".join(f"{float(c):.{p}f}" for c in data) if len(data) == 3 else None
@@ -374,18 +399,21 @@ def run_xmp_creation(
     image_folder_path: pathlib.Path,
     session_name: Optional[str],
     max_workers: int,
-    template_content: Optional[str]
+    template_content: Optional[str],
+    landmark_enable: bool
 ):
-    logger.info(f"Запуск создания XMP. Папка: {image_folder_path}")
+    logger.debug(f"ℹ️ Запуск создания XMP. Папка: {image_folder_path}")
+    logger.info(f"ℹ️ Сохранение Landmark 2D: {'✅' if landmark_enable else '❌'}")
     
-    processor = MetadataProcessor(image_folder_path, template_content)
+    # Передача флага в процессор
+    processor = MetadataProcessor(image_folder_path, template_content, landmark_enable)
 
     all_filenames = json_manager.get_all_filenames("all")
     if not all_filenames:
         logger.info("Нет файлов для обработки.")
         return
 
-    logger.info(f"Обработка {len(all_filenames)} изображений в {max_workers} потоках...")
+    logger.info(f"ℹ️ Обработка <b>{len(all_filenames)}</b> изображений в <b>{max_workers}</b> потоках...")
     
     errors = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -395,7 +423,7 @@ def run_xmp_creation(
             if file_info:
                 file_data, raw_photo_type = file_info
                 
-                # Получаем ландмарки из менеджера
+                # Получаем ландмарки (если они были загружены в main)
                 data_type_str = "portrait" if raw_photo_type == RawPhotoType.PORTRAIT else "group"
                 landmarks_data = json_manager.get_landmarks_data(fname, data_type_str) or {}
                 
@@ -411,24 +439,26 @@ def run_xmp_creation(
                 )
                 futures[future] = fname
             else:
-                logger.warning(f"Данные не найдены: {fname}")
+                logger.warning(f"⚠️ Данные не найдены: {fname}")
 
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Обновление XMP"):
             try:
                 if not future.result():
                     errors += 1
             except Exception as e:
-                logger.error(f"Ошибка в потоке для {futures[future]}: {e}", exc_info=True)
+                logger.error(f"❌ Ошибка в потоке для {futures[future]}: {e}", exc_info=True)
                 errors += 1
-
-    logger.info(f"Завершено. Ошибок: {errors}.")
+    if errors > 0:
+        logger.info(f"❌ Ошибок при сохранении XMP-файлов: <b>{errors}</b>\n")
+    else:
+        logger.info("\n")
 
 
 # 6. БЛОК: Точка входа
 # ==============================================================================
 def main():
     if not IS_MANAGED_RUN:
-        logger.critical("Требуется запуск в среде PySM.")
+        logger.critical("❌ Требуется запуск в среде PySM.")
         sys.exit(1)
 
     config = get_config()
@@ -439,7 +469,7 @@ def main():
     photo_session = pysm_context.get("wf_photo_session")
 
     if not all([session_path_str, session_name, photo_session]):
-        logger.critical("Отсутствуют переменные контекста wf_*.")
+        logger.critical("❌ Отсутствуют переменные контекста wf_*.")
         sys.exit(1)
 
     base_path = pathlib.Path(session_path_str) / session_name
@@ -450,18 +480,22 @@ def main():
     group_json = analysis_path / GROUP_JSON_FILENAME
 
     if not portrait_json.exists() or not group_json.exists():
-        logger.error(f"JSON файлы не найдены в {analysis_path}")
+        logger.error(f"❌ JSON файлы не найдены в {analysis_path}")
         sys.exit(1)
 
     # 1. Загрузка основных данных
     json_manager = JsonDataManager(portrait_json, group_json)
     if not json_manager.load_data():
-        logger.error("Ошибка загрузки JSON данных.")
+        logger.error("❌ Ошибка загрузки JSON данных.")
         sys.exit(1)
         
-    # 2. Загрузка ландмарков (Тяжелые данные)
-    if not json_manager.load_landmarks("all"):
-        logger.warning("Ландмарки не загружены или отсутствуют. XMP будут созданы без детальной геометрии.")
+    # 2. Условная загрузка ландмарков
+    # Если флаг не установлен, не тратим время и память на загрузку
+    if config.landmark_enable:
+        if not json_manager.load_landmarks("all"):
+            logger.warning("⚠️ Ландмарки не загружены или отсутствуют. XMP будут созданы без детальной геометрии.")
+    else:
+        logger.debug("⚠️ Загрузка ландмарков пропущена (настройка отключена).")
 
     # Запуск
     run_xmp_creation(
@@ -469,12 +503,14 @@ def main():
         image_folder_path=image_folder,
         session_name=session_name,
         max_workers=config.all_threads,
-        template_content=template_content
+        template_content=template_content,
+        landmark_enable=config.landmark_enable # Передаем флаг дальше
     )
 
     if image_folder.exists():
         pysm_context.log_link(str(image_folder), "Открыть папку с XMP-файлами")
-    print(" ")
+    logger.info("\n")
+
 
 if __name__ == "__main__":
     main()

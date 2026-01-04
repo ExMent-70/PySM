@@ -9,8 +9,6 @@ class SetRunMode:
     Используется строковыми значениями для совместимости с JSON.
     """
 
-    SEQUENTIAL_FULL = "sequential_full"
-    SEQUENTIAL_STEP = "sequential_step"
     SINGLE_FROM_SET = "single_from_set"
     CONDITIONAL_FULL = "conditional_full"
     CONDITIONAL_STEP = "conditional_step"

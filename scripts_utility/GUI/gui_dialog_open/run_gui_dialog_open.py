@@ -108,6 +108,7 @@ def main():
     selected_path = ""
     parent_widget = None
 
+    print(f"<b>{config.dlg_open_title}</b>")
     if config.dlg_open_type == 'file':
         print("Открытие диалога выбора файла...")
         selected_path, _ = QFileDialog.getOpenFileName(
@@ -137,14 +138,17 @@ def main():
                 value=selected_path,
                 var_type=path_type
             )
-            print("\n<b>Переменная контекста успешно сохранена.</b>")
-            print(f"<b>{config.dlg_open_var}</b> = <i>{selected_path} (тип: {path_type})</i><br>")
+            print("\nВыбранный путь сохранен в переменную контекста")
+            s = f"<b>{config.dlg_open_var}</b> = <i>{selected_path}</i><br>"
+            #s = f"<b>{config.dlg_open_var}</b> = <i>{selected_path} (тип: {path_type})</i><br>"
+            #print(f"<b>{config.dlg_open_var}</b> = <i>{selected_path} (тип: {path_type})</i><br>")
             
             link_path = selected_path if os.path.isdir(selected_path) else os.path.dirname(selected_path)
             
             pysm_context.log_link(
                 url_or_path=str(link_path),
-                text=f"Открыть папку <i>{link_path}</i>",
+                text=s,                
+                #text=f"Открыть папку <i>{link_path}</i>",
             )                  
             print(" ", file=sys.stderr)
 

@@ -183,6 +183,7 @@ class SetManager:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+
             loaded_collection = ScriptSetsCollectionModel(**data)
 
             context_file_path = self._get_context_file_path(file_path)

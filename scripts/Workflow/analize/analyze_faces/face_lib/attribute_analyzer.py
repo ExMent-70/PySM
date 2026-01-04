@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 # --- Блок 1: Вспомогательные функции и константы ---
 # ==============================================================================
-LEFT_EYE_INDICES = [35, 36, 37, 38, 39, 40, 41, 42]
-RIGHT_EYE_INDICES = [89, 90, 91, 92, 93, 94, 95, 96]
+EYE_LEFT_INDICES = [35, 36, 37, 38, 39, 40, 41, 42]
+EYE_RIGHT_INDICES = [89, 90, 91, 92, 93, 94, 95, 96]
 IMAGENET_MEAN_RGB = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD_RGB = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 BEAUTY_MEAN_BGR = np.array([104.0, 117.0, 123.0], dtype=np.float32).reshape(3, 1, 1)
@@ -248,19 +248,19 @@ class AttributeAnalyzer:
                     landmarks_np = np.array(landmarks)
                     img_h, img_w = full_image.shape[:2]
 
-                    left_bbox = get_eye_bbox_from_landmarks(landmarks_np, LEFT_EYE_INDICES)
+                    left_bbox = get_eye_bbox_from_landmarks(landmarks_np, EYE_LEFT_INDICES)
                     if left_bbox:
                         x1, y1, x2, y2 = left_bbox
-                        left_eye_img = full_image[max(0, y1):min(img_h, y2), max(0, x1):min(img_w, x2)]
-                        res = self._run_analysis(left_eye_img, "eyeblink")
-                        if res: face_data_dict["left_eye_state"], face_data_dict["left_eye_score"] = res
+                        eye_left_img = full_image[max(0, y1):min(img_h, y2), max(0, x1):min(img_w, x2)]
+                        res = self._run_analysis(eye_left_img, "eyeblink")
+                        if res: face_data_dict["eye_left_state"], face_data_dict["eye_left_score"] = res
 
-                    right_bbox = get_eye_bbox_from_landmarks(landmarks_np, RIGHT_EYE_INDICES)
+                    right_bbox = get_eye_bbox_from_landmarks(landmarks_np, EYE_RIGHT_INDICES)
                     if right_bbox:
                         x1, y1, x2, y2 = right_bbox
-                        right_eye_img = full_image[max(0, y1):min(img_h, y2), max(0, x1):min(img_w, x2)]
-                        res = self._run_analysis(right_eye_img, "eyeblink")
-                        if res: face_data_dict["right_eye_state"], face_data_dict["right_eye_score"] = res
+                        eye_right_img = full_image[max(0, y1):min(img_h, y2), max(0, x1):min(img_w, x2)]
+                        res = self._run_analysis(eye_right_img, "eyeblink")
+                        if res: face_data_dict["eye_right_state"], face_data_dict["eye_right_score"] = res
         except Exception as e:
             filename = face_data_bundle.get("filename", "unknown")
             face_idx = face_data_bundle.get("face_index", -1)

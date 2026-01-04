@@ -70,11 +70,12 @@ class AnalysisResultWriter:
         # 3. Сохранение отдельных файлов с ландмарками
         if p_land:
             self._save_json_safe(self.output_dir / "info_portrait_landmarks.json", p_land)
-            logger.info(f"- ландмарки портретов: <i>info_portrait_landmarks.json</i>")
+            logger.info(f"✅ ландмарки портретов: <i>info_portrait_landmarks.json</i>")
             
         if g_land:
             self._save_json_safe(self.output_dir / "info_group_landmarks.json", g_land)
-            logger.info(f"- ландмарки групп: <i>info_group_landmarks.json</i>")
+            logger.info(f"✅ ландмарки групп: <i>info_group_landmarks.json</i>")
+        logger.info("<br>")
 
         # 4. Сохранение эмбеддингов и индексов
         if self.portrait_embeddings or self.group_embeddings:

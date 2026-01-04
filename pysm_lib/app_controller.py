@@ -57,7 +57,7 @@ class AppController(QObject):
     controller_state_updated = Signal()
     config_updated = Signal()
     scan_state_changed = Signal(bool)
-    run_mode_restored = Signal(str)
+
 
     def __init__(
         self,
@@ -301,12 +301,6 @@ class AppController(QObject):
             )
             self._log_collection_properties()
 
-            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-            # КОММЕНТАРИЙ: Режим запуска всегда берется из модели коллекции,
-            # независимо от того, выбран какой-то набор или нет.
-            self._internal_set_and_emit_run_mode(collection_model.execution_mode)
-            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
-
             self.config_manager.last_used_sets_collection_file = str(
                 self.current_collection_file_path
             )
@@ -542,8 +536,7 @@ class AppController(QObject):
         self.log_message_to_console.emit(
             "runner_info", self.locale_manager.get("user_actions.collection_new")
         )
-        default_mode = self.set_manager.current_collection_model.execution_mode
-        self._internal_set_and_emit_run_mode(default_mode)
+
         self.config_manager.last_used_sets_collection_file = ""
         self.set_active_script_set_node(None)
         self.config_manager.save_config()
@@ -556,9 +549,6 @@ class AppController(QObject):
     def save_current_collection_requested_by_gui(
         self, target_file_path: Optional[pathlib.Path]
     ) -> bool:
-        self.set_manager.current_collection_model.execution_mode = (
-            self.set_manager.current_collection_model.execution_mode
-        )
 
         if self.set_manager.save_collection_to_file(target_file_path):
             self.current_collection_file_path = (

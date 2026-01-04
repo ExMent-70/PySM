@@ -81,7 +81,7 @@ def get_config() -> argparse.Namespace:
     return ConfigResolver(parser).resolve_all() if IS_MANAGED_RUN else parser.parse_args()
 
 def run_clustering_mode(location_analyzer: LocationAnalyzer, mask_files: List[Path], cli_config) -> Tuple[List[Path], np.ndarray, np.ndarray]:
-    print(f"\n<b>Режим работы: Автоматическая кластеризация</b>")
+    logger.info(f"\n<b>Режим работы: Автоматическая кластеризация</b>")
     num_workers = cli_config.all_threads or os.cpu_count() or 4
 
     results = []
@@ -102,18 +102,18 @@ def run_clustering_mode(location_analyzer: LocationAnalyzer, mask_files: List[Pa
     clustering_params = location_analyzer.config_manager.get("clustering")
     clustering_params['eps'] = cli_config.a_cl_cluster_eps
     
-    print(f"<br>Вычислено <b>{len(results)} эмбеддингов</b>. Запуск кластеризации с параметрами: <i>{clustering_params}</i>")
+    logger.info(f"<br>Вычислено <b>{len(results)} эмбеддингов</b>. Запуск кластеризации с параметрами: <i>{clustering_params}</i>")
     clusterer = DBSCAN(**clustering_params)
     labels = clusterer.fit_predict(embeddings_matrix)
     
     n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
     n_noise = np.sum(labels == -1)
-    print(f"Найдено <b>{n_clusters}</b> локаций (кластеров). Шумовых/уникальных фото: <b>{n_noise}</b><br>")
+    logger.info(f"Найдено <b>{n_clusters}</b> локаций (кластеров). Шумовых/уникальных фото: <b>{n_noise}</b><br>")
 
     return list(paths), labels, embeddings_matrix
 
 def run_classification_mode(location_analyzer: LocationAnalyzer, mask_files: List[Path], cli_config) -> Tuple[List[Path], np.ndarray, np.ndarray]:
-    print(f"\n<b>Режим работы: Классификация по текстовым описаниям</b>")
+    logger.info(f"\n<b>Режим работы: Классификация по текстовым описаниям</b>")
     prompts = cli_config.a_cl_location_prompts
     
     try:
@@ -145,21 +145,21 @@ def run_classification_mode(location_analyzer: LocationAnalyzer, mask_files: Lis
     threshold = location_analyzer.config_manager.get("classification.match_threshold", 0.25)
     labels = np.where(best_prompt_scores >= threshold, best_prompt_indices, -1)
     
-    print("Результаты классификации:")
+    logger.info("Результаты классификации:")
     for i, prompt in enumerate(prompts):
         count = np.sum(labels == i)
-        print(f" - Локация {i} ('{prompt[:40]}...'): <b>{count}</b> фото")
+        logger.info(f" - Локация {i} ('{prompt[:40]}...'): <b>{count}</b> фото")
     
     n_noise = np.sum(labels == -1)
-    print(f" - Не классифицировано (ниже порога {threshold}): <b>{n_noise}</b> фото<br>")
+    logger.info(f" - Не классифицировано (ниже порога {threshold}): <b>{n_noise}</b> фото<br>")
     
     return list(image_paths), labels, image_embeddings_matrix
 
 def main():
     log_level = pysm_context.get("sys_log_level", "INFO") if IS_MANAGED_RUN else "INFO"
-    logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO), format="%(message)s", stream=sys.stderr)
+    logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO), format="%(message)s", stream=sys.stdout)
 
-    print("<b>КЛАСТЕРИЗАЦИЯ ФОТОГРАФИЙ ПО ЛОКАЦИЯМ</b>")
+    logger.info("<b>КЛАСТЕРИЗАЦИЯ ФОТОГРАФИЙ ПО ЛОКАЦИЯМ</b>")
     cli_config = get_config()
     
     # 1. Загрузка конфига
@@ -207,7 +207,7 @@ def main():
         group_json_path=output_dir / "info_group_faces.json"
     )
 
-    print("<br>Обновление JSON файлов с метками кластеров...")
+    logger.info("<br>Обновление JSON файлов с метками кластеров...")
     if not json_manager.load_data(): sys.exit(1)
     
 
@@ -236,14 +236,14 @@ def main():
     with open(embeddings_dir / "location_index.json", "w", encoding="utf-8") as f:
         json.dump(location_index, f, indent=2)
     
-    print("- эмбеддинги локаций: <i>_Embeddings/location_embeddings.npy</i>")
-    print("- индекс эмбеддингов: <i>_Embeddings/location_index.json</i><br>")
+    logger.info("✅ эмбеддинги локаций: <i>_Embeddings/location_embeddings.npy</i>")
+    logger.info("✅ индекс эмбеддингов: <i>_Embeddings/location_index.json</i><br>")
     
     # --- НАЧАЛО ИЗМЕНЕНИЙ ---
     # Блок 3: Удалена ссылка на несуществующую папку
     if IS_MANAGED_RUN:
         pysm_context.log_link(url_or_path=str(output_dir), text="Открыть папку с результатами (JSON-файлы)")
-        print(" ", file=sys.stderr)
+        logger.info("<br>")    
     # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 if __name__ == "__main__":

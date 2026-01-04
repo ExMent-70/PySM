@@ -289,50 +289,57 @@ class SetRunnerOrchestrator(QObject):
         self.instance_status_changed.emit(instance_id, ScriptRunStatus.RUNNING)
 
     def _handle_script_complete(self, instance_id: str, return_code: int):
-        is_success = return_code == 0
-        status = (
-            self.locale_manager.get(
-                "app_controller.console_script_status_label_success"
+            is_success = return_code == 0
+            status = (
+                self.locale_manager.get(
+                    "app_controller.console_script_status_label_success"
+                )
+                if is_success
+                else self.locale_manager.get(
+                    "app_controller.console_script_status_label_error"
+                )
             )
-            if is_success
-            else self.locale_manager.get(
-                "app_controller.console_script_status_label_error"
+            duration = (
+                time.time() - self.script_start_time if self.script_start_time > 0 else 0
             )
-        )
-        duration = (
-            time.time() - self.script_start_time if self.script_start_time > 0 else 0
-        )
-        key = (
-            "app_controller.console_script_status_success_text"
-            if is_success
-            else "app_controller.console_script_status_error_text"
-        )
-        status_text = self.locale_manager.get(
-            key,
-            status=status,
-            return_code=return_code,
-            duration=f"{duration:.2f}",
-            unit=self.locale_manager.get("general.seconds_unit_short"),
-        )
-        new_status = ScriptRunStatus.SUCCESS if is_success else ScriptRunStatus.ERROR
-        self.instance_status_changed.emit(instance_id, new_status)
+            key = (
+                "app_controller.console_script_status_success_text"
+                if is_success
+                else "app_controller.console_script_status_error_text"
+            )
+            status_text = self.locale_manager.get(
+                key,
+                status=status,
+                return_code=return_code,
+                duration=f"{duration:.2f}",
+                unit=self.locale_manager.get("general.seconds_unit_short"),
+            )
+            new_status = ScriptRunStatus.SUCCESS if is_success else ScriptRunStatus.ERROR
+            self.instance_status_changed.emit(instance_id, new_status)
 
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        # КОММЕНТАРИЙ: Здесь мы только устанавливаем флаг ошибки.
-        # Решение об остановке будет принято в _common_script_finish_handler.
-        if not is_success:
-            self.run_had_errors = True
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        # Возвращаем вывод информационной плашки о статусе завершения скрипта.
-        # Это самое подходящее место: после всех расчетов, но до принятия
-        # решения о следующем шаге.
-        style_type = "script_success_block" if is_success else "script_error_block"
-        self.log_message.emit(style_type, status_text)
-        self.log_message.emit("EMPTY_LINE", "")
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---        
+            if not is_success:
+                self.run_had_errors = True
 
-        self._common_script_finish_handler(instance_id)
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # 1. Находим объект экземпляра в очереди, чтобы проверить настройки
+            entry = next((e for e in self.script_queue if e.instance_id == instance_id), None)
+            is_silent = entry.silent_mode if entry else False
+
+            # 2. Логика вывода:
+            # Выводим сообщение, если:
+            # а) Тихий режим ВЫКЛЮЧЕН (обычное поведение)
+            # б) ИЛИ если произошла ОШИБКА (ошибки показываем даже в тихом режиме)
+            if not is_silent or not is_success:
+                style_type = "script_success_block" if is_success else "script_error_block"
+                self.log_message.emit(style_type, status_text)
+                self.log_message.emit("EMPTY_LINE", "")
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+            self._common_script_finish_handler(instance_id)
+
+
+
+
 
     def _handle_script_error(self, instance_id: str, error_message: str):
         self.log_message.emit(
@@ -382,7 +389,6 @@ class SetRunnerOrchestrator(QObject):
         is_last_step = self.current_script_idx >= len(self.script_queue) - 1
 
         if self.run_mode in [
-            SetRunMode.SEQUENTIAL_STEP,
             SetRunMode.CONDITIONAL_STEP,
         ]:
             if is_last_step:
@@ -469,12 +475,6 @@ class SetRunnerOrchestrator(QObject):
 
     def _log_set_start_info(self):
         mode_map = {
-            SetRunMode.SEQUENTIAL_FULL: self.locale_manager.get(
-                "collection_widget.run_mode_full"
-            ),
-            SetRunMode.SEQUENTIAL_STEP: self.locale_manager.get(
-                "collection_widget.run_mode_step"
-            ),
             SetRunMode.SINGLE_FROM_SET: self.locale_manager.get(
                 "collection_widget.run_mode_single"
             ),

@@ -61,12 +61,12 @@
     "dirty_indicator": "*",
     "toolbar": {
       "main_toolbar_title": "Главная панель инструментов",
-      "new_collection": "Новая коллекция...",
-      "open_collection": "Открыть коллекцию...",
-      "save_collection": "Сохранить коллекцию",
+      "new_collection": "Новый рабочий процесс...",
+      "open_collection": "Открыть рабочий процесс...",
+      "save_collection": "Сохранить рабочий процесс",
 	  "save_collection_as": "Сохранить как...",
-	  "save_collection_tooltip": "Сохранить текущую коллекцию",
-      "collection_passport": "Паспорт коллекции...",
+	  "save_collection_tooltip": "Сохранить активный рабочий процесс",
+      "collection_passport": "Параметры рабочего процесса...",
       "refresh_scripts": "Обновить список скриптов",
       "toggle_console": "Показать/скрыть консоль",
       "settings": "Настройки...",
@@ -79,12 +79,12 @@
     },
     "unsaved_dialog": {
       "title": "Несохраненные изменения",
-      "text": "В текущей коллекции есть несохраненные изменения. Хотите сохранить их?"
+      "text": "В текущем рабочем процессе есть несохраненные изменения. Хотите сохранить их?"
     },
     "file_dialog": {
-      "open_title": "Открыть коллекцию",
-      "save_as_title": "Сохранить коллекцию как...",
-      "filter": "Коллекции PySM (*{extension})"
+      "open_title": "Открыть рабочий процесс",
+      "save_as_title": "Сохранить рабочий процесс как...",
+      "filter": "Рабочий процесс PySM (*{extension})"
     }
   },
   "available_scripts_widget": {
@@ -112,24 +112,21 @@
       "active_set_changed": "WIDGET: Слот on_active_set_node_changed получил модель: {name}"
     },
     "continue_on_error_checkbox": "Выполнить следующий скрипт, если текущий завершен с ошибкой",
-    "group_title": "Активная коллекция",
-    "header_collection": "Коллекция",
-    "unsaved_suffix": "- НЕ СОХРАНЕНА",
-    "run_mode_label": "Режим:",
-    "run_mode_full": "Весь набор (авто)",
-    "run_mode_step": "Весь набор (пошагово)",
-    "run_mode_conditional_full": "Условный (авто)",
-    "run_mode_conditional_step": "Условный (пошагово)",
-    "run_mode_single": "Один скрипт",
+    "group_title": "Активный рабочий процесс",
+    "header_collection": "Рабочий процесс",
+    "unsaved_suffix": "- НЕ СОХРАНЕН",
+    "run_mode_conditional_full": "Выполнить все скрипты в наборе (автоматически)",
+    "run_mode_conditional_step": "Выполнить все скрипты в наборе (пошагово)",
+    "run_mode_single": "Выполнить только выбранный скрипт",
     "run_button_run": "Выполнить",
     "run_button_stop": "Остановить",
-    "run_button_next_step": "Следующий шаг",
-    "run_tooltip_save_first": "Сохраните коллекцию перед запуском",
+    "run_button_next_step": "Выполнить следующий скрипт",
+    "run_tooltip_save_first": "Сохраните рабочий процесс перед запуском",
     "script_not_found_format": "НЕ НАЙДЕН: {id}",
     "run_error": {
       "title": "Запуск невозможен",
-      "no_set_selected": "Выберите набор или отдельный скрипт в наборе для запуска.",
-      "no_script_in_set": "Для этого режима нужно выбрать конкретный скрипт в наборе."
+      "no_set_selected": "Выберите набор или отдельный скрипт в наборе для запуска",
+      "no_script_in_set": "Выберите конкретный скрипт в наборе"
     },
     "context_menu": {
           "create_folder": "Создать папку здесь",
@@ -356,13 +353,13 @@
       }
     },
     "collection_passport": {
-      "title": "Паспорт коллекции",
-      "properties_group": "Свойства коллекции",
-      "name_label": "Имя коллекции:",
+      "title": "Параметры рабочего процесса",
+      "properties_group": "Свойства",
+      "name_label": "Имя рабочего процесса:",
       "description_label": "Описание:",
       "roots_group": "Корневые директории скриптов",
       "select_dir_dialog_title": "Выберите корневую директорию",
-      "context_group": "Контекст коллекции"
+      "context_group": "Контекст рабочего процесса"
     },
     "context_editor": {
       "header_name": "Имя",
@@ -393,15 +390,15 @@
     }
   },
   "user_actions": {
-    "collection_opened": "Открыта коллекция '{name}'",
+    "collection_opened": "Загружен рабочий процесс '{name}'",
     "config_saved": "Конфигурация приложения сохранена.",
     "config_save_error": "ОШИБКА: Не удалось сохранить конфигурацию приложения.",
-    "collection_renamed": "Коллекция '{old_name}' переименована в '{new_name}'.",
-    "collection_props_updated": "Свойства коллекции обновлены.",
-	"collection_saved": "Коллекция сохранена в '{path}'",
-    "folder_created": "В коллекцию добавлена папка '{name}'.",
-    "set_created": "В коллекцию добавлен набор '{name}'.",
-    "node_deleted": "Из коллекции удален узел '{name}'.",
+    "collection_renamed": "Рабочий процесс '{old_name}' переименована в '{new_name}'.",
+    "collection_props_updated": "Свойства рабочего процесса обновлены.",
+	"collection_saved": "Рабочий процесс сохранена в '{path}'",
+    "folder_created": "В рабочий процесс добавлена папка '{name}'.",
+    "set_created": "В рабочий процесс добавлен набор '{name}'.",
+    "node_deleted": "Из текущего рабочего процесса удален узел '{name}'.",
     "node_renamed": "Узел '{old_name}' переименован в '{new_name}'.",
     "node_moved": "Узел '{name}' перемещен.",
     "passport_saved": "Сохранен паспорт для скрипта '{name}'.",
@@ -437,13 +434,13 @@
     "log_warning": {
       "scan_while_busy": "Попытка запустить сканирование, пока приложение занято. Отмена.",
       "delete_context_file_failed": "Не удалось удалить файл контекста '{path}': {error}",
-      "run_with_unsaved_changes": "Попытка запуска с несохраненными изменениями. Сохраните коллекцию.",
+      "run_with_unsaved_changes": "Попытка запуска с несохраненными изменениями. Сохраните рабочий процесс",
       "export_node_not_found": "Попытка экспорта узла с ID '{node_id}', но он не найден."	  
     },
     "log_error": {
       "async_scan_error": "Ошибка асинхронного сканирования: {error}",
       "context_file_failed": "Не удалось создать файл контекста: {error}",
-      "run_unsaved_collection": "Запуск невозможен: коллекция ни разу не была сохранена.",
+      "run_unsaved_collection": "Запуск невозможен: рабочий процесс ни разу не была сохранена.",
       "context_path_error": "Не удалось определить путь к файлу контекста: {error}",
       "export_save_failed": "Не удалось сохранить экспортированный набор в '{path}': {error}",
       "import_read_failed": "Не удалось прочитать или импортировать набор из '{path}': {error}"	  
@@ -479,14 +476,14 @@
     "status_scan_complete": "Сканирование завершено.",
     "status_scan_error": "Ошибка при сканировании.",
     "status_scan_busy": "Дождитесь окончания сканирования...",
-    "status_new_collection": "Создана новая коллекция.",
-    "status_collection_loaded": "Коллекция '{name}' загружена.",
-    "status_collection_load_error": "Ошибка загрузки коллекции '{name}'.",
-    "status_collection_saved": "Коллекция сохранена в '{name}'.",
+    "status_new_collection": "Создан новый рабочий процесс",
+    "status_collection_loaded": "Рабочий процесс '{name}' загружена.",
+    "status_collection_load_error": "Ошибка загрузки рабочего процесса '{name}'.",
+    "status_collection_saved": "Рабочий процесс сохранена в '{name}'.",
     "status_step_complete": "Шаг завершен. Нажмите 'Следующий шаг'.",
     "console_log": {
-      "collection_properties_header": "Параметры коллекции:",
-      "collection_description": "  Описание коллекции",
+      "collection_properties_header": "Параметры рабочего процесса:",
+      "collection_description": "  Описание рабочего процесса",
       "collection_roots_header": "  Корневые директории скриптов:",
       "stopping_on_error": "<b>=== Скрипт завершен с ошибкой или остановлен пользователем ===</b><br>"
     },
@@ -576,10 +573,10 @@
   },
   "set_manager": {
     "log_info": {
-      "init": "Инициализация SetManager. Директория коллекций по умолчанию: {path}",
-      "creating_new_collection": "SetManager: Создание новой пустой коллекции в памяти.",
-      "loading_from_file": "SetManager: Попытка загрузки коллекции из файла: {path}",
-      "collection_loaded": "Коллекция '{name}' успешно загружена. is_dirty = {dirty}",
+      "init": "Инициализация SetManager. Директория для сохранения рабочих процессов по умолчанию: {path}",
+      "creating_new_collection": "SetManager: Создание нового рабочего процесса в памяти.",
+      "loading_from_file": "SetManager: Попытка загрузки рабочего процесса из файла: {path}",
+      "collection_loaded": "Рабочий процесс '{name}' успешно загружена. is_dirty = {dirty}",
       "loading_context_file": "SetManager: Загрузка файла контекста: {path}",
       "saving_context_file": "SetManager: Сохранение файла контекста: {path}",
       "deleting_empty_context_file": "SetManager: Удаление пустого файла контекста: {path}",
@@ -592,17 +589,17 @@
       "dirty_flag_set": "SetManager: Флаг 'is_dirty' установлен в {state}."
     },
     "log_warning": {
-      "adapting_structure": "Структура коллекции в '{path}' не имеет главного узла-папки. Адаптация...",
-      "reload_context_no_path": "SetManager: Невозможно перезагрузить контекст, путь к коллекции не определен.",
+      "adapting_structure": "Структура рабочего процесса в '{path}' не имеет главного узла-папки. Адаптация...",
+      "reload_context_no_path": "SetManager: Невозможно перезагрузить контекст, путь к файлу рабочего процесса не определен.",
       "export_set_not_found": "Ошибка экспорта: Набор скриптов с ID '{node_id}' не найден.",
       "import_parent_not_found": "Ошибка импорта: Родительская папка с ID '{folder_id}' не найдена.",
       "import_set_validation_failed": "Ошибка валидации при импорте набора: {error}",
       "import_set_generic_failed": "Неизвестная ошибка при импорте набора: {error}"	  
     },
     "log_error": {
-      "file_not_found": "Файл коллекции '{path}' не найден. Создается новая пустая коллекция.",
-      "load_failed": "Ошибка при загрузке или валидации коллекции из '{path}': {error}",
-      "save_failed": "Ошибка сохранения коллекции в файл '{path}': {error}",
+      "file_not_found": "Файл рабочего процесса '{path}' не найден. Создается новый файл",
+      "load_failed": "Ошибка при загрузке или валидации файла из '{path}': {error}",
+      "save_failed": "Ошибка сохранения рабочего процесса в файл '{path}': {error}",
       "context_file_invalid_format": "SetManager: Файл контекста '{path}' имеет неверный формат (не является словарем).",
       "context_reload_failed": "SetManager: Ошибка при перезагрузке контекста из '{path}': {error}"
     },
@@ -610,7 +607,7 @@
       "create_default_dirs_failed": "Не удалось создать директории по умолчанию: {error}"
     },
     "default_folder_name": "Основная папка",
-    "new_collection_name": "Новая коллекция"
+    "new_collection_name": "Новый рабочий процесс"
   },
   "config_manager": {
     "log_info": {
@@ -711,9 +708,9 @@
       "default_author": "Не указан"
     },
     "collection": {
-      "default_name": "Новая коллекция",
-      "description": "Описание того, для чего предназначена эта коллекция.",
-      "script_roots_description": "Список корневых директорий, в которых ищутся скрипты для этой коллекции."
+      "default_name": "Новый рабочий процесс",
+      "description": "Описание того, для чего предназначена этот рабочий процесс",
+      "script_roots_description": "Список корневых директорий, в которых ищутся скрипты для этого рабочего процесса"
     },
     "errors": {
       "must_be_dict": "{field} должен быть словарем",

@@ -94,13 +94,13 @@ class KeypointAnalyzer:
         except IndexError:
             face_width = 100.0
 
-        left_eye_indices = [35, 39, 42, 41, 37, 36]
-        right_eye_indices = [93, 89, 95, 96, 90, 91]
+        eye_left_indices = [35, 39, 42, 41, 37, 36]
+        eye_right_indices = [93, 89, 95, 96, 90, 91]
         eye_3d_left_slice = kps_3d_np[36:42] if kps_3d_np is not None and len(kps_3d_np) >= 42 else None
         eye_3d_right_slice = kps_3d_np[42:48] if kps_3d_np is not None and len(kps_3d_np) >= 48 else None
         
-        left_eye_state = self._get_eye_state(kps_2d_np, left_eye_indices, face_width, eye_3d_left_slice)
-        right_eye_state = self._get_eye_state(kps_2d_np, right_eye_indices, face_width, eye_3d_right_slice)
+        eye_left_state = self._get_eye_state(kps_2d_np, eye_left_indices, face_width, eye_3d_left_slice)
+        eye_right_state = self._get_eye_state(kps_2d_np, eye_right_indices, face_width, eye_3d_right_slice)
 
         mouth_3d_slice = kps_3d_np[48:68] if kps_3d_np is not None and len(kps_3d_np) >= 68 else None
         mouth_state = self._get_mouth_state(kps_2d_np, mouth_3d_slice)
@@ -108,7 +108,7 @@ class KeypointAnalyzer:
         head_pose_state = self._get_head_pose(pose)
 
         return {
-            "eye_states": {"left": left_eye_state, "right": right_eye_state},
+            "eye_states": {"left": eye_left_state, "right": eye_right_state},
             "mouth_state": mouth_state,
             "head_pose": head_pose_state,
         }
@@ -215,7 +215,7 @@ class KeypointAnalyzer:
 
         # 2. Загружаем ландмарки через менеджер
         if not json_manager.load_landmarks(data_type):
-            logger.warning(f"Не удалось загрузить ландмарки для '{data_type}'. Анализ будет неполным.")
+            logger.warning(f"Не удалось загрузить landmarks для '{data_type}'. Анализ будет неполным.")
 
         detailed_metrics = []
         
@@ -347,8 +347,10 @@ class KeypointAnalyzer:
         rec_path = data_dir / filename
         try:
             rec_path.write_text("\n".join(recs), encoding="utf-8")
-            logger.info(f"Файл с рекомендациями сохранен:")
-            logger.info(f"<i>{rec_path}</i>")
+            
+            pysm_context.log_link(str(rec_path), f"Открыть файл {filename}")
+            logger.info("\n")            
+            
         except Exception as e:
             logger.error(f"Не удалось сохранить файл с рекомендациями: {e}")
 

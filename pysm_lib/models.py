@@ -311,11 +311,6 @@ class ScriptSetsCollectionModel(BaseModel):
     )
     data_format_version: str = "1.1"
 
-    # --- ИЗМЕНЕНИЕ: Добавлено новое поле ---
-    execution_mode: str = Field(
-        default="sequential_full",
-        description="Режим запуска по умолчанию для коллекции: sequential_full, sequential_step, single_from_set",
-    )
 
     script_roots: List[ScriptRootModel] = Field(
         default_factory=list,

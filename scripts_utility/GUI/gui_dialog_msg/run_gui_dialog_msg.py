@@ -2,6 +2,7 @@
 # ==============================================================================
 import argparse
 import sys
+import logging
 
 # Определяем, запущен ли скрипт под управлением PySM
 IS_MANAGED_RUN = False
@@ -27,6 +28,9 @@ except ImportError:
     print("Пожалуйста, установите его: pip install PySide6", file=sys.stderr)
     sys.exit(1)
 
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
+logger = logging.getLogger(__name__)
 
 # 2. БЛОК: Определение и получение конфигурации
 # ==============================================================================
@@ -128,13 +132,15 @@ def main():
     
     #print(f"Пользователь выбрал: '{result_string}'")
 
+    logger.info(f"<b>Сообщение</b>")
+    logger.info(f"{config.dlg_msg_message}")
     # 3.5. Сохранение результата в контекст (если возможно)
     if IS_MANAGED_RUN and pysm_context:
         try:
             # Используем актуальный метод set()
             pysm_context.set(config.dlg_msg_var, result_string)
-            print("\n<b>Переменная контекста успешно сохранена.</b>")
-            print(f"<b>{config.dlg_msg_var}</b> = <i>{result_string}<br>")
+            print("\n<b>Выбор пользователя сохранён в переменную контекста:</b>")
+            logger.info(f"✅ <b>{config.dlg_msg_var}</b> = <i>{result_string}<br>")
 
         except Exception as e:
             # В случае ошибки при записи в контекст, выводим ее в stderr
@@ -156,7 +162,7 @@ def main():
     elif result_string in ["cancel", "unknown"]:
         exit_code = 1
         
-    print(f"Скрипт завершается с кодом выхода: {exit_code}<br>")
+    logger.debug(f"Скрипт завершается с кодом выхода: {exit_code}<br>")
     sys.exit(exit_code)
 
 

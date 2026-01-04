@@ -211,35 +211,44 @@ class XmpEditor:
             li.text = item
 
     def save(self) -> bool:
-        """
-        Атомарно сохраняет XMP файл.
-        """
-        if self.tree is None:
-            return False
+            """
+            Атомарно сохраняет XMP файл.
+            Создает родительские директории, если они не существуют.
+            """
+            if self.tree is None:
+                return False
 
-        try:
-            # Красивое форматирование (отступы)
-            ET.indent(self.tree, space="  ", level=0)
-            
-            xml_string = ET.tostring(self.tree.getroot(), encoding="utf-8", method="xml")
-            if not xml_string.startswith(b"<?xml"):
-                xml_string = b'<?xml version="1.0" encoding="UTF-8"?>\n' + xml_string
+            try:
+                # Красивое форматирование (отступы)
+                ET.indent(self.tree, space="  ", level=0)
+                
+                xml_string = ET.tostring(self.tree.getroot(), encoding="utf-8", method="xml")
+                if not xml_string.startswith(b"<?xml"):
+                    xml_string = b'<?xml version="1.0" encoding="UTF-8"?>\n' + xml_string
 
-            # Запись во временный файл
-            with NamedTemporaryFile("wb", delete=False, dir=self.file_path.parent, suffix=".xmp~") as tmp:
-                tmp.write(xml_string)
-                tmp_path = pathlib.Path(tmp.name)
+                # Проверка и создание папки назначения
+                if not self.file_path.parent.exists():
+                    try:
+                        self.file_path.parent.mkdir(parents=True, exist_ok=True)
+                    except Exception as e:
+                        logger.error(f"Не удалось создать директорию {self.file_path.parent}: {e}")
+                        return False
 
-            # Атомарная замена
-            if os.name == 'nt':
-                # Windows не любит атомарную замену, если файл существует, поэтому удаляем целевой
-                if self.file_path.exists():
-                    os.remove(self.file_path)
-                os.replace(tmp_path, self.file_path)
-            else:
-                shutil.move(str(tmp_path), self.file_path)
-            
-            return True
-        except Exception as e:
-            logger.error(f"Ошибка сохранения XMP {self.file_path}: {e}", exc_info=True)
-            return False
+                # Запись во временный файл
+                with NamedTemporaryFile("wb", delete=False, dir=self.file_path.parent, suffix=".xmp~") as tmp:
+                    tmp.write(xml_string)
+                    tmp_path = pathlib.Path(tmp.name)
+
+                # Атомарная замена
+                if os.name == 'nt':
+                    # Windows не любит атомарную замену, если файл существует, поэтому удаляем целевой
+                    if self.file_path.exists():
+                        os.remove(self.file_path)
+                    os.replace(tmp_path, self.file_path)
+                else:
+                    shutil.move(str(tmp_path), self.file_path)
+                
+                return True
+            except Exception as e:
+                logger.error(f"Ошибка сохранения XMP {self.file_path}: {e}", exc_info=True)
+                return False

@@ -115,15 +115,15 @@ class ReportGenerator:
                     "age_onnx": face.get("age_faceonnx"),
                     "emotion_onnx": face.get("emotion_faceonnx"),
                     "beauty_onnx": f"{face.get('beauty_faceonnx', 0.0):.2f}" if face.get('beauty_faceonnx') is not None else "N/A",
-                    "left_eye_state": face.get("left_eye_state"),
-                    "right_eye_state": face.get("right_eye_state"),
+                    "eye_left_state": face.get("eye_left_state"),
+                    "eye_right_state": face.get("eye_right_state"),
                 }
                 
                 keypoint_analysis = face.get("keypoint_analysis", {})
-                file_info["left_eye_state"] = keypoint_analysis.get("eye_states", {}).get("left")
-                file_info["right_eye_state"] = keypoint_analysis.get("eye_states", {}).get("right")
+                file_info["eye_left_state"] = keypoint_analysis.get("eye_states", {}).get("left")
+                file_info["eye_right_state"] = keypoint_analysis.get("eye_states", {}).get("right")
 
-                l_eye, r_eye = file_info["left_eye_state"], file_info["right_eye_state"]
+                l_eye, r_eye = file_info["eye_left_state"], file_info["eye_right_state"]
                 combined = "N/A"
                 if l_eye and r_eye: combined = f"L:{l_eye}/R:{r_eye}"
                 elif l_eye: combined = f"L:{l_eye}"

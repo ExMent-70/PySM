@@ -374,7 +374,6 @@ class MainWindow(QMainWindow):
             self.scripts_widget.setEnabled(is_enabled)
         if self.collection_widget:
             self.collection_widget.collection_tree_view.setEnabled(is_enabled)
-            self.collection_widget.combo_set_run_mode.setEnabled(is_enabled)
             self.collection_widget.chk_continue_on_error.setEnabled(is_enabled)
 
         self.action_new_collection.setEnabled(is_enabled)

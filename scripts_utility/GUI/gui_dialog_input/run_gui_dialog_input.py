@@ -42,7 +42,7 @@ try:
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMessageBox
 except ImportError:
-    print("Критическая ошибка: для работы этого скрипта требуется PySide6.", file=sys.stderr)
+    print("❌ Критическая ошибка: для работы этого скрипта требуется PySide6.", file=sys.stderr)
     sys.exit(1)
 
 # Настройка логирования
@@ -96,24 +96,27 @@ class ContextHandler:
         if IS_MANAGED_RUN and pysm_context:
             context_val = pysm_context.get(self.var_name)
             if context_val is not None:
-                logger.info(f"Начальное значение из контекста '{self.var_name}': '{context_val}'")
+                logger.info(f"ℹ️ Текущее значение: <b>{self.var_name}</b> = <i>{context_val}</i>")
                 return str(context_val)
         return default
 
     def save_result(self, value: str) -> None:
         """Сохраняет результат в контекст, если это возможно."""
-        logger.info(f"Пользователь ввел: '{value}'")
+        logger.debug(f"Пользователь ввел: '{value}'")
         
         if IS_MANAGED_RUN and pysm_context:
             try:
                 pysm_context.set(self.var_name, value)
-                logger.info("Переменная контекста успешно сохранена.")
-                logger.info(f"{self.var_name} = {value}")
+                logger.debug("Переменная контекста успешно сохранена.")
+                logger.info(f"✅ Новое значение: <b>{self.var_name}</b> = <i>{value}</i>")
             except Exception as e:
-                logger.critical(f"Ошибка при сохранении данных в контекст: {e}")
+                logger.critical(f"❌ Ошибка при сохранении данных в контекст: {e}")
                 sys.exit(1)
+            finally:
+                logger.info(f"<br>")
+            
         else:
-            logger.info("Запуск в автономном режиме, результат в контекст не сохраняется.")
+            logger.info("⚠️ Запуск в автономном режиме, результат в контекст не сохраняется.")
 
 
 class Validator:
@@ -122,7 +125,7 @@ class Validator:
     """
     def __init__(self, config: argparse.Namespace):
         self.pattern: Optional[str] = None
-        self.error_desc: str = "Неизвестная ошибка валидации."
+        self.error_desc: str = "❌ Неизвестная ошибка валидации."
         self._setup(config)
 
     def _setup(self, config: argparse.Namespace) -> None:
@@ -131,11 +134,11 @@ class Validator:
             self.pattern = config.dlg_input_custom_regexp
             self.error_desc = (
                 config.dlg_input_custom_regexp_desc
-                or "Значение не соответствует заданному формату."
+                or "⚠️ Значение не соответствует заданному формату."
             )
             if not self.pattern:
                 logger.warning(
-                    "Выбран тип валидации 'custom', но не задан шаблон. Валидация отключена."
+                    "⚠️ Выбран тип валидации 'custom', но не задан шаблон. Валидация отключена."
                 )
         elif config.dlg_input_valid_type in VALIDATION_PRESETS:
             preset = VALIDATION_PRESETS[config.dlg_input_valid_type]
@@ -156,7 +159,7 @@ class Validator:
                 return True, ""
             return False, self.error_desc
         except re.error as e:
-            err_msg = f"Ошибка в шаблоне регулярного выражения: {e}"
+            err_msg = f"❌ Ошибка в шаблоне регулярного выражения: {e}"
             logger.error(err_msg)
             return False, err_msg
 
@@ -256,6 +259,7 @@ def main():
     # 1. Конфигурация
     config = get_config()
     
+    print(f"<b>Инициализация переменной контекста <i>{config.dlg_input_var}</i></b><br>")
     # 2. Подготовка сервисов
     context_handler = ContextHandler(config.dlg_input_var)
     validator = Validator(config)
@@ -273,11 +277,11 @@ def main():
     
     # 5. Обработка результата
     if result is None:
-        logger.warning("Операция отменена пользователем. Выполнение прервано.")
+        logger.debug("Операция отменена пользователем. Выполнение прервано.")
         sys.exit(1)
         
     context_handler.save_result(result)
-    logger.info("Скрипт успешно завершен.")
+    logger.debug("Скрипт успешно завершен.")
     sys.exit(0)
 
 
