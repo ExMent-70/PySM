@@ -3,14 +3,14 @@
 """
 Интерактивный скрипт для пакетной обработки фотографий.
 
-1.  Извлекает номера из текста.
-2.  Загружает метаданные из JSON-файлов.
-3.  Находит соответствующие файлы в исходной папке.
-4.  Выполняет набор опциональных операций:
-    - Обновление XMP-тегов (запись локации).
-    - Переименование файлов при копировании.
-    - Копирование файлов в папку, структурированную по локациям.
-5.  Опционально синхронизирует файл 'matches_portrait_to_group.json'.
+Основные функции:
+1.  **Парсинг:** Извлекает номера фотографий из произвольного текста.
+2.  **Поиск:** Находит соответствующие файлы (RAW, JPG, XMP) в исходной папке.
+3.  **Обработка:**
+    -   Обновляет метаданные XMP (локация, ключевые слова).
+    -   Копирует файлы в целевую структуру с сохранением иерархии папок.
+    -   Опционально переименовывает файлы при копировании.
+4.  **Синхронизация:** Обновляет файл соответствия портретов и групповых фото.
 """
 
 # 1. БЛОК: Импорты и настройка окружения
@@ -25,7 +25,7 @@ import sys
 from argparse import Namespace
 from collections import defaultdict
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
     current_script_path = pathlib.Path(__file__).resolve()
@@ -76,9 +76,16 @@ RAW_EXTENSIONS = {".cr2", ".cr3", ".nef", ".arw", ".dng", ".raf", ".rw2"}
 CAPTURE_FOLDER = "Capture"
 SELECTS_FOLDER = "Selects"
 
+
 # 2. БЛОК: Получение конфигурации
 # ==============================================================================
 def get_config() -> Namespace:
+    """
+    Парсит аргументы командной строки и разрешает конфигурацию через PySM Context.
+
+    Returns:
+        Namespace: Объект с конфигурационными параметрами (пути, флаги).
+    """
     parser = argparse.ArgumentParser(description="Пакетная обработка файлов по номерам.")
     parser.add_argument("--portrait_json", type=str, required=True, help="Путь к info_portrait_faces.json.")
     parser.add_argument("--group_json", type=str, required=True, help="Путь к info_group_faces.json.")
@@ -88,7 +95,7 @@ def get_config() -> Namespace:
     parser.add_argument("--max_digits", type=int, default=4, help="Макс. длина номера.")
     parser.add_argument("--exclude_dirs", nargs="+", default=["CaptureOne"], help="Папки для исключения.")
     
-    # --- Новые флаги операций ---
+    # Флаги операций
     parser.add_argument("--update-xmp", action="store_true", help="Активировать обновление XMP-тегов.")
     parser.add_argument("--rename-files", action="store_true", help="Активировать переименование файлов при копировании.")
     parser.add_argument("--copy-files", action="store_true", help="Активировать копирование файлов в папку назначения.")
@@ -96,9 +103,19 @@ def get_config() -> Namespace:
     if IS_MANAGED_RUN and ConfigResolver: return ConfigResolver(parser).resolve_all()
     return parser.parse_args()
 
+
 # 3. БЛОК: Вспомогательные функции
 # ==============================================================================
 def _read_json_safely(json_path: pathlib.Path) -> Dict:
+    """
+    Безопасно читает JSON файл.
+
+    Args:
+        json_path (pathlib.Path): Путь к файлу.
+
+    Returns:
+        Dict: Данные JSON или пустой словарь в случае ошибки.
+    """
     if not json_path or not json_path.exists(): return {}
     try:
         with open(json_path, "r", encoding="utf-8") as f: return json.load(f)
@@ -106,6 +123,13 @@ def _read_json_safely(json_path: pathlib.Path) -> Dict:
         logger.error(f"Ошибка чтения {json_path.name}: {e}"); return {}
 
 def _write_json_safely(json_path: pathlib.Path, data: Dict):
+    """
+    Безопасно записывает словарь в JSON файл.
+
+    Args:
+        json_path (pathlib.Path): Путь для сохранения.
+        data (Dict): Данные для записи.
+    """
     try:
         json_path.parent.mkdir(parents=True, exist_ok=True)
         with open(json_path, "w", encoding="utf-8") as f:
@@ -114,24 +138,57 @@ def _write_json_safely(json_path: pathlib.Path, data: Dict):
     except Exception as e:
         logger.error(f"Ошибка записи {json_path.name}: {e}")
 
+
 # 4. БЛОК: Модель данных GUI
 # ==============================================================================
 class TreeItem:
-    """Простой элемент древовидной структуры для модели Qt."""
+    """
+    Узел древовидной структуры данных для модели Qt.
+    """
     def __init__(self, data: List, parent: "TreeItem" = None):
+        """
+        Args:
+            data (List): Данные столбцов для этого узла.
+            parent (TreeItem, optional): Родительский узел.
+        """
         self._data = data
         self._parent = parent
         self._children: List["TreeItem"] = []
-    def child(self, row: int) -> Optional["TreeItem"]: return self._children[row] if 0 <= row < len(self._children) else None
-    def childCount(self) -> int: return len(self._children)
-    def columnCount(self) -> int: return len(self._data)
-    def data(self, column: int) -> Any: return self._data[column] if 0 <= column < len(self._data) else None
-    def parent(self) -> Optional["TreeItem"]: return self._parent
-    def row(self) -> int: return self._parent._children.index(self) if self._parent else 0
-    def appendChild(self, item: "TreeItem"): self._children.append(item)
+
+    def child(self, row: int) -> Optional["TreeItem"]:
+        """Возвращает дочерний элемент по индексу строки."""
+        return self._children[row] if 0 <= row < len(self._children) else None
+
+    def childCount(self) -> int:
+        """Возвращает количество дочерних элементов."""
+        return len(self._children)
+
+    def columnCount(self) -> int:
+        """Возвращает количество столбцов данных."""
+        return len(self._data)
+
+    def data(self, column: int) -> Any:
+        """Возвращает данные конкретного столбца."""
+        return self._data[column] if 0 <= column < len(self._data) else None
+
+    def parent(self) -> Optional["TreeItem"]:
+        """Возвращает родительский узел."""
+        return self._parent
+
+    def row(self) -> int:
+        """Возвращает индекс строки этого узла в родителе."""
+        return self._parent._children.index(self) if self._parent else 0
+
+    def appendChild(self, item: "TreeItem"):
+        """Добавляет дочерний узел."""
+        self._children.append(item)
+
 
 class ResultTreeModel(QAbstractItemModel):
-    """Модель Qt для отображения результатов поиска и анализа файлов."""
+    """
+    Модель данных Qt (AbstractItemModel) для отображения иерархического списка найденных файлов.
+    Колонки: №, Номер, Имя, Локация, Статус, Новое имя, Файлы.
+    """
     def __init__(self, data=None, icons=None, colors=None, parent=None):
         super().__init__(parent)
         self.headers = ["№", "Номер", "Имя", "Локация", "Статус", "Новое имя (основа)", "Файлы"]
@@ -141,18 +198,22 @@ class ResultTreeModel(QAbstractItemModel):
         self.setup_model_data(data or [])
 
     def setup_model_data(self, model_data: List[Dict]):
+        """
+        Инициализирует структуру дерева на основе списка словарей с данными.
+        
+        Args:
+            model_data (List[Dict]): Список результатов поиска.
+        """
         self.beginResetModel()
         self._root_item = TreeItem(self.headers)
         sorted_data = sorted(model_data, key=lambda x: int(x.get("number", 0)))
         
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        # Возвращаем enumerate для получения порядкового номера
         for idx, item_data in enumerate(sorted_data, 1):
             files = item_data.get("files", [])
             base_path = item_data.get("base_path")
             files_count_str = f"({len(files)} файлов)" if files else ""
             row_data = [
-                str(idx), # Порядковый номер
+                str(idx), 
                 item_data.get("number", ""),
                 item_data.get("child_name", ""),
                 item_data.get("location_name", ""),
@@ -164,37 +225,34 @@ class ResultTreeModel(QAbstractItemModel):
 
             if files and base_path:
                 for fpath in files:
-                    # Добавляем пустые строки для всех колонок, кроме последней
-                    child_row_data = ["", "", "", "", "", "", str(fpath.relative_to(base_path))]
+                    # Вычисляем относительный путь для отображения
+                    try:
+                        rel_path = fpath.relative_to(base_path)
+                    except ValueError:
+                        rel_path = fpath.name
+                    child_row_data = ["", "", "", "", "", "", str(rel_path)]
                     parent_item.appendChild(TreeItem(child_row_data, parent_item))
-            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
-
 
             self._root_item.appendChild(parent_item)
         self.endResetModel()
 
-    def data(self, index, role):
-        """Возвращает данные для отображения элемента."""
-        if not index.isValid():
-            return None
+    def data(self, index: QModelIndex, role: int) -> Any:
+        """Возвращает данные для ячейки таблицы в зависимости от роли (текст, цвет, иконка)."""
+        if not index.isValid(): return None
         item = index.internalPointer()
         col = index.column()
 
         if role == Qt.DisplayRole:
             return item.data(col)
 
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        # Сдвигаем индекс колонки для иконок
         if role == Qt.DecorationRole and col == 6:
             if item.parent() == self._root_item and item.childCount() > 0:
                 return self.icons.get("folder")
             elif item.parent() != self._root_item:
                 return self.icons.get("file")
 
-        # Сдвигаем индекс колонки для статуса
-        if col == 4:
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
-            status = item.data(4) # Используем новый индекс
+        if col == 4: # Колонка статуса
+            status = item.data(4)
             is_found = status == "Найден"
             is_not_found = status == "Не найден"
             if role == Qt.BackgroundRole:
@@ -206,44 +264,40 @@ class ResultTreeModel(QAbstractItemModel):
 
         return None
 
-    def index(self, row, col, parent=QModelIndex()):
+    def index(self, row: int, col: int, parent: QModelIndex = QModelIndex()) -> QModelIndex:
         if not self.hasIndex(row, col, parent): return QModelIndex()
         parent_item = parent.internalPointer() if parent.isValid() else self._root_item
         child_item = parent_item.child(row)
         return self.createIndex(row, col, child_item) if child_item else QModelIndex()
 
-    def parent(self, index):
+    def parent(self, index: QModelIndex) -> QModelIndex:
         if not index.isValid(): return QModelIndex()
         child_item = index.internalPointer()
         parent_item = child_item.parent()
         if parent_item == self._root_item: return QModelIndex()
         return self.createIndex(parent_item.row(), 0, parent_item)
 
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.column() > 0: return 0
         parent_item = parent.internalPointer() if parent.isValid() else self._root_item
         return parent_item.childCount()
 
-    def columnCount(self, parent=QModelIndex()):
-        """Возвращает количество колонок."""
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self.headers)
 
-    def headerData(self, section, orientation, role):
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int) -> Any:
         if orientation == Qt.Horizontal and role == Qt.DisplayRole: return self._root_item.data(section)
         return None
 
     def sort(self, column: int, order: Qt.SortOrder):
-        """Сортирует данные по указанной колонке."""
+        """Сортирует таблицу по выбранной колонке."""
         self.layoutAboutToBeChanged.emit()
         reverse_order = order == Qt.DescendingOrder
 
         def sort_key(item):
             data = item.data(column)
             if data is None: return ""
-            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-            # Сортировка по "№" и "Номер" должна быть числовой
-            if column in [0, 1]: 
-            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+            if column in [0, 1]: # Числовая сортировка для № и Номера
                 try: return int(data)
                 except (ValueError, TypeError): return 0
             return str(data)
@@ -251,10 +305,14 @@ class ResultTreeModel(QAbstractItemModel):
         self._root_item._children.sort(key=sort_key, reverse=reverse_order)
         self.layoutChanged.emit()
 
+
 # 5. БЛОК: Воркер
 # ==============================================================================
 class Worker(QThread):
-    """Выполняет длительные операции в фоновом потоке."""
+    """
+    Фоновый рабочий поток для выполнения длительных операций (парсинг, поиск, копирование),
+    чтобы не блокировать графический интерфейс.
+    """
     parse_finished = Signal(list, str)
     search_finished = Signal(list)
     processing_finished = Signal(str)
@@ -263,8 +321,8 @@ class Worker(QThread):
     def __init__(self):
         super().__init__()
         self.task = ""
-        self.source_dir = None
-        self.dest_dir = None
+        self.source_dir: Optional[pathlib.Path] = None
+        self.dest_dir: Optional[pathlib.Path] = None
         self.metadata = {}
         self.numbers_to_find = []
         self.search_results = []
@@ -279,6 +337,7 @@ class Worker(QThread):
         self.do_copy_files = False
 
     def run(self):
+        """Точка входа потока. Распределяет задачи."""
         try:
             if self.task == "parse": self._task_parse()
             elif self.task == "search": self._task_search()
@@ -287,6 +346,7 @@ class Worker(QThread):
             self.error_occurred.emit(str(e))
 
     def _init_palette(self):
+        """Инициализирует палитру цветов для ipymarkup."""
         if Palette and self.markup_color:
             try:
                 self.palette = Palette([self.markup_color])
@@ -294,6 +354,7 @@ class Worker(QThread):
                 logger.error(f"Ошибка при создании палитры ipymarkup: {e}")
 
     def _task_parse(self):
+        """Задача: Извлечение номеров из текста и генерация HTML с подсветкой."""
         self._init_palette()
         logger.info("Парсинг текста...")
         min_d, max_d = self.min_digits, self.max_digits
@@ -308,6 +369,7 @@ class Worker(QThread):
         self.parse_finished.emit(numbers, html)
 
     def _task_search(self):
+        """Задача: Поиск файлов в исходной папке по номерам."""
         logger.info(f"Поиск файлов в {self.source_dir}...")
         logger.info(f"Исключая папки: {self.exclude_dirs}")
         all_files_in_dir = []
@@ -353,7 +415,10 @@ class Worker(QThread):
         self.search_finished.emit(results)
 
     def _task_process_files(self):
-        """Выполняет выбранные операции: обновление XMP, переименование, копирование."""
+        """
+        Задача: Выполняет основные операции (XMP, Копирование).
+        Критически важно: при копировании сохраняет структуру папок относительно source_dir.
+        """
         tasks = []
         if self.do_update_xmp: tasks.append("Обновление XMP")
         if self.do_copy_files: tasks.append("Копирование")
@@ -400,28 +465,38 @@ class Worker(QThread):
                             except Exception as e:
                                 tqdm.write(f"[ОШИБКА XMP] {file_path.name}: {e}")
 
-                # --- Шаг 2: Копирование с опциональным переименованием (если включено) ---
+                # --- Шаг 2: Копирование с сохранением структуры (если включено) ---
                 if self.do_copy_files:
                     if not self.dest_dir:
                         tqdm.write("[КРИТИЧЕСКАЯ ОШИБКА] Копирование включено, но не указана папка назначения (dest_dir).")
-                        break # Прерываем весь процесс
+                        break 
 
                     location = item.get("location_name", "unknown")
                     child_name = item.get("child_name")
                     number = item.get("number")
-                    target_subdir = self.dest_dir / str(location)
-                    target_subdir.mkdir(parents=True, exist_ok=True)
                     
+                    target_location_root = self.dest_dir / str(location)
+
                     new_stem = None
                     if self.do_rename_files and child_name:
                         new_stem = f"{child_name}-{number}"
 
                     for src_file in files:
+                        try:
+                            # КЛЮЧЕВОЙ МОМЕНТ: Вычисляем путь относительно корня поиска
+                            relative_path = src_file.relative_to(self.source_dir)
+                        except ValueError:
+                            relative_path = pathlib.Path(src_file.name)
+                        
+                        # Воссоздаем структуру папок
+                        dest_folder = target_location_root / relative_path.parent
+                        dest_folder.mkdir(parents=True, exist_ok=True)
+                        
                         dest_name = f"{new_stem}{src_file.suffix}" if new_stem else src_file.name
-                        dest_file = target_subdir / dest_name
+                        dest_file = dest_folder / dest_name
                         
                         if dest_file.exists():
-                            tqdm.write(f"[ПРОПУСК] Файл {dest_file.name} уже существует в '{location}'")
+                            tqdm.write(f"[ПРОПУСК] Файл {dest_file.name} уже существует.")
                             continue
                         try:
                             shutil.copy2(src_file, dest_file)
@@ -430,11 +505,20 @@ class Worker(QThread):
         
         self.processing_finished.emit(f"Обработка завершена. Обработано групп: {len(items_to_process)}.")
 
+
 # 6. БЛОК: Главное окно
 # ==============================================================================
 class SorterWindow(QMainWindow):
-    """Главное окно приложения."""
+    """
+    Главное окно приложения на PySide6.
+    """
     def __init__(self, config: Namespace):
+        """
+        Инициализирует окно, загружает данные и настраивает UI.
+        
+        Args:
+            config (Namespace): Конфигурация запуска.
+        """
         super().__init__()
         self.config = config
         self.final_status = 1
@@ -460,6 +544,7 @@ class SorterWindow(QMainWindow):
         self._init_worker()
 
     def _load_theme_colors(self):
+        """Загружает цвета из темы PySM или использует дефолтные."""
         if IS_MANAGED_RUN and theme_api:
             self.ipymarkup_color = theme_api.get_ipymarkup_color("markup_number", defaults={"background-color": "#e3f2fd", "border-color": "#bbdefb", "color": "#000000"})
             self.colors = {
@@ -473,6 +558,7 @@ class SorterWindow(QMainWindow):
             self.colors = {"found_bg": QColor("#d4edda"), "found_fg": QColor("#155724"), "not_found_bg": QColor("#f8d7da"), "not_found_fg": QColor("#721c24")}
 
     def _init_ui(self):
+        """Настраивает графический интерфейс (кнопки, таблицы, вкладки)."""
         title = "Сортировка по локациям"
         source_dir = pathlib.Path(self.config.source_dir)
         if source_dir: title += f" - [{source_dir.name}]"
@@ -517,11 +603,16 @@ class SorterWindow(QMainWindow):
         self.chk_sync_matches = QCheckBox("Синхронизировать matches.json")
         self.chk_sync_matches.setChecked(False)
 
+        # Новая кнопка "Закрыть"
+        self.btn_close = QPushButton("Закрыть")
+        self.btn_close.clicked.connect(self.close)
+
         bottom_layout.addWidget(self.btn_parse)
         bottom_layout.addWidget(self.btn_search)
         bottom_layout.addStretch()
         bottom_layout.addWidget(self.chk_sync_matches)
         bottom_layout.addWidget(self.btn_copy)
+        bottom_layout.addWidget(self.btn_close)
         layout.addLayout(bottom_layout)
 
         self.btn_search.setEnabled(False); self.btn_copy.setEnabled(False)
@@ -534,6 +625,7 @@ class SorterWindow(QMainWindow):
         self.icons = {"folder": self.style().standardIcon(QStyle.SP_DirIcon), "file": self.style().standardIcon(QStyle.SP_FileIcon)}
 
     def _init_worker(self):
+        """Инициализирует фоновый поток (Worker)."""
         self.worker = Worker()
         self.worker.markup_color = self.ipymarkup_color
         self.worker.parse_finished.connect(self.on_parse_finished)
@@ -542,6 +634,7 @@ class SorterWindow(QMainWindow):
         self.worker.error_occurred.connect(lambda msg: self.statusBar().showMessage(f"Ошибка: {msg}"))
 
     def start_parse(self):
+        """Запускает процесс парсинга текста."""
         text = self.text_input.toPlainText()
         if not text.strip(): return
         self.numbers_line_edit.clear()
@@ -553,6 +646,7 @@ class SorterWindow(QMainWindow):
         self.worker.start()
 
     def on_parse_finished(self, numbers, html):
+        """Обработчик завершения парсинга."""
         self.statusBar().showMessage(f"Найдено номеров: {len(numbers)}")
         self.markup_browser.setHtml(html)
         self.numbers_line_edit.setText(" ".join(numbers))
@@ -562,6 +656,7 @@ class SorterWindow(QMainWindow):
             self.left_tabs.setCurrentIndex(1)
 
     def start_search(self):
+        """Запускает поиск файлов по извлеченным номерам."""
         if not self.isEnabled(): return
         numbers = self.numbers_line_edit.text().split()
         if not numbers: return
@@ -574,9 +669,11 @@ class SorterWindow(QMainWindow):
         self.worker.start()
 
     def on_search_finished(self, results):
+        """Обработчик завершения поиска."""
         self.statusBar().showMessage(f"Анализ завершен. Найдено групп: {len(results)}")
         model = ResultTreeModel(results, self.icons, getattr(self, "colors", {}))
         self.tree_view.setModel(model)
+        self.tree_view.collapseAll() # Сворачиваем строки по умолчанию
         for i in range(model.columnCount()):
             self.tree_view.resizeColumnToContents(i)
         self.tree_view.header().setSectionResizeMode(5, QHeaderView.Stretch)
@@ -584,12 +681,13 @@ class SorterWindow(QMainWindow):
         self.btn_copy.setEnabled(found_items_count > 0)
         self.btn_copy.setText(f"3. Копировать ({found_items_count} групп)")
 
-    def start_processing(self): # Переименованный метод
-        """Запускает основные операции в фоновом потоке."""
+    def start_processing(self): 
+        """
+        Запускает основные операции в фоновом потоке: XMP, Копирование, Переименование.
+        """
         if not self.worker.search_results:
             QMessageBox.warning(self, "Внимание", "Нет файлов для обработки."); return
 
-        # Определяем, какие задачи будут выполнены
         tasks = []
         do_update_xmp = getattr(self.config, "update_xmp", False)
         do_rename_files = getattr(self.config, "rename_files", False)
@@ -625,13 +723,27 @@ class SorterWindow(QMainWindow):
             
         self.worker.start()
 
-    def on_processing_finished(self, message): # Переименованный слот
-        """Обрабатывает завершение всех операций."""
+    def on_processing_finished(self, message: str):
+        """
+        Обрабатывает завершение всех операций. Очищает интерфейс для новой работы.
+        
+        Args:
+            message (str): Сообщение о результате.
+        """
         self.statusBar().showMessage(message)
         self.final_status = 0
         
         if self.chk_sync_matches.isChecked():
             self.sync_matches_file()
+
+        # --- ОЧИСТКА ИНТЕРФЕЙСА ---
+        self.markup_browser.clear()
+        self.numbers_line_edit.clear()
+        self.tree_view.setModel(ResultTreeModel([]))
+        self.btn_search.setEnabled(False)
+        self.btn_copy.setEnabled(False)
+        self.left_tabs.setCurrentIndex(0) # Переключение на вкладку "Ввод"
+        # ---------------------------
 
         QMessageBox.information(self, "Успех", "Все операции успешно завершены.")
         
@@ -644,37 +756,32 @@ class SorterWindow(QMainWindow):
                 )
 
     def sync_matches_file(self):
-        """
-        Координирует процесс синхронизации файла matches_portrait_to_group.json.
-        """
+        """Координирует процесс синхронизации файла matches_portrait_to_group.json."""
         logger.info("Синхронизация matches_portrait_to_group.json...")
         if not self.matches_data:
             logger.warning("Файл matches.json пуст или не загружен. Синхронизация пропущена.")
             return
 
-        # Шаг 1: Подготовка данных
         selected_numbers, found_numbers_map, regex = self._prepare_sync_data()
 
-        # Шаг 2: Итерация и синхронизация для каждого человека
         for cluster_id, data in self.matches_data.items():
             child_name = data.get("child_name")
-            if not child_name:
-                continue
+            if not child_name: continue
 
             current_photos = data.get("group_photos", [])
-            
             new_group_photos = self._sync_person_photos(
                 child_name, current_photos, selected_numbers, found_numbers_map, regex
             )
-            
             self.matches_data[cluster_id]["group_photos"] = new_group_photos
 
-        # Шаг 3: Сохранение
         _write_json_safely(self.matches_json_path, self.matches_data)
 
-    def _prepare_sync_data(self) -> tuple:
+    def _prepare_sync_data(self) -> Tuple[Set[str], Dict[str, str], re.Pattern]:
         """
         Подготавливает данные для синхронизации и создает динамический RegExp.
+        
+        Returns:
+            Tuple[Set[str], Dict[str, str], re.Pattern]: Выбранные номера, карта найденных, скомпилированный regex.
         """
         selected_numbers = set(self.numbers_line_edit.text().split())
         found_numbers_map = {
@@ -682,47 +789,41 @@ class SorterWindow(QMainWindow):
             for item in self.worker.search_results
             if item['status'] == 'Найден' and item['child_name']
         }
-        
         min_d, max_d = self.config.min_digits, self.config.max_digits
-        if min_d > max_d:
-            min_d, max_d = max_d, min_d
-            
+        if min_d > max_d: min_d, max_d = max_d, min_d
         regex_pattern = r"(\d{%d,%d})" % (min_d, max_d)
-        
         return selected_numbers, found_numbers_map, re.compile(regex_pattern)
 
-    def _sync_person_photos(
-        self,
-        child_name: str,
-        current_photos: List[Dict],
-        selected_numbers: Set[str],
-        found_numbers_map: Dict[str, str],
-        regex: re.Pattern,
-    ) -> List[Dict]:
+    def _sync_person_photos(self, child_name: str, current_photos: List[Dict], selected_numbers: Set[str], found_numbers_map: Dict[str, str], regex: re.Pattern) -> List[Dict]:
         """
         Выполняет очистку и дополнение списка фотографий для одного человека.
+        
+        Args:
+            child_name (str): Имя человека.
+            current_photos (List[Dict]): Текущий список фото из JSON.
+            selected_numbers (Set[str]): Набор номеров, выбранных пользователем.
+            found_numbers_map (Dict[str, str]): Маппинг "Номер -> Имя" из текущего поиска.
+            regex (re.Pattern): Регулярное выражение для извлечения номера из имени файла.
+
+        Returns:
+            List[Dict]: Обновленный список фотографий.
         """
         new_group_photos = []
         existing_photo_numbers = set()
 
-        # 1. Очистка: оставляем только те фото, чьи номера есть в выборе
+        # 1. Очистка: оставляем только те, что есть в selected_numbers
         for photo_info in current_photos:
             match = regex.search(photo_info.get("filename", ""))
             if match and match.group(1) in selected_numbers:
                 new_group_photos.append(photo_info)
                 existing_photo_numbers.add(match.group(1))
 
-        # 2. Дополнение: добавляем новые выбранные фото для этого человека
+        # 2. Дополнение: добавляем найденные в текущем сеансе
         for number, name in found_numbers_map.items():
             if name == child_name and number not in existing_photo_numbers:
-                new_photo_info = {
-                    "filename": f"IMG_{number}.jpg",
-                    "min_distance": 0.0,
-                    "num_faces": 1,
-                }
+                new_photo_info = {"filename": f"IMG_{number}.jpg", "min_distance": 0.0, "num_faces": 1}
                 new_group_photos.append(new_photo_info)
 
-        # Сортируем для консистентности
         new_group_photos.sort(key=lambda p: p.get("filename", ""))
         return new_group_photos
 
