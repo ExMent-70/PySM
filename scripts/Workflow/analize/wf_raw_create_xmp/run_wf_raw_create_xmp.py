@@ -61,8 +61,6 @@ if not logger.handlers:
 
 # Константы
 PYSM_PREFIX = "PySM_"
-ANALYSIS_SUBFOLDER_TEMPLATE = "Output/Analysis_{photo_session}"
-IMAGE_SUBFOLDER_TEMPLATE = "Capture/{photo_session}"
 PORTRAIT_JSON_FILENAME = "info_portrait_faces.json"
 GROUP_JSON_FILENAME = "info_group_faces.json"
 TEMPLATE_FILENAME = "template.xmp"
@@ -81,6 +79,7 @@ class JsonKeys(str, Enum):
     FACES = "faces"
     LOCATION_NAME = "location_name"
     ORIGINAL_BBOX = "original_bbox"
+    ORIGINAL_SHAPE = "original_shape"
     BBOX = "bbox"
     POSE = "pose"
     CHILD_NAME = "child_name"
@@ -91,10 +90,8 @@ class JsonKeys(str, Enum):
     GENDER = "gender_faceonnx"
     EYE_LEFT = "eye_left_state"
     EYE_RIGHT = "eye_right_state"
-    # --- НОВЫЕ КЛЮЧИ ---
     KEYPOINT_ANALYSIS = "keypoint_analysis"
     MOUTH_STATE = "mouth_state"
-    # -------------------
     LANDMARK_2D_106 = "landmark_2d_106"
     LANDMARK_3D_68 = "landmark_3d_68"
     EMBEDDING = "embedding"
@@ -132,16 +129,29 @@ class SubjectCode:
 # ==============================================================================
 def get_config() -> Namespace:
     parser = argparse.ArgumentParser(description="Creates or updates XMP metadata files based on JSON data.")
+    
     parser.add_argument("--all_threads", type=int, default=os.cpu_count() or 4, help="Number of processing threads.")
     
-    # --- ИЗМЕНЕНО: Используем стандартный флаг ---
-    # Если флаг передан, значение будет True. Если нет — False.
+    # --- ИЗМЕНЕНО: Новые аргументы путей ---
+    parser.add_argument(
+        "--analysis_dir", 
+        type=str, 
+        required=True, 
+        help="Path to the directory containing analysis JSON files."
+    )
+    parser.add_argument(
+        "--image_dir", 
+        type=str, 
+        required=True, 
+        help="Path to the directory containing images and where XMPs will be saved."
+    )
+    # ---------------------------------------
+
     parser.add_argument(
         "--landmark_enable", 
         action="store_true",
         help="Enable writing 2D landmarks to XMP."
     )
-    # ---------------------------------------------
 
     if IS_MANAGED_RUN and ConfigResolver:
         return ConfigResolver(parser).resolve_all()
@@ -169,7 +179,7 @@ class MetadataProcessor:
     def __init__(self, image_folder: pathlib.Path, template_content: Optional[str], landmark_enable: bool):
         self.image_folder = image_folder
         self.template_content = template_content
-        self.landmark_enable = landmark_enable # Сохраняем настройку
+        self.landmark_enable = landmark_enable 
 
     def process_file(
         self,
@@ -199,14 +209,23 @@ class MetadataProcessor:
         
         face_keywords, subject_codes, persons = self._extract_face_info(faces, photo_type, is_portrait)
 
+        # Добавление глобальных данных изображения в SubjectCode
+        if original_shape := merged_file_data.get(JsonKeys.ORIGINAL_SHAPE.value):
+            formatted_shape = self._format_coordinates(JsonKeys.ORIGINAL_SHAPE.value, original_shape)
+            if formatted_shape:
+                shape_code = SubjectCode(
+                    key=JsonKeys.ORIGINAL_SHAPE.value, 
+                    value=formatted_shape, 
+                    prefix="F0" 
+                )
+                subject_codes.insert(0, str(shape_code))
+
         # 3. Обновление списков (Bag)
         base_keywords = self._get_base_keywords(merged_file_data, photo_type)
         all_keywords = base_keywords.union(face_keywords)
 
         editor.update_bag("dc", "subject", list(all_keywords), sort=True)
         editor.update_bag("lightroom", "hierarchicalSubject", list(all_keywords), sort=True)
-        
-        # SubjectCode сохраняем без сортировки, чтобы landmark был в конце
         editor.update_bag("Iptc4xmpCore", "SubjectCode", subject_codes, sort=False)
         
         if is_portrait and persons:
@@ -223,18 +242,14 @@ class MetadataProcessor:
         """
         if not landmarks_data:
             return file_data
-            
         merged = file_data.copy()
         merged_faces = []
-        
         land_faces = landmarks_data.get("faces", [])
-        
         for i, face in enumerate(file_data.get("faces", [])):
             face_merged = face.copy()
             if i < len(land_faces):
                 face_merged.update(land_faces[i])
             merged_faces.append(face_merged)
-            
         merged["faces"] = merged_faces
         return merged
 
@@ -327,11 +342,9 @@ class MetadataProcessor:
                 elif eye_left == SpecialValues.EYE_STATE_OPEN.value and eye_right == SpecialValues.EYE_STATE_OPEN.value:
                     keywords.add(PYSM_PREFIX+"EYE_"+SpecialValues.EYES_OPEN.value)
                 
-                # --- ИЗМЕНЕНИЕ: Обработка mouth_state ---
                 flattened_mouth_key = f"{JsonKeys.KEYPOINT_ANALYSIS.value}_{JsonKeys.MOUTH_STATE.value}"
                 if mouth_state := face_attributes.get(flattened_mouth_key):
                     keywords.add(PYSM_PREFIX + "MOUTH_" + str(mouth_state).strip())
-                # ----------------------------------------
 
             # Генерация SubjectCode строк
             prefix = f"F{face_idx}"
@@ -344,13 +357,11 @@ class MetadataProcessor:
                 
                 code = SubjectCode(key=key, value=clean_val, prefix=prefix)
                 
-                # --- ИЗМЕНЕНИЕ: Фильтрация ландмарок по флагу ---
                 if key == JsonKeys.LANDMARK_2D_106.value:
                     if self.landmark_enable:
                         landmark_entry = str(code)
                 else:
                     codes_for_face.append(str(code))
-                # ------------------------------------------------
             
             codes_for_face.sort()
             if landmark_entry:
@@ -379,6 +390,9 @@ class MetadataProcessor:
         try:
             if not isinstance(data, list): return str(data)
             p = 3
+            if key == JsonKeys.ORIGINAL_SHAPE.value:
+                return ",".join(str(x) for x in data)
+            
             if key in (JsonKeys.BBOX.value, JsonKeys.ORIGINAL_BBOX.value):
                 return ",".join(f"{float(c):.{p}f}" for c in data) if len(data) == 4 else None
             if key in ("kps", JsonKeys.LANDMARK_2D_106.value):
@@ -405,7 +419,6 @@ def run_xmp_creation(
     logger.debug(f"ℹ️ Запуск создания XMP. Папка: {image_folder_path}")
     logger.info(f"ℹ️ Сохранение Landmark 2D: {'✅' if landmark_enable else '❌'}")
     
-    # Передача флага в процессор
     processor = MetadataProcessor(image_folder_path, template_content, landmark_enable)
 
     all_filenames = json_manager.get_all_filenames("all")
@@ -463,18 +476,26 @@ def main():
 
     config = get_config()
     template_content = load_template_content(current_script_path)
-
-    session_path_str = pysm_context.get("wf_session_path")
+    
+    # Контекст для метаданных
     session_name = pysm_context.get("wf_session_name")
-    photo_session = pysm_context.get("wf_photo_session")
+    
+    # --- ИЗМЕНЕНО: Пути берутся из конфигурации ---
+    analysis_path = pathlib.Path(config.analysis_dir)
+    image_folder = pathlib.Path(config.image_dir)
 
-    if not all([session_path_str, session_name, photo_session]):
-        logger.critical("❌ Отсутствуют переменные контекста wf_*.")
+    if not analysis_path.exists():
+        logger.error(f"❌ Папка анализа не найдена: {analysis_path}")
         sys.exit(1)
-
-    base_path = pathlib.Path(session_path_str) / session_name
-    analysis_path = base_path / ANALYSIS_SUBFOLDER_TEMPLATE.format(photo_session=photo_session)
-    image_folder = base_path / IMAGE_SUBFOLDER_TEMPLATE.format(photo_session=photo_session)
+    
+    if not image_folder.exists():
+        try:
+            image_folder.mkdir(parents=True, exist_ok=True)
+            logger.info(f"ℹ️ Папка назначения не найдена. Создана новая: {image_folder}")
+        except Exception as e:
+            logger.critical(f"❌ Не удалось создать папку назначения {image_folder}: {e}")
+            sys.exit(1)
+    # ----------------------------------------------
 
     portrait_json = analysis_path / PORTRAIT_JSON_FILENAME
     group_json = analysis_path / GROUP_JSON_FILENAME
@@ -504,7 +525,7 @@ def main():
         session_name=session_name,
         max_workers=config.all_threads,
         template_content=template_content,
-        landmark_enable=config.landmark_enable # Передаем флаг дальше
+        landmark_enable=config.landmark_enable 
     )
 
     if image_folder.exists():
