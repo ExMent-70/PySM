@@ -212,11 +212,17 @@ class ClusterDataManager:
         return name
 
 
-    def move_images_to_cluster(self, mode_config: Dict, target_id: str, target_name: str, filenames: List[str]):
+    # --- НАЧАЛО ИЗМЕНЕНИЯ: Сигнатура и тело метода ---
+    def move_images_to_cluster(self, mode_config: Dict, target_id: str, target_name: str, filenames: List[str], face_selection_map: Dict[str, int] = None):
+        """
+        Перемещает изображения в целевой кластер.
+        
+        Args:
+            face_selection_map: Словарь {filename: face_index}, указывающий, 
+                                какое именно лицо оставить на фото.
+        """
         is_face_mode = mode_config["mode_name"] == 'face'
         new_id_val = int(target_id) if target_id.isdigit() else None
-        
-        # "Чистим" имя от UI-префикса перед сохранением в модель
         clean_target_name = self._strip_name_prefix(target_name)
         
         for filename in filenames:
@@ -224,21 +230,46 @@ class ClusterDataManager:
             if not record: continue
             
             if is_face_mode:
+                # Определяем индекс лица для работы. По умолчанию 0.
+                target_face_index = 0
+                if face_selection_map and filename in face_selection_map:
+                    target_face_index = face_selection_map[filename]
+
                 if target_id == "group":
+                    # Перенос В Группу (обратный процесс)
                     if record.image_type == 'portrait':
                         record.image_type = 'group'
-                        if record.faces: record.faces[0].cluster_label = None
+                        # При возврате в группу мы просто сбрасываем метку у ВСЕХ лиц, 
+                        # так как не знаем, какое из них было "портретным".
+                        # Либо сбрасываем только у первого. 
+                        # В текущей логике сбросим у всех, чтобы было чисто.
+                        for face in record.faces:
+                            face.cluster_label = None
+                            face.child_name = None
                 else:
+                    # Перенос В Портретный кластер
                     if record.image_type == 'group':
                         record.image_type = 'portrait'
+                    
                     if record.faces:
-                        record.faces[0].cluster_label = new_id_val
-                        record.faces[0].child_name = clean_target_name
+                        # ВАЖНО: Если указан конкретный индекс, мы ОСТАВЛЯЕМ только это лицо
+                        # и удаляем остальные, так как это теперь портрет одного человека.
+                        if 0 <= target_face_index < len(record.faces):
+                            selected_face = record.faces[target_face_index]
+                            
+                            # Присваиваем атрибуты выбранному лицу
+                            selected_face.cluster_label = new_id_val
+                            selected_face.child_name = clean_target_name
+                            
+                            # Перезаписываем список лиц, оставляя только одно
+                            record.faces = [selected_face]
             else:
+                # Логика для локаций (без изменений)
                 record.location_cluster = new_id_val
                 record.location_name = target_name
         
         self._build_indices()
+    # --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
 
 

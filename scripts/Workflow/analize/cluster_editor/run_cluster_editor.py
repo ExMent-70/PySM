@@ -41,7 +41,7 @@ try:
     from _lib.editor_workers import FileReaderWorker, GalleryLoadWorker, ExportWorker
     from _lib.editor_delegates import ClusterItemDelegate, ImageItemDelegate
     from _lib.editor_widgets import ImageDragListWidget, ClusterDropListWidget
-    from _lib.editor_dialogs import EnhanceSettingsDialog, RenameDialog
+    from _lib.editor_dialogs import EnhanceSettingsDialog, RenameDialog, FaceSelectorDialog
     from _lib.data_manager import ClusterDataManager
     # --- ИСПРАВЛЕНИЕ: Добавлен недостающий импорт класса Face ---
     from _lib.data_models import Face
@@ -748,37 +748,72 @@ class MainWindow(QWidget):
 
     @Slot(str, str, list)
     def _handle_drop(self, source_id: str, target_id: str, filenames: List[str]):
-        """Обрабатывает завершение операции Drag & Drop."""
+        """Обрабатывает завершение операции Drag & Drop с возможным выбором лица."""
         target_cluster_data = self._get_cluster_item_data_by_id(target_id)
         if not target_cluster_data:
             return
 
+        face_selection_map = {}
+        files_to_process = []
+
+        # Логика выбора лица нужна только в режиме 'face' и при переносе в конкретный кластер (не в группу/мусор)
+        if self.mode == 'face' and target_id not in ["group", "-1"]:
+            for fname in filenames:
+                record = self.data_manager.records.get(fname)
+                if not record or not record.faces:
+                    continue
+                
+                # Если лиц больше одного, спрашиваем пользователя
+                if len(record.faces) > 1:
+                    # Определяем текущий путь к картинке для отображения в диалоге.
+                    # Если перетаскиваем из "group", то фото физически там. 
+                    # Если из другого кластера, то скорее всего 'portrait'.
+                    current_image_type = 'group' if source_id == 'group' else 'portrait'
+                    full_image_path = self._get_image_path(fname, current_image_type)
+                    
+                    dialog = FaceSelectorDialog(full_image_path, record.faces, self)
+                    if dialog.exec() == QDialog.Accepted:
+                        selected_idx = dialog.get_selected_index()
+                        face_selection_map[fname] = selected_idx
+                        files_to_process.append(fname)
+                    else:
+                        logger.info(f"Перемещение файла {fname} отменено пользователем.")
+                else:
+                    # Если лицо одно, берем его автоматически (индекс 0)
+                    face_selection_map[fname] = 0
+                    files_to_process.append(fname)
+        else:
+            # В режиме 'location' или при переносе обратно в 'group'/'trash'
+            # диалог выбора лица не нужен, обрабатываем все файлы
+            files_to_process = filenames
+
+        if not files_to_process:
+            return
+
         # 1. Обновляем модель данных
         self.data_manager.move_images_to_cluster(
-            self.mode_config, target_id, target_cluster_data["name"], filenames
+            self.mode_config, 
+            target_id, 
+            target_cluster_data["name"], 
+            files_to_process,
+            face_selection_map
         )
-
-        # --- ИЗМЕНЕНИЕ: Явная и надежная логика обновления UI ---
 
         # 2. Запоминаем, какой кластер был активен (это кластер-источник)
         active_id_before_refresh = self.active_cluster_id
 
-        # 3. Полностью перерисовываем левую панель (обновятся счетчики).
-        #    Эта функция также попытается восстановить выделение на active_id_before_refresh.
+        # 3. Полностью перерисовываем левую панель (обновятся счетчики)
         self._refresh_left_panel()
 
-        # 4. Принудительно и безусловно перерисовываем правую панель для активного кластера.
-        #    Это исправляет баг, когда галерея не обновлялась, т.к. ID активного кластера не менялся.
+        # 4. Принудительно перерисовываем правую панель
+        # Это необходимо, так как состав активного кластера изменился (из него убрали фото)
         if active_id_before_refresh:
-            # Находим обновленный QListWidgetItem для нашего кластера
             current_item = self._get_item_by_cluster_id(active_id_before_refresh)
             if current_item:
-                # Убеждаемся, что он все еще выбран
                 self.cluster_list_widget.setCurrentItem(current_item)
-                # И ГЛАВНОЕ: вызываем _render_gallery напрямую, минуя ошибочную проверку в слоте.
                 self._render_gallery(active_id_before_refresh)
             else:
-                # Если исходный кластер исчез (например, стал пустым и был удален), очищаем правую панель.
+                # Если исходный кластер исчез (например, стал пустым и был удален)
                 self.image_list_widget.clear()
                 self.right_panel_label.setText("Кластер")
 

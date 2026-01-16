@@ -8,10 +8,11 @@ from typing import Dict, Optional, List
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QGraphicsView,
-    QGraphicsScene, QGraphicsPixmapItem, QPushButton, QSlider, QFrame, QComboBox, QDialogButtonBox
+    QGraphicsScene, QGraphicsPixmapItem, QPushButton, QSlider, QFrame, QComboBox, QDialogButtonBox,
+    QListWidget, QListWidgetItem
 )
-from PySide6.QtGui import QPixmap, QPainter, QTransform, QWheelEvent
-from PySide6.QtCore import Qt, Slot, QEvent
+from PySide6.QtGui import QPixmap, QPainter, QTransform, QWheelEvent, QIcon 
+from PySide6.QtCore import Qt, Slot, QEvent, QSize
 
 
 from . import editor_styles as styles
@@ -25,8 +26,7 @@ except ImportError:
 
 # --- ИЗМЕНЕНИЕ: Исправляем импорт Pillow ---
 try:
-    from PIL import Image, ImageEnhance
-    # Импортируем МОДУЛЬ ImageQt
+    from PIL import Image, ImageEnhance, ImageOps # <--- Добавили ImageOps
     from PIL import ImageQt
     IS_PILLOW_AVAILABLE = True
 except ImportError:
@@ -34,6 +34,7 @@ except ImportError:
     Image = None
     ImageEnhance = None
     ImageQt = None
+    ImageOps = None
 # --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
 logger = logging.getLogger(__name__)
@@ -280,3 +281,147 @@ class RenameDialog(QDialog):
     def get_selected_name(self) -> str:
         """Возвращает итоговый текст из QComboBox."""
         return self.combo_box.currentText().strip()
+        
+# --- НАЧАЛО НОВОГО КЛАССА ---
+class FaceSelectorDialog(QDialog):
+    """
+    Диалог для выбора конкретного лица на фотографии, если их найдено несколько.
+    Показывает миниатюры всех обнаруженных лиц.
+    """
+    def __init__(self, image_path: Path, faces: List, parent=None):
+        super().__init__(parent)
+        self.image_path = image_path
+        self.faces = faces
+        self.selected_index = -1
+        
+        self.setWindowTitle("Выберите лицо для перемещения")
+        self.setMinimumSize(600, 400)
+        
+        self.layout = QVBoxLayout(self)
+        
+        # Инструкция
+        info_lbl = QLabel(f"На изображении <b>{image_path.name}</b> обнаружено несколько лиц.<br>"
+                          "Выберите, какое из них соответствует целевому кластеру:")
+        self.layout.addWidget(info_lbl)
+        
+        # Список лиц (в виде иконок)
+        self.list_widget = QListWidget()
+        self.list_widget.setViewMode(QListWidget.ViewMode.IconMode)
+        self.list_widget.setIconSize(QSize(150, 150))
+        self.list_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
+        self.list_widget.setSpacing(10)
+        self.list_widget.itemDoubleClicked.connect(self._on_item_double_clicked)
+        self.layout.addWidget(self.list_widget)
+        
+        # Кнопки
+        btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btn_box.accepted.connect(self._on_accept)
+        btn_box.rejected.connect(self.reject)
+        self.layout.addWidget(btn_box)
+        
+        self._load_faces()
+
+    def _load_faces(self):
+        if not IS_PILLOW_AVAILABLE or not Image:
+            for i, face in enumerate(self.faces):
+                item = QListWidgetItem(f"Лицо #{i+1}")
+                item.setData(Qt.ItemDataRole.UserRole, i)
+                self.list_widget.addItem(item)
+            return
+
+        try:
+            # 1. Загружаем изображение
+            # ВАЖНО: Убрали ImageOps.exif_transpose. 
+            # Если координаты в JSON от OpenCV/dlib, они обычно по сырому файлу.
+            full_img = Image.open(str(self.image_path)).convert("RGBA")
+            img_w, img_h = full_img.size
+
+            for i, face in enumerate(self.faces):
+                bbox = face.bbox
+                if len(bbox) == 4:
+                    # --- ИЗМЕНЕНИЕ: Меняем порядок распаковки ---
+                    # Было: top, right, bottom, left (face_recognition style)
+                    # Стало: left, top, right, bottom (Common/PIL style)
+                    # Попробуем этот формат, так как он чаще вызывает такие "сдвиги" при ошибке.
+                    # Если у вас точно face_recognition, вернем обратно, но уберем transpose.
+                    
+                    # План А: Пробуем стандартный порядок [left, top, right, bottom]
+                    v1, v2, v3, v4 = map(int, bbox)
+                    
+                    # Эвристика для определения формата:
+                    # Обычно right > left и bottom > top.
+                    # Если bbox[1] > bbox[3] (как в top, right, bottom, left где right > left), 
+                    # то значения могут быть перепутаны.
+                    
+                    # Давайте попробуем универсальный подход:
+                    # Pillow требует (left, top, right, bottom)
+                    
+                    # Вариант 1: JSON хранит [left, top, right, bottom]
+                    x1, y1, x2, y2 = v1, v2, v3, v4
+                    
+                    # Вариант 2: Если JSON хранит [top, right, bottom, left], раскомментируйте это:
+                    # y1, x2, y2, x1 = v1, v2, v3, v4 
+
+                    # Валидация и исправление координат
+                    # Гарантируем x1 < x2 и y1 < y2
+                    if x1 > x2: x1, x2 = x2, x1
+                    if y1 > y2: y1, y2 = y2, y1
+
+                    # Отступ 20%
+                    width = x2 - x1
+                    height = y2 - y1
+                    padding = int(max(width, height) * 0.2)
+                    
+                    # Clamping (обрезка по границам фото)
+                    final_x1 = max(0, x1 - padding)
+                    final_y1 = max(0, y1 - padding)
+                    final_x2 = min(img_w, x2 + padding)
+                    final_y2 = min(img_h, y2 + padding)
+                    
+                    # Проверка на вырожденность
+                    if final_x2 <= final_x1 or final_y2 <= final_y1:
+                        self.list_widget.addItem(f"Лицо #{i+1} (Ошибка координат)")
+                        continue
+
+                    face_img = full_img.crop((final_x1, final_y1, final_x2, final_y2))
+                    
+                    if ImageQt:
+                        qim = ImageQt.ImageQt(face_img)
+                        pixmap = QPixmap.fromImage(qim)
+                        icon = QIcon(pixmap)
+                        
+                        item = QListWidgetItem(f"Лицо {i+1}")
+                        item.setIcon(icon)
+                        item.setData(Qt.ItemDataRole.UserRole, i)
+                        self.list_widget.addItem(item)
+                    else:
+                        self.list_widget.addItem(f"Лицо {i+1}")
+
+        except Exception as e:
+            logger.error(f"Ошибка при нарезке лиц для диалога: {e}")
+            self.list_widget.clear()
+            for i in range(len(self.faces)):
+                item = QListWidgetItem(f"Лицо #{i+1} (Ошибка)")
+                item.setData(Qt.ItemDataRole.UserRole, i)
+                self.list_widget.addItem(item)
+
+    def _on_item_double_clicked(self, item):
+        self.selected_index = item.data(Qt.ItemDataRole.UserRole)
+        self.accept()
+
+    def _on_accept(self):
+        if len(self.list_widget.selectedItems()) > 0:
+            item = self.list_widget.selectedItems()[0]
+            self.selected_index = item.data(Qt.ItemDataRole.UserRole)
+            self.accept()
+        else:
+            # Если ничего не выбрано, но нажали ОК - берем первое (или можно запретить)
+            if self.list_widget.count() > 0:
+                self.selected_index = 0
+                self.accept()
+            else:
+                self.reject()
+
+    def get_selected_index(self) -> int:
+        return self.selected_index
+# --- КОНЕЦ НОВОГО КЛАССА ---        
