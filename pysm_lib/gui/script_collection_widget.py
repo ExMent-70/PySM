@@ -19,6 +19,7 @@ from ..models import (
 )
 # --- 1. БЛОК: ИЗМЕНЕННЫЕ ИМПОРТЫ ---
 from ..theme_manager import ThemeManager
+from ..pysm_icons import icons
 from .gui_utils import resolve_themed_text
 from ..app_enums import SetRunMode, AppState, ScriptRunStatus
 from ..locale_manager import LocaleManager
@@ -111,7 +112,7 @@ class ScriptCollectionWidget(QWidget):
             self.collection_tree_view = QTreeView()
             self.collection_tree_view.setAlternatingRowColors(True)
             self.collection_tree_view.setHeaderHidden(True)
-            self.collection_tree_view.setIconSize(QSize(20, 20))
+            self.collection_tree_view.setIconSize(QSize(24, 24))
             self.collection_tree_view.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
             self.collection_tree_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
             self.collection_tree_view.setDropIndicatorShown(True)
@@ -132,7 +133,15 @@ class ScriptCollectionWidget(QWidget):
             # --- НАЧАЛО ИЗМЕНЕНИЙ ---
             # 1. Используем QPushButton вместо QToolButton для стандартного внешнего вида
             self.btn_run_action = QPushButton(self.locale_manager.get("collection_widget.run_button_run"))
-            self.btn_run_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+            #self.btn_run_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+            #self.btn_run_action.setIcon(icons.get_qicon("PLAY"))
+
+            # 1. Генерируем иконку в хорошем качестве (например, 32px)
+            self.btn_run_action.setIcon(icons.get_qicon("PLAY", size=28))
+            # 2. Явно задаем размер иконки для кнопки
+            self.btn_run_action.setIconSize(QSize(28, 28)) 
+            
+            
             
             # 2. Устанавливаем политику размера Preferred, чтобы кнопка НЕ растягивалась
             self.btn_run_action.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
@@ -146,7 +155,14 @@ class ScriptCollectionWidget(QWidget):
             self.action_run_full = QAction(self.locale_manager.get("collection_widget.run_mode_conditional_full"), self)
             self.action_run_step = QAction(self.locale_manager.get("collection_widget.run_mode_conditional_step"), self)
             self.action_run_single = QAction(self.locale_manager.get("collection_widget.run_mode_single"), self)
-            
+
+            # --- ДОБАВЛЕНИЕ ИКОНОК В МЕНЮ ---
+            self.action_run_full.setIcon(icons.get_qicon("PLAY"))
+            self.action_run_step.setIcon(icons.get_qicon("NEXT")) # Шаг вперед
+            self.action_run_single.setIcon(icons.get_qicon("FILE_PY")) # Один файл
+            # --------------------------------            
+
+
             self.run_menu.addAction(self.action_run_full)
             self.run_menu.addAction(self.action_run_step)
             self.run_menu.addSeparator()
@@ -156,7 +172,12 @@ class ScriptCollectionWidget(QWidget):
             self.btn_run_action.setMenu(self.run_menu)
 
             self.btn_stop_action = QPushButton(self.locale_manager.get("collection_widget.run_button_stop"))
-            self.btn_stop_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+            #self.btn_stop_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+            self.btn_stop_action.setIcon(icons.get_qicon("STOP", size=28))
+            # 2. Явно задаем размер иконки для кнопки
+            self.btn_stop_action.setIconSize(QSize(28, 28)) 
+
+
 
             # Добавляем кнопки в лейаут.
             # Добавляем stretch в конце, чтобы прижать кнопки влево, если они не занимают всю ширину
@@ -390,7 +411,7 @@ class ScriptCollectionWidget(QWidget):
         
         # Сбрасываем стили к значениям по умолчанию для текущей палитры
         default_fg = self.palette().color(QPalette.ColorRole.Text)
-        item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileLinkIcon))
+        item.setIcon(icons.get_qicon("INSTANCE_ITEM"))
         item.setBackground(QBrush(Qt.GlobalColor.transparent))
         item.setForeground(QBrush(default_fg))
 
@@ -421,21 +442,17 @@ class ScriptCollectionWidget(QWidget):
 
         # 3. Устанавливаем иконки (как в оригинале)
         if status == ScriptRunStatus.RUNNING:
-            item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+            #item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+            item.setIcon(icons.get_qicon("PLAY"))
         elif status == ScriptRunStatus.SUCCESS:
-            item.setIcon(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton)
-            )
+            item.setIcon(icons.get_qicon("OK"))
         elif status == ScriptRunStatus.ERROR:
-            item.setIcon(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton)
-            )
+            item.setIcon(icons.get_qicon("ERROR"))
         elif status == ScriptRunStatus.PENDING:
-            item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowRight))
+            #item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowRight))
+            item.setIcon(icons.get_qicon("ARROW_SUB"))
         elif status == ScriptRunStatus.SKIPPED:
-            item.setIcon(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_DialogDiscardButton)
-            )
+            item.setIcon(icons.get_qicon("WARNING", color="gray"))
             # --- ИЗМЕНЕНИЕ ---
             # Для пропущенных явно устанавливаем серый цвет текста
             item.setForeground(QColor("gray"))          
@@ -456,11 +473,11 @@ class ScriptCollectionWidget(QWidget):
             node_item.setToolTip(node_data.description or node_data.name)
             
             if isinstance(node_data, SetFolderNodeModel):
-                node_item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirClosedIcon))
+                node_item.setIcon(icons.get_qicon("FOLDER_VIRTUAL"))
                 parent_qt_item.appendRow(node_item)
                 if node_data.children: self._populate_collection_recursive(node_item, node_data.children)
             elif isinstance(node_data, ScriptSetNodeModel):
-                node_item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogNewFolder))
+                node_item.setIcon(icons.get_qicon("INSTANCE_SET"))
                 parent_qt_item.appendRow(node_item)
                 for entry in node_data.script_entries:
                     script_info = self.controller.get_script_info_by_id(entry.id)
@@ -476,7 +493,7 @@ class ScriptCollectionWidget(QWidget):
                     entry_item.setToolTip(tooltip_html)
                     
                     if not (script_info and script_info.passport_valid):
-                        entry_item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning))
+                        entry_item.setIcon(icons.get_qicon("ERROR"))
                         entry_item.setForeground(QColor("red"))
 
                     node_item.appendRow(entry_item)
@@ -539,7 +556,7 @@ class ScriptCollectionWidget(QWidget):
         if current_state == AppState.SET_RUNNING_STEP_WAIT:
             # Режим ожидания шага
             self.btn_run_action.setText(self.locale_manager.get("collection_widget.run_button_next_step"))
-            self.btn_run_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekForward))
+            self.btn_run_action.setIcon(icons.get_qicon("NEXT"))
             
             # Убираем меню, чтобы кнопка работала как обычный клик
             self.btn_run_action.setMenu(None)
@@ -550,7 +567,7 @@ class ScriptCollectionWidget(QWidget):
         elif current_state == AppState.IDLE:
             # Режим простоя
             self.btn_run_action.setText(self.locale_manager.get("collection_widget.run_button_run"))
-            self.btn_run_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+            self.btn_run_action.setIcon(icons.get_qicon("PLAY"))
             
             # Возвращаем меню
             self.btn_run_action.setMenu(self.run_menu)

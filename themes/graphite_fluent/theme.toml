@@ -1,11 +1,25 @@
 api_image_description = "color: #A0A0A0; font-style: italic;"
 api_link = "color: #00C7BD; text-decoration: none;"
+# Добавлено: Светло-коралловый для ошибок
+api_link_error = "color: #FF8A80; text-decoration: line-through;"
+
+# Исправлено: Адаптировано под темную тему (был светлый фон)
+collection_info = "color: #E0E0E0; background-color: #263238; padding: 5px; border-radius: 3px;"
+
 console_background = "background-color: #202020;"
 delegate_changed_indicator = "color: #D32F2F;"
 delegate_hover_border = "color: #00A29A;"
 delegate_preview_background = "color: #383838;"
 delegate_secondary_text = "color: #A0A0A0;"
-markup_number = "background-color: #27ae60; border-color: #bbdefb; color: #ffffff;"
+# Добавлено: Ярко-бирюзовый для дроп-зоны
+delegate_drop_target_border = "color: #00C7BD;"
+
+# Маркапы: Темные приглушенные тона
+markup_number = "background-color: #2E7D32; border-color: #66BB6A; color: #ffffff;"
+markup_surname = "background-color: #00695C; border-color: #4DB6AC; color: #ffffff;"
+markup_name = "background-color: #37474F; border-color: #90A4AE; color: #ECEFF1;"
+markup_fio = "background-color: #3E2723; border-color: #8D6E63; color: #FFCCBC;"
+
 runner_info = "color: #A0A0A0; font-style: italic;"
 script_arg_value = "color: #E0E0E0; font-weight: bold;"
 script_description = "color: white; background-color: #00A29A; padding: 10px;"
@@ -22,11 +36,24 @@ status_pending = "background-color: transparent; color: #A0A0A0;"
 status_running = "background-color: #00A29A; color: white;"
 status_skipped = "background-color: #383838; color: #A0A0A0;"
 status_success = "background-color: transparent; color: #81C784;"
-table_status_found = "color: #27ae60; background-color: #27ae60;"
-table_status_not_found = "color: #c0392b; background-color: #c0392b;"
-tooltip_arg_value = "color: #00C7BD;"
-tooltip_instance_args_block = "background-color: rgba(0, 162, 154, 0.1); border-left: 3px solid #00A29A; padding: 5px;"
-tooltip_script_args_block = "background-color: rgba(74, 74, 74, 0.2); border-left: 3px solid #4A4A4A; padding: 5px;"
-table_background_base = "color: #202020;"
 table_background_alternate = "color: #2D2D2D;"
+table_background_base = "color: #202020;"
+# Исправлено: текст сделан белым для читаемости
+table_status_found = "color: #ffffff; background-color: #27ae60;"
+table_status_not_found = "color: #ffffff; background-color: #c0392b;"
 
+tooltip_arg_value = "color: #00C7BD;"
+tooltip_instance_args_block = "background-color: rgba(0, 162, 154, 0.1); border-left: 3px solid #00A29A; padding: 5px; color: #E0E0E0;"
+tooltip_script_args_block = "background-color: rgba(74, 74, 74, 0.2); border-left: 3px solid #4A4A4A; padding: 5px; color: #E0E0E0;"
+
+# --- Палитра Иконок (Teal Dark) ---
+icon_primary = "color: #A0A0A0;"    # Светло-серый
+icon_folder = "color: #FFB74D;"     # Мягкий оранжевый (контраст к бирюзовому)
+icon_file = "color: #00C7BD;"       # Ярко-бирюзовый (Accent)
+icon_success = "color: #81C784;"    # Светло-зеленый
+icon_warning = "color: #FFD54F;"    # Янтарный
+icon_danger = "color: #FF8A80;"     # Светло-красный/Коралловый
+icon_info = "color: #4FC3F7;"       # Голубой
+icon_adobe = "color: #F06292;"      # Розовый
+icon_code = "color: #AED581;"       # Лайм
+icon_archive = "color: #90A4AE;"    # Серо-голубой

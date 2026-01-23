@@ -17,6 +17,8 @@ import os
 # Импортируем зависимые компоненты из нашей же библиотеки
 from .pysm_progress_reporter import tqdm
 from . import pysm_context
+from .pysm_icons import icons
+from .pysm_theme_api import theme_api
 
 
 
@@ -108,17 +110,26 @@ def perform_directory_operation(
 
     :return: 0 при успехе, 1 при наличии ошибок.
     """
-    #print("[Directory Operation Starting]")
-    print(f"\nMode: <b>{mode}</b>, Threads: <b>{threads}</b>, On Conflict: <b>{on_conflict}</b>")
+    text_main = theme_api.get_parsed_style("script_stdout", default="color: #2c3e50")
+    text_color = text_main.get("color")
+    name_style = f"color: {text_color};"
+
+    if mode == "move":
+        print("<b>ПЕРЕМЕЩЕНИЕ ФАЙЛОВ И ПАПОК</b>")
+    else:
+        print("<b>КОПИРОВАНИЕ ФАЙЛОВ И ПАПОК</b>")
+
+    #print(f"\nРежим работы: <b>{mode}</b>,<br> Количество потоков: <b>{threads}</b>,<br> Действие при конфликте: <b>{on_conflict}</b>")
 
     source_dir = pathlib.Path(source_dir_str)
     dest_dir = pathlib.Path(dest_dir_str)
 
     if not source_dir.is_dir():
-        tqdm.write(
-            f"ERROR: Source directory not found or is not a directory: {source_dir}"
-        )
+        icon_stat = icons.ERROR()
+        html = (f'<div style="{name_style}">{icon_stat} Операция отменена. Папка {source_dir} не найдена<br></div>')
+        pysm_context.log_html(html)       
         return 1
+
 
     final_dest_root = dest_dir / source_dir.name if copy_base_folder else dest_dir
     print(f"Copying base folder: <b>{copy_base_folder}</b>")

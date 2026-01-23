@@ -272,13 +272,13 @@ class MainWindow(QWidget):
         buttons_layout.addWidget(self.export_button)
         buttons_layout.addWidget(self.save_button)
 
-        self.watermarks_enabled_checkbox = QCheckBox("Наложить водяные знаки на изображение при экспорте")
-        self.watermarks_enabled_checkbox.setChecked(True)
+        #self.watermarks_enabled_checkbox = QCheckBox("Наложить водяные знаки на изображение при экспорте")
+        #self.watermarks_enabled_checkbox.setChecked(True)
 
         left_layout.addWidget(left_title)
         left_layout.addWidget(self.search_bar)
         left_layout.addWidget(self.cluster_list_widget, 1)
-        left_layout.addWidget(self.watermarks_enabled_checkbox)
+        #left_layout.addWidget(self.watermarks_enabled_checkbox)
         left_layout.addLayout(buttons_layout)
 
         right_layout.addWidget(self.right_panel_label)
@@ -364,87 +364,111 @@ class MainWindow(QWidget):
             item.setHidden(search_text not in cluster_name.lower())
 
     def _refresh_left_panel(self):
-        active_id_before_refresh = self.active_cluster_id
-        self.cluster_list_widget.clear()
-        self.preview_pixmaps.clear()
-        clusters = self._get_clusters_from_model()
+            active_id_before_refresh = self.active_cluster_id
+            self.cluster_list_widget.clear()
+            self.preview_pixmaps.clear()
+            clusters = self._get_clusters_from_model()
 
-        sort_key_func = lambda x: int(x) if x.isdigit() else (9998 if x == "-1" else 9999)
-        if self.mode == 'location':
-            sort_key_func = lambda x: x
+            sort_key_func = lambda x: int(x) if x.isdigit() else (9998 if x == "-1" else 9999)
+            if self.mode == 'location':
+                sort_key_func = lambda x: x
 
-        sorted_labels = sorted(clusters.keys(), key=sort_key_func)
+            sorted_labels = sorted(clusters.keys(), key=sort_key_func)
 
-        item_to_select = None
-        for label in sorted_labels:
-            if self.mode == 'matches' and label in ["-1", "group"]:
-                continue
+            item_to_select = None
+            for label in sorted_labels:
+                if self.mode == 'matches' and label in ["-1", "group"]:
+                    continue
 
-            faces = clusters[label]
-# --- НАЧАЛО ИЗМЕНЕНИЯ ---
-            # В режиме 'matches' имя берется из кэша data_manager,
-            # который заполняется либо из portrait_faces, либо при перезагрузке.
-            if self.mode == 'matches':
-                cluster_name = self.data_manager._cluster_id_to_name_cache.get(label)
-                if not cluster_name and faces: # Если в кэше нет, берем из данных портрета
-                    cluster_name = faces[0].child_name
-                if not cluster_name: cluster_name = f"Кластер {label}" # Фоллбэк
-            else:
-                cluster_name = faces[0].effective_name if faces else f"Кластер {label}"
+                faces = clusters[label]
 
-            preview_path = Path()
-            if faces:
-                # Превью для левой панели ВСЕГДА берем из портретов
-                preview_path = self._get_image_path(faces[0].filename, 'portrait')
-# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+                # --- НАЧАЛО ИЗМЕНЕНИЯ: Унификация имен для всех режимов ---
+                if self.mode == 'matches':
+                    # В режиме matches берем имя из кэша (загруженного из JSON) или из первого лица
+                    raw_name = self.data_manager._cluster_id_to_name_cache.get(label)
+                    if not raw_name and faces:
+                        raw_name = faces[0].child_name
+                    if not raw_name: 
+                        raw_name = f"Кластер {label}"
+                    
+                    # Принудительно добавляем цифровой префикс (00-), как в режиме face
+                    # 1. Очищаем имя от старого префикса, если он вдруг есть в данных
+                    clean_name = raw_name
+                    if clean_name and '-' in clean_name and clean_name.split('-', 1)[0].isdigit():
+                        clean_name = clean_name.split('-', 1)[-1]
+                    
+                    # 2. Генерируем новый префикс согласно конфигурации (00-, 01- и т.д.)
+                    prefix = self.mode_config["name_prefix_logic"](label)
+                    cluster_name = prefix + clean_name
+                else:
+                    # В режимах face/location имя уже сформировано в get_clusters (effective_name)
+                    cluster_name = faces[0].effective_name if faces else f"Кластер {label}"
+
+                preview_path = Path()
+                if faces:
+                    # Превью для левой панели ВСЕГДА берем из портретов (даже в режиме matches)
+                    preview_path = self._get_image_path(faces[0].filename, 'portrait')
+                # --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+                from _lib.editor_delegates import PREVIEW_SIZE
+                pixmap = QPixmap(str(preview_path))
+                if not pixmap.isNull():
+                    pixmap = pixmap.scaled(PREVIEW_SIZE, PREVIEW_SIZE, Qt.AspectRatioMode.KeepAspectRatio)
+
+                self.preview_pixmaps[label] = pixmap
+
+                if self.mode == 'matches':
+                    count = len(self.data_manager.get_group_matches_for_cluster(label))
+                else:
+                    count = len(self.data_manager.get_files_for_cluster(self.mode_config, label))
+
+                item_data = { 
+                    "id": label, 
+                    "name": cluster_name, 
+                    "count": count,
+                    "pixmap": pixmap, 
+                    "is_changed": self.data_manager.is_cluster_changed(self.mode_config["mode_name"], label) 
+                }
+                item = QListWidgetItem()
+                item.setData(Qt.ItemDataRole.UserRole, item_data)
+                self.cluster_list_widget.addItem(item)
+
+                if label == active_id_before_refresh:
+                    item_to_select = item
+
+            for new_cluster in self.data_manager.newly_created_clusters:
+                if new_cluster["id"] in clusters:
+                    continue
+                item_data = {
+                    "id": new_cluster["id"], "name": new_cluster["name"], "count": 0,
+                    "pixmap": QPixmap(), "is_changed": True
+                }
+                item = QListWidgetItem()
+                item.setData(Qt.ItemDataRole.UserRole, item_data)
+                self.cluster_list_widget.addItem(item)
+                if new_cluster["id"] == active_id_before_refresh:
+                    item_to_select = item
+
+            if item_to_select:
+                self.cluster_list_widget.setCurrentItem(item_to_select)
+            elif self.cluster_list_widget.count() > 0:
+                self.cluster_list_widget.setCurrentRow(0)
 
 
 
 
-            from _lib.editor_delegates import PREVIEW_SIZE
-            pixmap = QPixmap(str(preview_path))
-            if not pixmap.isNull():
-                pixmap = pixmap.scaled(PREVIEW_SIZE, PREVIEW_SIZE, Qt.AspectRatioMode.KeepAspectRatio)
-
-            self.preview_pixmaps[label] = pixmap
-            
-            
-
-# --- НАЧАЛО ИЗМЕНЕНИЯ ---
-            if self.mode == 'matches':
-                count = len(self.data_manager.get_group_matches_for_cluster(label))
-            else:
-                count = len(self.data_manager.get_files_for_cluster(self.mode_config, label))
-# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
 
 
-            item_data = { "id": label, "name": cluster_name, "count": count,
-                          "pixmap": pixmap, "is_changed": self.data_manager.is_cluster_changed(self.mode_config["mode_name"], label) }
-            item = QListWidgetItem()
-            item.setData(Qt.ItemDataRole.UserRole, item_data)
-            self.cluster_list_widget.addItem(item)
 
-            if label == active_id_before_refresh:
-                item_to_select = item
 
-        for new_cluster in self.data_manager.newly_created_clusters:
-            if new_cluster["id"] in clusters:
-                continue
-            item_data = {
-                "id": new_cluster["id"], "name": new_cluster["name"], "count": 0,
-                "pixmap": QPixmap(), "is_changed": True
-            }
-            item = QListWidgetItem()
-            item.setData(Qt.ItemDataRole.UserRole, item_data)
-            self.cluster_list_widget.addItem(item)
-            if new_cluster["id"] == active_id_before_refresh:
-                item_to_select = item
 
-        if item_to_select:
-            self.cluster_list_widget.setCurrentItem(item_to_select)
-        elif self.cluster_list_widget.count() > 0:
-            self.cluster_list_widget.setCurrentRow(0)
+
+
+
+
+
+
 
     def _render_gallery(self, cluster_id: str):
         self._stop_gallery_load_if_running()
@@ -907,17 +931,48 @@ class MainWindow(QWidget):
         dialog = EnhanceSettingsDialog(first_image_path, self)
         if dialog.exec() != QDialog.Accepted: return
 
-        enhancement_factors = dialog.get_enhancement_factors()
-        logger.info(f"Параметры обработки фотографий перед экспортом:\n<i>{enhancement_factors}</i>")
+
+
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Получение всех настроек из диалога ---
+        export_settings = dialog.get_export_settings()
+        
+        factors = export_settings["factors"]
+        width = export_settings["width"]
+        height = export_settings["height"]
+        dpi = export_settings["dpi"]
+        quality = export_settings["quality"]       # Новое
+        apply_watermarks = export_settings["watermarks"] # Перенесено
+        
+        logger.info(
+            f"Параметры экспорта:\n"
+            f"Улучшение: {factors}\n"
+            f"Размер: {width}x{height} px, DPI: {dpi}, Качество: {quality}%\n"
+            f"Водяные знаки: {'Да' if apply_watermarks else 'Нет'}"
+        )
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
 
         self.status_progress_bar.setRange(0, len(tasks))
         self.status_progress_bar.setValue(0)
         self.status_progress_bar.setFormat("Экспорт... %p%")
 
-        apply_watermarks = self.watermarks_enabled_checkbox.isChecked()
-        logger.info(f"Водяные знаки: {'Включены' if apply_watermarks else 'Выключены'}")
+        # Удаляем старую логику получения чекбокса из self
+        # apply_watermarks = self.watermarks_enabled_checkbox.isChecked() <-- УДАЛЕНО
 
-        self.export_worker = ExportWorker(tasks, os.cpu_count() or 4, enhancement_factors, apply_watermarks)
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Передача quality в воркер ---
+        self.export_worker = ExportWorker(
+            tasks=tasks, 
+            num_threads=os.cpu_count() or 4, 
+            enhancement_factors=factors, 
+            target_size=(width, height),
+            target_dpi=(dpi, dpi),
+            quality=quality,             # Передаем качество
+            apply_watermarks=apply_watermarks
+        )
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+
+
         self.export_thread = QThread()
         self.export_worker.moveToThread(self.export_thread)
         self.export_worker.progress_updated.connect(self.status_progress_bar.setValue)

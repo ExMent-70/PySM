@@ -13,8 +13,13 @@ from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QAction, QP
 from ..models import ScriptInfoModel, CategoryNodeModel, ScanTreeNodeType
 from ..locale_manager import LocaleManager
 from ..theme_manager import ThemeManager
+from ..pysm_icons import icons
 from .dialogs import ScriptPropertiesDialog, EditMode
 from .tooltip_generator import generate_script_tooltip_html
+
+# --- КОНСТАНТА РАЗМЕРА ИКОНОК ---
+ICON_SIZE = 28
+# --------------------------------
 
 
 class AvailableScriptsWidget(QWidget):
@@ -48,7 +53,7 @@ class AvailableScriptsWidget(QWidget):
         main_layout.addWidget(scripts_groupbox)
         self.tree_available_scripts = QTreeView()
         self.tree_available_scripts.setAlternatingRowColors(True)
-        self.tree_available_scripts.setIconSize(QSize(24, 24))
+        self.tree_available_scripts.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
         self.tree_available_scripts.setHeaderHidden(False)
         self.tree_available_scripts.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.tree_available_scripts.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -140,15 +145,19 @@ class AvailableScriptsWidget(QWidget):
         if not updated_model.passport_valid:
             item_col0.setForeground(QColor("red"))
             item_col1.setForeground(QColor("red"))
-            item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning))
+            # Иконка ошибки
+            item_col0.setIcon(icons.get_qicon("ERROR", size=ICON_SIZE, color="red"))
             description_text = f"[{updated_model.passport_error}]" if not updated_model.description else self.locale_manager.get("general.passport_error_format", description=updated_model.description)
         elif updated_model.is_raw:
             item_col0.setForeground(QColor("#808000"))
             item_col1.setForeground(QColor("#808000"))
-            item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton))
+            # Иконка "Требует настройки" (Шестеренка желтая)
+            item_col0.setIcon(icons.get_qicon("SETTINGS", size=ICON_SIZE, color="#808000"))
             description_text = self.locale_manager.get("general.setup_required_format")
         else:
-            item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+            #item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+            # Иконка обычного скрипта
+            item_col0.setIcon(icons.get_qicon("FILE_PY", size=ICON_SIZE))            
 
         item_col1.setText(description_text)
         item_col0.setToolTip(tooltip_html)
@@ -170,7 +179,8 @@ class AvailableScriptsWidget(QWidget):
             if isinstance(node_data, CategoryNodeModel):
                 item_col0.setText(node_data.name)
                 item_col1.setText(node_data.description or "")
-                item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirClosedIcon))
+                #item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirClosedIcon))
+                item_col0.setIcon(icons.get_qicon("FOLDER_PY", size=ICON_SIZE))
                 parent_qt_item.appendRow([item_col0, item_col1])
                 if node_data.children: self._populate_tree_recursive(item_col0, node_data.children)
             elif isinstance(node_data, ScriptInfoModel):
@@ -181,15 +191,21 @@ class AvailableScriptsWidget(QWidget):
                 if not node_data.passport_valid:
                     item_col0.setForeground(QColor("red"))
                     item_col1.setForeground(QColor("red"))
-                    item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning))
+                    #item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxWarning))
+                    # Иконка ошибки
+                    item_col0.setIcon(icons.get_qicon("ERROR", size=ICON_SIZE, color="red"))
                     description_text = f"[{node_data.passport_error}]" if not node_data.description else self.locale_manager.get("general.passport_error_format", description=node_data.description)
                 elif node_data.is_raw:
                     item_col0.setForeground(QColor("#808000"))
                     item_col1.setForeground(QColor("#808000"))
-                    item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton))
+                    #item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ToolBarHorizontalExtensionButton))
+                    # Иконка настройки
+                    item_col0.setIcon(icons.get_qicon("SETTINGS", size=ICON_SIZE, color="#808000"))
                     description_text = self.locale_manager.get("general.setup_required_format")
                 else:
-                    item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+                    #item_col0.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+                    # Иконка файла скрипта
+                    item_col0.setIcon(icons.get_qicon("FILE_PY", size=ICON_SIZE))
 
                 item_col1.setText(description_text)
                 item_col0.setToolTip(tooltip_html)

@@ -121,6 +121,50 @@ QPlainTextEdit:read-only {
     border: 1px solid @borderColor;
 }
 
+/* --- [4.1] ЧИСЛОВЫЕ ПОЛЯ (QSpinBox, QDoubleSpinBox) --- */
+QSpinBox, QDoubleSpinBox {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+    border-radius: 5px; padding: 4px;
+    selection-background-color: @accentColorSelection;
+    selection-color: @textColorOnAccent;
+}
+QSpinBox:focus, QDoubleSpinBox:focus { border: 1px solid @accentColor; }
+QSpinBox:disabled, QDoubleSpinBox:disabled {
+    background-color: @bgColorBase; color: @textColorDisabled;
+}
+
+/* Кнопки вверх/вниз */
+QSpinBox::up-button, QDoubleSpinBox::up-button,
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: border;
+    width: 16px;
+    background-color: transparent;
+    border-left: 1px solid @borderColor;
+}
+QSpinBox::up-button { subcontrol-position: top right; border-bottom: 1px solid @borderColor; border-top-right-radius: 5px; }
+QSpinBox::down-button { subcontrol-position: bottom right; border-bottom-right-radius: 5px; }
+
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+    background-color: @bgColorHover;
+}
+QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed,
+QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed {
+    background-color: @accentColorPressed;
+}
+
+/* Стрелки (используем системные или простые треугольники через border, если нет SVG) */
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    width: 0; height: 0;
+    border-left: 3px solid transparent; border-right: 3px solid transparent;
+    border-bottom: 4px solid @textColorSecondary;
+}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    width: 0; height: 0;
+    border-left: 3px solid transparent; border-right: 3px solid transparent;
+    border-top: 4px solid @textColorSecondary;
+}
 
 /* --- [5] КОНТЕЙНЕРЫ (QGroupBox, QTabWidget, QToolBox) --- */
 QGroupBox {

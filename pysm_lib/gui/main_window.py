@@ -28,6 +28,8 @@ from ..app_constants import (
     COLLECTION_FILE_TYPE_NAME,
 )
 from ..locale_manager import LocaleManager
+from ..pysm_icons import icons
+
 from .console_widget import ConsoleWidget
 from .dialogs import SettingsDialog, CollectionPassportDialog
 from .available_scripts_widget import AvailableScriptsWidget
@@ -82,96 +84,96 @@ class MainWindow(QMainWindow):
         self.setMenuBar(None)
 
     def _create_toolbar(self):
-        self.toolbar = QToolBar(
-            self.locale_manager.get("main_window.toolbar.main_toolbar_title")
-        )
-        self.toolbar.setMovable(False)
-        self.toolbar.setIconSize(QSize(32, 32))
-        self.toolbar.setFixedHeight(50)
-        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
+            self.toolbar = QToolBar(
+                self.locale_manager.get("main_window.toolbar.main_toolbar_title")
+            )
+            self.toolbar.setMovable(False)
+            self.toolbar.setIconSize(QSize(32, 32))
+            self.toolbar.setFixedHeight(50)
+            self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
 
-        self.action_new_collection = QAction(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon),
-            self.locale_manager.get("main_window.toolbar.new_collection"),
-            self,
-        )
-        self.toolbar.addAction(self.action_new_collection)
+            self.action_new_collection = QAction(
+                icons.get_qicon("NEW"),  # <--- ЗАМЕНА
+                self.locale_manager.get("main_window.toolbar.new_collection"),
+                self,
+            )
+            self.toolbar.addAction(self.action_new_collection)
 
-        self.action_open_collection = QAction(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton),
-            self.locale_manager.get("main_window.toolbar.open_collection"),
-            self,
-        )
-        self.toolbar.addAction(self.action_open_collection)
+            self.action_open_collection = QAction(
+                icons.get_qicon("OPEN"),  # <--- ЗАМЕНА
+                self.locale_manager.get("main_window.toolbar.open_collection"),
+                self,
+            )
+            self.toolbar.addAction(self.action_open_collection)
 
-        self.save_button = QToolButton()
-        self.save_button.setToolTip(
-            self.locale_manager.get("main_window.toolbar.save_collection_tooltip")
-        )
-        self.save_button.setIcon(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton)
-        )
-        self.save_button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
-        self.save_button.clicked.connect(
-            self._on_save_collection
-        )
+            self.save_button = QToolButton()
+            self.save_button.setToolTip(
+                self.locale_manager.get("main_window.toolbar.save_collection_tooltip")
+            )
+            self.save_button.setIcon(
+                icons.get_qicon("SAVE")  # <--- ЗАМЕНА
+            )
+            self.save_button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+            self.save_button.clicked.connect(
+                self._on_save_collection
+            )
 
-        save_menu = QMenu(self.save_button)
-        self.action_save_collection = save_menu.addAction(
-            self.locale_manager.get("main_window.toolbar.save_collection")
-        )
-        self.action_save_collection_as = save_menu.addAction(
-            self.locale_manager.get("main_window.toolbar.save_collection_as")
-        )
-        self.save_button.setMenu(save_menu)
-        self.toolbar.addWidget(self.save_button)
+            save_menu = QMenu(self.save_button)
+            self.action_save_collection = save_menu.addAction(
+                self.locale_manager.get("main_window.toolbar.save_collection")
+            )
+            self.action_save_collection_as = save_menu.addAction(
+                self.locale_manager.get("main_window.toolbar.save_collection_as")
+            )
+            self.save_button.setMenu(save_menu)
+            self.toolbar.addWidget(self.save_button)
 
-        self.toolbar.addSeparator()
+            self.toolbar.addSeparator()
 
-        self.action_collection_passport = QAction(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogInfoView),
-            self.locale_manager.get("main_window.toolbar.collection_passport"),
-            self,
-        )
-        self.toolbar.addAction(self.action_collection_passport)
+            self.action_collection_passport = QAction(
+                icons.get_qicon("SLIDERS"),  # <--- ЗАМЕНА (Паспорт коллекции)
+                self.locale_manager.get("main_window.toolbar.collection_passport"),
+                self,
+            )
+            self.toolbar.addAction(self.action_collection_passport)
 
-        self.action_refresh_scripts_toolbar = QAction(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload),
-            self.locale_manager.get("main_window.toolbar.refresh_scripts"),
-            self,
-        )
-        self.toolbar.addAction(self.action_refresh_scripts_toolbar)
+            self.action_refresh_scripts_toolbar = QAction(
+                icons.get_qicon("REFRESH"),  # <--- ЗАМЕНА
+                self.locale_manager.get("main_window.toolbar.refresh_scripts"),
+                self,
+            )
+            self.toolbar.addAction(self.action_refresh_scripts_toolbar)
 
-        self.toolbar.addSeparator()
+            self.toolbar.addSeparator()
 
-        self.action_settings_toolbar = QAction(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_DialogHelpButton),
-            self.locale_manager.get("main_window.toolbar.settings"),
-            self,
-        )
-        self.toolbar.addAction(self.action_settings_toolbar)
+            self.action_settings_toolbar = QAction(
+                icons.get_qicon("SETTINGS"),  # <--- ЗАМЕНА
+                self.locale_manager.get("main_window.toolbar.settings"),
+                self,
+            )
+            self.toolbar.addAction(self.action_settings_toolbar)
 
-        self.action_toggle_console_toolbar = QAction(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_DesktopIcon),
-            self.locale_manager.get("main_window.toolbar.toggle_console"),
-            self,
-        )
-        self.action_toggle_console_toolbar.setCheckable(True)
-        self.action_toggle_console_toolbar.setChecked(self.console_visible_state)
-        self.toolbar.addAction(self.action_toggle_console_toolbar)
+            self.action_toggle_console_toolbar = QAction(
+                icons.get_qicon("CONSOLE"),  # <--- ЗАМЕНА
+                self.locale_manager.get("main_window.toolbar.toggle_console"),
+                self,
+            )
+            self.action_toggle_console_toolbar.setCheckable(True)
+            self.action_toggle_console_toolbar.setChecked(self.console_visible_state)
+            self.toolbar.addAction(self.action_toggle_console_toolbar)
 
-        self.toolbar.addSeparator()
-        spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
-        self.toolbar.addWidget(spacer)
+            self.toolbar.addSeparator()
+            spacer = QWidget()
+            spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            self.toolbar.addWidget(spacer)
 
-        self.action_exit_toolbar = QAction(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_TabCloseButton),
-            self.locale_manager.get("main_window.toolbar.exit"),
-            self,
-        )
-        self.action_exit_toolbar.triggered.connect(self.close)
-        self.toolbar.addAction(self.action_exit_toolbar)
+            self.action_exit_toolbar = QAction(
+                icons.get_qicon("EXIT"), # <--- Используем новую иконку
+                self.locale_manager.get("main_window.toolbar.exit"),
+                self,
+            )
+            self.action_exit_toolbar.triggered.connect(self.close)
+            self.toolbar.addAction(self.action_exit_toolbar)
 
     def _create_left_panel(self):
         self.left_panel_splitter = QSplitter(Qt.Orientation.Vertical)

@@ -4,12 +4,13 @@
 """
 import logging
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QGraphicsView,
     QGraphicsScene, QGraphicsPixmapItem, QPushButton, QSlider, QFrame, QComboBox, QDialogButtonBox,
-    QListWidget, QListWidgetItem
+    QListWidget, QListWidgetItem,
+    QSpinBox, QCheckBox, QGroupBox, QFormLayout # <--- Добавлены новые виджеты
 )
 from PySide6.QtGui import QPixmap, QPainter, QTransform, QWheelEvent, QIcon 
 from PySide6.QtCore import Qt, Slot, QEvent, QSize
@@ -19,6 +20,7 @@ from . import editor_styles as styles
 
 try:
     from pysm_lib import pysm_context
+    from pysm_lib.pysm_theme_api import set_widget_class    
     IS_MANAGED_RUN = True
 except ImportError:
     pysm_context = None
@@ -48,6 +50,7 @@ class EnhanceSettingsDialog(QDialog):
         "brightness": 1.0, "contrast": 1.1, "color": 1.1, "sharpness": 1.2
     }
 
+
     def __init__(self, preview_image_path: Path, parent=None):
         super().__init__(parent)
         if not IS_PILLOW_AVAILABLE:
@@ -57,21 +60,31 @@ class EnhanceSettingsDialog(QDialog):
         self.original_pil_image: Optional[Image.Image] = None
         self.original_qt_pixmap: Optional[QPixmap] = None
         self.enhancement_factors: Dict[str, float] = {}
+        
+        # Параметры экспорта
+        self.original_size = (0, 0)
+        self.original_dpi = 300
         self.is_fitted_in_view = False
 
-        self.setWindowTitle("Настройка улучшения изображений")
-        self.setMinimumSize(1000, 700)
-        #self.setStyleSheet(styles.MAIN_WINDOW_STYLE)
+        self.setWindowTitle("Настройка экспорта")
+        self.setMinimumSize(1100, 750) # Немного увеличили окно
 
         self._load_original_image()
         self._init_ui()
         self._load_settings()
         self._update_preview()
 
+
     def _load_original_image(self):
         try:
+            # Загружаем оригинал
             self.original_pil_image = Image.open(self.preview_image_path).convert("RGB")
-            # --- ИЗМЕНЕНИЕ: Используем правильный вызов Модуль.Класс() ---
+            
+            # Сохраняем исходные параметры
+            self.original_size = self.original_pil_image.size
+            info = self.original_pil_image.info
+            self.original_dpi = int(info.get('dpi', (300, 300))[0]) # Берем X DPI
+            
             if ImageQt:
                 qimage = ImageQt.ImageQt(self.original_pil_image)
                 self.original_qt_pixmap = QPixmap.fromImage(qimage)
@@ -83,6 +96,8 @@ class EnhanceSettingsDialog(QDialog):
 
     def _init_ui(self):
         main_layout = QHBoxLayout(self)
+        
+        # 1. Левая часть - Превью (без изменений)
         preview_container = QFrame()
         preview_layout = QVBoxLayout(preview_container)
         self.scene = QGraphicsScene(self)
@@ -90,29 +105,26 @@ class EnhanceSettingsDialog(QDialog):
         self.view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
         self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        #self.view.setStyleSheet("QGraphicsView { border: 1px solid #444; }")
-        #self.view.verticalScrollBar().setStyleSheet(styles.SCROLLBAR_STYLE)
-        #self.view.horizontalScrollBar().setStyleSheet(styles.SCROLLBAR_STYLE)
         self.pixmap_item = QGraphicsPixmapItem()
         self.scene.addItem(self.pixmap_item)
         self.view.installEventFilter(self)
-        #preview_title = QLabel("<b>Предпросмотр (Колесо - зум, Двойной клик - вписать/100%)</b>")
-        #preview_title.setStyleSheet(styles.TITLE_LABEL_STYLE)
-        #preview_layout.addWidget(preview_title)
         preview_layout.addWidget(self.view)
+
+        # 2. Правая часть - Настройки
         settings_container = QFrame()
-        settings_container.setFixedWidth(280)
+        settings_container.setFixedWidth(320)
         settings_layout = QVBoxLayout(settings_container)
-        toggle_preview_button = QPushButton("До/После")
-        #toggle_preview_button.setStyleSheet(styles.BUTTON_STYLE)
-        toggle_preview_button.pressed.connect(self._show_original_preview)
-        toggle_preview_button.released.connect(self._update_preview)
-        settings_layout.addWidget(toggle_preview_button)
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setFrameShadow(QFrame.Shadow.Sunken)
-        #line.setStyleSheet("QFrame { border: 1px solid #444; }")
+
+        # --- Кнопка До/После ---
+        #toggle_preview_button = QPushButton("До/После (Зажать)")
+        #toggle_preview_button.pressed.connect(self._show_original_preview)
+        #toggle_preview_button.released.connect(self._update_preview)
+        #settings_layout.addWidget(toggle_preview_button)
+        
+        line = QFrame(); line.setFrameShape(QFrame.Shape.HLine); line.setFrameShadow(QFrame.Shadow.Sunken)
         settings_layout.addWidget(line)
+
+        # --- Слайдеры улучшения ---
         self.brightness_slider = self._create_slider("Яркость", "brightness")
         self.contrast_slider = self._create_slider("Контраст", "contrast")
         self.color_slider = self._create_slider("Насыщенность", "color")
@@ -122,28 +134,107 @@ class EnhanceSettingsDialog(QDialog):
         settings_layout.addWidget(self.color_slider["group"])
         settings_layout.addWidget(self.sharpness_slider["group"])
 
+        line2 = QFrame(); line2.setFrameShape(QFrame.Shape.HLine); line2.setFrameShadow(QFrame.Shadow.Sunken)
+        settings_layout.addWidget(line2)
+
+# --- НАЧАЛО ИСПРАВЛЕННОГО БЛОКА (Правильный порядок) ---
+        # Сначала создаем Группу и Лайаут
+        export_group = QGroupBox("Параметры вывода")
+        export_layout = QFormLayout(export_group)
+
+        # 1. Качество JPEG (теперь добавляем в существующий export_layout)
+        self.quality_spin = QSpinBox()
+        self.quality_spin.setRange(1, 100)
+        self.quality_spin.setValue(95)
+        self.quality_spin.setSuffix("%")
+        export_layout.addRow("Качество JPG:", self.quality_spin)
+
+        # 2. DPI
+        self.dpi_spin = QSpinBox()
+        self.dpi_spin.setRange(72, 1200)
+        self.dpi_spin.setValue(self.original_dpi)
+        self.dpi_spin.setSuffix(" dpi")
+        export_layout.addRow("Разрешение:", self.dpi_spin)
+
+        # 3. Размер
+        self.width_spin = QSpinBox()
+        self.width_spin.setRange(100, 20000)
+        self.width_spin.setValue(self.original_size[0])
+        self.width_spin.setSuffix(" px")
+        
+        self.height_spin = QSpinBox()
+        self.height_spin.setRange(100, 20000)
+        self.height_spin.setValue(self.original_size[1])
+        self.height_spin.setSuffix(" px")
+
+        self.ratio_check = QCheckBox("Сохранять пропорции")
+        self.ratio_check.setChecked(True)
+
+        export_layout.addRow("Ширина:", self.width_spin)
+        export_layout.addRow("Высота:", self.height_spin)
+        export_layout.addRow("", self.ratio_check)
+        
+        # Логика пропорций
+        self.aspect_ratio = self.original_size[0] / self.original_size[1] if self.original_size[1] > 0 else 1.0
+        self.width_spin.valueChanged.connect(self._on_width_changed)
+        self.height_spin.valueChanged.connect(self._on_height_changed)
+
+        # 4. Водяные знаки
+        self.watermark_check = QCheckBox("Наложить водяные знаки")
+        self.watermark_check.setChecked(True)
+        export_layout.addRow("", self.watermark_check)
+        
+        # Добавляем готовую группу в основной лайаут
+        settings_layout.addWidget(export_group)
+# --- КОНЕЦ ИСПРАВЛЕННОГО БЛОКА ---
         apply_button = QPushButton("Применить и экспортировать")
-        #apply_button.setStyleSheet(styles.BUTTON_STYLE + "background-color: #28a745;")
+        apply_button.setProperty("class", "primary") 
+        #set_widget_class(apply_button, "primary")        
         apply_button.clicked.connect(self.accept)
         settings_layout.addWidget(apply_button)
 
+
         settings_layout.addStretch()
 
+        # Кнопки
+        # --- Кнопка До/После ---
+        toggle_preview_button = QPushButton("До/После")
+        toggle_preview_button.pressed.connect(self._show_original_preview)
+        toggle_preview_button.released.connect(self._update_preview)
+        toggle_preview_button.setProperty("class", "primary") 
+        
 
         reset_button = QPushButton("Сбросить")
         cancel_button = QPushButton("Отмена")
-        #reset_button.setStyleSheet(styles.BUTTON_STYLE_ORANGE_COMPACT)
-        #cancel_button.setStyleSheet(styles.BUTTON_STYLE_ORANGE_COMPACT)
         reset_button.clicked.connect(self._reset_sliders)
         cancel_button.clicked.connect(self.reject)
+        
+        
         bottom_buttons_layout = QHBoxLayout()
+        bottom_buttons_layout.addWidget(toggle_preview_button)
         bottom_buttons_layout.addWidget(reset_button)
         bottom_buttons_layout.addWidget(cancel_button)
-        settings_layout.addLayout(bottom_buttons_layout)
 
+        settings_layout.addLayout(bottom_buttons_layout)
 
         main_layout.addWidget(preview_container, 1)
         main_layout.addWidget(settings_container)
+
+
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Логика изменения размеров ---
+    def _on_width_changed(self, new_width):
+        if self.ratio_check.isChecked():
+            self.height_spin.blockSignals(True)
+            self.height_spin.setValue(int(new_width / self.aspect_ratio))
+            self.height_spin.blockSignals(False)
+
+    def _on_height_changed(self, new_height):
+        if self.ratio_check.isChecked():
+            self.width_spin.blockSignals(True)
+            self.width_spin.setValue(int(new_height * self.aspect_ratio))
+            self.width_spin.blockSignals(False)
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
 
     def eventFilter(self, source, event: QEvent) -> bool:
         if source is self.view and event.type() == QEvent.Type.MouseButtonDblClick:
@@ -202,18 +293,55 @@ class EnhanceSettingsDialog(QDialog):
             self.pixmap_item.setPixmap(self.original_qt_pixmap)
             
     def _load_settings(self):
+        # Загружаем настройки улучшения
         settings = self.RECOMMENDED_DEFAULTS
         if IS_MANAGED_RUN and pysm_context:
             settings = pysm_context.get("enhancer_settings", self.RECOMMENDED_DEFAULTS)
-        else:
-            logger.warning("pysm_context не доступен, используются рекомендуемые настройки.")
+        
         for key, widget_dict in self._get_all_sliders().items():
             value = float(settings.get(key, self.RECOMMENDED_DEFAULTS.get(key, 1.0)))
             widget_dict["slider"].setValue(int(value * 100))
 
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Загрузка параметров экспорта ---
+        # 1. Сбрасываем размеры на оригинал текущего фото (безопасно)
+        self.width_spin.setValue(self.original_size[0])
+        self.height_spin.setValue(self.original_size[1])
+        
+        # 2. Загружаем сохраненные параметры экспорта или ставим дефолт
+        # DPI
+        saved_dpi = settings.get("export_dpi", self.original_dpi)
+        self.dpi_spin.setValue(int(saved_dpi))
+        
+        # Качество
+        saved_quality = settings.get("export_quality", 95)
+        self.quality_spin.setValue(int(saved_quality))
+        
+        # Чекбоксы
+        saved_watermarks = settings.get("export_watermarks", True)
+        self.watermark_check.setChecked(bool(saved_watermarks))
+        
+        saved_ratio = settings.get("export_keep_ratio", True)
+        self.ratio_check.setChecked(bool(saved_ratio))
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+
     def accept(self):
         if IS_MANAGED_RUN and pysm_context:
-            pysm_context.set("enhancer_settings", self.enhancement_factors)
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Сохранение всех параметров в контекст ---
+            # Берем текущие коэффициенты слайдеров
+            settings = self.enhancement_factors.copy()
+            
+            # Добавляем параметры экспорта
+            settings.update({
+                "export_dpi": self.dpi_spin.value(),
+                "export_quality": self.quality_spin.value(),
+                "export_watermarks": self.watermark_check.isChecked(),
+                "export_keep_ratio": self.ratio_check.isChecked()
+                # Размеры (width/height) не сохраняем, они зависят от фото
+            })
+            
+            pysm_context.set("enhancer_settings", settings)
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
         super().accept()
 
     def _create_slider(self, name: str, key: str) -> Dict:
@@ -235,12 +363,38 @@ class EnhanceSettingsDialog(QDialog):
         self._update_preview()
 
     def _reset_sliders(self):
+        # Сброс слайдеров
         for key, widget_dict in self._get_all_sliders().items():
             default_value = self.RECOMMENDED_DEFAULTS.get(key, 1.0)
             widget_dict["slider"].setValue(int(default_value * 100))
+        
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Сброс параметров экспорта ---
+        # Сброс размеров и DPI на оригинальные значения файла
+        self.width_spin.setValue(self.original_size[0])
+        self.height_spin.setValue(self.original_size[1])
+        self.dpi_spin.setValue(self.original_dpi)
+        
+        # Сброс остальных настроек на "заводские"
+        self.quality_spin.setValue(95)
+        self.watermark_check.setChecked(True)
+        self.ratio_check.setChecked(True)
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
-    def get_enhancement_factors(self) -> Dict[str, float]:
-        return self.enhancement_factors
+    def get_export_settings(self) -> Dict[str, Any]:
+        """Возвращает словарь со всеми настройками (улучшение + размер + dpi + качество + водяные знаки)."""
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Возврат новых параметров ---
+        return {
+            "factors": self.enhancement_factors,
+            "width": self.width_spin.value(),
+            "height": self.height_spin.value(),
+            "dpi": self.dpi_spin.value(),
+            "quality": self.quality_spin.value(),
+            "watermarks": self.watermark_check.isChecked()
+        }
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+    #def get_enhancement_factors(self) -> Dict[str, float]:
+    #    return self.enhancement_factors
 
     def _get_all_sliders(self) -> Dict[str, Dict]:
         return {"brightness": self.brightness_slider, "contrast": self.contrast_slider,

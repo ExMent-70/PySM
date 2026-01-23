@@ -208,16 +208,23 @@ class ExportWorker(QObject):
     progress_updated = Signal(int)
     finished = Signal(str)
 
-    def __init__(self, tasks: List[Dict], num_threads: int, enhancement_factors: Dict[str, float], apply_watermarks: bool):
+# --- НАЧАЛО ИЗМЕНЕНИЯ: Добавлен аргумент quality ---
+    def __init__(self, tasks: List[Dict], num_threads: int, enhancement_factors: Dict[str, float], 
+                 target_size: Tuple[int, int], target_dpi: Tuple[int, int], 
+                 quality: int, apply_watermarks: bool):
         super().__init__()
         if Image is None:
-            raise ImportError("Для экспорта необходима библиотека Pillow. Установите ее: pip install Pillow")
+            raise ImportError("Для экспорта необходима библиотека Pillow.")
         self.tasks = tasks
         self.num_threads = num_threads
         self.enhancement_factors = enhancement_factors
+        self.target_size = target_size
+        self.target_dpi = target_dpi
+        self.quality = quality  # Сохраняем качество
         self.apply_watermarks = apply_watermarks
         self.watermark_cache = None
         self._lock = threading.Lock()
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
     def _create_watermark(self, size: Tuple[int, int]) -> Image.Image:
         with self._lock:
@@ -235,85 +242,119 @@ class ExportWorker(QObject):
 
 
     def _process_single_task(self, task: Dict):
-        """Обрабатывает одну задачу (одно изображение)."""
-        if ImageEnhance is None:
-            raise ImportError("Для улучшения изображений требуется Pillow (ImageEnhance).")
+            """Обрабатывает одну задачу (одно изображение)."""
+            if ImageEnhance is None:
+                raise ImportError("Для улучшения изображений требуется Pillow (ImageEnhance).")
 
-        source_path = task["source_path"]
-        output_path = task["output_path"]
-        child_name = task["child_name"]
+            source_path = task["source_path"]
+            output_path = task["output_path"]
+            child_name = task["child_name"]
 
-        file_number_match = re.search(r'(\d{4})$', Path(source_path).stem)
-        file_number = file_number_match.group(1) if file_number_match else "----"
+            file_number_match = re.search(r'(\d{4})$', Path(source_path).stem)
+            file_number = file_number_match.group(1) if file_number_match else "----"
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with Image.open(source_path).convert("RGBA") as base_image:
-            enhanced_image = base_image
-            factors = self.enhancement_factors
-            if factors.get("brightness", 1.0) != 1.0:
-                enhanced_image = ImageEnhance.Brightness(enhanced_image).enhance(factors["brightness"])
-            if factors.get("contrast", 1.0) != 1.0:
-                enhanced_image = ImageEnhance.Contrast(enhanced_image).enhance(factors["contrast"])
-            if factors.get("color", 1.0) != 1.0:
-                enhanced_image = ImageEnhance.Color(enhanced_image).enhance(factors["color"])
-            if factors.get("sharpness", 1.0) != 1.0:
-                enhanced_image = ImageEnhance.Sharpness(enhanced_image).enhance(factors["sharpness"])
+            # Открываем изображение
+            with Image.open(source_path) as src_img:
+                # Конвертируем для обработки
+                base_image = src_img.convert("RGBA")
 
-            final_image = enhanced_image
-            
-            if self.apply_watermarks:
-                watermark_grid = self._create_watermark(enhanced_image.size)
-                final_image = Image.alpha_composite(enhanced_image, watermark_grid)
+                # 1. Улучшение
+                enhanced_image = base_image
+                factors = self.enhancement_factors
+                if factors.get("brightness", 1.0) != 1.0:
+                    enhanced_image = ImageEnhance.Brightness(enhanced_image).enhance(factors["brightness"])
+                if factors.get("contrast", 1.0) != 1.0:
+                    enhanced_image = ImageEnhance.Contrast(enhanced_image).enhance(factors["contrast"])
+                if factors.get("color", 1.0) != 1.0:
+                    enhanced_image = ImageEnhance.Color(enhanced_image).enhance(factors["color"])
+                if factors.get("sharpness", 1.0) != 1.0:
+                    enhanced_image = ImageEnhance.Sharpness(enhanced_image).enhance(factors["sharpness"])
 
-                try:
-                    font_watermark = ImageFont.truetype("calibri.ttf", int(base_image.height / 18))
-                except IOError:
-                    font_watermark = ImageFont.load_default()
+                # 2. Изменение размера
+                # Используем LANCZOS для наилучшего качества
+                if self.target_size != enhanced_image.size:
+                    enhanced_image = enhanced_image.resize(self.target_size, Image.Resampling.LANCZOS)
+
+                final_image = enhanced_image
                 
-                watermark_text = "Выбор фото"
-                wm_bbox = font_watermark.getbbox(watermark_text)
-                wm_width, wm_height = wm_bbox[2] - wm_bbox[0], wm_bbox[3] - wm_bbox[1]
-                max_len = int((wm_width**2 + wm_height**2)**0.5) + 2 
-                
-                for _ in range(12):
-                    txt_layer = Image.new("RGBA", (max_len, max_len), (255, 255, 255, 0))
-                    draw_txt = ImageDraw.Draw(txt_layer)
-                    draw_txt.text(
-                        ((max_len - wm_width) / 2, (max_len - wm_height) / 2), 
-                        watermark_text, font=font_watermark, fill=(255, 255, 255, 85)
-                    )
-                    angle = random.randint(-45, 45)
-                    rotated_txt_layer = txt_layer.rotate(angle, expand=False, resample=Image.BICUBIC)
-                    rand_x = random.randint(0, int(base_image.width * 0.8))
-                    rand_y = random.randint(0, int(base_image.height * 0.8))
-                    final_image.paste(rotated_txt_layer, (rand_x, rand_y), rotated_txt_layer)
+                # 3. Водяные знаки (накладываем уже на измененный размер)
+                if self.apply_watermarks:
+                    # _create_watermark создаст сетку нужного (нового) размера
+                    watermark_grid = self._create_watermark(enhanced_image.size)
+                    final_image = Image.alpha_composite(enhanced_image, watermark_grid)
 
-                draw_main = ImageDraw.Draw(final_image)
-                font_size = int(base_image.height / 15)
-                
-                while font_size > 10:
+                    # --- Текст "Выбор фото" ---
+                    # Рассчитываем размер шрифта относительно НОВОЙ высоты
                     try:
-                        font_main = ImageFont.truetype("arialbd.ttf", font_size)
+                        font_watermark = ImageFont.truetype("calibri.ttf", int(final_image.height / 18))
                     except IOError:
-                        font_main = ImageFont.load_default(size=font_size)
+                        font_watermark = ImageFont.load_default()
+                    
+                    watermark_text = "Выбор фото"
+                    wm_bbox = font_watermark.getbbox(watermark_text)
+                    wm_width, wm_height = wm_bbox[2] - wm_bbox[0], wm_bbox[3] - wm_bbox[1]
+                    max_len = int((wm_width**2 + wm_height**2)**0.5) + 2 
+                    
+                    for _ in range(12):
+                        txt_layer = Image.new("RGBA", (max_len, max_len), (255, 255, 255, 0))
+                        draw_txt = ImageDraw.Draw(txt_layer)
+                        draw_txt.text(
+                            ((max_len - wm_width) / 2, (max_len - wm_height) / 2), 
+                            watermark_text, font=font_watermark, fill=(255, 255, 255, 85)
+                        )
+                        angle = random.randint(-45, 45)
+                        rotated_txt_layer = txt_layer.rotate(angle, expand=False, resample=Image.BICUBIC)
+                        # Координаты для вставки рандомим в пределах нового размера
+                        rand_x = random.randint(0, int(final_image.width * 0.8))
+                        rand_y = random.randint(0, int(final_image.height * 0.8))
+                        final_image.paste(rotated_txt_layer, (rand_x, rand_y), rotated_txt_layer)
+
+                    # --- Имя и Номер файла ---
+                    draw_main = ImageDraw.Draw(final_image)
+                    # Размер основного шрифта относительно НОВОЙ высоты
+                    font_size = int(final_image.height / 15)
+                    
+                    while font_size > 10:
+                        try:
+                            font_main = ImageFont.truetype("arialbd.ttf", font_size)
+                        except IOError:
+                            font_main = ImageFont.load_default(size=font_size)
+                        
+                        name_bbox = draw_main.textbbox((0, 0), child_name, font=font_main)
+                        # Проверяем, влезает ли текст в НОВУЮ ширину
+                        if (name_bbox[2] - name_bbox[0]) < final_image.width * 0.9: break
+                        font_size -= 2
                     
                     name_bbox = draw_main.textbbox((0, 0), child_name, font=font_main)
-                    if (name_bbox[2] - name_bbox[0]) < base_image.width * 0.9: break
-                    font_size -= 2
-                
-                name_bbox = draw_main.textbbox((0, 0), child_name, font=font_main)
-                name_width, name_height = name_bbox[2] - name_bbox[0], name_bbox[3] - name_bbox[1]
-                name_pos = ((base_image.width - name_width) / 2, (base_image.height - name_height) / 2 + 340)
-                #name_pos = ((base_image.width - name_width) / 2, (base_image.height - name_height) / 2 - 20)
-                draw_main.text(name_pos, child_name, font=font_main, fill="white", stroke_width=3, stroke_fill="black")
+                    name_width, name_height = name_bbox[2] - name_bbox[0], name_bbox[3] - name_bbox[1]
+                    
+                    # Вычисляем позицию текста. 
+                    # Ранее было фиксированное смещение +340 px.
+                    # Теперь масштабируем это смещение пропорционально высоте, чтобы текст не улетел на маленьких картинках.
+                    # Берем 4000px как условный эталон высоты для смещения 340.
+                    reference_height = 4000
+                    scaled_offset = int(340 * (final_image.height / reference_height))
+                    # Минимальное смещение, чтобы не прилипло к центру, если картинка совсем маленькая
+                    scaled_offset = max(scaled_offset, int(final_image.height * 0.05))
 
-                num_bbox = draw_main.textbbox((0, 0), file_number, font=font_main)
-                num_width = num_bbox[2] - num_bbox[0]
-                num_pos = ((base_image.width - num_width) / 2, name_pos[1] + name_height + 10)
-                draw_main.text(num_pos, file_number, font=font_main, fill="white", stroke_width=3, stroke_fill="black")
-            
-            final_image.convert("RGB").save(output_path, "JPEG", quality=95)
+                    name_pos = ((final_image.width - name_width) / 2, (final_image.height - name_height) / 2 + scaled_offset)
+                    draw_main.text(name_pos, child_name, font=font_main, fill="white", stroke_width=3, stroke_fill="black")
+
+                    num_bbox = draw_main.textbbox((0, 0), file_number, font=font_main)
+                    num_width = num_bbox[2] - num_bbox[0]
+                    num_pos = ((final_image.width - num_width) / 2, name_pos[1] + name_height + 10)
+                    draw_main.text(num_pos, file_number, font=font_main, fill="white", stroke_width=3, stroke_fill="black")
+                
+                # 4. Сохраняем с указанным пользователем DPI и Качеством
+                final_image.convert("RGB").save(
+                    output_path, 
+                    "JPEG", 
+                    quality=self.quality, # Используем переменную
+                    dpi=self.target_dpi
+                )                
+
 
     def run(self):
         total = len(self.tasks)

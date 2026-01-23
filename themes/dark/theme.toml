@@ -1,32 +1,61 @@
-api_image_description = "color: #6c757d; font-size: 11pt; font-style: italic; background-color: transparent; padding: 2px;"
-api_link = "color: #0077b6; font-size: 12pt; text-decoration: underline; font-weight: normal;"
-collection_info = "color: #000000; background-color: #e8f0fe; padding: 5px; border-radius: 3px;"
-console_background = "background-color: #ffffff;"
-delegate_changed_indicator = "color: #f0ad4e;"
-delegate_hover_border = "color: #0078d7;"
-delegate_preview_background = "color: #e8e8e8;"
-delegate_secondary_text = "color: #555555;"
-markup_number = "background-color: #27ae60; border-color: #bbdefb; color: #ffffff;"
-runner_info = "color: #808080; font-style: italic;"
-script_arg_value = "color: #005a9e;"
-script_description = "color: #ffffff; background-color: #0077b6; font-size: 10pt; padding: 10px;"
-script_error_block = "color: #ffffff; background-color: #c0392b; font-weight: bold;"
-script_header_block = "color: #ffffff; background-color: #27ae60; font-weight: bold;"
-script_info = "color: #555555; font-family: 'Courier New', monospace;"
-script_stderr = "color: #e74c3c;"
-script_stdout = "color: #e8e8e8;"
-script_success_block = "color: #ffffff; background-color: #27ae60; font-weight: bold;"
-set_header = "color: #ffffff; background-color: #0078d7; font-weight: bold;"
-set_info = "color: #005a9e;"
-status_error = "background-color: #f8d7da; color: #721c24;"
-status_pending = "background-color: transparent; color: #383d41;"
-status_running = "background-color: #d4edda; color: #155724;"
-status_skipped = "background-color: #e2e3e5; color: #383d41;"
-status_success = "background-color: transparent; color: #155724;"
-table_background_alternate = "color: #2d2d30;"
-table_background_base = "color: #252526;"
-table_status_found = "color: #ffffff; background-color: #27ae60;"
-table_status_not_found = "color: #ffffff; background-color: #c0392b;"
-tooltip_arg_value = "color: #0078d7;"
-tooltip_instance_args_block = "color: #000000; background-color: #e8f5e9; padding: 5px; border-radius: 5px; border: 1px solid #d0e8d2;"
-tooltip_script_args_block = "color: #000000; background-color: #e5f1fb; padding: 5px; border-radius: 5px; border: 1px solid #d0e0f0;"
+api_image_description = "color: #8b949e; font-size: 11pt; font-style: italic; background-color: transparent; padding: 2px;"
+api_link = "color: #58a6ff; font-size: 12pt; text-decoration: underline; font-weight: normal;"
+# Добавлено: Ярко-красный для ссылок с ошибками на темном фоне
+api_link_error = "color: #ff7b72; font-size: 12pt; text-decoration: line-through; font-weight: normal;"
+# Очень темный фон для инфо-блоков
+collection_info = "color: #c9d1d9; background-color: #161b22; padding: 5px; border-radius: 3px;"
+# Почти черный фон консоли
+console_background = "background-color: #0d1117;"
+delegate_changed_indicator = "color: #d29922;"
+delegate_hover_border = "color: #58a6ff;"
+delegate_preview_background = "color: #161b22;"
+delegate_secondary_text = "color: #8b949e;"
+# Добавлено: Красная граница при перетаскивании
+delegate_drop_target_border = "color: #f85149;"
+
+# Маркапы: Темный фон, светлый текст
+markup_number = "background-color: #238636; border-color: #2ea043; color: #ffffff;"
+markup_surname = "background-color: #1f6feb; border-color: #388bfd; color: #ffffff;"
+markup_name = "background-color: #30363d; border-color: #6e7681; color: #c9d1d9;"
+markup_fio = "background-color: #3e1f1f; border-color: #8e1519; color: #ffa198;"
+
+runner_info = "color: #8b949e; font-style: italic;"
+script_arg_value = "color: #79c0ff;"
+script_description = "color: #c9d1d9; background-color: #1f6feb; font-size: 10pt; padding: 10px;"
+script_error_block = "color: #ffffff; background-color: #8e1519; font-weight: bold;"
+script_header_block = "color: #ffffff; background-color: #238636; font-weight: bold;"
+script_info = "color: #8b949e; font-family: 'Courier New', monospace;"
+script_stderr = "color: #ff7b72;"
+script_stdout = "color: #c9d1d9;"
+script_success_block = "color: #ffffff; background-color: #238636; font-weight: bold;"
+set_header = "color: #ffffff; background-color: #1f6feb; font-weight: bold;"
+set_info = "color: #79c0ff;"
+
+# Статусы: Темные подложки, яркий текст
+status_error = "background-color: #3e1f1f; color: #ff7b72;"
+status_pending = "background-color: transparent; color: #8b949e;"
+status_running = "background-color: #1f3625; color: #3fb950;"
+status_skipped = "background-color: #161b22; color: #6e7681;"
+status_success = "background-color: transparent; color: #3fb950;"
+
+# Таблицы: Чередование очень темных цветов
+table_background_alternate = "color: #161b22;"
+table_background_base = "color: #0d1117;"
+table_status_found = "color: #ffffff; background-color: #238636;"
+table_status_not_found = "color: #ffffff; background-color: #8e1519;"
+
+tooltip_arg_value = "color: #79c0ff;"
+tooltip_instance_args_block = "color: #c9d1d9; background-color: #161b22; padding: 5px; border-radius: 5px; border: 1px solid #30363d;"
+tooltip_script_args_block = "color: #c9d1d9; background-color: #161b22; padding: 5px; border-radius: 5px; border: 1px solid #30363d;"
+
+# --- Палитра Иконок (High Contrast Dark) ---
+icon_primary = "color: #8b949e;"    # Светло-серый
+icon_folder = "color: #e3b341;"     # Золотой (хорошо виден на черном)
+icon_file = "color: #58a6ff;"       # Светло-синий
+icon_success = "color: #3fb950;"    # Ярко-зеленый
+icon_warning = "color: #d29922;"    # Оранжево-желтый
+icon_danger = "color: #f85149;"     # Ярко-красный
+icon_info = "color: #79c0ff;"       # Голубой
+icon_adobe = "color: #ff7b72;"      # Лососевый
+icon_code = "color: #56d364;"       # Светло-зеленый
+icon_archive = "color: #6e7681;"    # Серый

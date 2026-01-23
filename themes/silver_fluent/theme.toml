@@ -1,11 +1,27 @@
 api_image_description = "color: #555555; font-style: italic;"
 api_link = "color: #0066cc; text-decoration: none;"
+# Добавлено: Красный для ссылок-ошибок
+api_link_error = "color: #c82333; text-decoration: line-through;"
+
+# Добавлено: Светло-голубой фон для инфо-панели (стандарт для светлых тем)
+collection_info = "color: #000000; background-color: #e8f0fe; padding: 5px; border-radius: 3px;"
+
 console_background = "background-color: #ffffff;"
 delegate_changed_indicator = "color: #c82333;"
 delegate_hover_border = "color: #0078d7;"
 delegate_preview_background = "color: #e8e8e8;"
 delegate_secondary_text = "color: #555555;"
+# Добавлено: Красная граница для дроп-зоны
+delegate_drop_target_border = "color: #c82333;"
+
 markup_number = "background-color: #27ae60; border-color: #bbdefb; color: #ffffff;"
+# Добавлено: Стиль для Фамилии (Синий)
+markup_surname = "background-color: #e3f2fd; border-color: #bbdefb; color: #0d47a1;"
+# Добавлено: Стиль для Имени (Зеленый/Серый)
+markup_name = "background-color: #f0f0f0; border-color: #cccccc; color: #333333;"
+# Добавлено: Стиль для неразобранного (Оранжевый)
+markup_fio = "background-color: #fff3e0; border-color: #ffe0b2; color: #e65100;"
+
 runner_info = "color: #777777; font-style: italic;"
 script_arg_value = "color: #000000; font-weight: bold;"
 script_description = "color: #1c1c1c; background-color: #e5f1fb; padding: 10px;"
@@ -22,10 +38,26 @@ status_pending = "background-color: transparent; color: #555555;"
 status_running = "background-color: #cce4f7; color: #004085;"
 status_skipped = "background-color: #e2e3e5; color: #383d41;"
 status_success = "background-color: transparent; color: #155724;"
-table_status_found = "color: #218838; background-color: #218838;"
-table_status_not_found = "color: #c0392b; background-color: #c0392b;"
+
+table_background_base = "color: #ffffff;"
+table_background_alternate = "color: #f7f7f7;"
+# Исправлено: текст сделан белым (был зеленым на зеленом фоне)
+table_status_found = "color: #ffffff; background-color: #218838;"
+# Исправлено: текст сделан белым (был красным на красном фоне)
+table_status_not_found = "color: #ffffff; background-color: #c0392b;"
+
 tooltip_arg_value = "color: #0078d7;"
 tooltip_instance_args_block = "background-color: #f8f9fa; border-left: 3px solid #0078d7; padding: 5px;"
 tooltip_script_args_block = "background-color: #f8f9fa; border-left: 3px solid #cccccc; padding: 5px;"
-table_background_base = "color: #ffffff;"
-table_background_alternate = "color: #f7f7f7;"
+
+# --- Палитра Иконок (Classic Professional) ---
+icon_primary = "color: #555555;"    # Темно-серый
+icon_folder = "color: #F5B041;"     # Классический желтый папочный
+icon_file = "color: #0078d7;"       # Корпоративный синий
+icon_success = "color: #218838;"    # Темно-зеленый
+icon_warning = "color: #e67e22;"    # Оранжевый (лучше виден на белом, чем желтый)
+icon_danger = "color: #c82333;"     # Строгий красный
+icon_info = "color: #17a2b8;"       # Бирюзовый/Инфо
+icon_adobe = "color: #D9005F;"      # Брендовый Adobe
+icon_code = "color: #28a745;"       # Зеленый код
+icon_archive = "color: #6c757d;"    # Серый
