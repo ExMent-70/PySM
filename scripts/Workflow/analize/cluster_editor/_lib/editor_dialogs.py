@@ -442,23 +442,33 @@ class FaceSelectorDialog(QDialog):
     Диалог для выбора конкретного лица на фотографии, если их найдено несколько.
     Показывает миниатюры всех обнаруженных лиц.
     """
-    def __init__(self, image_path: Path, faces: List, parent=None):
+    def __init__(self, image_path: Path, faces: List, parent=None, instruction_text: Optional[str] = None):
         super().__init__(parent)
         self.image_path = image_path
         self.faces = faces
         self.selected_index = -1
         
-        self.setWindowTitle("Выберите лицо для перемещения")
+        self.setWindowTitle("Выбор лица") # Более нейтральный заголовок
         self.setMinimumSize(600, 400)
         
         self.layout = QVBoxLayout(self)
         
-        # Инструкция
-        info_lbl = QLabel(f"На изображении <b>{image_path.name}</b> обнаружено несколько лиц.<br>"
+        # Формируем текст инструкции
+        if instruction_text:
+            # Если текст передан, используем его (добавляем имя файла для контекста)
+            final_text = f"Файл: <b>{image_path.name}</b><br><br>{instruction_text}"
+        else:
+            # Дефолтный текст (для обратной совместимости)
+            final_text = (f"На изображении <b>{image_path.name}</b> обнаружено несколько лиц.<br>"
                           "Выберите, какое из них соответствует целевому кластеру:")
+            
+        info_lbl = QLabel(final_text)
+        # Разрешаем перенос слов и форматирование
+        info_lbl.setWordWrap(True)
+        info_lbl.setTextFormat(Qt.TextFormat.RichText) 
         self.layout.addWidget(info_lbl)
         
-        # Список лиц (в виде иконок)
+
         self.list_widget = QListWidget()
         self.list_widget.setViewMode(QListWidget.ViewMode.IconMode)
         self.list_widget.setIconSize(QSize(150, 150))
@@ -467,13 +477,13 @@ class FaceSelectorDialog(QDialog):
         self.list_widget.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.layout.addWidget(self.list_widget)
         
-        # Кнопки
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btn_box.accepted.connect(self._on_accept)
         btn_box.rejected.connect(self.reject)
         self.layout.addWidget(btn_box)
         
         self._load_faces()
+# --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
     def _load_faces(self):
         if not IS_PILLOW_AVAILABLE or not Image:

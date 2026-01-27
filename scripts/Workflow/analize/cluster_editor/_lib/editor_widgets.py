@@ -4,11 +4,11 @@
 такие как списки с поддержкой Drag & Drop.
 """
 import logging
-from PySide6.QtWidgets import QListWidget
+from PySide6.QtWidgets import QListWidget, QListWidgetItem, QAbstractItemView
 from PySide6.QtGui import QDropEvent, QDrag, QPainter, QColor, QPixmap
-from PySide6.QtCore import Qt, Signal, QMimeData, QPoint
+from PySide6.QtCore import Qt, Signal, QMimeData, QPoint, QSize
 
-from .editor_delegates import THUMBNAIL_SIZE
+from .editor_delegates import THUMBNAIL_SIZE, FACE_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -144,3 +144,16 @@ class ImageDragListWidget(QListWidget):
         drag.setPixmap(drag_pixmap)
         drag.setHotSpot(QPoint(drag_pixmap.width() // 2, drag_pixmap.height() // 2))
         drag.exec(Qt.DropAction.MoveAction)
+        
+class FaceDetailsWidget(QListWidget):
+    """
+    Виджет для отображения крупных планов лиц с выделенной фотографии.
+    Поддерживает отображение цветных рамок и информации.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setViewMode(QListWidget.ViewMode.IconMode)
+        self.setResizeMode(QListWidget.ResizeMode.Adjust)
+        self.setSpacing(10)
+        self.setIconSize(QSize(FACE_SIZE, FACE_SIZE)) 
+        self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)      

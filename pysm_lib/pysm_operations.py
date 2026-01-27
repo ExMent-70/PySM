@@ -113,27 +113,37 @@ def perform_directory_operation(
     text_main = theme_api.get_parsed_style("script_stdout", default="color: #2c3e50")
     text_color = text_main.get("color")
     name_style = f"color: {text_color};"
+    icon_error = icons.ERROR()
+    icon_info = icons.INFO()
+    icon_sub = icons.ARROW_SUB()
+    icon_ok = icons.OK()
+    icon_folder = icons.FOLDER()
+    icon_warning = icons.WARNING()
 
     if mode == "move":
-        print("<b>ПЕРЕМЕЩЕНИЕ ФАЙЛОВ И ПАПОК</b>")
+        action_desc = "<b>ПЕРЕМЕЩЕНИЕ ФАЙЛОВ И ПАПОК</b>"
     else:
-        print("<b>КОПИРОВАНИЕ ФАЙЛОВ И ПАПОК</b>")
+        action_desc = "<b>КОПИРОВАНИЕ ФАЙЛОВ И ПАПОК</b>"
+    print(action_desc)
 
+    
     #print(f"\nРежим работы: <b>{mode}</b>,<br> Количество потоков: <b>{threads}</b>,<br> Действие при конфликте: <b>{on_conflict}</b>")
 
     source_dir = pathlib.Path(source_dir_str)
     dest_dir = pathlib.Path(dest_dir_str)
 
     if not source_dir.is_dir():
-        icon_stat = icons.ERROR()
-        html = (f'<div style="{name_style}">{icon_stat} Операция отменена. Папка {source_dir} не найдена<br></div>')
+        html = (f'<div style="{name_style}"><br>{icon_error} Операция отменена. Исходная папка не найдена:</div>')
+        html = html + (f'<div style="{name_style}"><i>{source_dir}</i><br></div>')
         pysm_context.log_html(html)       
         return 1
 
-
     final_dest_root = dest_dir / source_dir.name if copy_base_folder else dest_dir
-    print(f"Copying base folder: <b>{copy_base_folder}</b>")
-    print(f"Including files matching: <b>{include_patterns}</b>")
+    html=""
+    html = html + (f'<div style="{name_style}">{icon_sub} корневую папку: <b>{copy_base_folder}</b></div>')
+    html =  html +  (f'<div style="{name_style}">{icon_sub} только файлы: <b>{include_patterns}</b></div>')
+    pysm_context.log_html(html)       
+
 
     items_to_process = []
     for pattern in include_patterns:
@@ -143,13 +153,20 @@ def perform_directory_operation(
     )
 
     if not items_to_process:
-        tqdm.write("No files matching the filter were found. Exiting.")
+        html = (f'<div style="{name_style}">{icon_error} В целевой папке файлы <b>{include_patterns}</b> не найдены<br></div>')
+        pysm_context.log_html(html) 
         if copy_base_folder and not final_dest_root.exists():
             final_dest_root.mkdir(parents=True, exist_ok=True)
-            print(f"Created empty destination folder: {final_dest_root}")
+            html = (f'<div style="{name_style}">{icon_info} Создана целевая папка: <b>{final_dest_root}</b></div>')
+            pysm_context.log_html(html) 
         return 0
 
-    print(f"\nFound {len(items_to_process)} files to process...")
+    if mode == "move":
+        action_desc = "для перемещения"
+    else:
+        action_desc = "для копирования"
+    html = (f'<div style="{name_style}">{icon_info} \nНайдено файлов {action_desc}: <b>{len(items_to_process)}</b></div>')
+    pysm_context.log_html(html) 
 
     stats = {"success": 0, "error": 0, "skipped": 0}
 
@@ -181,9 +198,6 @@ def perform_directory_operation(
                 tqdm.write(f"[FATAL] An unexpected error occurred: {e}")
 
 
-
-
-
     # --- НАЧАЛО ИЗМЕНЕНИЙ: Полностью переработана логика завершения для 'move' ---
     if mode == "move" and stats["error"] == 0 and stats["success"] > 0:
         # Вместо удаления всей папки, мы аккуратно удаляем только пустые поддиректории,
@@ -193,26 +207,27 @@ def perform_directory_operation(
         _cleanup_empty_dirs(source_dir)
         
     elif mode == "move" and stats["error"] > 0:
-        tqdm.write(
-            "WARNING: Move completed with errors. Source directory structure remains untouched."
-        )
+        html = (f'<div style="{name_style}">{icon_warning}Перемещение выполнено с ошибками. Структура исходного каталога не изменилась</div>')
+        pysm_context.log_html(html) 
+
     # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
+    if mode == "move":
+        action_desc = "перемещено"
+    else:
+        action_desc = "скопировано"
+    sum_str = f"<b>{stats['success']}</b> {action_desc}, <b>{stats['skipped']}</b> пропущено, <b>{stats['error']}</b> ошибок"
+    html = (f'<div style="{name_style}">{icon_ok}{sum_str}</div>')
+    pysm_context.log_html(html) 
 
-
-
-
-    print(
-        f"Summary: {stats['success']} processed, {stats['skipped']} skipped, {stats['error']} failed."
-    )
     #print("[Directory Operation Finished]")
     pysm_context.log_link(
         url_or_path=str(source_dir), # Передаем строку, а не объект Path
-        text=f"<br>Открыть исходную папку <i>{source_dir}</i><br>",
+        text=f"{icon_folder} Исходная папка",
     )
     pysm_context.log_link(
         url_or_path=str(final_dest_root), # Передаем строку, а не объект Path
-        text=f"Открыть целевую папку <i>{final_dest_root}</i><br>",
+        text=f"{icon_folder} Целевая папка<br>",
     )    
     return 1 if stats["error"] > 0 else 0
 

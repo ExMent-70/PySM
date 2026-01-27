@@ -105,54 +105,88 @@ class ConfigManager:
             return default
 
 
-# --- Блок 4: Класс для загрузки эмбеддингов ---
+# --- Блок 4: Класс для работы с эмбеддингами ---
 # ==============================================================================
 class EmbeddingLoader:
     """
-    Класс для загрузки файлов эмбеддингов (.npy) и
+    Класс для загрузки И СОХРАНЕНИЯ файлов эмбеддингов (.npy) и
     соответствующих им индексных файлов (.json).
     """
     def __init__(self, embeddings_dir: Path):
         """
-        Инициализирует загрузчик.
+        Инициализирует менеджер.
 
         Args:
             embeddings_dir: Путь к директории, содержащей файлы эмбеддингов.
         """
-        if not embeddings_dir.is_dir():
-            raise FileNotFoundError(f"Директория с эмбеддингами не найдена: {embeddings_dir}")
+        if not embeddings_dir.exists():
+             # Директорию можно создать, если мы собираемся в нее писать
+             pass 
         self.embeddings_dir = embeddings_dir
 
     def load(self, data_type: str) -> Tuple[Optional[np.ndarray], Optional[Dict]]:
         """
         Загружает пару файлов: эмбеддинги и их индекс.
-
-        Args:
-            data_type: Тип данных для загрузки ('portrait' или 'group').
-
-        Returns:
-            Кортеж (numpy.ndarray, dict) в случае успеха, иначе (None, None).
         """
         npy_path = self.embeddings_dir / f"{data_type}_embeddings.npy"
         idx_path = self.embeddings_dir / f"{data_type}_index.json"
 
         if not npy_path.exists() or not idx_path.exists():
-            logger.warning(f"Файлы для '{data_type}' не найдены в {self.embeddings_dir}")
+            logger.warning(f"❌ Файлы для '{data_type}' не найдены в {self.embeddings_dir}")
             return None, None
         try:
             embeddings = np.load(npy_path)
             with idx_path.open("r", encoding="utf-8") as f:
                 index_data = json.load(f)
 
-            # Приведение ключей индекса к корректному формату для групповых фото
+            # Приведение ключей индекса к единому формату
             if data_type == "group":
-                index_data = {
-                    f"{key.split('::')[0]}::{int(key.split('::')[1])}": val
-                    for key, val in index_data.items()
-                }
+                # Гарантируем, что ключи имеют вид "filename::face_index"
+                new_index = {}
+                for key, val in index_data.items():
+                    try:
+                        fname, fidx = key.rsplit('::', 1)
+                        new_index[f"{fname}::{int(fidx)}"] = val
+                    except ValueError:
+                        continue # Пропускаем битые ключи
+                index_data = new_index
 
-            logger.info(f"Загружены эмбеддинги для '{data_type}': {embeddings.shape[0]} векторов.")
+            logger.info(f"ℹ️ Загружено <b>{embeddings.shape[0]}</b> векторов для <i>{data_type}</i>")
             return embeddings, index_data
         except Exception as e:
-            logger.error(f"Ошибка загрузки эмбеддингов для '{data_type}': {e}", exc_info=True)
+            logger.error(f"❌ Ошибка загрузки эмбеддингов для '{data_type}': {e}", exc_info=True)
             return None, None
+
+    # --- НОВЫЙ МЕТОД ---
+    def save(self, data_type: str, embeddings: np.ndarray, index: Dict[str, int]) -> bool:
+        """
+        Сохраняет массив эмбеддингов и индексный словарь на диск.
+
+        Args:
+            data_type: Тип данных ('portrait' или 'group').
+            embeddings: Numpy массив векторов (N, 512).
+            index: Словарь {ключ: номер_строки_в_массиве}.
+
+        Returns:
+            True, если сохранение прошло успешно.
+        """
+        try:
+            if not self.embeddings_dir.exists():
+                self.embeddings_dir.mkdir(parents=True, exist_ok=True)
+
+            npy_path = self.embeddings_dir / f"{data_type}_embeddings.npy"
+            idx_path = self.embeddings_dir / f"{data_type}_index.json"
+
+            # 1. Сохраняем .npy
+            np.save(npy_path, embeddings)
+
+            # 2. Сохраняем .json
+            # Для group проверяем формат ключей, но обычно сохраняем как есть
+            with idx_path.open("w", encoding="utf-8") as f:
+                json.dump(index, f, ensure_ascii=False, indent=2)
+
+            logger.info(f"💾 Сохранено <b>{embeddings.shape[0]}</b> векторов для <i>{data_type}</i>")
+            return True
+        except Exception as e:
+            logger.critical(f"❌ Критическая ошибка при сохранении эмбеддингов '{data_type}': {e}", exc_info=True)
+            return False

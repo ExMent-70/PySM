@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 
 from PySide6.QtCore import QObject, Signal, Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QImage
 
 try:
     from PIL import Image, ImageDraw, ImageFont, ImageEnhance
@@ -89,115 +89,111 @@ class GalleryPrepareWorker(QObject):
         self.finished.emit()
 
 
-class FileReaderWorker(QObject):
-    """Читает файлы с диска последовательно в одном потоке, чтобы избежать I/O contention."""
-    finished = Signal(list)
-
-    def __init__(self, tasks: List[Dict]):
-        super().__init__()
-        self.tasks = tasks
-        self._is_interruption_requested = False
-
-    def requestInterruption(self):
-        self._is_interruption_requested = True
-
-    def run(self):
-        read_data_tasks = []
-        for task in self.tasks:
-            if self._is_interruption_requested:
-                break
-            
-            full_path = task.get("full_path")
-            if not full_path or not full_path.is_file():
-                continue
-
-            try:
-                raw_data = full_path.read_bytes()
-                new_task = {
-                    "filename": task["filename"],
-                    "cluster_id": task["cluster_id"],
-                    "raw_data": raw_data
-                }
-                read_data_tasks.append(new_task)
-            except IOError as e:
-                logger.error(f"Ошибка чтения файла {full_path}: {e}")
-        
-        if not self._is_interruption_requested:
-            self.finished.emit(read_data_tasks)
 
 
-class GalleryLoadWorker(QObject):
+# --- НОВЫЙ КЛАСС: Умный загрузчик ---
+class ChunkedImageLoader(QObject):
     """
-    Создает QPixmap из данных в памяти и кэширует их.
-    Сообщает о прогрессе и о завершении со списком обработанных файлов.
+    Загружает изображения параллельно и отдает их порциями (чанками)
+    по мере готовности, обеспечивая плавность интерфейса.
     """
+    # Сигнал отправляет список кортежей: [(filename, QImage), ...]
+    chunk_ready = Signal(list) 
     progress_updated = Signal(int)
-    finished = Signal(list) 
+    finished = Signal()
 
     def __init__(self, tasks: List[Dict], pixmap_cache: Dict):
         super().__init__()
         self.tasks = tasks
         self.pixmap_cache = pixmap_cache
-        self.num_threads = os.cpu_count() or 4
+        self.num_threads = min(8, (os.cpu_count() or 4) * 2) # Больше потоков для I/O операций
         self._is_interruption_requested = False
 
     def requestInterruption(self):
         self._is_interruption_requested = True
-        logger.debug("Получен запрос на прерывание GalleryLoadWorker.")
 
-    def _process_single_image(self, task: Dict) -> Optional[Dict]:
+    def _load_single_image(self, task: Dict) -> Optional[Tuple[str, QImage]]:
+        """Читает и ресайзит одно изображение."""
         if self._is_interruption_requested:
             return None
             
+        full_path = task.get("full_path")
         filename = task["filename"]
-        raw_data = task["raw_data"]
 
-        pixmap = QPixmap()
-        if not pixmap.loadFromData(raw_data):
-            logger.error(f"Не удалось создать QPixmap из данных для {filename}")
+        if not full_path or not full_path.is_file():
             return None
+
+        try:
+            # Используем QImageReader для быстрого чтения или PIL, если нужно
+            # Стандартный QImage.load() работает быстро и поддерживает много форматов
+            image = QImage()
+            if not image.load(str(full_path)):
+                return None
             
-        scaled_pixmap = pixmap.scaled(
-            THUMBNAIL_SIZE, THUMBNAIL_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        
-        self.pixmap_cache[filename] = scaled_pixmap
-        
-        return {"filename": filename}
+            # Сразу делаем ресайз в потоке, чтобы не грузить UI thread
+            # И используем FastTransformation для скорости превью (или Smooth для качества)
+            thumb = image.scaled(
+                THUMBNAIL_SIZE, THUMBNAIL_SIZE, 
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            
+            return (filename, thumb)
+        except Exception as e:
+            logger.error(f"Error loading {filename}: {e}")
+            return None
 
     def run(self):
-        processed_tasks = []
-        processed_count = 0
         total_tasks = len(self.tasks)
-        progress_step = max(1, total_tasks // 100) 
+        processed_count = 0
+        
+        # Настройки батчинга
+        # Сначала отдаем маленькими порциями для быстрого старта, потом увеличиваем
+        current_batch_size = 5 
+        max_batch_size = 20
+        batch_buffer = []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_threads) as executor:
-            future_to_task = {executor.submit(self._process_single_image, task): task for task in self.tasks}
+            # Запускаем все задачи
+            future_to_task = {
+                executor.submit(self._load_single_image, task): task 
+                for task in self.tasks
+            }
             
             for future in concurrent.futures.as_completed(future_to_task):
                 if self._is_interruption_requested:
-                    for f in future_to_task: f.cancel()
                     break
+
                 try:
                     result = future.result()
                     if result:
-                        processed_tasks.append(result)
-                except Exception as e:
-                    task = future_to_task[future]
-                    logger.error(f"Ошибка обработки pixmap для {task['filename']}: {e}")
+                        batch_buffer.append(result)
+                except Exception:
+                    pass
                 
                 processed_count += 1
                 
-                if processed_count % progress_step == 0 or processed_count == total_tasks:
+                # Если накопили достаточно для чанка -> отправляем
+                if len(batch_buffer) >= current_batch_size:
+                    self.chunk_ready.emit(batch_buffer)
+                    batch_buffer = [] # Очищаем буфер
                     self.progress_updated.emit(processed_count)
+                    
+                    # Разгоняем батчинг (адаптивная загрузка)
+                    if current_batch_size < max_batch_size:
+                        current_batch_size += 5
 
-        if not self._is_interruption_requested:
-            if processed_count % progress_step != 0:
-                 self.progress_updated.emit(processed_count)
-            self.finished.emit(processed_tasks)
-        else:
-            self.finished.emit([])
+        # Отправляем остатки
+        if batch_buffer and not self._is_interruption_requested:
+            self.chunk_ready.emit(batch_buffer)
+            self.progress_updated.emit(processed_count)
+
+        self.finished.emit()
+
+
+
+
+
 
 
 class ExportWorker(QObject):

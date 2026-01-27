@@ -8,6 +8,10 @@ from PySide6.QtCore import Qt, QRect, QSize
 # --- КОНСТАНТЫ РАЗМЕРОВ ---
 THUMBNAIL_SIZE = 180
 PREVIEW_SIZE = 180
+FACE_SIZE = 130
+FACE_MIN = 100
+FACE_MAX = 400
+
 
 # --- Импорт API тем ---
 try:

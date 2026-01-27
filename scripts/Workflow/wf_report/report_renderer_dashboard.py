@@ -89,6 +89,8 @@ def generate_dashboard_html(
                     child.name = "Портретные<br>фото (JSON)"
                 elif child.name == "matches_portrait_to_group.json": 
                     child.name = "Портрет-<br>Группа (JSON)"  # <--- НОВОЕ ИМЯ
+                elif child.name == "error_matches.json":
+                    child.name = "Ошибки<br>(JSON)"
                 elif child.name == "face_clustering_report.html": 
                     child.name = "HTML<br>отчет"
 
@@ -238,7 +240,7 @@ class DashboardRenderer:
         except:
             link = "#"
         
-        self._render_header(f"Блок 2: Исходные RAW-файлы. AI-анализ фотографий ({session_name})", link, mode="simple")
+        self._render_header(f"Блок 2: Исходные RAW-файлы. AI-анализ фотографий", link, mode="simple")
 
         if not nodes: return
 
@@ -268,6 +270,7 @@ class DashboardRenderer:
         json_group = analysis_node.find_child_by_name("Групповые")
         json_portrait = analysis_node.find_child_by_name("Портрет")
         json_matches = analysis_node.find_child_by_name("Портрет-")
+        json_errors = analysis_node.find_child_by_name("Ошибки")
         html_report = analysis_node.find_child_by_name("HTML")
 
         table_html = f'<table style="{self._style_table(no_top_margin=True)}">' 
@@ -275,11 +278,14 @@ class DashboardRenderer:
         table_html += self._render_large_cell(analysis_node)
         table_html += self._render_large_cell(jpg_node)
         table_html += self._render_large_cell(masks_node)
+        table_html += self._render_large_cell(html_report)
+        table_html += self._render_large_cell(children_file_node)        
+        table_html += '</tr>'
+        table_html += '<tr>'
         table_html += self._render_large_cell(json_group)
         table_html += self._render_large_cell(json_portrait)
-        table_html += self._render_large_cell(json_matches)        
-        table_html += self._render_large_cell(html_report)
-        table_html += self._render_large_cell(children_file_node)
+        table_html += self._render_large_cell(json_matches)   
+        table_html += self._render_large_cell(json_errors)        
         table_html += '</tr></table>'
         self.html_parts.append(table_html)
 

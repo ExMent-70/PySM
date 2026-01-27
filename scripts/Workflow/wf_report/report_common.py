@@ -230,6 +230,16 @@ def scan_analysis_structure(
             is_critical=False
         ))
 
+        # --- НОВЫЙ ФАЙЛ: Ошибки сопоставления ---
+        json_errors = item / "error_matches.json"
+        analysis_node.children.append(ResourceNode(
+            name="error_matches.json",
+            path=json_errors,
+            type='code',
+            description="Ошибки сопоставления",
+            is_critical=False
+        ))
+
         # 4. Отчет
         report_file = item / "face_clustering_report.html"
         

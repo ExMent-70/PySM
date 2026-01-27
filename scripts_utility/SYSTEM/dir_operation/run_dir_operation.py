@@ -55,17 +55,14 @@ def main():
     Главная функция: получает конфигурацию, валидирует ее и вызывает API.
     """
     if not IS_MANAGED_RUN or not pysm_operations:
-        print("ERROR: This script requires the PySM environment.", file=sys.stderr)
+        print("❌ Запуск скрипта возможен только в системе Pyton Script Manager", file=sys.stderr)
         sys.exit(1)
 
     config = get_config()
 
     # Валидация, специфичная для логики этого скрипта
     if not config.do_source_dir or not config.do_dest_dir:
-        print(
-            "ERROR: Source and Destination directories are required. Check your arguments or context variables.",
-            file=sys.stderr,
-        )
+        print("❌ Исходный и/или целевой каталог(и) не найдены. Проверьте аргументы командной строки или переменные контекста")
         sys.exit(1)
 
     # Вызываем основную функцию API

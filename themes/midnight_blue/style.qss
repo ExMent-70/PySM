@@ -343,3 +343,33 @@ QDialog#InstanceSelectionDialog QListWidget {
 QDialog#InstanceSelectionDialog QPushButton {
     min-width: 80px;
 }
+
+/* --- [12] ПАНЕЛЬ "ЛИЦА НА ФОТО" (FaceDetailsWidget) --- */
+/* Класс: "face-panel" */
+
+QListWidget[class~="face-panel"] {
+    background-color: @bgColorContainer;
+    border: 1px solid @borderColor;
+    border-radius: 5px;
+    outline: none;
+}
+
+QListWidget[class~="face-panel"]::item {
+    background-color: @bgColorAlternate;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    padding: 5px;
+    margin: 4px;
+    color: @textColor;
+}
+
+QListWidget[class~="face-panel"]::item:hover {
+    background-color: @bgColorHover;
+    border: 1px solid @borderColor;
+}
+
+QListWidget[class~="face-panel"]::item:selected {
+    background-color: @accentColorSelection;
+    color: @textColorOnAccent;
+    border: 1px solid @accentColor;
+}
