@@ -947,15 +947,62 @@ class MainWindow(QWidget):
         QMessageBox.information(self, "Экспорт завершен", message)
         if hasattr(self, 'export_thread'): self.export_thread.quit(); self.export_thread.wait()
 
+# analize/cluster_editor/run_cluster_editor.py -> class MainWindow
+
     def _perform_save(self) -> bool:
+        """
+        Выполняет сохранение данных JSON и, в режиме 'location',
+        обновляет переменную контекста PySM.
+
+        Returns:
+            bool: True в случае успеха, иначе False.
+        """
+        # 1. Сохраняем данные на диск
         if not self.data_manager.save_data():
             QMessageBox.critical(self, "Ошибка", "Не удалось сохранить JSON.")
             return False
+
+        # 2. Обновляем UI
         self._refresh_left_panel()
-        
+
+# --- ИСПРАВЛЕНИЕ: Восстановлена логика сохранения в контекст ---
+        # 3. В режиме 'location' обновляем системную переменную контекста
         if self.mode == 'location' and IS_MANAGED_RUN:
-            # Сохранение превью для локаций в контекст (опционально)
-            pass 
+            try:
+                location_previews: Dict[str, str] = {}
+                # Получаем актуальные кластеры из менеджера данных
+                clusters = self.data_manager.get_clusters(self.mode_config)
+                
+                # Заполняем словарь: Имя Локации -> Имя файла-представителя
+                for cluster_id, faces in clusters.items():
+                    if faces:  # Убеждаемся, что кластер не пустой
+                        location_name = faces[0].effective_name
+                        first_filename = faces[0].filename
+                        if location_name and first_filename:
+                            location_previews[location_name] = Path(first_filename).name
+
+                # Добавляем системные/резервные имена (пустые, если их нет в реальных данных)
+                additional_system_names = [
+                    "portrait_A6",
+                    "portrait_A5",
+                    "portrait_A4"
+                ]
+                for name in additional_system_names:
+                    if name not in location_previews:
+                        location_previews[name] = ""
+                
+                # Формируем имя переменной: sys_location_name_ИМЯ_СЕССИИ
+                current_location_name = f"sys_location_name_{self.photo_session}"
+                
+                # Сохраняем в контекст PySM
+                pysm_context.set(current_location_name, location_previews)
+                logger.info(f"Словарь локаций сохранен в переменную контекста: '{current_location_name}'.")
+                
+            except Exception as e:
+                logger.error(f"Ошибка при сохранении контекста PySM: {e}")
+                # Не блокируем сохранение файла, если контекст не записался, но логируем ошибку
+# --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+
         return True
 
     def _save_changes(self, silent: bool = False) -> bool:

@@ -32,12 +32,14 @@
     "ps_action_set": {
       "type": "string",
       "description": "Имя набора экшенов. Если не указано, появится диалог выбора.",
-      "required": false
+      "required": false,
+      "default": "PySM_Actions"
     },
     "ps_action_name": {
       "type": "string",
       "description": "Имя экшена. Если не указано, появится диалог выбора.",
-      "required": false
+      "required": false,
+      "default": "PySM_RETUCHE_RUN"
     },
     "ps_need_save": {
       "type": "bool",
