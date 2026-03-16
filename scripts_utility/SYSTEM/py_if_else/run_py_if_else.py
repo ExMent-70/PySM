@@ -22,25 +22,50 @@
 # 1. БЛОК: Импорты и настройка окружения
 # ==============================================================================
 import argparse
+import logging
 import sys
+from pathlib import Path
 from argparse import Namespace
 from typing import Any
 
 IS_MANAGED_RUN = False
+# Добавляем корневую папку 'analize' в sys.path
 try:
+    current_script_path = Path(__file__).resolve()
+    project_root = current_script_path.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    
+     
+    # Импорт PySM
     from pysm_lib import pysm_context
     from pysm_lib.pysm_context import ConfigResolver
-    from pysm_lib.pysm_progress_reporter import tqdm
+    from pysm_lib.pysm_report_api import ResourceNode, StandardTreeBuilder, DashboardBuilder
     IS_MANAGED_RUN = True
-except ImportError:
-    # Заглушки для автономного запуска и отладки
+except ImportError as e:
     pysm_context = None
     ConfigResolver = None
-    class TqdmWriteMock:
-        @staticmethod
-        def write(msg, *args, **kwargs): print(msg)
-    tqdm = TqdmWriteMock
+    print(f"Критическая ошибка импорта: {e}", file=sys.stderr)
+    print("Убедитесь, что структура папок верна и все зависимости установлены.", file=sys.stderr)
+    sys.exit(1)
 
+
+from _common import (
+    icon_ok, 
+    icon_warning, 
+    icon_error, 
+    icon_info,
+    icon_delete,
+    icon_play,
+    icon_save,
+    icon_arrow_sub,
+    icon_save_warning,
+    icon_save_error
+)
+
+
+# Инициализируем глобальный логгер
+logger = logging.getLogger(__name__)
 
 # 2. БЛОК: Определение и получение конфигурации
 # ==============================================================================
@@ -138,33 +163,37 @@ def evaluate_condition(actual_value: Any, operator: str, comparison_value: str) 
 # ==============================================================================
 def main():
     """Основная функция-оркестратор."""
-    if not IS_MANAGED_RUN or not pysm_context:
-        tqdm.write("ОШИБКА: Этот скрипт может быть запущен только в среде PySM.")
-        sys.exit(1)
+    log_level = pysm_context.get("sys_log_level", "INFO") if IS_MANAGED_RUN and pysm_context else "INFO"
+    logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO), format="%(message)s", stream=sys.stdout)
 
     config = get_config()
 
     # 1. Получаем фактическое значение переменной из контекста
     actual_value = pysm_context.get_structured(config.if_variable_name)
-
-    print(
-        f"Проверка условия: [<b>{config.if_variable_name}</b>] (значение: <i>{actual_value}</i>) "
-        f"<b>{config.if_operator}</b> [<i>{config.if_comparison_value}</i>]"
-    )
+    logger.info("<b>ПРОВЕРКА УСЛОВИЯ...</b>")
 
     # 2. Вычисляем результат условия
     is_true = evaluate_condition(actual_value, config.if_operator, config.if_comparison_value)
 
     target_id = None
-    branch = ""
+    branch = icon_warning
     if is_true:
         target_id = config.then_instance_id
-        branch = "Then"
-        print("Результат: <b>ИСТИНА</b>. Выбран переход по ветке <b>ЕСЛИ</b>")
+        branch = icon_ok
+        #logger.info("Результат: <b>ИСТИНА</b>")
     else:
         target_id = config.else_instance_id
-        branch = "Else"
-        print("Результат: <b>ЛОЖЬ</b>. Выбран переход по ветке <b>ИНАЧЕ</b>")
+        branch = icon_error
+        #logger.info(f"{icon_error}Результат: <b>ЛОЖЬ</b>")
+
+    logger.info(f"{branch} Значение переменной <b>{config.if_variable_name.upper()}</b> [<i>{str(actual_value).upper()}</i>] <b>{config.if_operator}</b> [<i>{config.if_comparison_value.upper()}</i>]")
+
+    # 4. Опционально очищаем переменную
+    if config.clear_variable:
+        logger.info(f"{icon_delete} Очистка переменной <b>{config.if_variable_name.upper()}</b>")
+        pysm_context.remove(config.if_variable_name)
+
+    logger.info(f"{icon_info} Порядок выполнения скриптов изменён, следующий скрипт:")
 
     # 3. Устанавливаем следующий скрипт или продолжаем по умолчанию
     if target_id:
@@ -174,20 +203,14 @@ def main():
             target_name = all_instances.get(target_id, "Неизвестное имя")
             
             pysm_context.set_next_script(target_id)
-            print(f"\nСледующий скрипт:")
-            print(f"<b>{target_name}</b> (ID: <i>{target_id}</i>)")
+            logger.info(f" {icon_arrow_sub} <b>{target_name.upper()}</b> (ID: <i>{target_id}</i>)<br>")
         except Exception as e:
-            tqdm.write(f"КРИТИЧЕСКАЯ ОШИБКА при установке следующего скрипта: {e}")
+            logger.error(f"КРИТИЧЕСКАЯ ОШИБКА при установке следующего скрипта: {e}")
             sys.exit(1)
     elif not is_true:
         # Это случай, когда условие ложно и `else_instance_id` не указан
-        print("Ветка 'Else' не определена. Выполнение будет продолжено по умолчанию.")
+        logger.info("Ветка 'Else' не определена. Выполнение будет продолжено по умолчанию.")
     
-    # 4. Опционально очищаем переменную
-    if config.clear_variable:
-        print(f"\nОчистка переменной контекста: <b>{config.if_variable_name}</b>.")
-        pysm_context.remove(config.if_variable_name)
-
     sys.exit(0)
 
 

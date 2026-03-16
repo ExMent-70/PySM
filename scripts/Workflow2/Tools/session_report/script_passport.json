@@ -1,0 +1,38 @@
+{
+  "description": "Генерация визуального отчета о состоянии ресурсов проекта. Поддерживает режимы списка (Standard) и информационной панели (Dashboard), а также фильтрацию по текущей или всем сессиям.",
+  "category": "Системные / Отчеты",
+  "author": "PySM Team",
+  "version": "2026.01.22",
+  "command_line_args_meta": {
+    "template": {
+      "type": "choice",
+      "description": "Шаблон отображения отчета",
+      "required": false,
+      "choices": [
+        "standard",
+        "dashboard"
+      ]
+    },
+    "scope": {
+      "type": "choice",
+      "description": "Объем данных (фильтр сессий)",
+      "required": false,
+      "choices": [
+        "current",
+        "full"
+      ]
+    },
+    "icon_size_tree": {
+      "type": "int",
+      "description": "Размер иконок для шаблона 'Дерево' (px)",
+      "required": false,
+      "default": 24
+    },
+    "icon_size_dashboard": {
+      "type": "int",
+      "description": "Размер иконок для шаблона 'Дашборд' (px)",
+      "required": false,
+      "default": 48
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "description": "Универсальный анализатор лиц (v2026.02.05)",
+  "category": "Анализ и AI",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2026.02.05",
+  "command_line_args_meta": {
+    "a_target_dir": {
+      "type": "dir_path",
+      "description": "Путь к папке Analysis.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
+    },
+    "a_mode": {
+      "type": "choice",
+      "description": "Режим работы: Cleaning (чистка), Face (кластеризация), Matches (поиск).",
+      "required": true,
+      "default": "face",
+      "choices": [
+        "cleaning",
+        "face",
+        "matches"
+      ]
+    },
+    "a_sim_threshold": {
+      "type": "float",
+      "description": "Порог схожести. Для Cleaning/Face это радиус (Eps), для Match это дистанция. (0.25 - 0.45)",
+      "required": false,
+      "default": 0.4
+    },
+    "a_metric": {
+      "type": "choice",
+      "description": "Метрика расстояния (cosine/euclidean).",
+      "required": false,
+      "choices": [
+        "cosine",
+        "euclidean"
+      ]
+    },
+    "a_clear_min_score": {
+      "type": "float",
+      "description": "[Cleaning] Мин. уверенность (0.0 - 1.0).",
+      "required": false,
+      "default": 0.6
+    },
+    "a_clear_min_abs_area": {
+      "type": "int",
+      "description": "[Cleaning] Мин. площадь (px).",
+      "required": false,
+      "default": 2500
+    },
+    "a_clear_min_rel_area": {
+      "type": "float",
+      "description": "[Cleaning] Мин. отн. площадь (0.001 = 0.1%).",
+      "required": false,
+      "default": "0.001"
+    },
+    "a_clear_min_claster_size": {
+      "type": "int",
+      "description": "[Cleaning/Face] Мин. размер кластера.",
+      "required": false,
+      "default": 3
+    },
+    "a_algorithm": {
+      "type": "choice",
+      "description": "[Face] Алгоритм.",
+      "required": false,
+      "default": "dbscan",
+      "choices": [
+        "dbscan",
+        "hdbscan"
+      ]
+    },
+    "a_ref_dir": {
+      "type": "dir_path",
+      "description": "[Matches] Внешняя папка с эталонами.",
+      "required": false
+    },
+    "a_hdb_cluster_selection_epsilon": {
+      "type": "float",
+      "description": "[HDBSCAN] Параметр слияния.",
+      "required": false,
+      "default": 0.0
+    }
+  }
+}

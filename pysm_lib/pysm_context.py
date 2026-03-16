@@ -435,10 +435,11 @@ class PySMContext:
             # Удаляем символы переноса строки, так как передача через stderr
             # требует, чтобы сообщение с префиксом PYSM_HTML_BLOCK было одной строкой.
             # Заменяем их на пробелы, чтобы не склеить слова.
-            clean_content = html_content.replace("\n", " ").replace("\r", "")
+            clean_content = html_content.replace("\n", "<br>").replace("\r", "")
 
             styles = f"text-align: {align}; margin-top: {margin}px; margin-bottom: {margin}px;"
             wrapped_html = f'<div style="{styles}">{clean_content}</div>'
+            #wrapped_html = f'{clean_content}'
 
             print(f"PYSM_HTML_BLOCK:{wrapped_html}", file=sys.stderr, flush=True)
 

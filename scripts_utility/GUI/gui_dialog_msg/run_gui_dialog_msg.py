@@ -1,36 +1,52 @@
+# run_gui_dialog_msg.py
+
 # 1. БЛОК: Импорты и настройка окружения
 # ==============================================================================
 import argparse
 import sys
+from pathlib import Path
 import logging
-
-# Определяем, запущен ли скрипт под управлением PySM
-IS_MANAGED_RUN = False
-try:
-    from pysm_lib import pysm_context
-    from pysm_lib import theme_api    
-    from pysm_lib.pysm_context import ConfigResolver
-    IS_MANAGED_RUN = True
-except ImportError:
-    # Создаем заглушки для автономного запуска
-    pysm_context = None
-    ConfigResolver = None
-
-# Импортируем PySide6 с проверкой на его наличие
-try:
-    # --- ИЗМЕНЕНИЕ: Добавляем импорт Qt для флагов окна ---
-    from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QApplication, QMessageBox
-except ImportError:
-    # Это сообщение будет видно только при прямом запуске,
-    # т.к. PySM поставляется с PySide6.
-    print("Ошибка: для работы этого скрипта требуется PySide6.", file=sys.stderr)
-    print("Пожалуйста, установите его: pip install PySide6", file=sys.stderr)
-    sys.exit(1)
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
+
+IS_MANAGED_RUN = False
+
+try:
+    current_script_path = Path(__file__).resolve()
+    # Предполагаем, что скрипт лежит в папке внутри проекта, поднимаемся к корню
+    project_root = current_script_path.parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    
+    # Импорт PySM
+    from pysm_lib import pysm_context
+    from pysm_lib import theme_api        
+    from pysm_lib.pysm_context import ConfigResolver
+    # ResourceNode, StandardTreeBuilder, DashboardBuilder удалены, так как не используются
+    IS_MANAGED_RUN = True
+except ImportError as e:
+    pysm_context = None
+    ConfigResolver = None
+    print(f"Ошибка импорта pysm_lib: {e}", file=sys.stderr)
+    # Здесь можно не выходить, а продолжить в автономном режиме, если логика позволяет
+
+# Импорт иконок
+from _common import (
+    icon_save,
+    icon_save_error,
+    icon_save_warning    
+)
+
+# Импортируем PySide6
+try:
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication, QMessageBox
+except ImportError:
+    print("Ошибка: для работы этого скрипта требуется PySide6.", file=sys.stderr)
+    sys.exit(1)
+
 
 # 2. БЛОК: Определение и получение конфигурации
 # ==============================================================================
@@ -40,33 +56,29 @@ def get_config():
         description="Показывает диалоговое окно и сохраняет выбор пользователя."
     )
     
-    # --- ИЗМЕНЕНИЯ: Аргументы приведены в полное соответствие с script_passport.json ---
-    
     parser.add_argument(
         "--dlg_msg_var", 
         type=str,
-        # help теперь соответствует description из паспорта
-        help="Имя переменной, в которую будет сохранен результат выбора пользователя (например, 'user_choice'). Результатом будет строка: 'ok', 'yes', 'no' или 'cancel'.",
-        # Добавлен default из паспорта, required=True убран
+        help="Имя переменной контекста для сохранения результата.",
         default="var_user_choice"
     )
     parser.add_argument(
         "--dlg_msg_type", 
         type=str,
         choices=['ok', 'yes_no', 'yes_no_cancel'],
-        help="Выберите набор кнопок для отображения в диалоговом окне.",
+        help="Тип диалога.",
         default="yes_no"
     )
     parser.add_argument(
         "--dlg_msg_title", 
         type=str,
-        help="Текст, который будет отображаться в заголовке диалогового окна.",
+        help="Заголовок окна.",
         default="Подтверждение"
     )
     parser.add_argument(
         "--dlg_msg_message", 
         type=str,
-        help="Основной текст вопроса или сообщения, который будет показан пользователю. Можно использовать несколько строк.",
+        help="Текст сообщения.",
         default="Вы уверены, что хотите продолжить?"
     )
 
@@ -79,31 +91,28 @@ def get_config():
         config.dlg_msg_message = resolver.get("dlg_msg_message")
         return config
     else:
-        # При автономном запуске стандартный argparse теперь будет использовать
-        # те же значения по умолчанию, что и в паспорте.
         return parser.parse_args()
 
 
 # 3. БЛОК: Основная логика
 # ==============================================================================
 def main():
-    """Основная функция-оркестратор."""
-    # 3.1. Получение конфигурации
     config = get_config()
 
-    # 3.2. Инициализация GUI и создание QMessageBox
-    # Если приложение уже запущено (в среде PySM), используем его экземпляр.
-    # Иначе — создаем новый.
+    # Инициализация приложения
     q_app = QApplication.instance() or QApplication(sys.argv)
-    theme_api.apply_theme_to_app(q_app)
+    
+    # Применяем тему, если доступна
+    if IS_MANAGED_RUN:
+        theme_api.apply_theme_to_app(q_app)
     
     msg_box = QMessageBox()
-    # --- ИЗМЕНЕНИЕ: Устанавливаем флаг, чтобы окно было поверх всех остальных ---
+    # Окно поверх всех окон (важно для диалогов, вызываемых из других процессов)
     msg_box.setWindowFlag(Qt.WindowStaysOnTopHint)
     msg_box.setWindowTitle(config.dlg_msg_title)
     msg_box.setText(config.dlg_msg_message)
 
-    # 3.3. Настройка кнопок в зависимости от типа диалога
+    # Настройка кнопок
     button_map = {
         'ok': QMessageBox.Ok,
         'yes_no': QMessageBox.Yes | QMessageBox.No,
@@ -115,13 +124,13 @@ def main():
         'yes_no_cancel': QMessageBox.Yes
     }
     
-    msg_box.setStandardButtons(button_map.get(config.dlg_msg_type, QMessageBox.NoButton))
-    msg_box.setDefaultButton(default_button_map.get(config.dlg_msg_type))
+    msg_box.setStandardButtons(button_map.get(config.dlg_msg_type, QMessageBox.Ok))
+    msg_box.setDefaultButton(default_button_map.get(config.dlg_msg_type, QMessageBox.Ok))
         
-    # 3.4. Показ окна и обработка результата
+    # Показ окна
     result_code = msg_box.exec()
 
-    # Карта для преобразования кода ответа PySide6 в строку
+    # Интерпретация результата
     result_string_map = {
         QMessageBox.Ok: "ok",
         QMessageBox.Yes: "yes",
@@ -129,44 +138,46 @@ def main():
         QMessageBox.Cancel: "cancel",
     }
     result_string = result_string_map.get(result_code, "unknown")
-    
-    #print(f"Пользователь выбрал: '{result_string}'")
 
-    logger.info(f"<b>Сообщение</b>")
-    logger.info(f"{config.dlg_msg_message}")
-    # 3.5. Сохранение результата в контекст (если возможно)
+    # Сохранение в контекст
     if IS_MANAGED_RUN and pysm_context:
         try:
-            # Используем актуальный метод set()
+            # 1. Запись переменной
             pysm_context.set(config.dlg_msg_var, result_string)
-            print("\n<b>Выбор пользователя сохранён в переменную контекста:</b>")
-            logger.info(f"✅ <b>{config.dlg_msg_var}</b> = <i>{result_string}<br>")
+            
+            # 2. Логирование в HTML
+            # Получаем стиль из темы (или дефолтный белый, если темы нет)
+            style_color = theme_api.get_dynamic_style("tooltip_script_args_block", default="color: #fff;")
+            buttons_labels_map = {
+                'ok': "[<i>OK</i>]",
+                'yes_no': "[<i>YES</i>] / [<i>NO</i>]",
+                'yes_no_cancel': "[<i>YES</i>] / [<i>NO</i>] / [<i>CANCEL</i>]"
+            }            
+            # Получаем строку кнопок, если тип неизвестен - выводим сам тип
+            buttons_display = buttons_labels_map.get(config.dlg_msg_type, config.dlg_msg_type)
+            
+            msg_html = f"<b>СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЮ</b><br><br>{config.dlg_msg_message} {buttons_display}"
+            msg_html += f"<br><br>{icon_save} Выбор пользователя [<b>{result_string.upper()}</b>] сохранён в переменную <b>{config.dlg_msg_var.upper()}</b>"
+            
+            # ИСПРАВЛЕНИЕ: Используем div вместо table-тегов, так как log_html оборачивает в div
+            info_html = f"""
+            <tr><td style="{style_color} padding: 10px;">{msg_html}</td></tr>
+            """
+            pysm_context.log_html(info_html)
 
         except Exception as e:
-            # В случае ошибки при записи в контекст, выводим ее в stderr
-            # и завершаем скрипт с кодом ошибки.
-            print(f"Критическая ошибка при сохранении данных в контекст: {e}", file=sys.stderr)
+            logger.error(f"{icon_save_error} Ошибка при сохранении в контекст: {e}")
             sys.exit(1)
     else:
-        print("Запуск в автономном режиме, результат в контекст не сохраняется.")
+        print(f"Автономный режим. Выбор: {result_string}")
 
-    # 3.6. Определение кода завершения скрипта
-    # Операция считается "отмененной", если пользователь нажал Cancel,
-    # "No" в диалоге yes/no, или просто закрыл окно.
-    # В этих случаях возвращаем код 1, в остальных — 0.
-    
-    exit_code = 0  # Код по умолчанию (успех)
-    
-    if config.dlg_msg_type == 'yes_no' and result_string == 'no':
-        exit_code = 1
-    elif result_string in ["cancel", "unknown"]:
+    # Логика кода выхода (для управления потоком выполнения)
+    logger.info("")
+    exit_code = 0
+    if result_string in ["cancel", "unknown"]:
         exit_code = 1
         
-    logger.debug(f"Скрипт завершается с кодом выхода: {exit_code}<br>")
     sys.exit(exit_code)
 
-
-# 4. БЛОК: Точка входа
-# ==============================================================================
 if __name__ == "__main__":
     main()

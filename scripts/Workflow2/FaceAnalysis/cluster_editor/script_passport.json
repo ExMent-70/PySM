@@ -1,0 +1,38 @@
+{
+  "description": "Интерактивный GUI-редактор для визуальной проверки и исправления результатов кластеризации.\n<br><b>Поддерживаемые режимы:</b>\n<br> • <b>face</b>: редактирование кластеров лиц.\n<br> • <b>location</b>: редактирование кластеров локаций.\n<br> • <b>matches</b>: просмотр и ручная коррекция совпадений между портретами и групповыми фото.\n\n<br><b>Важно:</b> Скрипт требует явного указания путей к файлам `info_portrait_faces.json` и `info_group_faces.json`. В режиме `matches` позволяет динамически загружать данные из разных съемок, обрабатывать неопознанные лица и сохранять результаты в `matches_portrait_to_group.json` и `error_matches.json`.",
+  "category": "Утилиты",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "v2.2026.02.12",
+  "command_line_args_meta": {
+    "ce_working_dir": {
+      "type": "dir_path",
+      "description": "Папка с данными",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
+    },
+    "ce_reference_dir": {
+      "type": "file_path",
+      "description": "Папка с эталонами (для matches)",
+      "required": false,
+      "default": ""
+    },
+    "all_threads": {
+      "type": "int",
+      "description": "Количество потоков для параллельной обработки изображений. 0 - авто (по числу ядер CPU).",
+      "required": false,
+      "default": "12"
+    },
+    "mode": {
+      "type": "choice",
+      "description": "Определяет режим работы редактора.",
+      "required": true,
+      "default": "face",
+      "choices": [
+        "face",
+        "location",
+        "matches",
+        "cleaning"
+      ]
+    }
+  }
+}

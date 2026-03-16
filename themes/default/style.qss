@@ -36,6 +36,8 @@
 @accentColorPrimaryBtn = #0e639c;
 @accentColorDangerBtn = #d9534f;
 
+@bgColorHoverItem = #f0ad4e;
+@textColorHoverItem = #000000;
 
 /* --- [1] ГЛОБАЛЬНЫЕ И ОСНОВНЫЕ СТИЛИ --- */
 QWidget {
@@ -65,6 +67,17 @@ QPushButton {
 QPushButton:hover { background-color: @bgColorHover; border-color: @accentColor; }
 QPushButton:pressed { background-color: @accentColorPressed; color: @textColorOnAccent; }
 QPushButton:disabled { background-color: @bgColorDisabled; color: @textColorDisabled; }
+
+/* Стили для переключаемых (Checkable) кнопок */
+QPushButton:checked {
+    background-color: @accentColor;
+    border: 1px solid @accentColor;
+    color: @textColorOnAccent;
+}
+QPushButton:checked:hover {
+    background-color: @accentColorHover;
+    border: 1px solid @accentColorHover;
+}
 
 /* Классы для кнопок */
 QPushButton[class~="primary"] { background-color: @accentColorPrimaryBtn; color: @textColorOnAccent; border-color: @accentColorPrimaryBtn; }
@@ -212,8 +225,9 @@ QTreeView, QListWidget, QTableWidget {
     alternate-background-color: @bgColorAlternate;
     border: 1px solid @borderColor; border-radius: 5px;
 }
-QTreeView::item:hover, QListWidget::item:hover { background-color: @bgColorHover; }
+QTreeView::item:hover { background-color: @bgColorHover; }
 QTreeView::item:selected, QListWidget::item:selected { background-color: @accentColorSelection; color: @textColorOnAccent; }
+QListWidget::item:hover { background-color: @bgColorHoverItem; }
 
 QHeaderView::section {
     background-color: @bgColorHeader; padding: 5px; border: none;
@@ -356,21 +370,26 @@ QListWidget[class~="face-panel"] {
 }
 
 QListWidget[class~="face-panel"]::item {
-    background-color: @bgColorAlternate;
-    border: 1px solid transparent;
+    /* Прозрачная рамка по умолчанию, чтобы избежать сдвигов при выделении */
+    border: 2px solid transparent;
     border-radius: 5px;
     padding: 5px;
     margin: 4px;
     color: @textColor;
+    background-color: transparent;
 }
 
 QListWidget[class~="face-panel"]::item:hover {
-    background-color: @bgColorHover;
-    border: 1px solid @borderColor;
+    background-color: @bgColorHoverItem;
+    border: 0px solid @borderColor;
+	color: @textColorHoverItem;
 }
 
+/* СТИЛЬ ВЫДЕЛЕНИЯ (РАМКА) */
 QListWidget[class~="face-panel"]::item:selected {
-    background-color: @accentColorSelection;
-    color: @textColorOnAccent;
-    border: 1px solid @accentColor;
+    /* Фон делаем прозрачным или слегка подсвеченным */
+    background-color: transparent; 
+    /* Жирная цветная рамка */
+    border: 2px solid @accentColor; 
+    color: @textColor;
 }

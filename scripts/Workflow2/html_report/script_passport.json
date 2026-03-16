@@ -1,0 +1,20 @@
+{
+  "description": "Создает интерактивный HTML-отчет для визуальной проверки результатов кластеризации и сопоставления лиц. Автоматически находит все необходимые пути из контекста.",
+  "category": "Отчеты",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2026.01.25",
+  "command_line_args_meta": {
+    "a_hr_target_dir": {
+      "type": "dir_path",
+      "description": "Папка текущей сессии",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
+    },
+    "a_hr_ref_dir": {
+      "type": "file_path",
+      "description": "Папка с эталонами (для matches)",
+      "required": false,
+      "default": ""
+    }
+  }
+}

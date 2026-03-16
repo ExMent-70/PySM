@@ -1,0 +1,70 @@
+{
+  "description": "Кластеризует или классифицирует фотографии по локациям на основе визуального содержимого.<br>Поддерживает два режима:<br>1. <b>Clustering</b>: Автоматическая группировка (DBSCAN). Рекомендуется использовать маски.<br>2. <b>Classification</b>: Поиск соответствий текстовым описаниям (CLIP Zero-shot). Рекомендуется использовать оригиналы.<br><div style=\"{theme.tooltip_instance_args_block}\">\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output / Analysis_{photo_session}</i>\n</div>",
+  "category": "Анализ и AI",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2.5.0",
+  "command_line_args_meta": {
+    "mode": {
+      "type": "choice",
+      "description": "Режим работы скрипта.",
+      "required": false,
+      "choices": [
+        "clustering",
+        "classification"
+      ]
+    },
+    "a_cl_data_dir": {
+      "type": "dir_path",
+      "description": "Путь к папке с результатами анализа (содержащей info_faces.json и папку JPG/Masks).",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
+    },
+    "a_cl_config_file": {
+      "type": "file_path",
+      "description": "Путь к файлу конфигурации (config.toml).",
+      "required": false,
+      "default": "config.toml"
+    },
+    "use_originals": {
+      "type": "bool",
+      "description": "Анализировать оригинальные фото вместо масок. ВАЖНО: Для классификации лучше True, для кластеризации — False.",
+      "required": true,
+      "default": false
+    },
+    "match_threshold": {
+      "type": "float",
+      "description": "Порог уверенности для классификации (0.0-1.0). Если ниже, фото считается неклассифицированным.",
+      "required": false,
+      "default": 0.25
+    },
+    "a_cl_location_prompts": {
+      "type": "list",
+      "description": "Список текстовых описаний локаций (для режима classification).",
+      "required": false
+    },
+    "a_cl_cluster_eps": {
+      "type": "float",
+      "description": "Параметр 'eps' для DBSCAN (для режима clustering).",
+      "required": false,
+      "default": 0.14
+    },
+    "a_cl_mask_suffix": {
+      "type": "str",
+      "description": "Суффикс имен файлов масок.",
+      "required": false,
+      "default": "_BiRefNet-portrait_output.jpg"
+    },
+    "all_threads": {
+      "type": "int",
+      "description": "Количество потоков (0 - авто).",
+      "required": false,
+      "default": "12"
+    },
+    "batch_size": {
+      "type": "int",
+      "description": "Размера пакета изображений (Batch Size).",
+      "required": false,
+      "default": 32
+    }
+  }
+}
