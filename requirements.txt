@@ -1,4 +1,4 @@
-beautifulsoup4
+beautifulsoup4=4.14.3
 comtypes
 cssutils
 einops
@@ -35,3 +35,4 @@ tqdm
 transformers==4.55.4
 transparent-background[gui]
 WMI
+idml-schema
