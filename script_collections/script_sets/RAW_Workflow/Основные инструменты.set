@@ -1,0 +1,136 @@
+{
+  "type": "script_set",
+  "id": "setnode_0c9832b28492",
+  "name": "Основные инструменты",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_790d968b/Workflow2/Tools/session_report",
+      "instance_id": "instance_a06607843125",
+      "name": "Информационная панель",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "template": {
+          "value": "dashboard",
+          "enabled": true
+        },
+        "scope": {
+          "value": "full",
+          "enabled": true
+        },
+        "icon_size_tree": {
+          "value": 24,
+          "enabled": true
+        },
+        "icon_size_dashboard": {
+          "value": "40",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_choice",
+      "instance_id": "instance_cdd709082e4f",
+      "name": "Выбор съемки (портретная, студийная, школьная и т.д.)",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_choice_var": {
+          "value": "wf_photo_session",
+          "enabled": true
+        },
+        "dlg_choice_title": {
+          "value": "Выбор съемки",
+          "enabled": true
+        },
+        "dlg_choice_message": {
+          "value": "Если договором предусмотрено несколько съемок\n(например: портретная, студийная, школьная и т.д.),\nукажите название текущей съемки.\n\nВыберите название съемки в выпадающем списке:\n",
+          "enabled": true
+        },
+        "dlg_choice_list": {
+          "value": [
+            "PORTRAIT",
+            "SCHOOL",
+            "SEPTEMBER1",
+            "STREET",
+            "STUDIO"
+          ],
+          "enabled": true
+        },
+        "dlg_choice_dvalue": {
+          "value": "wf_photo_session",
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow2/Tools/list_create",
+      "instance_id": "instance_80ef87a519cb",
+      "name": "Cписок класса/группы",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "wf_dest_dir": {
+          "value": "{wf_psd_path}/{wf_session_name}",
+          "enabled": true
+        },
+        "wf_output_txt_file": {
+          "value": "{wf_session_path}/{wf_session_name}/{wf_photo_session}_{wf_children_file_name}",
+          "enabled": true
+        },
+        "wf_autosave_formats": {
+          "value": [
+            "html",
+            "csv",
+            "txt"
+          ],
+          "enabled": true
+        },
+        "wf_default_info_fields": {
+          "value": [],
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/dir_operation",
+      "instance_id": "instance_e2320d14a6dc",
+      "name": "Перемещение PSD-файлов в папку для ретуши",
+      "description": "<div style=\" {theme.script_description}\">\nПеремещает/копирует PSD-файлы, экспортированные из Capture One, в папку для ретуши. При выполнении скрипта сохраняется  структура исходных папок.<br>\nПри работе с реальными данными рекомендуется установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке рабочего процессе использовать режим <b>copy</b></div>",
+      "silent_mode": true,
+      "command_line_args": {
+        "do_source_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/{wf_session_name}",
+          "enabled": true
+        },
+        "do_dest_dir": {
+          "value": "{wf_psd_path}/{wf_session_name}",
+          "enabled": true
+        },
+        "do_mode": {
+          "value": "move",
+          "enabled": true
+        },
+        "do_on_conflict": {
+          "value": "overwrite",
+          "enabled": true
+        },
+        "do_copy_base_folder": {
+          "value": false,
+          "enabled": true
+        },
+        "do_include": {
+          "value": [
+            "*.psd"
+          ],
+          "enabled": true
+        },
+        "all_threads": {
+          "value": "12",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

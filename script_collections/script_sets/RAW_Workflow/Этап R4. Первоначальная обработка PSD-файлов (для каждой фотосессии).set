@@ -1,12 +1,12 @@
 {
   "type": "script_set",
-  "id": "setnode_281bf327aab8",
-  "name": "Этап 5-RAW. Обработка PSD-файлов (для каждой фотосессии)",
+  "id": "setnode_aefbdf6ff1d9",
+  "name": "Этап R4. Первоначальная обработка PSD-файлов (для каждой фотосессии)",
   "description": null,
   "script_entries": [
     {
       "id": "root_790d968b/Photoshop/ps_photoshop_launch",
-      "instance_id": "instance_f8f8df4271fa",
+      "instance_id": "instance_345d80cc6e06",
       "name": "Фотошоп - Запустить",
       "description": null,
       "silent_mode": false,
@@ -19,7 +19,7 @@
     },
     {
       "id": "root_790d968b/Photoshop/ps_action_batch_set_select",
-      "instance_id": "instance_29465c41c5c9",
+      "instance_id": "instance_65a8c2e70551",
       "name": "Экшен - Универсальный пакетный запуск",
       "description": null,
       "silent_mode": false,
@@ -56,7 +56,7 @@
     },
     {
       "id": "root_790d968b/Photoshop/ps_document_close",
-      "instance_id": "instance_64c133da1bf6",
+      "instance_id": "instance_ee765768bf29",
       "name": "Закрыть файл-пресет",
       "description": null,
       "silent_mode": true,

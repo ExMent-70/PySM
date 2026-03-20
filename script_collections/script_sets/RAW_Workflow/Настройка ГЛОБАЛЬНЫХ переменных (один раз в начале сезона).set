@@ -1,0 +1,145 @@
+{
+  "type": "script_set",
+  "id": "setnode_114cecb4601f",
+  "name": "Настройка ГЛОБАЛЬНЫХ переменных (один раз в начале сезона)",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/SYSTEM/log_html",
+      "instance_id": "instance_0f85c81245dc",
+      "name": "Информационное сообщение",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "html_content": {
+          "value": "<div style=\" {theme.script_description}\">\n<b>НАСТРОЙКА ОКРУЖЕНИЯ</b>\n<i>(глобальные переменные)</i>\n\n<b>wf_session_path</b> - путь к папке, c исходными RAW-файлами всех фотосессий\n<b>wf_psd_path</b> -  путь к папке, c рабочими PSD и INDD-файлами  всех фотосессий\n<b>wf_children_file_name</b> - имя файла, со списком для фотосессии (фамилия, имя) отсортированным в порядке съемки\n<b>wf_idsgn_catalog</b> -  имя файла-каталога шаблонов InDesign\n</div>\n",
+          "enabled": true
+        },
+        "html_file": {
+          "value": null,
+          "enabled": false
+        },
+        "html_align": {
+          "value": "left",
+          "enabled": true
+        },
+        "html_margin": {
+          "value": 5,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_open",
+      "instance_id": "instance_c951af30a5a9",
+      "name": "ПЕРЕМЕННАЯ: Выбрать базовую папку для всех RAW-файлов/сессий Capture One",
+      "description": "Скрипт создает переменную <i>wf_session_path</i> в Контексте Коллекции и записывает в неё путь к папке, в которой будут создаваться папки для RAW-файлов и/или сессии Capture One. \nДля каждого класса создается своя папка/сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. \nТакой подход к хранению RAW-файлов/организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_open_var": {
+          "value": "wf_session_path",
+          "enabled": true
+        },
+        "dlg_open_type": {
+          "value": "directory",
+          "enabled": true
+        },
+        "dlg_open_title": {
+          "value": "Выбрать базовую папку для всех RAW-файлов/сессий Capture One",
+          "enabled": true
+        },
+        "dlg_open_filter": {
+          "value": "Все файлы (*.*)",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_open",
+      "instance_id": "instance_7f8a1d1a4cfb",
+      "name": "ПЕРЕМЕННАЯ: Выбрать базовую папку для PSD-файлов",
+      "description": "Скрипт создает переменную wf_psd_path в Контексте Коллекции и записывает в неё путь к папке, в которой, следующие скрипты будут создавать сессии Capture One. Для каждой съемки обычно создается своя сессиия, но все они хранятся в одном месте, определяемом значением этой переменной. Такой подход к организации сессий Capture One, значительно повышает эффективность работы с ними, оставляя хорошие возможности для автоматизации.",
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_open_var": {
+          "value": "wf_psd_path",
+          "enabled": true
+        },
+        "dlg_open_type": {
+          "value": "directory",
+          "enabled": true
+        },
+        "dlg_open_title": {
+          "value": "Выбрать базовую папку для PSD-файлов (в нее будут скопированны PSD-файлы текущей сессии)",
+          "enabled": true
+        },
+        "dlg_open_filter": {
+          "value": "Все файлы (*.*)",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_input",
+      "instance_id": "instance_621a235698ba",
+      "name": "ПЕРЕМЕННАЯ: Имя файла со списком для фотосессии",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_input_var": {
+          "value": "wf_children_file_name",
+          "enabled": true
+        },
+        "dlg_input_title": {
+          "value": "Ввод значения",
+          "enabled": true
+        },
+        "dlg_input_msg": {
+          "value": "Введите имя файла, со списком для фотосессии.\n\nНапример, children.txt",
+          "enabled": true
+        },
+        "dlg_input_dvalue": {
+          "value": "children.txt",
+          "enabled": true
+        },
+        "dlg_input_valid_type": {
+          "value": "filename_txt",
+          "enabled": true
+        },
+        "dlg_input_custom_regexp": {
+          "value": null,
+          "enabled": true
+        },
+        "dlg_input_custom_regexp_desc": {
+          "value": null,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_open",
+      "instance_id": "instance_2a57fb392b72",
+      "name": "ПЕРЕМЕННАЯ: Файл-каталог шаблонов InDesign",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_open_var": {
+          "value": "wf_idsgn_catalog",
+          "enabled": true
+        },
+        "dlg_open_type": {
+          "value": "file",
+          "enabled": true
+        },
+        "dlg_open_title": {
+          "value": "Выберите файл-каталог шаблонов InDesign",
+          "enabled": true
+        },
+        "dlg_open_filter": {
+          "value": "*.template",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

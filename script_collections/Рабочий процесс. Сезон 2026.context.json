@@ -15,7 +15,7 @@
   },
   "wf_session_name": {
     "type": "string",
-    "value": "Дс_ЗолотаяРыбка",
+    "value": "ШТарбагатай_9А",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
@@ -55,62 +55,6 @@
     "read_only": false,
     "choices": null
   },
-  "enhancer_settings": {
-    "type": "json",
-    "value": {
-      "brightness": 1.15,
-      "contrast": 1.0,
-      "color": 0.98,
-      "sharpness": 1.11
-    },
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
-  },
-  "generated_idml_path": {
-    "type": "string",
-    "value": "E:\\YandexDisk\\ФОТОСЕССИИ\\СЕЗОН_2026\\Школа10_11а_класс\\Альбом\\_Шаблоны_\\Обложка_6страниц.idml",
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
-  },
-  "sys_location_name": {
-    "type": "list",
-    "value": [
-      "-1",
-      "additional_photo_A4",
-      "additional_photo_A5",
-      "additional_portrait_01",
-      "additional_portrait_02",
-      "additional_portrait_03",
-      "additional_portrait_04",
-      "group_photo_boy",
-      "group_photo_cover_01",
-      "group_photo_down",
-      "group_photo_food",
-      "group_photo_girl",
-      "group_photo_table",
-      "main_portrait",
-      "portrait_cover"
-    ],
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
-  },
-  "var_jpg_move": {
-    "type": "int",
-    "value": 0,
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
-  },
-  "var_idsgn_catalog": {
-    "type": "file_path",
-    "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/catalog.template",
-    "description": "Auto-created by script",
-    "read_only": false,
-    "choices": null
-  },
   "wf_idsgn_catalog": {
     "type": "file_path",
     "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/catalog.template",
@@ -118,36 +62,138 @@
     "read_only": false,
     "choices": null
   },
-  "var_album_cover": {
+  "sys_location_name_SCHOOL": {
     "type": "json",
     "value": {
-      "id": "a44cbe31-d923-4454-8687-d0a922b4ca86",
-      "name": "Персональная обложка (портрет + горизонтальное фото)",
-      "category": "Обложки",
-      "template_path": "templates/01-Черный_бархат/01_Cover_03.idml",
-      "placeholder_map": {
-        "photo_cover_01": "group_photo_all_02",
-        "portrait": "portrait_cover"
-      },
-      "generation_mode": "sheet"
+      "portrait": "IMG_3848.jpg",
+      "group_photo_table": "IMG_4720.jpg",
+      "group_photo_01": "IMG_4926.jpg",
+      "group_photo_v_01": "IMG_5028.jpg",
+      "group_photo_02": "IMG_5176.jpg",
+      "group_photo_all_01": "IMG_5231.jpg",
+      "portrait_A6": "",
+      "portrait_A5": "",
+      "portrait_A4": ""
     },
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null
   },
-  "var_template_name": {
+  "generated_idml_path": {
+    "type": "string",
+    "value": "E:\\YandexDisk\\ФОТОСЕССИИ\\СЕЗОН_2026\\ШТарбагатай_9_класс\\Альбом\\_Шаблоны_\\[ШТарбагатай_9_класс]-[Виньетка 20 человек без цитат]-[portrait]_01.idml",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_portrait_exists": {
+    "type": "string",
+    "value": "yes",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_template_name": {
     "type": "json",
     "value": {
-      "id": "1ed7fb6a-9045-456e-931c-8a8c0e6ec30b",
-      "name": "Персональная обложка (портрет + вертикальное фото)",
-      "category": "Обложки",
-      "template_path": "templates/01-Черный_бархат/01_02_Cover.idml",
+      "id": "21422099-1ded-4808-b7d5-4a402a96f822",
+      "name": "Виньетка 20 человек (без цитат)",
+      "category": "Виньетки",
+      "template_path": "templates/01-Виньетки/Vignette_L20_01.idml",
       "placeholder_map": {
-        "photo_cover_01": "group_photo_v_01",
-        "portrait": "portrait"
+        "portrait_0": "portrait",
+        "portrait_1": "portrait",
+        "portrait_10": "portrait",
+        "portrait_11": "portrait",
+        "portrait_12": "portrait",
+        "portrait_13": "portrait",
+        "portrait_14": "portrait",
+        "portrait_15": "portrait",
+        "portrait_16": "portrait",
+        "portrait_17": "portrait",
+        "portrait_18": "portrait",
+        "portrait_19": "portrait",
+        "portrait_2": "portrait",
+        "portrait_3": "portrait",
+        "portrait_4": "portrait",
+        "portrait_5": "portrait",
+        "portrait_6": "portrait",
+        "portrait_7": "portrait",
+        "portrait_8": "portrait",
+        "portrait_9": "portrait",
+        "teacher": "portrait"
       },
-      "generation_mode": "sheet"
+      "generation_mode": "vignette",
+      "override_labels": []
     },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "enhancer_settings": {
+    "type": "json",
+    "value": {
+      "brightness": 1.03,
+      "contrast": 1.1,
+      "color": 1.0,
+      "sharpness": 1.2,
+      "temperature": -18.0,
+      "tint": -7.0,
+      "black_point": 36.0,
+      "white_point": -25.0,
+      "wm_stripe_alpha": 55.0,
+      "wm_mask_fill": 51.0,
+      "wm_pad_w": 0.1,
+      "wm_pad_h": 0.2,
+      "wm_text": "Тарбагатай - 9 класс",
+      "wm_text_alpha": 150.0,
+      "export_dpi": 300,
+      "export_quality": 95,
+      "export_watermarks": true,
+      "export_keep_ratio": true
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_portrait_session": {
+    "type": "string",
+    "value": "SCHOOL",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_temp_tech_claster": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_temp_location_claster": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_temp_matches_claster": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_temp_portrait_claster": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_run_script": {
+    "type": "string",
+    "value": "yes",
     "description": "Auto-created by script",
     "read_only": false,
     "choices": null

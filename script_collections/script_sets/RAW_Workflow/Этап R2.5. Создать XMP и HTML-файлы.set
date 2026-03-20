@@ -1,0 +1,50 @@
+{
+  "type": "script_set",
+  "id": "setnode_46724f3b1400",
+  "name": "Этап R2.5. Создать XMP и HTML-файлы",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_790d968b/Workflow2/FaceAnalysis/create_xmp",
+      "instance_id": "instance_922d6259e3c2",
+      "name": "Создать XMP-файлы",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "analysis_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}",
+          "enabled": true
+        },
+        "image_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
+          "enabled": true
+        },
+        "all_threads": {
+          "value": "12",
+          "enabled": true
+        },
+        "landmark_enable": {
+          "value": false,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow2/html_report",
+      "instance_id": "instance_7ec726071b38",
+      "name": "HTML отчет",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "a_hr_target_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}",
+          "enabled": true
+        },
+        "a_hr_ref_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_portrait_session}",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

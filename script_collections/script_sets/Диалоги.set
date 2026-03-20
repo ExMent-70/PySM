@@ -1,0 +1,195 @@
+{
+  "type": "script_set",
+  "id": "setnode_c5bc89897709",
+  "name": "Диалоги",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_msg",
+      "instance_id": "instance_46fc00d63b03",
+      "name": "gui_dialog_msg",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_msg_var": {
+          "value": "var_user_choice",
+          "enabled": true
+        },
+        "dlg_msg_type": {
+          "value": "yes_no",
+          "enabled": true
+        },
+        "dlg_msg_title": {
+          "value": "Подтверждение",
+          "enabled": true
+        },
+        "dlg_msg_message": {
+          "value": "Вы уверены, что хотите продолжить?",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_goto",
+      "instance_id": "instance_f1d4c4a55aa9",
+      "name": "gui_dialog_goto",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "title": {
+          "value": "Выбор следующего действия",
+          "enabled": true
+        },
+        "message": {
+          "value": "Выберите скрипт, к которому нужно перейти:",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_open",
+      "instance_id": "instance_174aa8e7fce7",
+      "name": "gui_dialog_open",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_open_var": {
+          "value": "dlg_open_user_var",
+          "enabled": true
+        },
+        "dlg_open_type": {
+          "value": "directory",
+          "enabled": true
+        },
+        "dlg_open_title": {
+          "value": "Выберите путь",
+          "enabled": true
+        },
+        "dlg_open_filter": {
+          "value": "Все файлы (*.*)",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_input",
+      "instance_id": "instance_d447725e6e8c",
+      "name": "gui_dialog_input",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_input_var": {
+          "value": "dlg_input_user_var",
+          "enabled": true
+        },
+        "dlg_input_title": {
+          "value": "Ввод значения",
+          "enabled": true
+        },
+        "dlg_input_msg": {
+          "value": "Введите значение:",
+          "enabled": true
+        },
+        "dlg_input_dvalue": {
+          "value": "",
+          "enabled": true
+        },
+        "dlg_input_valid_type": {
+          "value": "not_empty",
+          "enabled": true
+        },
+        "dlg_input_custom_regexp": {
+          "value": null,
+          "enabled": false
+        },
+        "dlg_input_custom_regexp_desc": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_vars",
+      "instance_id": "instance_9c087d6f0c73",
+      "name": "gui_dialog_vars",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "__edit": {
+          "value": false,
+          "enabled": true
+        },
+        "__title": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/file_operation",
+      "instance_id": "instance_9dc6e47c82e2",
+      "name": "file_operation",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "fo_operation": {
+          "value": "copy",
+          "enabled": true
+        },
+        "fo_source_path": {
+          "value": "D:/WORK_PYTHON2025/_TEST_DATE/_SOURCE_/33-config.json",
+          "enabled": true
+        },
+        "fo_destination_path": {
+          "value": "D:\\WORK_PYTHON2025\\_TEST_DATE\\_TARGET_",
+          "enabled": true
+        },
+        "fo_overwrite": {
+          "value": true,
+          "enabled": true
+        },
+        "fo_create_parents": {
+          "value": true,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/dir_operation",
+      "instance_id": "instance_b8adfa4391f6",
+      "name": "dir_operation",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "do_source_dir": {
+          "value": "{session_path}/{session_name}/Output/{session_name}",
+          "enabled": true
+        },
+        "do_dest_dir": {
+          "value": "{current_season_path}/{session_name}",
+          "enabled": true
+        },
+        "do_mode": {
+          "value": "copy",
+          "enabled": true
+        },
+        "do_on_conflict": {
+          "value": "overwrite",
+          "enabled": true
+        },
+        "do_copy_base_folder": {
+          "value": false,
+          "enabled": true
+        },
+        "do_include": {
+          "value": "*",
+          "enabled": true
+        },
+        "do_threads": {
+          "value": "8",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

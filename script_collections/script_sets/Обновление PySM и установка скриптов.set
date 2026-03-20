@@ -1,0 +1,70 @@
+{
+  "type": "script_set",
+  "id": "setnode_98b499c3bae7",
+  "name": "Обновление PySM и установка скриптов",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/SYSTEM/pysm_updater",
+      "instance_id": "instance_65e54835465c",
+      "name": "Обновить PySM и скрипты",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "repo_url": {
+          "value": "https://github.com/ExMent-70/PySM/archive/refs/heads/main.zip",
+          "enabled": true
+        },
+        "target_dir": {
+          "value": null,
+          "enabled": false
+        },
+        "token": {
+          "value": null,
+          "enabled": false
+        },
+        "no_backup": {
+          "value": false,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/py_install_req",
+      "instance_id": "instance_1415d8de3149",
+      "name": "Обновить Python-зависимости",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "inst_search_path": {
+          "value": "C:/7/repos/PySM",
+          "enabled": true
+        },
+        "inst_python_interpreter": {
+          "value": "",
+          "enabled": true
+        },
+        "inst_upgrade": {
+          "value": false,
+          "enabled": true
+        },
+        "inst_verbose": {
+          "value": false,
+          "enabled": true
+        },
+        "inst_analyze_only": {
+          "value": false,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/get_pc_hwid",
+      "instance_id": "instance_f66a0acc2190",
+      "name": "Определить HWID компьютера пользователя",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {}
+    }
+  ]
+}

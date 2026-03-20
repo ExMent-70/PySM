@@ -1,18 +1,18 @@
 {
   "type": "script_set",
-  "id": "setnode_8f970f3fa026",
-  "name": "Этап 2-RAW. Обработка RAW-файлов",
+  "id": "setnode_708c7f947f22",
+  "name": "Этап R1. Подготовка RAW-файлов",
   "description": null,
   "script_entries": [
     {
       "id": "root_7617c03c/GUI/gui_dialog_msg",
-      "instance_id": "instance_402adf7d1cce",
+      "instance_id": "instance_9611cb773a7c",
       "name": "СООБЩЕНИЕ: Вставить карту памяти в компьютер",
       "description": null,
       "silent_mode": true,
       "command_line_args": {
         "dlg_msg_var": {
-          "value": "var_user_choice",
+          "value": "var_run_script",
           "enabled": true
         },
         "dlg_msg_type": {
@@ -31,7 +31,7 @@
     },
     {
       "id": "root_7617c03c/GUI/gui_dialog_open",
-      "instance_id": "instance_f2e1623ce44f",
+      "instance_id": "instance_a291f1f7646d",
       "name": "ДИАЛОГ: Выбрать карту памяти с исходными RAW-файлами",
       "description": null,
       "silent_mode": false,
@@ -56,9 +56,9 @@
     },
     {
       "id": "root_7617c03c/SYSTEM/dir_operation",
-      "instance_id": "instance_a3c4b3e24dda",
-      "name": "Копирование файлов RAW в папку сессии",
-      "description": "<div style=\" {theme.script_description}\">При работе с реальными данными установить режим работы <b>do_mode</b> в состояние <b>move</b>. При отладке используется режим <b>copy</b></div>",
+      "instance_id": "instance_405fc193fa5a",
+      "name": "Копировать RAW-файлы  в папку сессии",
+      "description": "<div style=\" {theme.script_description}\">\nСкрипт копирует исходные RAW-файлы в папку Capture.\n</div>",
       "silent_mode": false,
       "command_line_args": {
         "do_source_dir": {
@@ -82,7 +82,9 @@
           "enabled": true
         },
         "do_include": {
-          "value": "*.cr3",
+          "value": [
+            "*.cr3"
+          ],
           "enabled": true
         },
         "all_threads": {
@@ -92,12 +94,20 @@
       }
     },
     {
-      "id": "root_790d968b/Workflow/analize/export_to_jpeg",
-      "instance_id": "instance_b056661524f6",
+      "id": "root_790d968b/Workflow2/Tools/raw2jpeg",
+      "instance_id": "instance_2c739ae45371",
       "name": "Конвертировать RAW в JPEG",
-      "description": "<div style=\"{theme.script_description}\">\n<b>Первый шаг в конвейере анализа изображений</b> \nСкрипт, конвертирует исходные файлы изображений (RAW или PSD) в формат JPEG для последующего анализа другими скриптами.\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}:\n\n<b>base_dir</b> =<i> {wf_session_path} / {wf_session_name}</i>\n<b>input_dir</b> =<i> {base_dir} / Capture / {wf_photo_session}</i>\n<b>output_dir</b> =<i> {base_dir} / Output / Analysis_{wf_photo_session}  / JPG</i>\n\nЕсли ваши изображения уже в формате JPG, то данный скрипт можно не запускать.\n</div>",
+      "description": "<div style=\"{theme.script_description}\">\nСкрипт, конвертирует исходные файлы изображений (RAW или PSD) в формат JPEG для последующего анализа другими скриптами.\n\nЕсли ваши изображения уже в формате JPG, то данный скрипт можно не запускать.\n</div>",
       "silent_mode": false,
       "command_line_args": {
+        "input_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
+          "enabled": true
+        },
+        "output_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG",
+          "enabled": true
+        },
         "a_r2j_image_type": {
           "value": "raw",
           "enabled": true
@@ -107,7 +117,7 @@
           "enabled": true
         },
         "a_r2j_jpeg_quality": {
-          "value": "90",
+          "value": 95,
           "enabled": true
         },
         "all_threads": {
@@ -118,8 +128,8 @@
     },
     {
       "id": "root_790d968b/img2mask",
-      "instance_id": "instance_5209a3477a08",
-      "name": "Создание маски фона",
+      "instance_id": "instance_e233278037dc",
+      "name": "Создать маски фона",
       "description": null,
       "silent_mode": false,
       "command_line_args": {
@@ -179,27 +189,6 @@
         },
         "img_rmbg_img_scale": {
           "value": "0",
-          "enabled": true
-        }
-      }
-    },
-    {
-      "id": "root_790d968b/Workflow/analize/analyze_faces",
-      "instance_id": "instance_c86f838722d7",
-      "name": "Найти лица на фотографиях. Вычислить эмбединги",
-      "description": "<div style=\" {theme.script_description}\">\n<b>Второй по очереди (но главный по сути) скрипт в конвейере анализа изображений</b> \nСкрипт анализуирует изображения в формате JPG, распознает на них лица людей и переводит их в векторный формат (вычисляет эмбединги). Результаты анализа сохраняются в JSON и NPY-файлы (отдельно для портретных и групповых фотографий).\n\nПути к рабочим папкам формируется из переменных контекста: {wf_session_path}, {wf_session_name} и {wf_photo_session}.\n\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>output_dir</b> = <i>{base_dir} / Output / Analysis_{photo_session}</i>\n<b>input_dir</b> = <i>{output_dir} / JPG</i>\n\nСкрипт работает с файлами JPG, поэтому RAW и PSD файлы необходимо предварительно конвертировать.\n</div>",
-      "silent_mode": false,
-      "command_line_args": {
-        "a_af_config_file": {
-          "value": "config.toml",
-          "enabled": true
-        },
-        "all_threads": {
-          "value": 0,
-          "enabled": true
-        },
-        "a_af_det_thresh": {
-          "value": "0.4",
           "enabled": true
         }
       }

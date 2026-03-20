@@ -1,0 +1,244 @@
+{
+  "type": "script_set",
+  "id": "setnode_a71102a83540",
+  "name": "Настройка ЛОКАЛЬНЫХ переменных (один раз для каждого класса(группы)",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/SYSTEM/log_html",
+      "instance_id": "instance_03caf48425f9",
+      "name": "Информационное сообщение",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "html_content": {
+          "value": "<div style=\" {theme.script_description}\">\n<b>НАСТРОЙКА ОКРУЖЕНИЯ</b>\n<i>(локальные переменные, структура рабочих папок)</i>\n\n<b>wf_session_name</b> - уникальное название школы/параллели/класса\n\n<b>wf_temp_tech_claster</b> - флаг выполнения технической кластеризации фотографий\n<b>wf_temp_portrait_claster</b> - флаг выполнения кластеризации портретных фотографий\n<b>wf_temp_location_claster</b> - флаг выполнения кластеризации фотографий по сюжетам\n<b>wf_temp_matches_claster</b> - флаг идентификации лиц на групповых фотограиях\n\nПри настройке окружения всем флагам присваивается значение <i>no</i> - соответствующий этап клестеризации не выполнялся\n</div>\n",
+          "enabled": true
+        },
+        "html_file": {
+          "value": null,
+          "enabled": false
+        },
+        "html_align": {
+          "value": "left",
+          "enabled": true
+        },
+        "html_margin": {
+          "value": 5,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_input",
+      "instance_id": "instance_ec99ca4859ce",
+      "name": "ПЕРЕМЕННАЯ: Указать школу/параллель/класс",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_input_var": {
+          "value": "wf_session_name",
+          "enabled": true
+        },
+        "dlg_input_title": {
+          "value": "Ввод значения",
+          "enabled": true
+        },
+        "dlg_input_msg": {
+          "value": "Укажите название школы, параллель и класс.\n\nНапример, Школа56_4а_класс",
+          "enabled": true
+        },
+        "dlg_input_dvalue": {
+          "value": "Школа56_4а_класс",
+          "enabled": true
+        },
+        "dlg_input_valid_type": {
+          "value": "not_empty",
+          "enabled": true
+        },
+        "dlg_input_custom_regexp": {
+          "value": null,
+          "enabled": false
+        },
+        "dlg_input_custom_regexp_desc": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/cli_var_set",
+      "instance_id": "instance_0fcb47844025",
+      "name": "ПЕРЕМЕННАЯ: wf_temp_tech_claster = no",
+      "description": "<div style=\" {theme.script_description}\">\nСброс флага выполнения операции кластеризации портретных фотографий.\n<b>wf_temp_tech_claster = no</b>\n</div>",
+      "silent_mode": true,
+      "command_line_args": {
+        "set_var_name": {
+          "value": "wf_temp_tech_claster",
+          "enabled": true
+        },
+        "set_var_value": {
+          "value": "no",
+          "enabled": true
+        },
+        "set_valid_type": {
+          "value": "not_empty",
+          "enabled": true
+        },
+        "set_custom_regexp": {
+          "value": null,
+          "enabled": false
+        },
+        "set_custom_regexp_desc": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/cli_var_set",
+      "instance_id": "instance_aa85d313a239",
+      "name": "ПЕРЕМЕННАЯ: wf_temp_portrait_claster = no",
+      "description": "<div style=\" {theme.script_description}\">\nСброс флага выполнения операции кластеризации портретных фотографий.\n<b>wf_temp_portrait_claster = no</b>\n</div>",
+      "silent_mode": true,
+      "command_line_args": {
+        "set_var_name": {
+          "value": "wf_temp_portrait_claster",
+          "enabled": true
+        },
+        "set_var_value": {
+          "value": "no",
+          "enabled": true
+        },
+        "set_valid_type": {
+          "value": "not_empty",
+          "enabled": true
+        },
+        "set_custom_regexp": {
+          "value": null,
+          "enabled": false
+        },
+        "set_custom_regexp_desc": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/cli_var_set",
+      "instance_id": "instance_743ea8969f38",
+      "name": "ПЕРЕМЕННАЯ: wf_temp_location_claster = no",
+      "description": "<div style=\" {theme.script_description}\">\nСброс флага выполнения операции кластеризации портретных фотографий.\n<b>wf_temp_location_claster = no</b>\n</div>",
+      "silent_mode": true,
+      "command_line_args": {
+        "set_var_name": {
+          "value": "wf_temp_location_claster",
+          "enabled": true
+        },
+        "set_var_value": {
+          "value": "no",
+          "enabled": true
+        },
+        "set_valid_type": {
+          "value": "not_empty",
+          "enabled": true
+        },
+        "set_custom_regexp": {
+          "value": null,
+          "enabled": false
+        },
+        "set_custom_regexp_desc": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/SYSTEM/cli_var_set",
+      "instance_id": "instance_4a0cae977993",
+      "name": "ПЕРЕМЕННАЯ: wf_temp_matches_claster = no",
+      "description": "<div style=\" {theme.script_description}\">\nСброс флага выполнения операции кластеризации портретных фотографий.\n<b>wf_temp_matches_claster = no</b>\n</div>",
+      "silent_mode": true,
+      "command_line_args": {
+        "set_var_name": {
+          "value": "wf_temp_matches_claster",
+          "enabled": true
+        },
+        "set_var_value": {
+          "value": "no",
+          "enabled": true
+        },
+        "set_valid_type": {
+          "value": "not_empty",
+          "enabled": true
+        },
+        "set_custom_regexp": {
+          "value": null,
+          "enabled": false
+        },
+        "set_custom_regexp_desc": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow2/Tools/session_create",
+      "instance_id": "instance_83c31491c0e5",
+      "name": "Создать структуру рабочих папок",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "wf_session_name": {
+          "value": "{wf_session_name}",
+          "enabled": true
+        },
+        "wf_raw_path": {
+          "value": "{wf_raw_path}",
+          "enabled": true
+        },
+        "wf_session_path": {
+          "value": "{wf_session_path}",
+          "enabled": true
+        },
+        "wf_psd_path": {
+          "value": "{wf_raw_path}",
+          "enabled": true
+        },
+        "wf_overwrite_session": {
+          "value": false,
+          "enabled": true
+        },
+        "wf_overwrite_album": {
+          "value": true,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow2/Tools/session_report",
+      "instance_id": "instance_d9b560e74726",
+      "name": "Информационная панель",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "template": {
+          "value": "dashboard",
+          "enabled": true
+        },
+        "scope": {
+          "value": "full",
+          "enabled": true
+        },
+        "icon_size_tree": {
+          "value": 24,
+          "enabled": true
+        },
+        "icon_size_dashboard": {
+          "value": "40",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

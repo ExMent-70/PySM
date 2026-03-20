@@ -1,0 +1,277 @@
+{
+  "type": "script_set",
+  "id": "setnode_c47b0d5f2955",
+  "name": "Фотошоп",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_790d968b/Photoshop/ps_photoshop_launch",
+      "instance_id": "instance_abcf71385e05",
+      "name": "Фотошоп - Запустить",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "photoshop_app_dir": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_document_new",
+      "instance_id": "instance_120b7f62c596",
+      "name": "Документ - Создать новый документ",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_width": {
+          "value": 1920,
+          "enabled": true
+        },
+        "ps_height": {
+          "value": 1080,
+          "enabled": true
+        },
+        "ps_resolution": {
+          "value": 300,
+          "enabled": true
+        },
+        "ps_name": {
+          "value": "Новый документ",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_document_open",
+      "instance_id": "instance_e6ee11498715",
+      "name": "Документ - Открыть",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_file_path": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_document_meta",
+      "instance_id": "instance_9a2add3eef69",
+      "name": "Документ - Метаданные",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_file_path": {
+          "value": null,
+          "enabled": false
+        },
+        "ps_meta_fields": {
+          "value": [],
+          "enabled": true
+        },
+        "ps_clear_context": {
+          "value": true,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_document_save",
+      "instance_id": "instance_2e59a6099d96",
+      "name": "Документ - Сохранить активный документ",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_save_path": {
+          "value": "",
+          "enabled": false
+        },
+        "ps_save_as_copy": {
+          "value": true,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_document_archive",
+      "instance_id": "instance_9f8d5fc67881",
+      "name": "Документ - Подготовить к храненинию",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_source_folder": {
+          "value": "{current_season_path}/{session_name}/Альбом/Фото/Портрет0",
+          "enabled": true
+        },
+        "ps_output_folder": {
+          "value": "{current_season_path}/{session_name}/Выпускникам",
+          "enabled": true
+        },
+        "ps_action_set": {
+          "value": "PySM Actions",
+          "enabled": true
+        },
+        "ps_action_name": {
+          "value": "_АРХИВ_",
+          "enabled": true
+        },
+        "ps_recursive": {
+          "value": false,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_document_close",
+      "instance_id": "instance_7301e9e3ec2e",
+      "name": "Документ - Закрыть",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_document_name": {
+          "value": null,
+          "enabled": false
+        },
+        "ps_force_close": {
+          "value": false,
+          "enabled": true
+        },
+        "ps_save_on_close": {
+          "value": false,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_action_set_load",
+      "instance_id": "instance_109580ec9683",
+      "name": "Экшен - Загрузить набор",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_atn_file_path": {
+          "value": null,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_action_set_delete",
+      "instance_id": "instance_333ab4ac13df",
+      "name": "Экшен - Удалить набор",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_action_set_name": {
+          "value": "__TEST__",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_action_run",
+      "instance_id": "instance_7ab0c4f4c581",
+      "name": "Экшен - Запустить - _PySM_ARCHIVE_",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_action_set": {
+          "value": "PySM Actions",
+          "enabled": true
+        },
+        "ps_action_name": {
+          "value": "_PySM_ARCHIVE_",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_action_batch",
+      "instance_id": "instance_5673519fa5fb",
+      "name": "Экшен - Пакетный запуск _PySM_RETUCHE_RUN_",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_mode": {
+          "value": "selected_file_folder",
+          "enabled": true
+        },
+        "ps_action_set": {
+          "value": "PySM Actions",
+          "enabled": true
+        },
+        "ps_action_name": {
+          "value": "_PySM_RETUCHE_RUN_",
+          "enabled": true
+        },
+        "ps_file_path": {
+          "value": "E:/Портрет0/22-Трофимов Егор-3025.psd",
+          "enabled": true
+        },
+        "ps_recursive": {
+          "value": true,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_action_batch",
+      "instance_id": "instance_f6fd90edfc59",
+      "name": "Экшен - Пакетный запуск - _PySM_RETUCHE_CLEAR_",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_mode": {
+          "value": "selected_file_folder",
+          "enabled": true
+        },
+        "ps_action_set": {
+          "value": "PySM Actions",
+          "enabled": true
+        },
+        "ps_action_name": {
+          "value": "PySM_RETUCHE_CLEAR",
+          "enabled": true
+        },
+        "ps_file_path": {
+          "value": "E:/Портрет0/22-Трофимов Егор-3025.psd",
+          "enabled": true
+        },
+        "ps_recursive": {
+          "value": true,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Photoshop/ps_action_batch_set_select",
+      "instance_id": "instance_4dfdf5e91c5d",
+      "name": "Экшен - Универсальный пакетный запуск",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "ps_mode": {
+          "value": "selected_file_folder",
+          "enabled": true
+        },
+        "ps_file_path": {
+          "value": "E:/Портрет0/22-Трофимов Егор-3025.psd",
+          "enabled": true
+        },
+        "ps_recursive": {
+          "value": false,
+          "enabled": true
+        },
+        "ps_action_set": {
+          "value": null,
+          "enabled": true
+        },
+        "ps_action_name": {
+          "value": null,
+          "enabled": true
+        }
+      }
+    }
+  ]
+}

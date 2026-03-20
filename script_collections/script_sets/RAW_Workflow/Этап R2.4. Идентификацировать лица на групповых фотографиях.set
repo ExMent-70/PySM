@@ -1,0 +1,146 @@
+{
+  "type": "script_set",
+  "id": "setnode_567d87821541",
+  "name": "Этап R2.4. Идентификацировать лица на групповых фотографиях",
+  "description": null,
+  "script_entries": [
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_msg",
+      "instance_id": "instance_5a2749b63e7f",
+      "name": "СООБЩЕНИЕ: Идентификация людей на групповых фотографиях",
+      "description": null,
+      "silent_mode": true,
+      "command_line_args": {
+        "dlg_msg_var": {
+          "value": "var_portrait_exists",
+          "enabled": true
+        },
+        "dlg_msg_type": {
+          "value": "yes_no",
+          "enabled": true
+        },
+        "dlg_msg_title": {
+          "value": "Блок скриптов для идентификации людей на групповых фотографиях",
+          "enabled": true
+        },
+        "dlg_msg_message": {
+          "value": "Набор скриптов для идентификации людей на групповых фотографиях\n\nВыполнение этих скриптов приведёт к созданию и/или изменению файлов: \n- info_faces.json\n- matches_portrait_to_group.json\n- error_matches.json",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_7617c03c/GUI/gui_dialog_choice",
+      "instance_id": "instance_923b7c985048",
+      "name": "Выбор эталонной ПОРТРЕТНОЙ съемки",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "dlg_choice_var": {
+          "value": "wf_portrait_session",
+          "enabled": true
+        },
+        "dlg_choice_title": {
+          "value": "Выбор съемки",
+          "enabled": true
+        },
+        "dlg_choice_message": {
+          "value": "Выберите ЭТАЛОННУЮ съемку с портретными фотографиями \nдля точной идентификации лиц на групповых фотографиях.\n\nВыберите название съемки в выпадающем списке:\n",
+          "enabled": true
+        },
+        "dlg_choice_list": {
+          "value": [
+            "PORTRAIT",
+            "SCHOOL",
+            "SEPTEMBER1",
+            "STREET",
+            "STUDIO"
+          ],
+          "enabled": true
+        },
+        "dlg_choice_dvalue": {
+          "value": "{wf_photo_session}",
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow2/FaceAnalysis/cluster_face2",
+      "instance_id": "instance_7c2143b4009f",
+      "name": "Идентификация людей на групповых фотографиях по ЭТАЛОННЫМ ПОРТРЕТАМ",
+      "description": null,
+      "silent_mode": false,
+      "command_line_args": {
+        "a_target_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}",
+          "enabled": true
+        },
+        "a_mode": {
+          "value": "matches",
+          "enabled": true
+        },
+        "a_sim_threshold": {
+          "value": "0.45",
+          "enabled": true
+        },
+        "a_metric": {
+          "value": "cosine",
+          "enabled": false
+        },
+        "a_clear_min_score": {
+          "value": 0.6,
+          "enabled": false
+        },
+        "a_clear_min_abs_area": {
+          "value": 2500,
+          "enabled": false
+        },
+        "a_clear_min_rel_area": {
+          "value": "0.001",
+          "enabled": false
+        },
+        "a_clear_min_claster_size": {
+          "value": "5",
+          "enabled": false
+        },
+        "a_algorithm": {
+          "value": "dbscan",
+          "enabled": false
+        },
+        "a_ref_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_portrait_session}",
+          "enabled": true
+        },
+        "a_hdb_cluster_selection_epsilon": {
+          "value": 0.0,
+          "enabled": false
+        }
+      }
+    },
+    {
+      "id": "root_790d968b/Workflow2/FaceAnalysis/cluster_editor",
+      "instance_id": "instance_d98e7f6cacec",
+      "name": "Просмотр и экспорт списка [ЭТАЛОННЫЙ ПОРТРЕТ-Групповые фотографии]",
+      "description": "<div style=\" {theme.script_description}\">\nЗапуск Редактора кластеров в режиме просмотра фотографий  [ЭТАЛОННЫЙ ПОРТРЕТ-Групповые фотографии]\n\nДля идентификации людей на групповых фотографиях текущей фотосессии <b>{wf_photo_session}</b> используются ПОРТРЕТЫ эталонной фотосессии <b>{wf_portrait_session}</b>\n\nДополнительно в скрипте реализован экспорт изображений в формат JPG с водяными знаками. При экспорте переменной контекста <b>var_jpg_move</b> присваивается значение <b>yes</b>\n<b>var_jpg_move = yes</b>\n</div>",
+      "silent_mode": false,
+      "command_line_args": {
+        "ce_working_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}",
+          "enabled": true
+        },
+        "ce_reference_dir": {
+          "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_portrait_session}",
+          "enabled": true
+        },
+        "all_threads": {
+          "value": "12",
+          "enabled": true
+        },
+        "mode": {
+          "value": "matches",
+          "enabled": true
+        }
+      }
+    }
+  ]
+}
