@@ -76,12 +76,13 @@ class ContextHandler:
 
     def save_result(self, value: str) -> None:
         """Сохраняет результат в контекст."""
-        logger.info(f"Попытка сохранить значение в '{self.var_name}': '{value}'")
+        logger.debug(f"Попытка сохранить значение в '{self.var_name}': '{value}'")
         
         if IS_MANAGED_RUN and pysm_context:
             try:
                 pysm_context.set(self.var_name, value)
-                logger.info("Переменная контекста успешно сохранена.")
+                #logger.info("Переменная контекста успешно сохранена.")
+                logger.info(f"✅ <b>{self.var_name}</b> = <i>{value}</i>\n")
             except Exception as e:
                 logger.critical(f"Ошибка при сохранении данных в контекст: {e}")
                 sys.exit(1)

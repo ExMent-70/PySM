@@ -1,8 +1,8 @@
 {
-  "description": "Создает новую сессию Capture One из шаблона",
-  "category": "Рабочий процесс",
+  "description": "Создает структуру папок для рабочего процесса на основе шаблона",
+  "category": "Tools Scripts Pack",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "1.05.03",
+  "version": "v2.2026.03.18",
   "command_line_args_meta": {
     "wf_session_name": {
       "type": "string",
@@ -12,23 +12,31 @@
     },
     "wf_raw_path": {
       "type": "dir_path",
-      "description": "Путь к папке, содержащей исходные RAW-файлы для импорта.",
+      "description": "Путь к папке, содержащей исходные RAW-файлы. Используется как базовый путь для PSD по умолчанию.",
       "required": true,
       "default": "{wf_raw_path}"
     },
     "wf_session_path": {
       "type": "dir_path",
-      "description": "Путь к родительской папке, в которой будет создана папка новой сессии (например, D:\\Photos\\2025).",
+      "description": "Путь к родительской папке, в которой будет создана папка новой сессии Capture One.",
       "required": true,
       "default": "{wf_session_path}"
     },
-    "wf_copy_threads": {
-      "type": "int",
-      "description": "Количество потоков для параллельного копирования файлов.",
-      "required": false,
-      "default": 8,
-      "min_val": 1,
-      "max_val": 16
+    "wf_psd_path": {
+      "type": "dir_path",
+      "description": "Путь к родительской папке, в которой будет создана структура рабочих PSD-файлов (Альбом).",
+      "required": true,
+      "default": "{wf_raw_path}"
+    },
+    "wf_overwrite_session": {
+      "type": "bool",
+      "description": "Перезаписывать ли существующие файлы при копировании шаблона сессии Capture One в уже существующую папку.",
+      "required": false
+    },
+    "wf_overwrite_album": {
+      "type": "bool",
+      "description": "Перезаписывать ли существующие файлы при копировании шаблона Альбома в уже существующую папку.",
+      "required": false
     }
   }
 }

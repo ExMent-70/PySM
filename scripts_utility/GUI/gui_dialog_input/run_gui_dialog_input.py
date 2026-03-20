@@ -96,7 +96,7 @@ class ContextHandler:
         if IS_MANAGED_RUN and pysm_context:
             context_val = pysm_context.get(self.var_name)
             if context_val is not None:
-                logger.info(f"ℹ️ Текущее значение: <b>{self.var_name}</b> = <i>{context_val}</i>")
+                logger.debug(f"ℹ️ Текущее значение: <b>{self.var_name}</b> = <i>{context_val}</i>")
                 return str(context_val)
         return default
 
@@ -108,12 +108,12 @@ class ContextHandler:
             try:
                 pysm_context.set(self.var_name, value)
                 logger.debug("Переменная контекста успешно сохранена.")
-                logger.info(f"✅ Новое значение: <b>{self.var_name}</b> = <i>{value}</i>")
+                logger.info(f"✅ <b>{self.var_name}</b> = <i>{value}</i>\n")
             except Exception as e:
                 logger.critical(f"❌ Ошибка при сохранении данных в контекст: {e}")
                 sys.exit(1)
-            finally:
-                logger.info(f"<br>")
+            #finally:
+                #logger.info(f"<br>")
             
         else:
             logger.info("⚠️ Запуск в автономном режиме, результат в контекст не сохраняется.")
@@ -259,7 +259,7 @@ def main():
     # 1. Конфигурация
     config = get_config()
     
-    print(f"<b>Инициализация переменной контекста <i>{config.dlg_input_var}</i></b><br>")
+    #print(f"<b>Инициализация переменной контекста <i>{config.dlg_input_var}</i></b><br>")
     # 2. Подготовка сервисов
     context_handler = ContextHandler(config.dlg_input_var)
     validator = Validator(config)
