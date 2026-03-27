@@ -193,7 +193,7 @@ def main():
         logger.info(f"{icon_delete} Очистка переменной <b>{config.if_variable_name.upper()}</b>")
         pysm_context.remove(config.if_variable_name)
 
-    logger.info(f"{icon_info} Порядок выполнения скриптов изменён, следующий скрипт:")
+    logger.debug(f"{icon_info} Порядок выполнения скриптов изменён, следующий скрипт:")
 
     # 3. Устанавливаем следующий скрипт или продолжаем по умолчанию
     if target_id:
@@ -203,7 +203,7 @@ def main():
             target_name = all_instances.get(target_id, "Неизвестное имя")
             
             pysm_context.set_next_script(target_id)
-            logger.info(f" {icon_arrow_sub} <b>{target_name.upper()}</b> (ID: <i>{target_id}</i>)<br>")
+            logger.info(f" {icon_play} Следующий скрипт: <b>{target_name.upper()}</b> (ID: <i>{target_id}</i>)<br>")
         except Exception as e:
             logger.error(f"КРИТИЧЕСКАЯ ОШИБКА при установке следующего скрипта: {e}")
             sys.exit(1)
