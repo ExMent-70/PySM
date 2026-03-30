@@ -1,0 +1,10 @@
+{
+    "Списки элементов интерфейса": {
+        "Кнопки в MsgBox": "ok\nyes_no\nyes_no_cancel",
+        "Режимы кластеризации сюжетов": "clustering\nclassification",
+        "Режимы кластеризации": "cleaning\nface\nmatches",
+        "Список доступных съемок": "PORTRAIT\nSCHOOL\nSEPTEMBER1\nSTREET\nSTUDIO",
+        "Операции сравнения": "равно\nне равно\nбольше\nменьше\nсодержит\nне содержит",
+        "Шаблоны валидации значения переменной": "none\nnot_empty\nfilename_txt\ninteger\npositive_integer\nfloat\nemail\ncustom"
+    }
+}
