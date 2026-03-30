@@ -1,40 +1,40 @@
 /* =============================================================================
- * PyScriptManager - Midnight_Blue QSS Template
+ * PyScriptManager - Default QSS Template
  * ========================================================================== */
 
 /* --- [0] ПЕРЕМЕННЫЕ ТЕМЫ (этот блок нужно заменять для каждой темы) --- */
-@bgColorBase = #2d333b;
-@bgColorContainer = #22272e;
-@bgColorAlternate = #2d333b;
-@bgColorHover = #373e48;
-@bgColorPressed = #316dca;
-@bgColorDisabled = #2d333b;
-@bgColorHeader = #373e48;
-@bgColorTooltip = #22272e;
-@bgColorScrollbar = #22272e;
-@bgColorScrollHandle = #434c58;
-@bgColorScrollHandleHover = #545d68;
-@bgColorMenu = #2d333b;
-@bgColorDialog = #2d333b;
-@bgColorButton = #373e48;
+@bgColorBase = #f0f0f0;
+@bgColorContainer = #ffffff;
+@bgColorAlternate = #f6f6f6;
+@bgColorHover = #e5f1fb;
+@bgColorPressed = #cce4f7;
+@bgColorDisabled = #f0f0f0;
+@bgColorHeader = #f0f0f0;
+@bgColorTooltip = #fcfcfc;
+@bgColorScrollbar = #f0f0f0;
+@bgColorScrollHandle = #cccccc;
+@bgColorScrollHandleHover = #bbbbbb;
+@bgColorMenu = #ffffff;
+@bgColorDialog = #f0f0f0;
+@bgColorButton = #f0f0f0; /* Для светлой темы используем базовый фон */
 
-@textColor = #adbac7;
-@textColorSecondary = #cdd5df;
-@textColorDisabled = #6a7582;
+@textColor = #000000;
+@textColorSecondary = #555555;
+@textColorDisabled = #aaaaaa;
 @textColorOnAccent = #ffffff;
-@textColorGroupBoxTitle = #cdd5df;
+@textColorGroupBoxTitle = #888888;
 
-@borderColor = #444c56;
-@borderColorGrid = #444c56;
-@borderColorDirty = #d15766;
-@borderColorTooltip = #545d68;
+@borderColor = #cccccc;
+@borderColorGrid = #e0e0e0;
+@borderColorDirty = #d9534f;
+@borderColorTooltip = #a0a0a0;
 
-@accentColor = #316dca;
-@accentColorHover = #3e81e9;
-@accentColorPressed = #316dca;
-@accentColorSelection = #214283;
-@accentColorPrimaryBtn = #316dca;
-@accentColorDangerBtn = #d15766;
+@accentColor = #0078d7;
+@accentColorHover = #008ae6;
+@accentColorPressed = #a4c8eb;
+@accentColorSelection = #a4c8eb; /* В светлой теме выделение может быть светлее */
+@accentColorPrimaryBtn = #0e639c;
+@accentColorDangerBtn = #d9534f;
 
 @bgColorHoverItem = #f0ad4e;
 @textColorHoverItem = #000000;
@@ -119,6 +119,7 @@ QLineEdit, QTextEdit, QPlainTextEdit {
     border-radius: 5px; padding: 4px;
 }
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus { border: 1px solid @accentColor; }
+
 QLineEdit:disabled, 
 QTextEdit:disabled, 
 QPlainTextEdit:disabled {
@@ -179,6 +180,7 @@ QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
     border-top: 4px solid @textColorSecondary;
 }
 
+
 /* --- [5] КОНТЕЙНЕРЫ (QGroupBox, QTabWidget, QToolBox) --- */
 QGroupBox {
     background-color: @bgColorContainer;
@@ -226,6 +228,7 @@ QTreeView, QListWidget, QTableWidget {
 QTreeView::item:hover { background-color: @bgColorHover; }
 QTreeView::item:selected, QListWidget::item:selected { background-color: @accentColorSelection; color: @textColorOnAccent; }
 QListWidget::item:hover { background-color: @bgColorHoverItem; }
+
 
 QHeaderView::section {
     background-color: @bgColorHeader; padding: 5px; border: none;
@@ -313,7 +316,6 @@ QMenuBar::item:selected { /* При наведении или открытии *
     background-color: @accentColorSelection;
     color: @textColorOnAccent;
 }
-
 
 
 /* --- [11] ДИАЛОГОВЫЕ ОКНА --- */

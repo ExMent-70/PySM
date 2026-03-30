@@ -26,7 +26,7 @@
       "type": "dir_path",
       "description": "Путь к родительской папке, в которой будет создана структура рабочих PSD-файлов (Альбом).",
       "required": true,
-      "default": "{wf_raw_path}"
+      "default": "{wf_psd_path}"
     },
     "wf_overwrite_session": {
       "type": "bool",

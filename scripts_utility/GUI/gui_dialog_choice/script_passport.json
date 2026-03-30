@@ -23,10 +23,11 @@
       "default": "Выберите один из вариантов в выпадающем списке."
     },
     "dlg_choice_list": {
-      "type": "list",
+      "type": "choice",
       "description": "Список вариантов для выбора, каждый с новой строки.",
       "required": true,
-      "default": [
+      "default": "PORTRAIT",
+      "choices": [
         "PORTRAIT",
         "SCHOOL",
         "SEPTEMBER1",

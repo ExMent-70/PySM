@@ -285,8 +285,8 @@ class PySMContext:
         raw_data = self._read_data()
         return {k: v.get("value") for k, v in raw_data.items()}
 
+    """
     def resolve_template(self, template_string: Optional[str]) -> str:
-        """Заменяет плейсхолдеры {key} в строке на значения из контекста."""
         if not template_string or "{" not in template_string:
             return template_string if template_string is not None else ""
         placeholders = re.findall(r"{([^}]+)}", template_string)
@@ -295,6 +295,41 @@ class PySMContext:
             value = self.get_structured(key, default=f"{{{key}}}")
             resolved_string = resolved_string.replace(f"{{{key}}}", str(value))
         return resolved_string
+    """
+    
+    def resolve_template(self, template_string: Optional[str]) -> str:
+            """
+            Рекурсивно заменяет плейсхолдеры {key} в строке на значения из контекста.
+            Выполняется до тех пор, пока все возможные плейсхолдеры не будут разрешены.
+            """
+            if not template_string or not isinstance(template_string, str) or "{" not in template_string:
+                return template_string if template_string is not None else ""
+
+            resolved_string = template_string
+            max_depth = 10  # Защита от бесконечной рекурсии (напр., a={b}, b={a})
+
+            for _ in range(max_depth):
+                placeholders = re.findall(r"{([^}]+)}", resolved_string)
+                if not placeholders:
+                    break
+
+                made_changes = False
+                for key in set(placeholders):
+                    # Пытаемся получить значение. Если ключа нет, вернется None
+                    val = self.get_structured(key, default=None)
+
+                    if val is not None:
+                        str_val = str(val)
+                        # Предотвращаем зацикливание, если значение равно самому плейсхолдеру
+                        if str_val != f"{{{key}}}":
+                            resolved_string = resolved_string.replace(f"{{{key}}}", str_val)
+                            made_changes = True
+
+                # Если за весь проход не было сделано ни одной замены, прерываем цикл
+                if not made_changes:
+                    break
+
+            return resolved_string        
 
     def resolve_path(self, path_str: str) -> pathlib.Path:
         """Преобразует относительный путь в абсолютный, используя директорию коллекции как базу."""
@@ -670,79 +705,110 @@ class ConfigResolver:
       проходят через обработчик шаблонов, который заменяет в них
       плейсхолдеры вида {имя_переменной_контекста}.
     """
+# 1. БЛОК: Класс ConfigResolver (ПОЛНОСТЬЮ ПЕРЕРАБОТАН)
+# ==============================================================================
+    PATH_KEYWORDS = {"path", "dir", "file", "folder"}
+    _MISSING = object()  # Уникальный маркер для проверки отсутствия значения
 
-    # 1. БЛОК: Конструктор __init__ (ИЗМЕНЕН)
     def __init__(
         self,
         parser: argparse.ArgumentParser,
         force_path_args: Optional[List[str]] = None,
     ):
-        """
-        Инициализирует резолвер с парсером argparse.
-
-        Args:
-            parser (argparse.ArgumentParser): Парсер аргументов для скрипта.
-            force_path_args (Optional[List[str]]): Список имен аргументов, которые
-                нужно принудительно обрабатывать как пути, независимо от их имени.
-        """
         self._parser = parser
         self._cli_args, _ = parser.parse_known_args()
         self._context = pysm_context
         self._is_managed = self._context._context_file_path is not None
         self._arg_actions = {action.dest: action for action in self._parser._actions}
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-        # Преобразуем список в множество для быстрой проверки 'in'
-        self._force_path_args = set(force_path_args or [])
-        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+        self._force_path_args = set(force_path_args or[])
+        
+        # Предварительно определяем аргументы, явно переданные через CLI
+        self._explicit_cli_args = self._detect_explicit_cli_args()
 
-    def _convert_to_expected_type(self, value: Any, param_name: str) -> Any:
-        if value is None:
-            return None
-        action = self._arg_actions.get(param_name)
-        if action and action.nargs in ("+", "*") and isinstance(value, str):
-            return [line for line in value.splitlines() if line]
+    def _detect_explicit_cli_args(self) -> set[str]:
+        """Определяет, какие аргументы были явно переданы через командную строку."""
+        explicit_args = set()
+        
+        for action in self._parser._actions:
+            if action.option_strings:
+                # Опциональные аргументы: ищем совпадения напрямую в sys.argv
+                for opt in action.option_strings:
+                    # Поддерживает форматы --arg value и --arg=value
+                    if any(arg == opt or arg.startswith(f"{opt}=") for arg in sys.argv):
+                        explicit_args.add(action.dest)
+                        break
+            else:
+                # Позиционные аргументы: полагаемся на то, что они не равны дефолту
+                cli_val = getattr(self._cli_args, action.dest, None)
+                if cli_val != self._parser.get_default(action.dest):
+                    explicit_args.add(action.dest)
+                    
+        return explicit_args
+
+    def _get_raw_value(self, param_name: str) -> Any:
+        """Извлекает сырое значение с учетом приоритетов (CLI -> Context -> Default)."""
+        # 1. Явно переданный CLI аргумент
+        if param_name in self._explicit_cli_args:
+            return getattr(self._cli_args, param_name)
+
+        # 2. Значение из контекста PySM
+        default_value = self._parser.get_default(param_name)
+        if self._is_managed:
+            context_value = self._context.get(param_name, default=self._MISSING)
+            if context_value is not self._MISSING:
+                return context_value
+
+        # 3. Дефолтное значение argparse
+        return default_value
+
+    def _process_string_value(self, param_name: str, value: Any) -> Any:
+        """Обрабатывает строковые значения: применяет шаблоны, URL и пути."""
+        if not isinstance(value, str) or not value:
+            return value
+
+        # 1. Рекурсивное разрешение шаблонов PySM
+        if self._is_managed:
+            value = self._context.resolve_template(value)
+
+        # 2. Игнорируем URL-адреса для обработки путей
+        if value.lower().startswith(("http://", "https://")):
+            return value
+
+        # 3. Разрешение путей
+        param_name_lower = param_name.lower()
+        is_path_like = any(kw in param_name_lower for kw in self.PATH_KEYWORDS)
+        force_as_path = param_name in self._force_path_args
+
+        if is_path_like or force_as_path:
+            if self._is_managed:
+                return str(self._context.resolve_path(value))
+            return str(pathlib.Path(value).resolve())
+
         return value
 
-    # 2. БЛОК: Метод get (ИЗМЕНЕН)
+    def _convert_to_expected_type(self, param_name: str, value: Any) -> Any:
+        """Приводит значение к ожидаемому типу на основе конфигурации argparse."""
+        if value is None:
+            return None
+            
+        action = self._arg_actions.get(param_name)
+        
+        # Преобразование многострочного текста в список, если argparse ожидает список
+        if action and action.nargs in ("+", "*") and isinstance(value, str):
+            return [line for line in value.splitlines() if line]
+            
+        return value
+
     def get(self, param_name: str, default: Any = None) -> Any:
-        cli_value = getattr(self._cli_args, param_name, None)
-        default_value = self._parser.get_default(param_name)
-        raw_value: Optional[Any] = None
-        if cli_value is not None and cli_value != default_value:
-            raw_value = cli_value
-        elif self._is_managed:
-            raw_value = self._context.get(param_name, default_value)
-        else:
-            raw_value = default_value
-
-        processed_value = raw_value
-        if isinstance(raw_value, str):
-            if self._is_managed:
-                processed_value = self._context.resolve_template(raw_value)
-
-            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
-            # КОММЕНТАРИЙ: Проверяем, является ли строка URL-адресом
-            is_url = processed_value.lower().startswith(("http://", "https://"))
-
-            param_name_lower = param_name.lower()
-            is_path_like = any(
-                keyword in param_name_lower
-                for keyword in ["path", "dir", "file", "folder"]
-            )
-            force_as_path = param_name in self._force_path_args
-
-            # КОММЕНТАРИЙ: Обрабатываем как путь, только если это НЕ URL
-            if not is_url and (is_path_like or force_as_path) and processed_value:
-                if self._is_managed:
-                    processed_value = str(self._context.resolve_path(processed_value))
-                else:
-                    processed_value = str(pathlib.Path(processed_value).resolve())
-            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
-
-        final_value = self._convert_to_expected_type(processed_value, param_name)
-        return final_value if final_value is not None else default_value
+        """Получает итоговое значение параметра, пропуская его через все стадии обработки."""
+        raw_value = self._get_raw_value(param_name)
+        processed_value = self._process_string_value(param_name, raw_value)
+        final_value = self._convert_to_expected_type(param_name, processed_value)
+        
+        return final_value if final_value is not None else default
 
     def resolve_all(self) -> Namespace:
+        """Разрешает все аргументы парсера и возвращает итоговый Namespace."""
         config = Namespace()
         for action in self._parser._actions:
             if action.dest != "help":

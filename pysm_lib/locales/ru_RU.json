@@ -385,8 +385,8 @@
       "search_placeholder": "Поиск по имени...",
       "view_title": "Просмотр переменной контекста",
       "multiline_editor_title": "Редактор многострочного текста",
-      "list_editor_title": "Редактор списка",
-      "list_editor_label": "Введите по одному значению на строку:"	  
+      "list_editor_title": "Редактор списков",
+      "list_editor_label": "Введите по одному значению на строку или загрузите список из шаблона:"	  
     }
   },
   "user_actions": {

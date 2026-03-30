@@ -18,6 +18,7 @@ from ...models import ScriptSetEntryModel, ScriptInfoModel
 from ...locale_manager import LocaleManager
 from ...theme_manager import ThemeManager
 from ..tooltip_generator import generate_instance_tooltip_html
+from ...pysm_icons import icons
 
 
 class InstanceSelectionDialog(QDialog):
@@ -70,11 +71,12 @@ class InstanceSelectionDialog(QDialog):
             
             display_name = entry.name or script_name
             
-            item_text = f"{display_name})"
+            item_text = f"{display_name}"
             #item_text = f"{display_name}  ({entry.instance_id})"
             item = QListWidgetItem(item_text)
             item.setData(Qt.ItemDataRole.UserRole, entry.instance_id)
-            item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileLinkIcon))
+            #item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileLinkIcon))
+            item.setIcon(icons.get_qicon("INSTANCE_ITEM"))
             
             # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
             # Используем tooltip_generator для создания подсказки

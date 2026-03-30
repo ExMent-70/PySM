@@ -165,7 +165,7 @@ def perform_directory_operation(
         action_desc = "для перемещения"
     else:
         action_desc = "для копирования"
-    html = (f'<div style="{name_style}">{icon_info} \nНайдено файлов {action_desc}: <b>{len(items_to_process)}</b></div>')
+    html = (f'<div style="{name_style}">{icon_info} Найдено файлов {action_desc}: <b>{len(items_to_process)}</b></div>')
     pysm_context.log_html(html) 
 
     stats = {"success": 0, "error": 0, "skipped": 0}

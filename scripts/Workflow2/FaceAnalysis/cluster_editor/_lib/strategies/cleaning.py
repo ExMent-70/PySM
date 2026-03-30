@@ -5,7 +5,7 @@ import json
 import re
 import numpy as np
 import shutil
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pathlib import Path
 from collections import defaultdict
 
@@ -100,9 +100,9 @@ class CleaningModeStrategy(EditorStrategy):
         return sorted(list(result), key=natural_keys)
 
     def move_images(self, source_id: str, target_id: str, filenames: List[str], 
-                    records: Dict[str, ImageRecord], 
-                    face_selection_map: Optional[Dict[str, int]] = None,
-                    target_name: Optional[str] = None) -> None:
+                        records: Dict[str, ImageRecord], 
+                        face_selection_map: Optional[Dict[str, Any]] = None,
+                        target_name: Optional[str] = None) -> None:
         
         new_id_val = int(target_id) if target_id.lstrip('-').isdigit() else None
         clean_name = self._strip_name_prefix(target_name) if target_name else None
@@ -111,9 +111,15 @@ class CleaningModeStrategy(EditorStrategy):
             record = records.get(filename)
             if not record: continue
             
-            # В cleaning selection_map обязателен, т.к. работаем с конкретными лицами,
-            # но если его нет, обрабатываем все лица в файле (fallback)
-            indices = [face_selection_map[filename]] if face_selection_map and filename in face_selection_map else range(len(record.faces))
+            # --- ИСПРАВЛЕНИЕ: Обработка списка индексов из face_selection_map ---
+            indices = range(len(record.faces))
+            if face_selection_map and filename in face_selection_map:
+                selection = face_selection_map[filename]
+                # Если передали список индексов - используем его, иначе оборачиваем в список
+                if isinstance(selection, list):
+                    indices = selection
+                else:
+                    indices = [selection]
             
             for idx in indices:
                 if idx >= len(record.faces): continue

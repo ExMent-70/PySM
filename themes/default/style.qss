@@ -323,23 +323,25 @@ QMessageBox, QFileDialog { background-color: @bgColorDialog; }
 QMessageBox QLabel { background-color: transparent; color: @textColor; }
 QDialogButtonBox QPushButton { padding: 6px 20px; }
 
-QDialog#JsonEditorDialog, QDialog#MultilineTextDialog, QInputDialog {
+/* --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА --- */
+QDialog#JsonEditorDialog, QDialog#MultilineTextDialog, QInputDialog, QDialog#TemplateInputDialog {
     background-color: @bgColorDialog; color: @textColor;
 }
 QDialog#JsonEditorDialog QPlainTextEdit, QDialog#MultilineTextDialog QPlainTextEdit,
-QInputDialog QPlainTextEdit, QInputDialog QLineEdit {
+QInputDialog QPlainTextEdit, QInputDialog QLineEdit, QDialog#TemplateInputDialog QLineEdit {
     background-color: @bgColorContainer; color: @textColor;
     border: 1px solid @borderColor;
     font-family: "Consolas", "Courier New", monospace;
 }
 QDialog#JsonEditorDialog QPushButton, QDialog#MultilineTextDialog QPushButton,
-QInputDialog QPushButton {
+QInputDialog QPushButton, QDialog#TemplateInputDialog QPushButton {
     background-color: @bgColorHeader; color: @textColorSecondary;
 }
 QDialog#JsonEditorDialog QPushButton:hover, QDialog#MultilineTextDialog QPushButton:hover,
-QInputDialog QPushButton:hover {
+QInputDialog QPushButton:hover, QDialog#TemplateInputDialog QPushButton:hover {
     background-color: @bgColorHover;
 }
+/* --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА --- */
 
 /* Стили для нового диалога выбора экземпляра */
 QDialog#InstanceSelectionDialog {

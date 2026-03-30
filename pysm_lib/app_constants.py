@@ -18,6 +18,7 @@ APPLICATION_ROOT_DIR = get_application_root()
 # === Блок 1.1: Константы для файлов (НОВЫЙ) ===
 COLLECTION_EXTENSION = ".pysmc"
 COLLECTION_FILE_TYPE_NAME = "PySM Collection"
+COLLECTION_DEFAULT_FOLDER = APPLICATION_ROOT_DIR / "script_collections"
 
 
 # === Блок 1.1: Пути к иконкам ===

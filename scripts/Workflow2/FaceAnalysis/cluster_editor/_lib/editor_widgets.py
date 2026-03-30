@@ -93,7 +93,6 @@ class ClusterDropListWidget(QListWidget):
             self.viewport().update(self.visualItemRect(old_target))
         super().dragLeaveEvent(event)
 
-
 class ImageDragListWidget(QListWidget):
     """Список, который правильно инициирует перетаскивание своих элементов."""
     def startDrag(self, supportedActions):
@@ -107,7 +106,19 @@ class ImageDragListWidget(QListWidget):
             return
 
         mime_data = QMimeData()
-        filenames = [item.data(Qt.ItemDataRole.UserRole)["filename"] for item in items]
+        
+        # --- ИСПРАВЛЕНИЕ: Передаем face_index вместе с именем файла ---
+        filenames =[]
+        for item in items:
+            user_data = item.data(Qt.ItemDataRole.UserRole)
+            fname = user_data["filename"]
+            # Для режима cleaning у нас сохранен face_index
+            f_idx = user_data.get("face_index")
+            if f_idx is not None:
+                filenames.append(f"{fname}::{f_idx}")
+            else:
+                filenames.append(fname)
+                
         mime_text = f"{main_window.active_cluster_id}::{'|'.join(filenames)}"
         mime_data.setText(mime_text)
 
@@ -144,7 +155,7 @@ class ImageDragListWidget(QListWidget):
         drag.setPixmap(drag_pixmap)
         drag.setHotSpot(QPoint(drag_pixmap.width() // 2, drag_pixmap.height() // 2))
         drag.exec(Qt.DropAction.MoveAction)
-        
+       
 class FaceDetailsWidget(QListWidget):
     """
     Виджет для отображения крупных планов лиц.

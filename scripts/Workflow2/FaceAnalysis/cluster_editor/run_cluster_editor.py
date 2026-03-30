@@ -503,7 +503,7 @@ class MainWindow(QWidget):
         """
         QTimer.singleShot(30, lambda: self._process_drop_logic(source_id, target_id, filenames))
 
-    def _process_drop_logic(self, source_id, target_id, filenames):
+    def _process_drop_logic(self, source_id, target_id, raw_filenames):
         """
         Основная логика обработки перемещения (вынесена из _handle_drop).
         """
@@ -511,7 +511,23 @@ class MainWindow(QWidget):
         target_name = target_data["name"] if target_data else ""
         
         face_selection = {}
-        valid_files = []
+        valid_files =[]
+
+        # --- ИСПРАВЛЕНИЕ: Нормализация путей и извлечение индексов лиц ---
+        filenames =[]
+        parsed_indices = {}
+        for raw_fname in raw_filenames:
+            if "::" in raw_fname:
+                fname, idx_str = raw_fname.split("::", 1)
+                idx = int(idx_str)
+                if fname not in parsed_indices:
+                    parsed_indices[fname] = []
+                parsed_indices[fname].append(idx)
+            else:
+                fname = raw_fname
+                
+            if fname not in filenames:
+                filenames.append(fname)
 
         # 1. Matches Mode
         if self.mode == 'matches':
@@ -530,7 +546,7 @@ class MainWindow(QWidget):
                     if not record: continue
                     
                     # Собираем кандидатов (индекс, лицо)
-                    candidates = []
+                    candidates =[]
                     for i, f in enumerate(record.faces):
                         if f.extra_data.get('matched_portrait_cluster_label') is None:
                             candidates.append((i, f))
@@ -568,16 +584,22 @@ class MainWindow(QWidget):
                 record = self.data_manager.records.get(fname)
                 if not record: continue
                 
-                target_idx = -1
-                for i, f in enumerate(record.faces):
-                    current_sid = "trash" if f.is_trash else str(f.temp_cluster_label)
-                    if current_sid == source_id:
-                        target_idx = i
-                        break
-                
-                if target_idx != -1:
-                    face_selection[fname] = target_idx
+                # --- ИСПРАВЛЕНИЕ: Используем массив индексов, переданный через Drag&Drop ---
+                if fname in parsed_indices:
+                    # Теперь face_selection хранит СПИСОК индексов для этого файла
+                    face_selection[fname] = parsed_indices[fname] 
                     valid_files.append(fname)
+                else:
+                    # Старый fallback на всякий случай
+                    target_idx = -1
+                    for i, f in enumerate(record.faces):
+                        current_sid = "trash" if f.is_trash else str(f.temp_cluster_label)
+                        if current_sid == source_id:
+                            target_idx = i
+                            break
+                    if target_idx != -1:
+                        face_selection[fname] = [target_idx]
+                        valid_files.append(fname)
         
         # 3. Face Mode
         elif self.mode == 'face':
@@ -610,6 +632,7 @@ class MainWindow(QWidget):
                 self._render_gallery(source_id)
             if self.mode == 'matches' and self.active_cluster_id == target_id:
                 self._render_gallery(target_id)
+
 
     def _save_changes(self, silent=False):
         self._stop_loader()
