@@ -56,11 +56,12 @@ logger = logging.getLogger(__name__)
 
 class MainWindow(QWidget):
     
-    def __init__(self, working_dir: Path, reference_dir: Optional[Path], mode: str, num_workers: int):
+    def __init__(self, working_dir: Path, reference_dir: Optional[Path], mode: str, num_workers: int, var_export_jpg: str):
         super().__init__()
         self.mode = mode # Сохраняем для специфичных UI-проверок (если остались)
         self.num_workers = num_workers
         self.working_dir = working_dir
+        self.var_export_jpg = var_export_jpg
         self.reference_dir = reference_dir if reference_dir else working_dir
         
         self.working_images_dir = self.working_dir / "JPG"
@@ -1286,8 +1287,11 @@ class MainWindow(QWidget):
     def _on_export_finished(self, message: str):
         self.status_bar.reset(); 
         self.status_bar.setFormat("")
+     
         QMessageBox.information(self, "Экспорт завершен", message)
         self.export_end = True
+        # Сохранить флаг экспорта JPG
+        pysm_context.set(self.var_export_jpg, "1")
 
         if hasattr(self, 'export_thread'): 
             self.export_thread.quit(); 
@@ -1377,6 +1381,8 @@ def get_config() -> argparse.Namespace:
     parser.add_argument(f"--{p}reference_dir", type=str, default=None, help="Папка с эталонами (для matches)")
     parser.add_argument("--all_threads", type=int, dest="all_threads", default=0, help="Количество потоков (0=авто).")
     parser.add_argument("--mode", type=str, choices=["face", "location", "matches", "cleaning"], default="face")
+    parser.add_argument("--var_ce_export_jpg", type=str, default="var_ce_export_jpg", help="Имя переменной контекста для сохранения флага экспорта")
+    
     return ConfigResolver(parser).resolve_all()
 
 if __name__ == "__main__":
@@ -1403,7 +1409,7 @@ if __name__ == "__main__":
 
         num_workers = cli_config.all_threads or (os.cpu_count() or 8)    
 
-        window = MainWindow(w_dir, r_dir, cli_config.mode, num_workers)
+        window = MainWindow(w_dir, r_dir, cli_config.mode, num_workers, cli_config.var_ce_export_jpg)
         window.show()
      
         sys.exit(app.exec())

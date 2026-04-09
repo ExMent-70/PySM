@@ -29,6 +29,14 @@ from _common import (
     icon_save_error
 )
 
+IS_MANAGED_RUN = False
+try:
+    from pysm_lib import pysm_context
+    IS_MANAGED_RUN = True
+except ImportError as e:
+    print(f"Ошибка импорта: {e}", file=sys.stderr)
+
+
 from .editor_delegates import THUMBNAIL_SIZE
 
 
@@ -244,6 +252,7 @@ class ExportWorker(QObject):
             "quality": quality,
             "apply_watermarks": apply_watermarks
         }
+
     def run(self):
         total = len(self.tasks)
         processed_count = 0
@@ -271,4 +280,6 @@ class ExportWorker(QObject):
         if errors:
             logger.error(f"Errors during export ({len(errors)}):")
             for e in errors[:5]: logger.error(e)
+
+           
         self.finished.emit(f"Экспорт завершен. Обработано {total} файлов. Ошибок: {len(errors)}.")

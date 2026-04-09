@@ -33,6 +33,12 @@
         "matches",
         "cleaning"
       ]
+    },
+    "var_export_jpg": {
+      "type": "string",
+      "description": "Имя переменной контекста для сохранения флага экспорта",
+      "required": true,
+      "default": "var_export_jpg"
     }
   }
 }

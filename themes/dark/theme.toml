@@ -10,6 +10,7 @@ delegate_changed_indicator = "color: #d29922;"
 delegate_hover_border = "color: #58a6ff;"
 delegate_preview_background = "color: #161b22;"
 delegate_secondary_text = "color: #8b949e;"
+delegate_hover_text = "color: #ffffff;"
 # Добавлено: Красная граница при перетаскивании
 delegate_drop_target_border = "color: #f85149;"
 
