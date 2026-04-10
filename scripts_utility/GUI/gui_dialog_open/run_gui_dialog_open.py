@@ -3,6 +3,7 @@
 import argparse
 import sys
 import os
+import logging
 import pathlib  # Добавляем импорт pathlib, если его не было
 
 # Определяем, запущен ли скрипт под управлением PySM
@@ -24,6 +25,10 @@ except ImportError:
     print("Ошибка: для работы этого скрипта требуется PySide6.", file=sys.stderr)
     print("Пожалуйста, установите его: pip install PySide6", file=sys.stderr)
     sys.exit(1)
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
+logger = logging.getLogger(__name__)
 
 
 # 2. БЛОК: Определение и получение конфигурации
@@ -61,29 +66,25 @@ def get_config():
         default="Все файлы (*.*)"
     )
 
-    if IS_MANAGED_RUN:
-        parser.add_argument(
-            "--dlg_path", 
-            type=str,
-            help="Расшифрованный путь к файлу или папке",
-            default=""
+    parser.add_argument("--dlg_path", type=str, help="Путь к файлу или папке", default=""
         )
+
+
+    if IS_MANAGED_RUN:
         resolver = ConfigResolver(parser)
-        config = argparse.Namespace()
-        config.dlg_open_var = resolver.get("dlg_open_var")
-        config.dlg_path = resolver.get(config.dlg_open_var)
-        config.dlg_open_type = resolver.get("dlg_open_type")
-        config.dlg_open_title = resolver.get("dlg_open_title")
-        config.dlg_open_filter = resolver.get("dlg_open_filter")
-        return config
+        return resolver.resolve_all()
     else:
         return parser.parse_args()
+  
 
 
 # 3. БЛОК: Основная логика (С ИСПРАВЛЕНИЯМИ)
 # ==============================================================================
 def main():
     """Основная функция-оркестратор."""
+    if not IS_MANAGED_RUN or not pysm_context:
+        logger.critical("❌ Этот скрипт может быть запущен только в среде PySM")
+        sys.exit(1)
   
     config = get_config()
     
@@ -92,25 +93,23 @@ def main():
     
     # Логика определения начальной директории
     initial_dir = ""
-    if IS_MANAGED_RUN and pysm_context:
-        existing_path_str = config.dlg_path
-        if existing_path_str and os.path.exists(existing_path_str):
-            if os.path.isfile(existing_path_str):
-                initial_dir = os.path.dirname(existing_path_str)
-            else:
-                initial_dir = existing_path_str
+    existing_path_str = pysm_context.get(config.dlg_open_var)
+    if existing_path_str and os.path.exists(existing_path_str):
+        if os.path.isfile(existing_path_str):
+            initial_dir = os.path.dirname(existing_path_str)
         else:
-            collection_dir = pysm_context.get_structured("pysm_info.collection_dir")
-            if collection_dir and os.path.isdir(collection_dir):
-                initial_dir = collection_dir
-            print(f"Начальная папка: {initial_dir}")
+            initial_dir = existing_path_str
+    else:
+        collection_dir = pysm_context.get_structured("pysm_info.collection_dir")
+        if collection_dir and os.path.isdir(collection_dir):
+            initial_dir = collection_dir
+
 
     selected_path = ""
     parent_widget = None
 
-    print(f"<b>{config.dlg_open_title}</b>")
+    logger.info(f"<b>{config.dlg_open_title}</b>")
     if config.dlg_open_type == 'file':
-        print("Открытие диалога выбора файла...")
         selected_path, _ = QFileDialog.getOpenFileName(
             parent=parent_widget,
             caption=config.dlg_open_title,
@@ -118,7 +117,6 @@ def main():
             filter=config.dlg_open_filter
         )
     elif config.dlg_open_type == 'directory':
-        print("Открытие диалога выбора папки...")
         selected_path = QFileDialog.getExistingDirectory(
             parent=parent_widget,
             caption=config.dlg_open_title,
@@ -126,38 +124,36 @@ def main():
         )
 
     if not selected_path:
-        print("\nОперация отменена пользователем.", file=sys.stderr)
+        logger.critical("❌ Операция отменена пользователем<br>")
         sys.exit(1)
     
     # Логика сохранения результата в контекст
-    if IS_MANAGED_RUN and pysm_context:
-        path_type = "dir_path" if config.dlg_open_type == 'directory' else 'file_path'        
-        try:
-            pysm_context.set(
-                key=config.dlg_open_var,
-                value=selected_path,
-                var_type=path_type
-            )
-            print("\nВыбранный путь сохранен в переменную контекста")
-            s = f"<b>{config.dlg_open_var}</b> = <i>{selected_path}</i><br>"
-            #s = f"<b>{config.dlg_open_var}</b> = <i>{selected_path} (тип: {path_type})</i><br>"
-            #print(f"<b>{config.dlg_open_var}</b> = <i>{selected_path} (тип: {path_type})</i><br>")
-            
-            link_path = selected_path if os.path.isdir(selected_path) else os.path.dirname(selected_path)
-            
-            pysm_context.log_link(
-                url_or_path=str(link_path),
-                text=s,                
-                #text=f"Открыть папку <i>{link_path}</i>",
-            )                  
-            print(" ", file=sys.stderr)
+    path_type = "dir_path" if config.dlg_open_type == 'directory' else 'file_path'        
+    try:
+        pysm_context.set(
+            key=config.dlg_open_var,
+            value=selected_path,
+            var_type=path_type
+        )
+        s = f"<b>{config.dlg_open_var}</b> = <i>{selected_path}</i><br>"
+        logger.info(f"✅ {s}")
+        #s = f"<b>{config.dlg_open_var}</b> = <i>{selected_path} (тип: {path_type})</i><br>"
+        #print(f"<b>{config.dlg_open_var}</b> = <i>{selected_path} (тип: {path_type})</i><br>")
+        
+        """
+        link_path = selected_path if os.path.isdir(selected_path) else os.path.dirname(selected_path)
+        
+        pysm_context.log_link(
+            url_or_path=str(link_path),
+            text=s,                
+            #text=f"Открыть папку <i>{link_path}</i>",
+        )                  
+        logger.info(" ")
+        """
+    except Exception as e:
+        logger.critical("❌ \nКритическая ошибка при записи в контекст: {e}", file=sys.stderr)
+        sys.exit(1)
 
-        except Exception as e:
-            print(f"\nКритическая ошибка при записи в контекст: {e}", file=sys.stderr)
-            sys.exit(1)
-    else:
-        print(f"\nВыбран путь: {selected_path}")
-        print("Запуск в автономном режиме, результат в контекст не сохраняется.")
 
     sys.exit(0)
 

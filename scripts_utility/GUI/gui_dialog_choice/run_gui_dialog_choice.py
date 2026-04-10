@@ -4,6 +4,7 @@
 # ==============================================================================
 import argparse
 import sys
+import logging
 from argparse import Namespace
 
 IS_MANAGED_RUN = False
@@ -11,16 +12,10 @@ try:
     from pysm_lib import pysm_context
     from pysm_lib.pysm_context import ConfigResolver
     from pysm_lib import theme_api
-    from pysm_lib.pysm_progress_reporter import tqdm
     IS_MANAGED_RUN = True
 except ImportError:
     pysm_context = None
     ConfigResolver = None
-    # Создаем заглушку для tqdm.write, чтобы избежать ошибок NameError
-    class TqdmWriteMock:
-        @staticmethod
-        def write(msg, *args, **kwargs): print(msg)
-    tqdm = TqdmWriteMock
 
 try:
     from PySide6.QtWidgets import QApplication, QInputDialog
@@ -29,6 +24,9 @@ except ImportError:
           "Установите его командой: pip install pyside6", file=sys.stderr)
     sys.exit(1)
 
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
+logger = logging.getLogger(__name__)
 
 # 2. БЛОК: Определение и получение конфигурации
 # ==============================================================================
@@ -75,7 +73,7 @@ def main():
     """Основная функция-оркестратор."""
     
     if not IS_MANAGED_RUN or not pysm_context:
-        tqdm.write("ОШИБКА: Этот скрипт может быть запущен только в среде PyScriptManager.")
+        logger.critical("❌ Этот скрипт может быть запущен только в среде PySM")
         sys.exit(1)
 
     config = get_config()
@@ -85,7 +83,7 @@ def main():
         choices = [item.strip() for item in choices.splitlines() if item.strip()]
 
     if not choices:
-        tqdm.write("ОШИБКА: Список для выбора (--dlg_choice_list) пуст.")
+        logger.critical("❌ Список для выбора (--dlg_choice_list) пуст.")
         sys.exit(1)
 
     # --- НАЧАЛО ИЗМЕНЕНИЙ ---
@@ -96,12 +94,12 @@ def main():
     context_value = pysm_context.get(config.dlg_choice_var)
     if context_value is not None and context_value in choices:
         default_value = context_value
-        print(f"Текущее значение переменной <i>{config.dlg_choice_var}</i> = <b>{context_value}</b>\n")
+        logger.debug(f"Текущее значение переменной <i>{config.dlg_choice_var}</i> = <b>{context_value}</b>\n")
   
     # Приоритет 2: Значение из аргумента --dlg_choice_dvalue
     elif config.dlg_choice_dvalue and config.dlg_choice_dvalue in choices:
         default_value = config.dlg_choice_dvalue
-        print(f"Используется значение по умолчанию из параметра: <b>'{default_value}'</b>")
+        logger.debug(f"Используется значение по умолчанию из параметра: <b>'{default_value}'</b>")
 
     # Определяем индекс для QInputDialog
     current_index = 0
@@ -110,7 +108,7 @@ def main():
             current_index = choices.index(default_value)
         except ValueError:
             # На случай, если значение есть, но его нет в списке
-            tqdm.write(f"Предупреждение: значение по умолчанию '{default_value}' не найдено в списке вариантов.")
+            logger.warning(f"Предупреждение: значение по умолчанию '{default_value}' не найдено в списке вариантов.")
     # --- КОНЕЦ ИЗМЕНЕНИЙ ---
     q_app = QApplication.instance() or QApplication(sys.argv)
     theme_api.apply_theme_to_app(q_app)
@@ -127,13 +125,15 @@ def main():
     if ok and selected_item:
         try:
             pysm_context.set(config.dlg_choice_var, selected_item)
-            print(f"Переменная <i>{config.dlg_choice_var}</i> = <b>{selected_item}</b> успешно сохранена\n\n")
+            logger.debug(f"Переменная <i>{config.dlg_choice_var}</i> = <b>{selected_item}</b> успешно сохранена\n\n")
+            logger.info(f"<b>{config.dlg_choice_title}</b>")
+            logger.info(f"✅ <b>{config.dlg_choice_var}</b> = <i>{selected_item}</i>\n")
             sys.exit(0)
         except Exception as e:
-            tqdm.write(f"Критическая ошибка при сохранении в контекст: {e}")
+            logger.critical(f"❌ Ошибка при сохранении данных в контекст: {e}")
             sys.exit(1)
     else:
-        tqdm.write("Операция отменена пользователем. Выполнение набора скриптов будет остановлено.\n")
+        logger.critical("❌ Операция отменена пользователем<br>")
         sys.exit(1)
 
 
