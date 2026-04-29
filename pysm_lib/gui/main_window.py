@@ -26,6 +26,7 @@ from ..app_controller import AppController
 from ..app_constants import (
     COLLECTION_EXTENSION,
     COLLECTION_FILE_TYPE_NAME,
+    APPLICATION_VER,
 )
 from ..locale_manager import LocaleManager
 from ..pysm_icons import icons
@@ -55,7 +56,7 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.controller = app_controller
         self.locale_manager = locale_manager
-        self.base_window_title = self.locale_manager.get("main_window.base_title")
+        self.base_window_title = self.locale_manager.get("main_window.base_title")+f" - {APPLICATION_VER}"
         self.initial_width = 950
         self.initial_height = 900
         self.setGeometry(100, 100, self.initial_width, self.initial_height)
@@ -92,12 +93,32 @@ class MainWindow(QMainWindow):
             self.toolbar.setFixedHeight(50)
             self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self.toolbar)
 
-            self.action_new_collection = QAction(
-                icons.get_qicon("NEW"),  # <--- ЗАМЕНА
-                self.locale_manager.get("main_window.toolbar.new_collection"),
-                self,
+
+
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            self.new_button = QToolButton()
+            self.new_button.setToolTip(
+                self.locale_manager.get("main_window.toolbar.new_collection_tooltip")
             )
-            self.toolbar.addAction(self.action_new_collection)
+            self.new_button.setIcon(icons.get_qicon("NEW"))
+            self.new_button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+            
+            # Действие по умолчанию (создать пустую) при клике на саму кнопку
+            self.new_button.clicked.connect(self._on_new_collection)
+
+            new_menu = QMenu(self.new_button)
+            self.action_new_empty = new_menu.addAction(
+                self.locale_manager.get("main_window.toolbar.new_collection_empty")
+            )
+            self.action_new_template = new_menu.addAction(
+                self.locale_manager.get("main_window.toolbar.new_collection_template")
+            )
+            self.new_button.setMenu(new_menu)
+            self.toolbar.addWidget(self.new_button)
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
+
+
 
             self.action_open_collection = QAction(
                 icons.get_qicon("OPEN"),  # <--- ЗАМЕНА
@@ -244,7 +265,12 @@ class MainWindow(QMainWindow):
         self.action_toggle_console_toolbar.triggered.connect(
             self._toggle_console_panel_action
         )
-        self.action_new_collection.triggered.connect(self._on_new_collection)
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        self.action_new_empty.triggered.connect(self._on_new_collection)
+        self.action_new_template.triggered.connect(self._on_new_collection_from_template)
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---        
+
         self.action_open_collection.triggered.connect(self._on_open_collection)
         self.action_save_collection.triggered.connect(self._on_save_collection)
         self.action_save_collection_as.triggered.connect(self._on_save_collection_as)
@@ -319,18 +345,22 @@ class MainWindow(QMainWindow):
     def _on_collection_passport_clicked(self):
         collection_model = self.controller.set_manager.current_collection_model
         
-        all_entries: List[ScriptSetEntryModel] = []
+        all_entries: List[Tuple[str, ScriptSetEntryModel]] = []
         def find_script_entries_recursive(nodes: List[SetHierarchyNodeType]):
             for node in nodes:
-                if isinstance(node, ScriptSetNodeModel): all_entries.extend(node.script_entries)
-                elif isinstance(node, SetFolderNodeModel) and node.children: find_script_entries_recursive(node.children)
+                if isinstance(node, ScriptSetNodeModel): 
+                    for e in node.script_entries:
+                        all_entries.append((node.name, e)) # Добавляем имя набора
+                elif isinstance(node, SetFolderNodeModel) and node.children: 
+                    find_script_entries_recursive(node.children)
         find_script_entries_recursive(collection_model.root_nodes)
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
 
         dialog = CollectionPassportDialog(
             controller=self.controller,
             collection_model=collection_model,
             locale_manager=self.locale_manager,
-            theme_manager=self.controller.theme_manager, # Эта строка уже была добавлена, проверяем
+            theme_manager=self.controller.theme_manager,
             script_entries=all_entries,
             get_script_name_func=self.controller.get_script_info_by_id,
             parent=self,
@@ -378,7 +408,8 @@ class MainWindow(QMainWindow):
             self.collection_widget.collection_tree_view.setEnabled(is_enabled)
             self.collection_widget.chk_continue_on_error.setEnabled(is_enabled)
 
-        self.action_new_collection.setEnabled(is_enabled)
+        self.new_button.setEnabled(is_enabled)
+
         self.action_open_collection.setEnabled(is_enabled)
         self.save_button.setEnabled(is_enabled)
         self.action_collection_passport.setEnabled(is_enabled)
@@ -407,6 +438,12 @@ class MainWindow(QMainWindow):
     def _on_new_collection(self):
         if self._check_unsaved_changes():
             self.controller.new_collection_requested_by_gui()
+
+    @Slot()
+    def _on_new_collection_from_template(self):
+        if self._check_unsaved_changes():
+            self.controller.new_collection_from_template_requested_by_gui()
+
 
     @Slot()
     def _on_open_collection(self):
@@ -439,9 +476,13 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _on_save_collection_as(self) -> bool:
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
         start_dir = self.controller.set_manager.default_sets_root_dir
         if self.controller.current_collection_file_path:
             start_dir = self.controller.current_collection_file_path.parent
+        elif self.controller.suggested_save_dir and self.controller.suggested_save_dir.is_dir():
+            start_dir = self.controller.suggested_save_dir
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
         suggested_name = (
             self.controller.set_manager.current_collection_model.collection_name

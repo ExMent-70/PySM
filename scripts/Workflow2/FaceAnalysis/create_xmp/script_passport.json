@@ -12,7 +12,7 @@
     },
     "image_dir": {
       "type": "str",
-      "description": "Полный путь к папке с изображениями, где будут созданы XMP-файлы.",
+      "description": "Полный путь к папке с изображениями, для которых создаются XMP-файлы",
       "required": true,
       "default": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}"
     },
@@ -26,9 +26,21 @@
     },
     "landmark_enable": {
       "type": "bool",
-      "description": "Включить запись 2D-ландмарок (106 точек) в XMP",
+      "description": "Включить данные 2D-ландмарок (106 точек) в XMP",
       "required": false,
       "default": false
-    }
+    },
+    "scan_folder_mode": {
+      "type": "bool",
+      "description": "Запуск скрипта в режиме рекурсивного сканирования папки с изображениями и сопоставление имён файлов из этой с данными в JSON",
+      "required": false,
+      "default": false
+    },
+    "xmp_subfolder": {
+      "type": "bool",
+      "description": "Сохранять XMP файлы в подпапке 'XMP' относительно целевого изображения",
+      "required": false,
+      "default": false
+    }	
   }
 }

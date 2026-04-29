@@ -46,7 +46,7 @@ class FaceAnalyzer:
         self.det_size = tuple(self.config_manager.get('model.det_size', [1280, 1280]))
         self.save_debug_kps = self.config_manager.get('task_flags.save_debug_kps', False)
         
-        self.onnx_manager = ONNXModelManager(self.config_manager.get('provider', {}))
+        self.onnx_manager = ONNXModelManager(self.config_manager.get('provider', dict()))
         self.attribute_analyzer = AttributeAnalyzer(self.config_manager, self.onnx_manager)
         
         # Легкая инициализация (без прогрева)
@@ -181,7 +181,8 @@ class FaceAnalyzer:
             scale = min(target_h / original_shape[0], target_w / original_shape[1])
             
             if scale < 1.0:
-                new_h, new_w = int(original_shape[0] * scale), int(original_shape[1] * scale)
+                new_h = max(1, int(original_shape[0] * scale))
+                new_w = max(1, int(original_shape[1] * scale))
                 img_resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
             else:
                 img_resized = image
@@ -209,8 +210,8 @@ class FaceAnalyzer:
             if not initial_faces:
                 return None, None, original_shape
                 
-            processed_face_data_list: List[Dict] = []
-            processed_face_embeddings_list: List[np.ndarray] = []
+            processed_face_data_list: List[Dict] = list()
+            processed_face_embeddings_list: List[np.ndarray] = list()
 
             for idx, face_initial in enumerate(initial_faces):
                 # Важно: CoordinateTransformer инициализируем размерами САМОЙ КАРТИНКИ (new_h, new_w),
@@ -341,10 +342,16 @@ class FaceAnalyzer:
             success, buffer = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 95])
             if success:
                 with open(output_path, "wb") as f: f.write(buffer)
-        except Exception: pass
+        except Exception as e:
+            logger.debug(f"Не удалось сохранить отладочное изображение: {e}")
 
     def shutdown(self):
         logger.info("<b>Освобождение ресурсов...</b>")
+        
+        # --- ИЗМЕНЕНИЕ: Генерируем статистику перед выгрузкой ---
+        if hasattr(self, 'attribute_analyzer') and self.attribute_analyzer.is_enabled:
+            self.attribute_analyzer.generate_recommendations(self.output_dir)
+            
         if self.onnx_manager: self.onnx_manager.shutdown()
         if hasattr(self, 'analyzer'): del self.analyzer
         gc.collect()

@@ -53,15 +53,21 @@
       "flag_present_text": "(flag)",
       "param_format": "--{name}: {value}",
       "label_instance_name": "Instance Name:",
+	  "label_link_instance_name": "Link Instance:",	  
       "label_overridden_params": "Overridden Parameters:"
+      "label_overridden_params": "Переопределенные параметры:",
+ 	  "context_menu_hint": "Use Context menu for Setup"
     }
   },
   "main_window": {
-    "base_title": "PySM - Python Script Manager",
+    "base_title": "Python Script Manager (PySM)",
     "dirty_indicator": "*",
     "toolbar": {
       "main_toolbar_title": "Main Toolbar",
       "new_collection": "New Collection...",
+	  "new_collection_empty": "Empty Collection",
+      "new_collection_template": "From Current as Template",
+      "new_collection_tooltip": "Create a new collection",
       "open_collection": "Open Collection...",
       "save_collection": "Save Collection",
       "save_collection_as": "Save As...",
@@ -129,7 +135,8 @@
     "run_error": {
       "title": "Cannot Run",
       "no_set_selected": "Select a set or a script within a set to run.",
-      "no_script_in_set": "For this mode, you must select a specific script in the set."
+      "no_script_in_set": "For this mode, you must select a specific script in the set.",
+	  "parent_set_not_found": "Parent set for this script was not found."
     },
     "context_menu": {
       "create_folder": "Create Folder Here",
@@ -142,7 +149,11 @@
       "duplicate_instance": "Duplicate",
       "paste_instance": "Paste Instance",
       "import_set": "Import Set Here...",
-      "export_set": "Export Set..."	  
+      "export_set": "Export Set...",
+	  "add_favorite": "Add to Favorites",
+      "remove_favorite": "Remove from Favorites",
+      "change_icon": "Change Icon...",
+	  "locate_in_tree": "Locate Script"	  
     },
     "create_folder": {
       "title": "Create Folder",
@@ -193,8 +204,25 @@
   "dialogs": {
     "instance_editor": {
         "title": "Select Script Instance",
-        "none_selected": "(not selected)"
+        "none_selected": "(not selected)",
+        "expand_all": "Expand All",
+        "collapse_all": "Collapse All",
+        "clear_selection": "Clear Selection"		
     },	  
+	"icon_selection": {
+		"title": "Select Icon and Color",
+		"color_label": "Icon Color:",
+		"default_color": "Default (Theme dependent)",
+		"custom_color": "Custom Color..."
+	},
+	"icon_categories": {
+		"system": "Basic & System",
+		"files": "Files, Documents, Tables",
+		"actions": "Actions & Applications",
+		"statuses": "Statuses & Marks",
+		"pysm": "Specific (PySM)",
+		"attributes": "Face Attributes"
+	},
     "script_properties": {
       "title_passport": "Script Properties: {name}",
       "title_instance": "Instance Parameters: {name}",
@@ -395,6 +423,7 @@
     "collection_opened": "Opened collection '{name}'",
     "config_saved": "Application configuration saved.",
     "config_save_error": "ERROR: Could not save application configuration.",
+	"collection_new_from_template": "Created a new collection based on the current one.",
     "collection_renamed": "Collection '{old_name}' renamed to '{new_name}'.",
     "collection_props_updated": "Collection properties updated.",
     "collection_saved": "Collection saved to '{path}'",
@@ -413,7 +442,9 @@
     "script_root_removed": "Removed script root directory.",
     "script_root_updated": "Updated script root directory.",
     "set_exported": "Set '{name}' exported to file: {path}",
-    "set_imported": "Set '{name}' imported from file: {path}"
+    "set_imported": "Set '{name}' imported from file: {path}",
+	"favorite_added": "Script instance added to Quick Access panel.",
+    "favorite_removed": "Script instance removed from Quick Access panel."
   },
   "app_controller": {
     "log_info": {

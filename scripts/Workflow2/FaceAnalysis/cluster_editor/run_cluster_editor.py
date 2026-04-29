@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QMainWindow,
     QInputDialog, QProgressBar, QMessageBox, QLineEdit, QMenu,
     QListWidget, QListWidgetItem, QDialog, QSplitter, QSlider, QTextEdit, QGroupBox, QFileDialog
 )
@@ -37,6 +37,9 @@ try:
     from pysm_lib.pysm_theme_api import set_widget_class
     from pysm_lib.pysm_context import ConfigResolver
     from pysm_lib.pysm_report_api import ResourceNode, StandardTreeBuilder, DashboardBuilder
+    from pysm_lib.pysm_icons import icons as pysm_icons    
+    from pysm_lib.window_state_manager import WindowStateManager
+    
     IS_MANAGED_RUN = True
 
     from _lib.editor_viewer import ImageViewer
@@ -46,22 +49,28 @@ try:
     from _lib.editor_dialogs import EnhanceSettingsDialog, RenameDialog, FaceSelectorDialog
     from _lib.data_manager import ClusterDataManager
     from _lib.data_models import Face
+    from _lib.editor_ui import EditorUIBuilder
+    from _lib.editor_filters import GalleryFilterManager
+    from _lib.editor_menus import EditorMenuManager
 
 except ImportError as e:
     print(f"Критическая ошибка импорта внутренних модулей: {e}", file=sys.stderr)
+    pysm_icons = None
     sys.exit(1)
 
 logger = logging.getLogger(__name__)
 
 
-class MainWindow(QWidget):
+class MainWindow(QMainWindow):
     
-    def __init__(self, working_dir: Path, reference_dir: Optional[Path], mode: str, num_workers: int, var_export_jpg: str):
+    def __init__(self, working_dir: Path, reference_dir: Optional[Path], mode: str, num_workers: int, export_dir: str, win_state_var_name: str):
         super().__init__()
         self.mode = mode # Сохраняем для специфичных UI-проверок (если остались)
         self.num_workers = num_workers
         self.working_dir = working_dir
-        self.var_export_jpg = var_export_jpg
+        
+        self.win_state_var_name = win_state_var_name
+
         self.reference_dir = reference_dir if reference_dir else working_dir
         
         self.working_images_dir = self.working_dir / "JPG"
@@ -69,7 +78,9 @@ class MainWindow(QWidget):
         
         self.session_name = working_dir.parent.parent.name 
         self.photo_session = working_dir.name.replace("Analysis_", "")
-        self.export_dir = ""
+       
+        exp_dir = Path(export_dir) if export_dir else self.working_dir.parent / self.session_name       
+        self.export_dir = exp_dir / f"Выбор_Фото_{self.photo_session}_{self.mode}"  
         self.export_end = False
 
         # 1. Инициализация Data Manager (здесь же создается Strategy)
@@ -96,7 +107,22 @@ class MainWindow(QWidget):
         self.cluster_delegate = ClusterItemDelegate(parent=self)
         self.image_delegate = ImageItemDelegate(parent=self)
 
-        self.init_ui()
+        # --- ИЗМЕНЕНИЕ: Внешний билдер вместо внутреннего метода ---
+        self.menu_manager = EditorMenuManager(self)     # <--- ДОБАВЛЕНО
+        self.filter_manager = GalleryFilterManager(self)
+        
+        # Внешний билдер вместо внутреннего метода
+        EditorUIBuilder.build_ui(self)
+        self.filter_manager.bind_ui()        
+        try:
+            screen_geometry = self.screen().geometry()
+            window_geometry = self.frameGeometry()
+            window_geometry.moveCenter(screen_geometry.center())
+            self.move(window_geometry.topLeft())
+        except Exception:
+            pass
+
+        
         self._load_and_display_data()
 
     def _get_image_path(self, filename: str) -> Path:
@@ -117,161 +143,6 @@ class MainWindow(QWidget):
             if data["id"] == cluster_id: return data
         return None
 
-    def _center_on_screen(self):
-        try:
-            screen_geometry = self.screen().geometry()
-            window_geometry = self.frameGeometry()
-            window_geometry.moveCenter(screen_geometry.center())
-            self.move(window_geometry.topLeft())
-        except Exception: pass
-
-    def init_ui(self):
-        self.setGeometry(0, 0, 1420, 900)
-        main_layout = QVBoxLayout(self)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_layout.addWidget(splitter, 1)
-
-        # 1. LEFT PANEL
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Заголовок левой панели определяем по режиму
-        left_label_text = "Список кластеров"
-        if self.mode == 'matches': left_label_text = "Эталоны (Портреты)"
-        elif self.mode == 'cleaning': left_label_text = "Технические группы"
-        
-        left_layout.addWidget(QLabel(f"{self.photo_session}: {left_label_text}"))
-        
-        self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Поиск...")
-        self.search_bar.textChanged.connect(self._on_search_text_changed)
-        left_layout.addWidget(self.search_bar)
-
-        self.cluster_list_widget = ClusterDropListWidget(self)
-        self.cluster_list_widget.setItemDelegate(self.cluster_delegate)
-        self.cluster_list_widget.setViewMode(QListWidget.ViewMode.IconMode)
-        self.cluster_list_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
-        self.cluster_list_widget.setSpacing(10)
-        self.cluster_list_widget.itemDoubleClicked.connect(self._rename_cluster_action)
-        self.cluster_list_widget.currentItemChanged.connect(self._on_cluster_selected)
-        self.cluster_list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.cluster_list_widget.customContextMenuRequested.connect(self.show_cluster_context_menu)
-        self.cluster_list_widget.setAcceptDrops(True)
-        self.cluster_list_widget.setDragDropMode(QListWidget.DragDropMode.DropOnly) 
-        self.cluster_list_widget.itemsDropped.connect(self._handle_drop)
-
-        left_layout.addWidget(self.cluster_list_widget, 1)
-
-        btn_layout = QHBoxLayout()
-        # Кнопка Экспорт (не нужна в Cleaning)
-        if self.mode != 'cleaning':
-            self.export_button = QPushButton("Экспорт")
-            export_menu = QMenu(self)
-            export_menu.addAction("Все кластеры").triggered.connect(self._on_export_all_triggered)
-            export_menu.addAction("Активный кластер").triggered.connect(self._on_export_active_triggered)
-            self.export_button.setMenu(export_menu)
-            btn_layout.addWidget(self.export_button)
-
-        self.save_button = QPushButton("Сохранить")
-        if self.mode == 'cleaning':
-            self.save_button.setText("Удалить мусор и Сохранить")
-            self.save_button.setStyleSheet("background-color: #d9534f; color: white; font-weight: bold;")
-        self.save_button.clicked.connect(lambda: self._save_changes(silent=False))
-        btn_layout.addWidget(self.save_button)
-        
-        left_layout.addLayout(btn_layout)
-
-        # 2. CENTER PANEL
-        center_widget = QWidget()
-        center_layout = QVBoxLayout(center_widget)
-        center_layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.gallery_label = QLabel("Галерея")
-        center_layout.addWidget(self.gallery_label)
-
-        self.image_list_widget = ImageDragListWidget(self)
-        self.image_list_widget.setViewMode(QListWidget.ViewMode.IconMode)
-        self.image_list_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
-        self.image_list_widget.setSpacing(10)
-        self.image_list_widget.setItemDelegate(self.image_delegate)
-        self.image_list_widget.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        self.image_list_widget.setDragEnabled(True)
-        self.image_list_widget.setDragDropMode(QListWidget.DragDropMode.DragOnly)
-        self.image_list_widget.itemDoubleClicked.connect(self._open_image_viewer)
-        self.image_list_widget.currentItemChanged.connect(self._update_face_panel)
-        
-        self.image_list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.image_list_widget.customContextMenuRequested.connect(self.show_gallery_context_menu)
-        center_layout.addWidget(self.image_list_widget, 1)
-
-        # 3. RIGHT PANEL (МОДИФИЦИРОВАНО)
-        splitter.addWidget(left_widget)
-        splitter.addWidget(center_widget)
-        
-        if self.data_manager.strategy.show_face_details_panel():
-            right_widget = QWidget()
-            right_layout = QVBoxLayout(right_widget)
-            right_layout.setContentsMargins(0, 0, 0, 0)
-            
-            # --- СЕКЦИЯ 1: Информация о фото ---
-            # group_photo = QGroupBox("Информация о фото")
-            # group_photo_layout = QVBoxLayout(group_photo)
-            # group_photo_layout.setContentsMargins(0, 5, 0, 0)
-            
-            self.photo_info_label = QLabel("Информация о фото")
-            right_layout.addWidget(self.photo_info_label)
-            
-            self.photo_info_viewer = QTextEdit()
-            self.photo_info_viewer.setReadOnly(True)
-            right_layout.addWidget(self.photo_info_viewer, 15) # Stretch factor 2
-            
-            # --- СЕКЦИЯ 2: Список лиц ---
-            right_layout.addWidget(QLabel("Лица на фото"))
-            self.face_details_widget = FaceDetailsWidget(self, mode=self.mode)
-            if IS_MANAGED_RUN: set_widget_class(self.face_details_widget, "face-panel")
-            
-            # Подключаем клик по лицу
-            self.face_details_widget.itemClicked.connect(self._on_face_item_clicked)
-            # Подключаем двойной клик (Просмотр)
-            self.face_details_widget.itemDoubleClicked.connect(self._on_face_item_double_clicked) # <--- NEW
-            self.face_details_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-            self.face_details_widget.customContextMenuRequested.connect(self.show_face_details_context_menu)
-
-            right_layout.addWidget(self.face_details_widget, 51) # Stretch factor 4
-            
-            # Слайдер размера            
-            self.face_size_slider = QSlider(Qt.Orientation.Horizontal)
-            self.face_size_slider.setRange(FACE_MIN, FACE_MAX)
-            if self.mode == 'face':
-                self.face_size_slider.setValue(FACE_SIZE_PORTRAIT)
-            else:
-                self.face_size_slider.setValue(FACE_SIZE)
-                
-            self.face_size_slider.valueChanged.connect(self._on_face_size_changed)
-            right_layout.addWidget(self.face_size_slider)
-            
-            # --- СЕКЦИЯ 3: Информация о лице ---
-            right_layout.addWidget(QLabel("Информация о выбранном лице"))
-            self.face_info_viewer = QTextEdit()
-            self.face_info_viewer.setReadOnly(True)
-            right_layout.addWidget(self.face_info_viewer, 24) # Stretch factor 2
-
-            splitter.addWidget(right_widget)
-            
-            # Настройка пропорций сплиттера (Лево, Центр, Право)
-            splitter.setStretchFactor(0, 31)
-            splitter.setStretchFactor(1, 46)
-            splitter.setStretchFactor(2, 23)
-        else:
-            splitter.setStretchFactor(0, 35)
-            splitter.setStretchFactor(1, 65)
-
-        self.status_bar = QProgressBar()
-        self.status_bar.setTextVisible(True)
-        main_layout.addWidget(self.status_bar)
-        self._center_on_screen()
-
     def _load_and_display_data(self):
         success, msg = self.data_manager.load_data()
         if not success:
@@ -289,6 +160,11 @@ class MainWindow(QWidget):
 
     def _refresh_left_panel(self):
         active_id = self.active_cluster_id
+        
+        # --- ИСПРАВЛЕНИЕ: Блокируем сигналы на всё время пересборки панели, 
+        # чтобы clear() не стирал active_cluster_id и центральную галерею! ---
+        self.cluster_list_widget.blockSignals(True)
+        
         self.cluster_list_widget.clear()
         
         clusters = self.data_manager.get_clusters()
@@ -303,20 +179,18 @@ class MainWindow(QWidget):
             
         sorted_ids = sorted(clusters.keys(), key=sort_key)
 
-        # Добавляем "Спец" кластеры, если их нет, но они нужны по режиму
         if self.mode == 'cleaning' and "trash" not in sorted_ids:
-            self._add_cluster_item("trash", "🗑️ КОРЗИНА", [], is_special=True)
+            self._add_cluster_item("trash", "🗑️ КОРЗИНА",[], is_special=True)
         
         if self.mode == 'matches':
-            err_count = len(self.data_manager.get_files_for_cluster({}, "error_matches"))
-            self._add_cluster_item("error_matches", f"⚠️ Неопознанные ({err_count})", [], is_special=True)
+            err_count = len(self.data_manager.get_files_for_cluster(dict(), "error_matches"))
+            self._add_cluster_item("error_matches", f"⚠️ Неопознанные ({err_count})",[], is_special=True)
 
         for cid in sorted_ids:
-            if self.mode == 'matches' and cid in ["-1", "group", "trash"]: continue
+            if self.mode == 'matches' and cid in["-1", "group", "trash"]: continue
             faces = clusters[cid]
             is_new = any(c['id'] == cid for c in self.data_manager.newly_created_clusters)
             
-            # Скрываем пустые (кроме новых и спец)
             if not faces and not is_new and cid not in ["trash", "error_matches"]: continue
             
             if faces: name = faces[0].effective_name
@@ -324,17 +198,32 @@ class MainWindow(QWidget):
 
             if cid == "trash": name = "🗑️ КОРЗИНА"
             
-            self._add_cluster_item(cid, name, faces, is_special=(cid in ["trash", "error_matches", "group"]))
+            self._add_cluster_item(cid, name, faces, is_special=(cid in["trash", "error_matches", "group"]))
 
-        # Восстановление выделения
+        # --- ВОССТАНОВЛЕНИЕ ВЫДЕЛЕНИЯ ---
+        found = False
         if active_id:
             for i in range(self.cluster_list_widget.count()):
                 item = self.cluster_list_widget.item(i)
                 if item.data(Qt.ItemDataRole.UserRole)["id"] == active_id:
                     self.cluster_list_widget.setCurrentItem(item)
+                    found = True
                     break
-        elif self.cluster_list_widget.count() > 0:
+                    
+        # Если кластер исчез (мы перетащили из него последнюю фотографию)
+        if not found and self.cluster_list_widget.count() > 0:
             self.cluster_list_widget.setCurrentRow(0)
+            new_item = self.cluster_list_widget.currentItem()
+            if new_item:
+                self.active_cluster_id = new_item.data(Qt.ItemDataRole.UserRole)["id"]
+                self._render_gallery(self.active_cluster_id) # Отрисовываем новый кластер
+        elif not found:
+            self.active_cluster_id = None
+            self.image_list_widget.clear()
+            self.gallery_label.setText("Галерея")
+
+        # --- Снимаем блокировку сигналов ---
+        self.cluster_list_widget.blockSignals(False)
 
     def _add_cluster_item(self, cid: str, name: str, faces: List, is_special: bool = False):
         pixmap = QPixmap()
@@ -400,10 +289,7 @@ class MainWindow(QWidget):
         if not pixmap.isNull():
             pixmap = pixmap.scaled(PREVIEW_SIZE, PREVIEW_SIZE, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
-        if self.mode == 'matches':
-            count = len(self.data_manager.get_group_matches_for_cluster(cid))
-        else:
-            count = len(self.data_manager.get_files_for_cluster({}, cid))
+        count = len(self.data_manager.get_files_for_cluster(dict(), cid))
 
         item_data = {
             "id": cid, "name": name, "count": count, "pixmap": pixmap,
@@ -422,13 +308,11 @@ class MainWindow(QWidget):
     @Slot(QListWidgetItem)
     def _on_face_item_double_clicked(self, item):
         """
-        Открывает просмотрщик изображений.
-        Собирает карту подсветок (highlights_map) для всех фото в галерее,
-        где встречается выбранный человек (по cluster_label или match_id).
+        Открывает просмотрщик изображений (Smart Viewer).
+        Определяет сценарий (Опознанное vs Неопознанное) и передает индекс.
         """
         if not item: return
         
-        # 1. Определяем текущее фото и лицо
         current_photo_item = self.image_list_widget.currentItem()
         if not current_photo_item: return
         fname = current_photo_item.data(Qt.ItemDataRole.UserRole)["filename"]
@@ -439,61 +323,23 @@ class MainWindow(QWidget):
         face_idx = item.data(Qt.ItemDataRole.UserRole)
         if face_idx is None or face_idx >= len(record.faces): return
         
-        selected_face = record.faces[face_idx]
+        face = record.faces[face_idx]
         
-        # 2. Определяем критерии поиска (независимо от режима)
-        # Если у лица есть ID сопоставления - используем его (наивысший приоритет)
-        target_match_id = selected_face.extra_data.get('matched_portrait_cluster_label')
-        
-        # Если нет матча, но есть ID кластера (распознанное лицо) - используем его
-        target_cluster_id = selected_face.cluster_label
+        # Проверяем, является ли лицо "Опознанным"
+        is_recognized = False
+        rec_id = face.extra_data.get('matched_portrait_cluster_label')
+        if rec_id is None:
+            rec_id = face.cluster_label
             
-        # 3. Подготавливаем список файлов
-        if self.mode == 'matches':
-             files = self.data_manager.get_group_matches_for_cluster(self.active_cluster_id)
-        else:
-             files = self.data_manager.get_files_for_cluster({}, self.active_cluster_id)
-        
-        # 4. Строим карту подсветок {filename: bbox}
-        highlights_map = {}
-        
-        # Если у лица нет никаких ID (оно совсем неизвестное), подсвечиваем только на текущем фото
-        if target_match_id is None and target_cluster_id is None:
-            highlights_map[fname] = selected_face.bbox
-        else:
-            # Иначе ищем этого человека на всех фото в текущей галерее
-            for f_name in files:
-                rec = self.data_manager.records.get(f_name)
-                if not rec: continue
-                
-                found_bbox = None
-                for f in rec.faces:
-                    # Приоритет 1: Совпадение по Match ID
-                    if target_match_id is not None:
-                        if f.extra_data.get('matched_portrait_cluster_label') == target_match_id:
-                            found_bbox = f.bbox
-                            break # Нашли - выходим из цикла лиц, идем к след. файлу
-                    
-                    # Приоритет 2: Совпадение по Cluster ID (если не ищем по Match ID)
-                    elif target_cluster_id is not None:
-                        if f.cluster_label == target_cluster_id:
-                            found_bbox = f.bbox
-                            break
-                
-                if found_bbox:
-                    highlights_map[f_name] = found_bbox
+        if rec_id is not None and str(rec_id) not in ("-1", "trash", "None"):
+            is_recognized = True
 
-        # Если вдруг на текущем фото лицо не нашлось через цикл (редкий кейс рассинхрона),
-        # добавляем его принудительно, чтобы рамка точно была при открытии
-        if fname not in highlights_map:
-            highlights_map[fname] = selected_face.bbox
+        # Если лицо опознано, передаем его индекс во Viewer (Сценарий 1)
+        # Если не опознано, передаем None, чтобы Viewer отрисовал все лица на фото (Сценарий 2)
+        target_idx = face_idx if is_recognized else None
+        
+        ImageViewer(self.data_manager, fname, parent=self, target_face_index=target_idx).exec()
 
-        if fname in files:
-            idx = files.index(fname)
-            paths = [self.working_images_dir / f for f in files]
-            
-            # 5. Запускаем вьювер с картой
-            ImageViewer(paths, files, idx, self, highlights_map=highlights_map).exec()
 
     @Slot(str, str, list)
     def _handle_drop(self, source_id, target_id, filenames):
@@ -625,14 +471,17 @@ class MainWindow(QWidget):
         # Execute Move
         if valid_files:
             self.data_manager.move_images_to_cluster(
-                {}, target_id, target_name, valid_files, face_selection
+                dict(), target_id, target_name, valid_files, face_selection
             )
             self._refresh_left_panel()
             
             if self.active_cluster_id == source_id:
-                self._render_gallery(source_id)
+                # ИЗМЕНЕНО: Добавлен preserve_state
+                self._render_gallery(source_id, preserve_state=True) 
+                
             if self.mode == 'matches' and self.active_cluster_id == target_id:
-                self._render_gallery(target_id)
+                # ИЗМЕНЕНО: Добавлен preserve_state
+                self._render_gallery(target_id, preserve_state=True)
 
 
     def _save_changes(self, silent=False):
@@ -685,36 +534,58 @@ class MainWindow(QWidget):
         self.active_cluster_id = cid
         self._render_gallery(cid)
 
-    def _render_gallery(self, cluster_id: str):
+    def _render_gallery(self, cluster_id: str, preserve_state: bool = False):
+        saved_scroll = 0
+        saved_row = 0
+        
+        # --- ДОБАВЛЕНО: Запоминаем текущий скролл и строку перед очисткой ---
+        if preserve_state and self.image_list_widget.count() > 0:
+            saved_scroll = self.image_list_widget.verticalScrollBar().value()
+            selected = self.image_list_widget.selectedItems()
+            if selected:
+                # Если выделено несколько, берем верхний, чтобы после удаления оказаться на "следующем"
+                saved_row = min([self.image_list_widget.row(i) for i in selected])
+            else:
+                saved_row = self.image_list_widget.currentRow()
+                if saved_row < 0: saved_row = 0
+
         self._stop_loader()
+        
+        if not preserve_state: # Очищаем только если мы не пытаемся сохранить текущее состояние (например, после удаления фото)
+            self.image_pixmap_cache.clear()       
+        
+        
         cdata = self._get_cluster_item_data_by_id(cluster_id)
         if not cdata: return
         
-        self.gallery_label.setText(f"Галерея: {cdata['name']} ({cdata['count']} фото)")
-        self.image_list_widget.clear()
+        # --- 1. Читаем текущие состояния кнопок и полей фильтров ---
+        has_filters = self.filter_manager.has_active_filters()
         
+        # Очищаем виджеты
+        self.image_list_widget.clear()
         self.gallery_items_map.clear()
 
-        if self.mode == 'matches':
-             filenames = self.data_manager.get_group_matches_for_cluster(cluster_id)
-        else:
-             filenames = self.data_manager.get_files_for_cluster({}, cluster_id)
+        filenames = self.data_manager.get_files_for_cluster(dict(), cluster_id)
+        if not filenames: 
+            self.gallery_label.setText(f"Галерея: {cdata['name']} (0 фото)")
+            return
 
-        if not filenames: return
-
-        tasks = []
+        tasks =[]
         placeholder = QPixmap(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
         placeholder.fill(QColor("#3e3e3e")) 
         
+        visible_count = 0
+        
+        # --- 2. Перебираем файлы и создаем только те, что прошли фильтр ---
         for fname in filenames:
             record = self.data_manager.records.get(fname)
             if not record: continue
             
             full_path = self.working_images_dir / fname
-            current_keys = []
+            current_keys =[]
             
             if self.mode == 'cleaning':
-                target_faces = []
+                target_faces =[]
                 for i, f in enumerate(record.faces):
                     if cluster_id == "trash":
                         if f.is_trash: target_faces.append(i)
@@ -729,13 +600,51 @@ class MainWindow(QWidget):
 
             for cache_key, face_idx in current_keys:
                 display_name = cache_key.split("::")[0]
-                item = QListWidgetItem(display_name)
                 
-                # --- ИЗМЕНЕНИЕ: Формируем расширенный словарь данных ---
-                user_data = {"filename": display_name}
+                user_data = {"filename": display_name, "overlays": list()}
                 if face_idx is not None:
-                    user_data["face_index"] = face_idx # Сохраняем индекс лица для cleaning
+                    user_data["face_index"] = face_idx 
                 
+                face_for_icon = None
+                if face_idx is not None and face_idx < len(record.faces):
+                    face_for_icon = record.faces[face_idx]
+                elif record.face_count == 1 and record.faces:
+                    face_for_icon = record.faces[0]
+                    
+                if face_for_icon:
+                    gender = face_for_icon.extra_data.get('gender_faceonnx')
+                    if gender == 'Male':
+                        user_data["overlays"].append("GENDER_MALE")
+                    elif gender == 'Female':
+                        user_data["overlays"].append("GENDER_FEMALE")
+                        
+                    eye_left = face_for_icon.extra_data.get('eye_left_state')
+                    eye_right = face_for_icon.extra_data.get('eye_right_state')
+                    if eye_left == 'Closed' or eye_right == 'Closed':
+                        user_data["overlays"].append("EYE_CLOSED")
+                        
+                    kp_analysis = face_for_icon.extra_data.get('keypoint_analysis', dict())
+                    mouth_state = kp_analysis.get('mouth_state')
+                    if mouth_state in ("open", "slightly_open", "wide_open"):
+                        user_data["overlays"].append("MOUTH_OPEN")
+
+                    beauty = face_for_icon.extra_data.get('beauty_faceonnx')
+                    if beauty is not None:
+                        try:
+                            user_data["beauty_score"] = int(float(beauty))
+                        except (ValueError, TypeError):
+                            pass
+                
+                user_data["face_count"] = record.face_count
+                
+                # --- 3. ЛОГИКА ФИЛЬТРАЦИИ НА ЭТАПЕ СОЗДАНИЯ ---
+                if has_filters and not self.filter_manager.passes(user_data):
+                    continue # Элемент не прошел фильтр -> пропускаем
+                
+                visible_count += 1
+
+                # Добавляем только прошедшие элементы (используем стандартный DecorationRole)
+                item = QListWidgetItem(display_name)
                 item.setData(Qt.ItemDataRole.UserRole, user_data)
                 
                 if cache_key in self.image_pixmap_cache:
@@ -756,8 +665,48 @@ class MainWindow(QWidget):
                 self.image_list_widget.addItem(item)
                 self.gallery_items_map[cache_key] = item
 
+        # Запускаем лоадер (он загрузит только видимые фото!)
         if tasks:
             self._start_loader(tasks)
+
+        # --- 4. Обновляем заголовок ---
+        if has_filters:
+            self.gallery_label.setText(f"Галерея: {cdata['name']} (Показано {visible_count} из {cdata['count']})")
+        else:
+            self.gallery_label.setText(f"Галерея: {cdata['name']} ({cdata['count']} фото)")
+
+        # --- 5. УМНЫЙ АВТОВЫБОР С УЧЕТОМ СОХРАНЕНИЯ ПОЗИЦИИ ---
+        if self.image_list_widget.count() == 0:
+            self.image_list_widget.setCurrentItem(None)
+        else:
+            target_row = 0
+            if preserve_state:
+                # Корректируем цель, если элементов стало меньше
+                target_row = min(saved_row, self.image_list_widget.count() - 1)
+                
+            visible_found = False
+            
+            # Ищем вниз первую видимую ячейку
+            for i in range(target_row, self.image_list_widget.count()):
+                if not self.image_list_widget.item(i).isHidden():
+                    self.image_list_widget.setCurrentRow(i)
+                    visible_found = True
+                    break
+            
+            # Если внизу ничего нет (например, перетащили последние элементы списка), ищем вверх
+            if not visible_found and preserve_state:
+                for i in range(target_row - 1, -1, -1):
+                    if not self.image_list_widget.item(i).isHidden():
+                        self.image_list_widget.setCurrentRow(i)
+                        visible_found = True
+                        break
+                        
+            if not visible_found:
+                self.image_list_widget.setCurrentItem(None)
+                
+            # Восстанавливаем прокрутку с микро-задержкой (чтобы Qt успел расставить элементы по сетке)
+            if preserve_state:
+                QTimer.singleShot(10, lambda: self.image_list_widget.verticalScrollBar().setValue(saved_scroll))
 
     def _start_loader(self, tasks: List[Dict]):
         self.status_bar.setRange(0, len(tasks))
@@ -772,11 +721,26 @@ class MainWindow(QWidget):
         self.loader_thread.start()
 
     def _stop_loader(self):
-        if self.loader_thread and self.loader_thread.isRunning():
-            if self.loader_worker: self.loader_worker.requestInterruption()
-            self.loader_thread.quit()
-            self.loader_thread.wait()
-        self.loader_thread = None; self.loader_worker = None
+        worker = getattr(self, 'loader_worker', None)
+        if worker:
+            try:
+                worker.finished.disconnect(self._on_loader_finished)
+            except Exception:
+                pass
+            worker.requestInterruption()
+            
+        thread = getattr(self, 'loader_thread', None)
+        if thread:
+            if thread.isRunning():
+                thread.quit()
+                thread.wait() # Гарантированно ждем завершения C++ потока
+            thread.deleteLater() # Безопасное удаление объекта в движке Qt
+            
+        self.loader_thread = None
+        self.loader_worker = None
+        
+        if hasattr(self, 'status_bar'):
+            self.status_bar.reset()
 
     @Slot(list)
     def _on_chunk_ready(self, items: List):
@@ -905,6 +869,13 @@ class MainWindow(QWidget):
         except Exception as e:
             logger.error(f"Error face panel: {e}")
 
+        # --- Автовыбор первого лица в правой панели ---
+        if hasattr(self, 'face_details_widget') and self.face_details_widget.count() > 0:
+            first_face_item = self.face_details_widget.item(0)
+            self.face_details_widget.setCurrentItem(first_face_item)
+            # Принудительно вызываем обновление информации о лице (т.к. программный выбор не эмулирует клик мыши)
+            self._on_face_item_clicked(first_face_item)            
+
     @Slot(QListWidgetItem)
     def _on_face_item_clicked(self, item):
         """
@@ -958,10 +929,31 @@ class MainWindow(QWidget):
         """
         
         # Атрибуты
-        age = face.extra_data.get('age_insight')
-        gender = face.extra_data.get('gender_insight')
+        age = face.extra_data.get('age_faceonnx')
+        gender = face.extra_data.get('gender_faceonnx')
         if age is not None: html += f"<tr><td><b>Возраст (AI):</b></td><td>{age}</td></tr>"
-        if gender is not None: html += f"<tr><td><b>Пол (AI):</b></td><td>{'М' if gender==1 else 'Ж'}</td></tr>"
+        if gender is not None:     
+            # Добавлена визуализация пола из FaceONNX
+            html += f"<tr><td><b>Пол (FaceONNX):</b></td><td>{gender}</td></tr>"
+
+        # --- ДОБАВЛЕНО: Beauty в правую панель ---
+        beauty_score = face.extra_data.get('beauty_faceonnx')
+        if beauty_score is not None:
+             try:
+                 html += f"<tr><td><b>Красота (Beauty):</b></td><td>{int(float(beauty_score))}</td></tr>"
+             except (ValueError, TypeError):
+                 pass
+
+        # --- ДОБАВЛЕНО: Глаза и рот ---
+        eye_left = face.extra_data.get('eye_left_state')
+        eye_right = face.extra_data.get('eye_right_state')
+        kp_analysis = face.extra_data.get('keypoint_analysis', dict())
+        mouth_state = kp_analysis.get('mouth_state')
+
+        if eye_left or eye_right:
+            html += f"<tr><td><b>Глаза (Л / П):</b></td><td>{eye_left or '?'} / {eye_right or '?'}</td></tr>"
+        if mouth_state:
+            html += f"<tr><td><b>Рот:</b></td><td>{mouth_state}</td></tr>"
 
         html += "<tr><td colspan='2'><hr></td></tr>"
         
@@ -986,239 +978,22 @@ class MainWindow(QWidget):
             name = item.data(Qt.ItemDataRole.UserRole)["name"].lower()
             item.setHidden(search not in name)
 
-    @Slot(QListWidgetItem)
-    def _rename_cluster_action(self, item):
-        data = item.data(Qt.ItemDataRole.UserRole)
-        cid = data["id"]
-        # Matches mode rename is disabled in strategy, check here or call anyway
-        if self.mode == 'matches': return 
-        if cid in ["trash", "error_matches"]: return
-        
-        current_name = self.data_manager.strategy._strip_name_prefix(data["name"])
-        new_name = None
-        
-        if self.mode == 'location':
-            dialog = RenameDialog(self.predefined_cluster_names, current_name, self)
-            if dialog.exec() == QDialog.Accepted:
-                new_name = dialog.get_selected_name()
-        else:
-            text, ok = QInputDialog.getText(self, "Переименование", "Имя:", text=current_name)
-            if ok: new_name = text
-            
-        if new_name and new_name.strip():
-            self.data_manager.rename_cluster({}, cid, new_name.strip())
-            self._refresh_left_panel()
-
-    def show_cluster_context_menu(self, pos):
-        item = self.cluster_list_widget.itemAt(pos)
-        menu = QMenu()
-        
-        if self.mode == 'cleaning':
-            act_empty = menu.addAction("Очистить корзину (удалить навсегда)")
-            
-            # --- ИСПРАВЛЕНИЕ: Явное преобразование в bool ---
-            is_trash = bool(item and item.data(Qt.ItemDataRole.UserRole)["id"] == "trash")
-            act_empty.setEnabled(is_trash)
-            
-            if act_empty.isEnabled():
-                act_empty.triggered.connect(lambda: self._save_changes(silent=False))
-        elif self.mode == 'matches':
-            # В режиме Matches добавляем возможность сменить рабочую папку (группы),
-            # оставив эталоны (портреты) загруженными.
-            action_load = menu.addAction("📂 Открыть другую съемку (JSON)...")
-            action_load.triggered.connect(self._load_other_session)
-            
-            # Разделитель, если кликнули по элементу
-            if item: menu.addSeparator()
-        elif self.mode != 'matches':
-            menu.addAction("Создать кластер").triggered.connect(self._create_cluster)
-            if item:
-                menu.addAction("Переименовать").triggered.connect(lambda: self._rename_cluster_action(item))
-                
-        menu.exec(self.cluster_list_widget.mapToGlobal(pos))
-
-    def _load_other_session(self):
-        """
-        Позволяет выбрать другой JSON файл и переключить рабочую директорию,
-        сохранив текущие эталоны (в режиме matches).
-        """
-        # 1. Проверка на несохраненные данные
-        if self.data_manager.has_changes():
-            reply = QMessageBox.question(self, "Смена сессии", 
-                                         "Есть несохраненные изменения. Сохранить перед переключением?", 
-                                         QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
-            if reply == QMessageBox.Cancel: return
-            if reply == QMessageBox.Save:
-                self._save_changes(silent=False)
-
-        # 2. Диалог выбора файла
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, 
-            "Выберите файл данных (info_faces.json / info_group_faces.json)",
-            str(self.working_dir),
-            "JSON Files (info_faces.json)"
-        )
-        
-        if not file_path: return
-        
-        new_path = Path(file_path)
-        
-        # 3. Обновление путей в Main Window
-        self.working_dir = new_path.parent
-        self.working_images_dir = self.working_dir / "JPG"
-        
-        # Обновляем имя сессии в заголовке
-        self.photo_session = self.working_dir.name.replace("Analysis_", "")
-        self.setWindowTitle(self.data_manager.strategy.get_window_title(self.photo_session))
-        
-        # 4. Обновление Data Manager
-        self.data_manager.switch_working_session(new_path)
-        
-        # 5. Перезагрузка данных
-        self._load_and_display_data()        
-
-
-    def show_gallery_context_menu(self, pos):
-        item = self.image_list_widget.itemAt(pos)
-        if not item: return
-        menu = QMenu()
-        
-        if self.mode == 'location':
-            action = menu.addAction("📸 Сделать обложкой локации")
-            action.triggered.connect(lambda: self._set_cover_action(item))
-            
-        if not menu.isEmpty():
-            menu.exec(self.image_list_widget.mapToGlobal(pos))
-
-    # ====== КОНТЕКСТНОЕ МЕНЮ ПАНЕЛИ ЛИЦ ======
-    """
-    Группа методов для работы с контекстным меню для панели лиц (правая панель).
-    Позволяет перейти к кластеру, которому принадлежит лицо.
-    Работает в режиме Face и matches
-    """
-    def show_face_details_context_menu(self, pos):
-        """
-        Контекстное меню для панели лиц (правая панель).
-        Позволяет перейти к кластеру, которому принадлежит лицо.
-        """
-        # --- ИЗМЕНЕНИЕ: Отключаем меню для Cleaning и Location ---
-        if self.mode in ['cleaning', 'location']:
-            return
-
-        item = self.face_details_widget.itemAt(pos)
-        if not item: return
-
-        # 1. Получаем данные лица
-        current_photo_item = self.image_list_widget.currentItem()
-        if not current_photo_item: return
-        fname = current_photo_item.data(Qt.ItemDataRole.UserRole)["filename"]
-        
-        record = self.data_manager.records.get(fname)
-        if not record: return
-        
-        face_idx = item.data(Qt.ItemDataRole.UserRole)
-        if face_idx is None or face_idx >= len(record.faces): return
-        
-        face = record.faces[face_idx]
-        
-        # 2. Определяем Target ID (с учетом улучшенной логики)
-        target_id = None
-        
-        # Шаг А: Проверяем прямую привязку к кластеру (для портретов)
-        if face.cluster_label is not None:
-            target_id = face.cluster_label
-            
-        # Шаг Б: Если нет прямой привязки, проверяем Сопоставление (Matches)
-        elif face.extra_data.get('matched_portrait_cluster_label') is not None:
-            target_id = face.extra_data.get('matched_portrait_cluster_label')
-
-        # 3. Создаем меню
-        menu = QMenu()
-        action_open = menu.addAction("📂 Перейти к кластеру")
-        
-        if target_id is not None:
-            target_id_str = str(target_id)
-            action_open.triggered.connect(lambda: self._activate_cluster_by_id(target_id_str))
-        else:
-            action_open.setEnabled(False)
-            action_open.setText("Кластер не определен")
-
-        menu.exec(self.face_details_widget.mapToGlobal(pos))
-
-    def _activate_cluster_by_id(self, cluster_id: str):
-        """
-        Находит кластер в левой панели и делает его активным.
-        """
-        # Сначала сбрасываем фильтр поиска, если кластер скрыт фильтром
-        if self.search_bar.text():
-            self.search_bar.clear()
-            
-        for i in range(self.cluster_list_widget.count()):
-            item = self.cluster_list_widget.item(i)
-            data = item.data(Qt.ItemDataRole.UserRole)
-            
-            # Сравниваем ID как строки
-            if str(data["id"]) == str(cluster_id):
-                self.cluster_list_widget.setCurrentItem(item)
-                self.cluster_list_widget.scrollToItem(item)
-                # Фокус на список, чтобы можно было сразу листать клавиатурой
-                self.cluster_list_widget.setFocus()
-                return
-        
-        # Если не нашли
-        QMessageBox.information(self, "Поиск", f"Кластер с ID {cluster_id} не найден в текущем списке.")
-
-    # ====== КОНТЕКСТНОЕ МЕНЮ ПАНЕЛИ ЛИЦ ======
-
-
-    def _set_cover_action(self, item):
-        fname = item.data(Qt.ItemDataRole.UserRole)["filename"]
-        cid = self.active_cluster_id
-        if not cid: return
-        self.data_manager.set_location_cover(cid, fname)
-        self._refresh_left_panel()
-
-    def _create_cluster(self):
-        name, ok = QInputDialog.getText(self, "Новый кластер", "Имя:")
-        if ok and name:
-            self.data_manager.create_cluster({}, name)
-            self._refresh_left_panel()
 
     @Slot(QListWidgetItem)
     def _open_image_viewer(self, item):
         data = item.data(Qt.ItemDataRole.UserRole)
         fname = data["filename"]
         
-        # --- НОВАЯ ЛОГИКА ДЛЯ CLEANING ---
+        # --- ЛОГИКА ДЛЯ CLEANING (Оставляем рамки) ---
         if self.mode == 'cleaning':
-            # В этом режиме мы открываем конкретное фото для проверки контекста
+            # В cleaning открываем с выделением конкретного лица
             face_idx = data.get("face_index")
-            
-            record = self.data_manager.records.get(fname)
-            if not record: return
-            
-            bbox = None
-            if face_idx is not None and face_idx < len(record.faces):
-                bbox = record.faces[face_idx].bbox
-            
-            full_path = self._get_image_path(fname)
-            
-            # В cleaning открываем вьювер только для одного фото (без навигации по кропам),
-            # так как навигация по "кропам" в полноэкранном режиме не интуитивна.
-            if full_path.exists():
-                ImageViewer([full_path], [fname], 0, self, highlight_bbox=bbox).exec()
+            ImageViewer(self.data_manager, fname, parent=self, target_face_index=face_idx, draw_boxes=True).exec()
             return
 
-        # --- СТАНДАРТНАЯ ЛОГИКА (Matches, Face, Location) ---
-        if self.mode == 'matches':
-             files = self.data_manager.get_group_matches_for_cluster(self.active_cluster_id)
-        else:
-             files = self.data_manager.get_files_for_cluster({}, self.active_cluster_id)
-            
-        if fname in files:
-            idx = files.index(fname)
-            paths = [self.working_images_dir / f for f in files]
-            ImageViewer(paths, files, idx, self).exec()
+        # --- СТАНДАРТНАЯ ЛОГИКА (Галерея) ---
+        # Открываем чистое фото БЕЗ рамок для детального рассмотрения
+        ImageViewer(self.data_manager, fname, parent=self, draw_boxes=False).exec()
 
     @Slot()
     def _on_export_all_triggered(self):
@@ -1233,8 +1008,6 @@ class MainWindow(QWidget):
 
     def _start_export(self, cluster_ids):
         # NOTE: Export logic remains mostly same, but we can clean it up later in Optimization phase
-        out_dir = self.working_dir.parent / self.session_name / f"Выбор_Фото_{self.photo_session}_{self.mode}"
-        self.export_dir = out_dir
         self.export_end = False
 
         tasks = []
@@ -1257,7 +1030,7 @@ class MainWindow(QWidget):
 
                 tasks.append({
                     "source_path": self.working_images_dir / fname,
-                    "output_path": out_dir / cname / fname,
+                    "output_path": self.export_dir / cname / fname,
                     "child_name": cname,
                     "faces_bboxes": faces_bboxes
                 })
@@ -1285,17 +1058,19 @@ class MainWindow(QWidget):
 
     @Slot(str)
     def _on_export_finished(self, message: str):
-        self.status_bar.reset(); 
+        self.status_bar.reset()
         self.status_bar.setFormat("")
      
         QMessageBox.information(self, "Экспорт завершен", message)
         self.export_end = True
-        # Сохранить флаг экспорта JPG
-        pysm_context.set(self.var_export_jpg, "1")
 
-        if hasattr(self, 'export_thread'): 
-            self.export_thread.quit(); 
-            self.export_thread.wait()
+        thread = getattr(self, 'export_thread', None)
+        if thread: 
+            if thread.isRunning():
+                thread.quit()
+                thread.wait()
+            thread.deleteLater()
+            self.export_thread = None
 
     def _update_pysm_context(self):
         # Helper to update legacy context if managed run
@@ -1344,44 +1119,64 @@ class MainWindow(QWidget):
                 logger.error(f"Ошибка при формировании финального отчета: {e}")
 
 
-
+             
     def closeEvent(self, event):
-        # --- ИСПРАВЛЕНИЕ: Останавливаем потоки ПЕРЕД любой логикой выхода ---
+        # --- ДОБАВЛЕНО: Сохранение состояния окна и сплиттеров ---
+        if IS_MANAGED_RUN and pysm_context and self.win_state_var_name and WindowStateManager:
+            mode_var_name = f"{self.win_state_var_name}_{self.mode}"
+            window_state = WindowStateManager.save_state(
+                window=self,
+                splitters={'main': self.main_splitter}
+            )
+            pysm_context.set(mode_var_name, window_state)
+        # --- ИСПРАВЛЕНИЕ: Останавливаем загрузчик фото перед выходом ---
         self._stop_loader()
       
-        # Если идет экспорт, его тоже по-хорошему надо остановить, 
-        # но ProcessPoolExecutor сложно убить мгновенно. 
-        # Оставим на совести пользователя (или можно добавить проверку isRunning).
+        # --- ИСПРАВЛЕНИЕ: Безопасное завершение экспорта (предотвращает зомби-процессы) ---
         if hasattr(self, 'export_thread') and self.export_thread and self.export_thread.isRunning():
-             # Можно добавить предупреждение: "Идет экспорт, прервать?"
-             pass
+            reply = QMessageBox.question(self, "Прерывание", 
+                                         "В данный момент выполняется экспорт фотографий.\nПрервать процесс и закрыть программу?",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.No:
+                event.ignore()
+                return
+            else:
+                if hasattr(self, 'export_worker') and self.export_worker:
+                    self.export_worker.requestInterruption()
+                self.export_thread.quit()
+                self.export_thread.wait()
+                self.export_thread.deleteLater() # <--- ДОБАВЛЕНО
+                self.export_thread = None                 
+
+        # Стандартная обработка несохраненных изменений
         if self.data_manager.has_changes():
-            reply = QMessageBox.question(self, "Выход", "Сохранить изменения?", 
-                                         QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
-            if reply == QMessageBox.Save:
-                # _save_changes внутри себя тоже вызывает _stop_loader, это нормально (дубль не страшен)
+            reply = QMessageBox.question(self, "Выход", "Сохранить изменения перед выходом?", 
+                                         QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel)
+            if reply == QMessageBox.StandardButton.Save:
                 if self._save_changes(silent=True):
                     self._log_final_report()
                     event.accept()
                 else:
                     event.ignore()
-            elif reply == QMessageBox.Discard:
+            elif reply == QMessageBox.StandardButton.Discard:
                 self._log_final_report()
                 event.accept()
             else:
                 event.ignore()
         else:
             self._log_final_report()
-            event.accept()
+            event.accept()        
 
 def get_config() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Редактор кластеров.")
     p = "ce_"
     parser.add_argument(f"--{p}working_dir", type=str, required=True, help="Папка с данными")
     parser.add_argument(f"--{p}reference_dir", type=str, default=None, help="Папка с эталонами (для matches)")
+    parser.add_argument(f"--{p}export_dir", type=str, default=None, help="Папка для экспорта фотографий с водяными знаками")
+    parser.add_argument(f"--{p}win_state_var_name", type=str, default="", help="Имя переменной контекста для сохранения состояния окна")
     parser.add_argument("--all_threads", type=int, dest="all_threads", default=0, help="Количество потоков (0=авто).")
     parser.add_argument("--mode", type=str, choices=["face", "location", "matches", "cleaning"], default="face")
-    parser.add_argument("--var_ce_export_jpg", type=str, default="var_ce_export_jpg", help="Имя переменной контекста для сохранения флага экспорта")
+
     
     return ConfigResolver(parser).resolve_all()
 
@@ -1404,12 +1199,13 @@ if __name__ == "__main__":
         w_dir = Path(getattr(cli_config, f"{arg_prefix}working_dir"))
         r_dir_str = getattr(cli_config, f"{arg_prefix}reference_dir")
         r_dir = Path(r_dir_str) if r_dir_str else None
-        
+        e_dir_str = getattr(cli_config, f"{arg_prefix}export_dir")  
+        win_var = getattr(cli_config, f"{arg_prefix}win_state_var_name", "")        
         if not w_dir.exists(): raise FileNotFoundError(f"Нет папки: {w_dir}")
 
         num_workers = cli_config.all_threads or (os.cpu_count() or 8)    
 
-        window = MainWindow(w_dir, r_dir, cli_config.mode, num_workers, cli_config.var_ce_export_jpg)
+        window = MainWindow(w_dir, r_dir, cli_config.mode, num_workers, e_dir_str, win_var)
         window.show()
      
         sys.exit(app.exec())

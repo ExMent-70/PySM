@@ -7,7 +7,7 @@
 экземпляра скрипта (EditMode.INSTANCE) и контекстных переменных (EditMode.CONTEXT_VARS).
 """
 
-from typing import Dict, Optional, Any, List, Union
+from typing import Dict, Optional, Any, List, Union, Tuple
 
 from PySide6.QtCore import Qt, Slot, QSignalBlocker, QTimer, QEvent, QObject, Signal
 from PySide6.QtGui import QColor
@@ -80,8 +80,9 @@ class ParameterEditorWidget(QWidget):
         mode: EditMode,
         locale_manager: LocaleManager,
         theme_manager: ThemeManager,
-        script_entries: Optional[List[ScriptSetEntryModel]] = None,
+        script_entries: Optional[List[Tuple[str, ScriptSetEntryModel]]] = None,
         get_script_name_func: Optional[callable] = None,
+        current_instance_id: Optional[str] = None,
         parent: Optional[QWidget] = None,
     ):
         """
@@ -103,6 +104,7 @@ class ParameterEditorWidget(QWidget):
             locale_manager=locale_manager,
             get_script_info_func=get_script_name_func or (lambda x: None),
             script_entries=script_entries or[],
+            current_instance_id=current_instance_id,
         )
 
         # Хранилища данных в зависимости от режима

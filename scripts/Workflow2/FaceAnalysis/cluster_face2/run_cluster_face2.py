@@ -100,6 +100,7 @@ def get_config() -> argparse.Namespace:
     parser.add_argument("--a_ref_dir", type=str, default=None, 
                         help="Папка с эталонами (если отличается от target)")
 
+
     return ConfigResolver(parser).resolve_all()
 
 
@@ -147,6 +148,8 @@ def main():
             sys.exit(1)
 
         strategy.run(config, data_manager)
+        photo_session = pysm_context.get("ws_photo_session", "SCHOOL")        
+        pysm_context.set(f"var_{photo_session}_claster_{mode}", "yes")
         logger.debug("=== ВЫПОЛНЕНИЕ ЗАВЕРШЕНО УСПЕШНО ===")
        
     except Exception as e:

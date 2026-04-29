@@ -35,7 +35,7 @@ class CoordinateTransformer:
         self.scale_y_det = self.original_h / self.resized_h if self.resized_h > 0 else 1.0
 
         # Параметры для обратного преобразования из финального кропа
-        self.crop_params: Dict[str, Any] = {}
+        self.crop_params: Dict[str, Any] = dict()
         logger.debug(
             f"CoordinateTransformer создан. Original: {original_shape}, Resized: {resized_shape_for_det}"
         )
@@ -93,7 +93,7 @@ class CoordinateTransformer:
         except Exception as e:
             logger.error(f"Критическая ошибка при сохранении параметров трансформации: {e}", exc_info=True)
             # Сбрасываем параметры в случае ошибки, чтобы избежать неверных вычислений в дальнейшем
-            self.crop_params = {}
+            self.crop_params = dict()
         # --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
 
@@ -111,7 +111,7 @@ class CoordinateTransformer:
                 "landmark_2d_106": None, "landmark_3d_68": None
             }
 
-        recalculated: Dict[str, Optional[np.ndarray]] = {}
+        recalculated: Dict[str, Optional[np.ndarray]] = dict()
         
         # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
         # Возвращаем декларативный словарь для описания атрибутов

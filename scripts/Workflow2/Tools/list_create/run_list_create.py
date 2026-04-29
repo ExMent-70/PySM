@@ -36,10 +36,10 @@ from PySide6.QtWidgets import (
 
 from domain import AppConfig, Student, ExtraService, CHILDREN_LIST_FILENAME
 from parser import SmartParser, simple_parse_text
-from ui_models import StudentTableModel, EnterKeyDelegate
+from ui_models import StudentTableModel, EnterKeyDelegate, StudentProxyModel
 from ui_dialogs import (
     ServicesEditorDialog, ExtraServicesDialog, NamesEditorDialog,
-    InfoSchemaEditorDialog, StudentInfoEditorDialog, AIParsingDialog # Добавлено
+    InfoSchemaEditorDialog, StudentInfoEditorDialog, AIParsingDialog, RanksEditorDialog
 )
 
 
@@ -84,10 +84,13 @@ class ClassListEditor(QMainWindow):
         self._is_loading: bool = False
 
         self.SERVICES: Dict[str, int] = {}
-        self.INFO_COLUMNS: List[str] = []  # Список заголовков доп. информации
+        self.INFO_COLUMNS: List[str] =[]  # Список заголовков доп. информации
+        self.RANKS: List[str] =[]         # НОВОЕ: Хранение списка рангов
 
         self._load_services()
+        self._load_ranks()
         self._load_theme_colors()
+
         self.smart_parser = SmartParser(
             surname_style=self.surname_style,
             name_style=self.name_style,
@@ -139,7 +142,7 @@ class ClassListEditor(QMainWindow):
 
     def _init_ui(self) -> None:
         self.setWindowTitle("PySM - Редактор списка класса")
-        self.resize(1200, 800)
+        self.resize(1400, 800)
         
         self._create_actions()
         self._create_menus()
@@ -163,6 +166,7 @@ class ClassListEditor(QMainWindow):
         self._update_summary_info()
         self._is_loading = False
 
+# --- ИЗМЕНЕННЫЙ БЛОК: run_list_create.py (Внутри класса ClassListEditor) ---
     def _create_actions(self) -> None:
         self.add_row_action = QAction("Добавить строку", self)
         self.add_row_action.triggered.connect(self._add_new_row)
@@ -174,11 +178,17 @@ class ClassListEditor(QMainWindow):
         self.swap_names_action.triggered.connect(self._swap_current_row_names)
         
         self.edit_extras_action = QAction("Редактировать доп. услуги", self)
-        self.edit_extras_action.triggered.connect(self._open_extra_services_editor)
+        # ИЗМЕНЕНО: Используем QTimer.singleShot(0, ...), чтобы отвязать запуск 
+        # диалога от цикла закрытия контекстного меню и избежать мерцания (flicker).
+        self.edit_extras_action.triggered.connect(
+            lambda: QTimer.singleShot(0, self._open_extra_services_editor)
+        )
 
-        # Новые действия для инфо
         self.edit_info_action = QAction("Редактировать информацию", self)
-        self.edit_info_action.triggered.connect(self._open_student_info_editor)
+        # ИЗМЕНЕНО: То же самое для редактора информации
+        self.edit_info_action.triggered.connect(
+            lambda: QTimer.singleShot(0, self._open_student_info_editor)
+        )
 
     def _create_menus(self) -> None:
             file_menu = self.menuBar().addMenu("&Файл")
@@ -216,6 +226,7 @@ class ClassListEditor(QMainWindow):
             settings_menu = self.menuBar().addMenu("&Настройки")
             settings_menu.addAction("Редактировать услуги...", self._open_services_editor)
             settings_menu.addAction("Редактировать словарь имен...", self._open_names_editor)
+            settings_menu.addAction("Редактировать ранги...", self._open_ranks_editor)
             settings_menu.addSeparator()
             settings_menu.addAction("Настроить поля информации...", self._open_info_schema_editor)
 
@@ -239,7 +250,7 @@ class ClassListEditor(QMainWindow):
 
         top_panel.addWidget(QLabel("Вид фотоуслуги:"), 0, 2)
         self.service_type_combo = QComboBox()
-        self.service_type_combo.addItems(self.SERVICES.keys())
+        self.service_type_combo.addItems(sorted(self.SERVICES.keys()))
         top_panel.addWidget(self.service_type_combo, 0, 3)
         top_panel.addWidget(QLabel("Стоимость:"), 0, 4)
         self.service_cost_label = QLabel()
@@ -288,7 +299,7 @@ class ClassListEditor(QMainWindow):
         self._create_table_view(right_layout)
         self._create_summary_panel(right_layout)
         splitter.addWidget(right_panel)
-        splitter.setSizes([400, 800])
+        splitter.setSizes([300, 1100])
 
     def _create_table_view(self, parent_layout: QVBoxLayout) -> None:
         self.processed_table = QTableView()
@@ -296,6 +307,7 @@ class ClassListEditor(QMainWindow):
 
         self.table_model = StudentTableModel(
             services=self.SERVICES,
+            ranks=self.RANKS,
             surname_style=self.surname_style,
             name_style=self.name_style,
             base_bg_color=self.table_base_bg_color,
@@ -306,11 +318,20 @@ class ClassListEditor(QMainWindow):
         self.table_model.dataChanged.connect(self._on_data_changed)
         self.table_model.rowsInserted.connect(self._update_summary_info)
         self.table_model.rowsRemoved.connect(self._update_summary_info)
-        self.table_model.row_focus_requested.connect(self._handle_row_focus_request_async)
+
         
-        self.processed_table.setModel(self.table_model)
+        # НОВОЕ: Настраиваем Прокси-модель
+        self.proxy_model = StudentProxyModel()
+        self.proxy_model.setSourceModel(self.table_model)
+        self.proxy_model.setDynamicSortFilter(True) # Авто-сортировка при редактировании
         
-        delegate = EnterKeyDelegate(self.processed_table, services=list(self.SERVICES.keys()))
+        self.processed_table.setModel(self.proxy_model) # Таблица теперь смотрит через прокси!
+        
+        delegate = EnterKeyDelegate(
+            self.processed_table, 
+            services=list(self.SERVICES.keys()),
+            ranks=self.RANKS
+        )
         self.processed_table.setItemDelegate(delegate)
         self.processed_table.setSortingEnabled(True)
         self.processed_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -321,26 +342,24 @@ class ClassListEditor(QMainWindow):
 
     def _setup_table_headers(self):
         header = self.processed_table.horizontalHeader()
-        # Сброс режимов (важно при динамическом изменении)
+        
+        # 1. Делаем ВСЕ колонки интерактивными (разрешаем ручное изменение мышью)
         for i in range(self.table_model.columnCount()):
              header.setSectionResizeMode(i, QHeaderView.ResizeMode.Interactive)
 
-        # Фиксированные
-        resize_modes = {
-            StudentTableModel.COL_SHOOT_ORDER: QHeaderView.ResizeMode.ResizeToContents,
-            StudentTableModel.COL_ALPHA_ORDER: QHeaderView.ResizeMode.ResizeToContents,
-            StudentTableModel.COL_TOTAL: QHeaderView.ResizeMode.ResizeToContents,
-            StudentTableModel.COL_EXTRAS: QHeaderView.ResizeMode.ResizeToContents,
-            StudentTableModel.COL_SURNAME: QHeaderView.ResizeMode.Stretch,
-            StudentTableModel.COL_NAME: QHeaderView.ResizeMode.Stretch,
-            StudentTableModel.COL_SERVICE: QHeaderView.ResizeMode.Stretch,
-        }
-        for col, mode in resize_modes.items():
-            header.setSectionResizeMode(col, mode)
-            
-        # Динамические - Stretch
-        for col in range(StudentTableModel.FIXED_COL_COUNT, self.table_model.columnCount()):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
+        # 2. Автоматически подгоняем стартовую ширину под текст заголовков и содержимого
+        self.processed_table.resizeColumnsToContents()
+
+        # 3. Задаем дефолтную минимальную ширину для текстовых колонок, 
+        # чтобы они не были слишком узкими, если таблица пустая
+        self.processed_table.setColumnWidth(StudentTableModel.COL_SURNAME, 130)
+        self.processed_table.setColumnWidth(StudentTableModel.COL_NAME, 100)
+        self.processed_table.setColumnWidth(StudentTableModel.COL_PATRONYMIC, 80)
+        self.processed_table.setColumnWidth(StudentTableModel.COL_RANK, 100)        
+        self.processed_table.setColumnWidth(StudentTableModel.COL_SERVICE, 220)
+
+        # 4. Последняя колонка будет тянуться до правого края окна
+        header.setStretchLastSection(True)
 
     def _create_summary_panel(self, parent_layout: QVBoxLayout) -> None:
         summary_layout = QHBoxLayout()
@@ -374,6 +393,29 @@ class ClassListEditor(QMainWindow):
         except IOError as e:
             QMessageBox.critical(self, "Ошибка сохранения", f"Не удалось записать файл услуг:\n{e}")
 
+    def _load_ranks(self) -> None:
+        """НОВОЕ: Загрузка списка рангов из файла."""
+        ranks_path = pathlib.Path(__file__).parent / "_ranks.json"
+        default_ranks =["ученик", "учитель", "директор", "завуч", "классный руководитель"]
+        if ranks_path.exists():
+            try:
+                with open(ranks_path, 'r', encoding='utf-8') as f:
+                    self.RANKS = json.load(f)
+            except Exception:
+                self.RANKS = default_ranks
+        else:
+            self.RANKS = default_ranks
+            self._save_ranks()
+
+    def _save_ranks(self) -> None:
+        """НОВОЕ: Сохранение списка рангов в файл."""
+        ranks_path = pathlib.Path(__file__).parent / "_ranks.json"
+        try:
+            with open(ranks_path, 'w', encoding='utf-8') as f:
+                json.dump(self.RANKS, f, ensure_ascii=False, indent=4)
+        except IOError as e:
+            print(f"Ошибка сохранения рангов: {e}", file=sys.stderr)
+
     def _process_raw_list(self) -> None:
         if self.table_model.rowCount() > 0:
              if QMessageBox.question(self, "Подтверждение", "Заменить текущий список?", 
@@ -399,7 +441,10 @@ class ClassListEditor(QMainWindow):
             s.service_cost = cost
         
         self.table_model.update_data(students)
-        self.table_model.sort(StudentTableModel.COL_SURNAME)
+        # НОВОЕ: Сортируем базу и проставляем номера п/п
+        self.table_model.sort_and_renumber()
+        self.processed_table.sortByColumn(StudentTableModel.COL_SURNAME, Qt.SortOrder.AscendingOrder)
+        
         self.statusBar().showMessage(f"Найдено: {len(students)}", 5000)
         self._is_dirty = True
 
@@ -418,36 +463,94 @@ class ClassListEditor(QMainWindow):
         self.summary_label_total_cost.setText(f"Итоговая сумма: {total_sum} руб.")
 
     # --- Actions ---
-
     def _add_new_row(self) -> None:
         new_student = Student(
-            surname="Ученик",
-            name="Новый",
-            color1=self.smart_parser.SURNAME_COLOR_HEX,
-            color2=self.smart_parser.NAME_COLOR_HEX,
-            color1_fg=self.surname_style.get("color", "#000000"),
-            color2_fg=self.name_style.get("color", "#000000"),
-            service_type=self.service_type_combo.currentText(),
-            service_cost=self.SERVICES.get(self.service_type_combo.currentText(), 0)
+            surname="Ученик", name="Новый",
+            color1=self.smart_parser.SURNAME_COLOR_HEX, color2=self.smart_parser.NAME_COLOR_HEX,
+            color1_fg=self.surname_style.get("color", "#000000"), color2_fg=self.name_style.get("color", "#000000"),
+            service_type=self.service_type_combo.currentText(), service_cost=self.SERVICES.get(self.service_type_combo.currentText(), 0)
         )
         self.table_model.insert_row(self.table_model.rowCount(), new_student)
-        self.table_model.sort(StudentTableModel.COL_SURNAME)
+        
+        # Пересчитываем номера
+        self.table_model.sort_and_renumber()
+        self.processed_table.sortByColumn(StudentTableModel.COL_SURNAME, Qt.SortOrder.AscendingOrder)
+        
+        # Находим строку, куда встал новый ученик после сортировки, и ставим фокус
         try:
-            new_idx = self.table_model.get_all_data().index(new_student)
-            self._handle_row_focus_request(new_idx, StudentTableModel.COL_SURNAME, clear_selection=True)
+            new_source_row = self.table_model.get_all_data().index(new_student)
+            source_idx = self.table_model.index(new_source_row, StudentTableModel.COL_SURNAME)
+            proxy_idx = self.proxy_model.mapFromSource(source_idx)
+            self.processed_table.selectionModel().clear()
+            self.processed_table.setCurrentIndex(proxy_idx)
+            self.processed_table.scrollTo(proxy_idx)
         except ValueError: pass
         self._is_dirty = True
 
     def _delete_selected_rows(self) -> None:
-        rows = sorted(list(set(i.row() for i in self.processed_table.selectionModel().selectedIndexes())))
+        proxy_indexes = self.processed_table.selectionModel().selectedIndexes()
+        rows = sorted(list(set(self.proxy_model.mapToSource(i).row() for i in proxy_indexes)))
         if rows and QMessageBox.question(self, "Подтверждение", f"Удалить {len(rows)} строк?", 
                                          QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
             self.table_model.remove_rows(rows)
+            # Пересчитываем номера после удаления
+            self.table_model.sort_and_renumber()
 
     def _swap_current_row_names(self) -> None:
-        current_row = self.processed_table.currentIndex().row()
-        if current_row >= 0:
-            self.table_model.swap_name_surname(current_row)
+        proxy_idx = self.processed_table.currentIndex()
+        if proxy_idx.isValid():
+            source_idx = self.proxy_model.mapToSource(proxy_idx)
+            student = self.table_model.get_all_data()[source_idx.row()]
+            self.table_model.swap_name_surname(source_idx.row())
+            
+            # Меняем местами и пересчитываем номера
+            self.table_model.sort_and_renumber()
+            
+            # Возвращаем фокус на этого же человека
+            try:
+                new_row = self.table_model.get_all_data().index(student)
+                new_proxy_idx = self.proxy_model.mapFromSource(self.table_model.index(new_row, StudentTableModel.COL_SURNAME))
+                self.processed_table.setCurrentIndex(new_proxy_idx)
+            except ValueError: pass
+
+    def _open_extra_services_editor(self) -> None:
+        proxy_idx = self.processed_table.currentIndex()
+        if not proxy_idx.isValid(): return
+        source_row = self.proxy_model.mapToSource(proxy_idx).row()
+        student = self.table_model.get_all_data()[source_row]
+        
+        dialog = ExtraServicesDialog(student.extra_services, self.SERVICES, self)
+        if dialog.exec():
+            new_extras = dialog.get_data()
+            self.table_model.update_extras(source_row, new_extras)
+            self._is_dirty = True
+            self._update_summary_info()
+            
+    def _open_student_info_editor(self) -> None:
+        proxy_idx = self.processed_table.currentIndex()
+        if not proxy_idx.isValid(): 
+            QMessageBox.information(self, "Информация", "Выберите ученика в таблице.")
+            return
+        
+        if not self.INFO_COLUMNS:
+             QMessageBox.information(self, "Информация", "Сначала настройте поля.")
+             return
+
+        source_row = self.proxy_model.mapToSource(proxy_idx).row()
+        students = self.table_model.get_all_data()
+        
+        dialog = StudentInfoEditorDialog(students, source_row, self.INFO_COLUMNS, self)
+        if dialog.exec():
+            changes = dialog.get_changes()
+            if changes:
+                self.table_model.update_info_bulk(changes)
+                self._is_dirty = True
+
+
+
+
+
+
 
     def _open_services_editor(self) -> None:
         dialog = ServicesEditorDialog(self.SERVICES, self)
@@ -478,18 +581,11 @@ class ClassListEditor(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка: {e}")
 
-    def _open_extra_services_editor(self) -> None:
-        idx = self.processed_table.currentIndex()
-        if not idx.isValid(): return
-        row = idx.row()
-        student = self.table_model.get_all_data()[row]
-        dialog = ExtraServicesDialog(student.extra_services, self.SERVICES, self)
-        if dialog.exec():
-            new_extras = dialog.get_data()
-            self.table_model.update_extras(row, new_extras)
-            self._is_dirty = True
-            self._update_summary_info()
-            
+
+
+
+
+           
     def _open_info_schema_editor(self) -> None:
         dialog = InfoSchemaEditorDialog(self.INFO_COLUMNS, self)
         if dialog.exec():
@@ -514,25 +610,24 @@ class ClassListEditor(QMainWindow):
             self._setup_table_headers() # Обновляем заголовки таблицы (важно для Stretch)
             self._is_dirty = True
 
-    def _open_student_info_editor(self) -> None:
-        idx = self.processed_table.currentIndex()
-        if not idx.isValid(): 
-            QMessageBox.information(self, "Информация", "Выберите ученика в таблице.")
-            return
-        
-        if not self.INFO_COLUMNS:
-             QMessageBox.information(self, "Информация", "Сначала настройте поля (Меню Настройки -> Настроить поля информации).")
-             return
+    def _open_ranks_editor(self) -> None:
+        """НОВОЕ: Открывает редактор рангов."""
+        dialog = RanksEditorDialog(self.RANKS, self)
+        if dialog.exec():
+            try:
+                self.RANKS = dialog.get_ranks()
+                self._save_ranks()
+                # Обновляем делегат в таблице с новыми рангами
+                delegate = EnterKeyDelegate(
+                    self.processed_table, 
+                    services=sorted(list(self.SERVICES.keys())),
+                    ranks=self.RANKS
+                )
+                self.processed_table.setItemDelegate(delegate)
+                self.statusBar().showMessage("Ранги обновлены.", 3000)
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Ошибка: {e}")
 
-        row = idx.row()
-        students = self.table_model.get_all_data()
-        
-        dialog = StudentInfoEditorDialog(students, row, self.INFO_COLUMNS, self)
-        dialog.exec() # Он сам сохраняет данные в объекты Student
-        self._is_dirty = True
-        # Обновляем таблицу (чтобы отобразить изменения)
-        # Просто передергиваем модель, так как изменения могли коснуться многих строк
-        self.table_model.layoutChanged.emit()
 
     def _open_ai_dialog(self) -> None:
         """Открывает диалог интеграции с AI."""
@@ -577,11 +672,12 @@ class ClassListEditor(QMainWindow):
             QMessageBox.information(self, "Схема обновлена", "AI добавил новые поля информации. Таблица обновлена.")
 
 
-    def _on_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles: List[int] = []) -> None:
+
+
+    def _on_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles: List[int] = None) -> None:
+        roles = roles or[]  # ИЗМЕНЕНО: Защита от мутабельного аргумента по умолчанию
         self._is_dirty = True
         self._update_summary_info()
-        if top_left.isValid() and top_left.column() in [StudentTableModel.COL_SURNAME, StudentTableModel.COL_NAME]:
-            self.table_model.sort_and_refocus(top_left.row(), top_left.column())
 
     # --- I/O ---
 
@@ -624,7 +720,9 @@ class ClassListEditor(QMainWindow):
 
             self.table_model.set_info_columns(self.INFO_COLUMNS)
             self.table_model.update_data(students)
-            self.table_model.sort(StudentTableModel.COL_SURNAME)
+                       
+            self.table_model.sort_and_renumber()
+            self.processed_table.sortByColumn(StudentTableModel.COL_SURNAME, Qt.SortOrder.AscendingOrder)
             self._setup_table_headers()
 
             self.config.wf_dest_dir = str(path.parent)
@@ -803,19 +901,25 @@ class ClassListEditor(QMainWindow):
              self._save_for_processing()
 
         if not self._is_dirty:
-            self.add_link()
-            event.accept(); return
+            #self.add_link()
+            event.accept(); 
+            return
             
         reply = QMessageBox.question(
             self, "Несохраненные изменения", "Сохранить перед выходом?", 
             QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel
         )
         if reply == QMessageBox.StandardButton.Save:
-            if self._save_list(): self.add_link(); event.accept()
-            else: event.ignore()
+            if self._save_list(): 
+                #self.add_link(); 
+                event.accept()
+            else: 
+                event.ignore()
         elif reply == QMessageBox.StandardButton.Discard:
-            self.add_link(); event.accept()
-        else: event.ignore()
+            #self.add_link(); 
+            event.accept()
+        else: 
+            event.ignore()
 
 
 def main() -> None:

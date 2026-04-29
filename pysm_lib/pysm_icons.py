@@ -1,7 +1,7 @@
 # pysm_lib/pysm_icons.py
 
 import base64
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 # Импортируем API тем
 from .pysm_theme_api import theme_api
@@ -87,6 +87,72 @@ SVG_PATHS: Dict[str, str] = {
     "ADD": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>',
     "DELETE": '<path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>',
     "ARROW_SUB": '<path d="M19 15l-6 6-1.42-1.42L15.17 16H4V4h2v10h9.17l-3.59-3.58L13 9l6 6z"/>',
+
+
+    # --- ИЗБРАННОЕ / QUICK ACCESS ---
+    "STAR": '<path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>',
+    "ROCKET": '<path d="M13.13 22.19L11.5 18.36C13.07 17.78 14.54 17 15.9 16.09L13.13 22.19zM5.64 12.5l-3.83-1.63 6.1-2.77C7 9.46 7.78 10.93 8.36 12.5L5.64 12.5zM21.03 2.97a9.38 9.38 0 0 0-6.19-2.91c-4.47 0-8.64 2.39-10.97 6.34-.1.17-.18.35-.25.53L1.5 8.13c-.4.17-.65.57-.6 1.01.05.44.38.79.82.88l3.65.73c.53 2.19 1.5 4.22 2.82 5.96l-1.92 4.13c-.19.42-.08.92.27 1.22.21.18.47.28.74.28.16 0 .32-.04.47-.11l4.58-2.16c1.86 1.25 3.99 2.05 6.22 2.31.13.02.26.02.39.02 4.54 0 8.61-2.82 10.23-7.09.18-.46.3-1.02.3-1.6V2.97zM20 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>',
+    "LIGHTNING": '<path d="M7 2v11h3v9l7-12h-4l4-8z"/>',
+    "WAND": '<path d="M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29c-.39-.39-1.02-.39-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.83 2.83c.39.39 1.02.39 1.41 0l11.66-11.66c.39-.39.39-1.02 0-1.41l-2.82-2.84z"/>',
+    "WRENCH": '<path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/>',
+    "TARGET": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>',
+    "BUG": '<path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/>',
+    
+    # --- НОВЫЕ ИКОНКИ (ПОЛЬЗОВАТЕЛЬСКИЕ) ---
+    "REPORT": '<path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>',
+    "TABLE": '<path d="M3 3h18v18H3V3zm2 2v4h4V5H5zm6 0v4h4V5h-4zm6 0v4h4V5h-4zM5 11v4h4v-4H5zm6 0v4h4v-4h-4zm6 0v4h4v-4h-4zM5 17v4h4v-4H5zm6 0v4h4v-4h-4zm6 0v4h4v-4h-4z"/>',
+    "LIST": '<path d="M4 6h2v2H4zm0 5h2v2H4zm0 5h2v2H4zm4-10h12v2H8zm0 5h12v2H8zm0 5h12v2H8z"/>',
+    "CAMERA": '<path d="M12 12c1.65 0 3-1.35 3-3s-1.35-3-3-3-3 1.35-3 3 1.35 3 3 3zm9-6h-3.17L16 4h-8l-1.83 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-9 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>',
+    "FILE_JPG": '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7zm2 5V3.5L18.5 9H15z"/><text x="12" y="17" font-family="Arial" font-size="8" fill="#FFF" text-anchor="middle" font-weight="bold">JPG</text>',
+    "COPY_JPG": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="17" font-family="Arial" font-size="6" fill="#FFF" text-anchor="middle" font-weight="bold">JPG</text>',
+    "COPY_PSD": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="17" font-family="Arial" font-size="6" fill="#FFF" text-anchor="middle" font-weight="bold">PSD</text>',
+    "SELECT_FILES": '<path d="M13 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-7-7zm2 5V3.5L18.5 9H15z"/><path fill="#FFF" d="M10.9 16.1l-2.8-2.8 1.4-1.4 1.4 1.4 4.6-4.6 1.4 1.4-6 6z"/>',
+    "APP_PHOTOSHOP": '<rect x="2" y="2" width="20" height="20" rx="4" ry="4"/><text x="12" y="16" font-family="Arial" font-size="11" fill="#FFF" text-anchor="middle" font-weight="bold">Ps</text>',    
+
+    # --- ПРОИЗВОДНЫЕ ОТ C1, INDD И НОВЫЙ ФОРМАТ XMP ---
+    "APP_C1": '<rect x="2" y="2" width="20" height="20" rx="4" ry="4"/><text x="12" y="16" font-family="Arial" font-size="11" fill="#FFF" text-anchor="middle" font-weight="bold">C1</text>',
+    "COPY_C1": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="16" font-family="Arial" font-size="9" fill="#FFF" text-anchor="middle" font-weight="bold">C1</text>',
+    
+    "APP_INDD": '<rect x="2" y="2" width="20" height="20" rx="4" ry="4"/><text x="12" y="16" font-family="Arial" font-size="11" fill="#FFF" text-anchor="middle" font-weight="bold">Id</text>',
+    "COPY_INDD": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="16" font-family="Arial" font-size="9" fill="#FFF" text-anchor="middle" font-weight="bold">Id</text>',
+
+    
+    "FILE_XMP": '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7zm2 5V3.5L18.5 9H15z"/><text x="12" y="17" font-family="Arial" font-size="8" fill="#FFF" text-anchor="middle" font-weight="bold">XMP</text>',
+    "APP_XMP": '<rect x="2" y="2" width="20" height="20" rx="4" ry="4"/><text x="12" y="16" font-family="Arial" font-size="9" fill="#FFF" text-anchor="middle" font-weight="bold">XMP</text>',
+    "COPY_XMP": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="17" font-family="Arial" font-size="6" fill="#FFF" text-anchor="middle" font-weight="bold">XMP</text>',
+
+    # --- ТИПЫ ФОТОГРАФИЙ ---
+    "PHOTO_PORTRAIT": '<path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9c1.65 0 3-1.35 3-3s-1.35-3-3-3-3 1.35-3 3 1.35 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-1.5c0-2.33-4.67-3.5-7-3.5z"/>',
+    "PHOTO_GROUP": '<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-9.5-9.5c.83 0 1.5-.67 1.5-1.5S10.33 6.5 9.5 6.5 8 7.17 8 8s.67 1.5 1.5 1.5zm5 0c.83 0 1.5-.67 1.5-1.5S15.33 6.5 14.5 6.5 13 7.17 13 8s.67 1.5 1.5 1.5zm-5 1.5c-1.83 0-5.5.92-5.5 2.75V16h11v-2.25c0-1.83-3.67-2.75-5.5-2.75zm5 0c-.26 0-.54.02-.82.07 1.01.7 1.7 1.64 1.7 2.85V16h3v-2.25c0-1.83-3.67-2.75-3.88-2.75z"/>',
+    "PHOTO_NATURE": '<path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>',
+
+    # --- РЕДАКТИРОВАНИЕ ФОТОГРАФИЙ (С КАРАНДАШОМ В УГЛУ) ---
+    "PHOTO_PORTRAIT_EDIT": '<path d="M3 3h4v2H3z M10 3h4v2h-4z M17 3h4v2h-4z M3 19h4v2H3z M10 19h4v2h-4z M17 19h4v2h-4z M3 7h2v4H3z M3 13h2v4H3z M19 7h2v4h-2z M19 13h2v4h-2z M12 12c1.65 0 3-1.35 3-3s-1.35-3-3-3-3 1.35-3 3 1.35 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-1.5c0-2.33-4.67-3.5-7-3.5z"/>',
+    "PHOTO_GROUP_EDIT": '<path d="M3 3h4v2H3z M10 3h4v2h-4z M17 3h4v2h-4z M3 19h4v2H3z M10 19h4v2h-4z M17 19h4v2h-4z M3 7h2v4H3z M3 13h2v4H3z M19 7h2v4h-2z M19 13h2v4h-2z M9.5 7c.83 0 1.5.67 1.5 1.5S10.33 10 9.5 10 8 9.33 8 8.5 8.67 7 9.5 7zm5 0c.83 0 1.5.67 1.5 1.5S15.33 10 14.5 10 13 9.33 13 8.5 13.67 7 14.5 7zm-5 4.5c-1.83 0-5.5.92-5.5 2.75V17h11v-2.25c0-1.83-3.67-2.75-5.5-2.75zm5 0c-.26 0-.54.02-.82.07 1.01.7 1.7 1.64 1.7 2.85V17h3v-2.25c0-1.83-3.67-2.75-3.88-2.75z"/>',
+    "PHOTO_NATURE_EDIT": '<path d="M3 3h4v2H3z M10 3h4v2h-4z M17 3h4v2h-4z M3 19h4v2H3z M10 19h4v2h-4z M17 19h4v2h-4z M3 7h2v4H3z M3 13h2v4H3z M19 7h2v4h-2z M19 13h2v4h-2z M8.5 14.5l2.5 3.01L14.5 13l4.5 6H5l3.5-4.5z"/>',
+
+    # --- РАБОТА С ПЕРЕМЕННЫМИ (Индикация {x} внутри блока) ---
+    "VAR_COPY": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="16" font-family="Consolas, monospace" font-size="9" fill="#FFF" text-anchor="middle" font-weight="bold">{x}</text>',
+    "VAR_SET": '<text x="12" y="16.5" font-family="Consolas, monospace" font-size="14" text-anchor="middle" font-weight="bold">{x}</text>',
+    "VAR_REMOVE": '<circle cx="12" cy="12" r="10"/><text x="12" y="16.5" font-family="Consolas, monospace" font-size="12" fill="#FFF" text-anchor="middle" font-weight="bold">{x}</text>',
+
+    # --- ЛОГИКА / УСЛОВИЯ (Ромб IF) ---
+    "LOGIC_IF": '<path d="M12 2L2 12l10 10 10-10L12 2z"/><text x="12" y="15.5" font-family="Arial" font-size="10" fill="#FFF" text-anchor="middle" font-weight="bold">IF</text>',
+    
+    # --- ФОРМАТ RAW И КОНВЕРТАЦИЯ ---
+    "FILE_RAW": '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7zm2 5V3.5L18.5 9H15z"/><text x="12" y="17" font-family="Arial" font-size="7" fill="#FFF" text-anchor="middle" font-weight="bold">RAW</text>',
+    "COPY_RAW": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="16" font-family="Arial" font-size="6.5" fill="#FFF" text-anchor="middle" font-weight="bold">RAW</text>',
+    "CONVER_RAW": '<rect x="1" y="5" width="9" height="14" rx="2"/><text x="5.5" y="15.5" font-family="Arial" font-size="10" fill="#FFF" text-anchor="middle" font-weight="bold">R</text><polygon points="11,10 13.5,12 11,14"/><rect x="14" y="5" width="9" height="14" rx="2"/><text x="18.5" y="15.5" font-family="Arial" font-size="10" fill="#FFF" text-anchor="middle" font-weight="bold">J</text>',    
+
+    # --- КОМАНДА МАСКИ (Классический значок маски) ---
+    "FILE_MASK": '<path fill-rule="evenodd" d="M3 5h18v14H3V5zm9 12c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5z"/>',   
+
+    # --- СТАТУСЫ И АТРИБУТЫ ЛИЦ ---
+    "GENDER_MALE": '<path d="M15 2v2h2.59l-4.59 4.59C11.83 7.55 10.46 7 9 7 5.13 7 2 10.13 2 14s3.13 7 7 7 7-3.13 7-7c0-1.46-.55-2.83-1.59-3.99L19 6.41V9h2V2h-7zM9 19c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>',
+    "GENDER_FEMALE": '<path d="M12 2C8.69 2 6 4.69 6 8c0 2.97 2.16 5.44 5 5.92V16H8v2h3v4h2v-4h3v-2h-3v-2.08c2.84-.48 5-2.95 5-5.92 0-3.31-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"/>',    
+    "EYE_CLOSED": '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>',
+    "MOUTH_OPEN": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2.5-8.5c.83 0 1.5-.67 1.5-1.5S10.33 8.5 9.5 8.5 8 9.17 8 10s.67 1.5 1.5 1.5zm5 0c.83 0 1.5-.67 1.5-1.5S15.33 8.5 14.5 8.5 13 9.17 13 10s.67 1.5 1.5 1.5zm-2.5 2.5c-1.5 0-2.5 1-2.5 2.5S10.5 19 12 19s2.5-1 2.5-2.5S13.5 14 12 14z"/>',    
+    
 }
 
 # Маппинг имен методов на ключи цветов в theme.toml
@@ -128,6 +194,50 @@ THEME_KEYS = {
     "WARNING": "icon_warning",
     "INFO": "icon_info",
     "LOCK": "icon_primary", "ARROW_SUB": "icon_primary",
+    
+    # Favorites
+    "STAR": "icon_primary", "ROCKET": "icon_primary", "LIGHTNING": "icon_primary",
+    "WAND": "icon_primary", "WRENCH": "icon_primary", "TARGET": "icon_primary", "BUG": "icon_primary",   
+
+    # --- НОВЫЕ ИКОНКИ ---
+    "REPORT": "icon_primary",
+    "TABLE": "icon_primary",
+    "LIST": "icon_primary",
+    "CAMERA": "icon_info",
+    "FILE_JPG": "icon_info",
+    "COPY_JPG": "icon_file",
+    "COPY_PSD": "icon_info",
+    "SELECT_FILES": "icon_success",
+    "APP_PHOTOSHOP": "icon_info", # Используем синий цвет (как для PSD)
+    
+    # App & Copies Derivatives
+    "APP_C1": "icon_folder", "COPY_C1": "icon_folder",
+    "APP_INDD": "icon_adobe", "COPY_INDD": "icon_adobe",
+    "FILE_XMP": "icon_code", "APP_XMP": "icon_code", "COPY_XMP": "icon_code",
+
+    # Photos
+    "PHOTO_PORTRAIT": "icon_info", "PHOTO_GROUP": "icon_info", "PHOTO_NATURE": "icon_info",
+    "PHOTO_PORTRAIT_EDIT": "icon_primary", "PHOTO_GROUP_EDIT": "icon_primary", "PHOTO_NATURE_EDIT": "icon_primary",
+
+    # Variables Actions
+    "VAR_COPY": "icon_primary", 
+    "VAR_SET": "icon_success", 
+    "VAR_REMOVE": "icon_danger",
+
+    # Logic
+    "LOGIC_IF": "icon_warning",
+
+    # RAW & Mask
+    "FILE_RAW": "icon_info", 
+    "COPY_RAW": "icon_info", 
+    "CONVER_RAW": "icon_success", # Зеленый цвет подчеркивает "действие/успех" конвертации
+    "FILE_MASK": "icon_primary",  # Синий/основной цвет как для стандартных команд  
+
+    # Attributes
+    "GENDER_MALE": "icon_info",    # Синий оттенок
+    "GENDER_FEMALE": "icon_adobe", # Розово-красный оттенок    
+    "EYE_CLOSED": "icon_danger",
+    "MOUTH_OPEN": "icon_warning",    
 }
 
 # Цвета по умолчанию (Fallback)
@@ -208,3 +318,24 @@ class PysmIcons:
 
 
 icons = PysmIcons()
+
+# Категоризация иконок для отображения в диалоге выбора
+ICON_CATEGORIES: Dict[str, List[str]] = {
+    "system":["FOLDER", "FOLDER_OPEN", "FILE", "NEW", "OPEN", "SAVE", "SLIDERS", "REFRESH", "SETTINGS", "CONSOLE", "EXIT", "CLOSE"],
+    "files":[
+        "FILE_PY", "FILE_CODE", "FILE_TXT", "FILE_HTML", "FILE_IMAGE", "FILE_DB", "FILE_ARCHIVE", 
+        "FILE_JPG", "FILE_PSD", "FILE_INDD", "FILE_C1", "REPORT", "TABLE", "LIST",
+        "FILE_XMP", "PHOTO_PORTRAIT", "PHOTO_GROUP", "PHOTO_NATURE",
+        "FILE_RAW", "FILE_MASK"  # <--- Добавлены сюда
+    ],
+    "actions":[
+        "PLAY", "STOP", "NEXT", "SELECT_FILES", "COPY_JPG", "COPY_PSD", "APP_PHOTOSHOP", "CAMERA", "ADD", "DELETE",
+        "APP_C1", "COPY_C1", "APP_INDD", "COPY_INDD", "APP_XMP", "COPY_XMP",
+        "PHOTO_PORTRAIT_EDIT", "PHOTO_GROUP_EDIT", "PHOTO_NATURE_EDIT",
+        "VAR_COPY", "VAR_SET", "VAR_REMOVE", "LOGIC_IF",
+        "COPY_RAW", "CONVER_RAW"
+    ],
+    "statuses":["OK", "ERROR", "WARNING", "INFO", "LOCK", "ARROW_SUB", "TARGET", "BUG"],
+    "pysm":["FOLDER_PY", "FOLDER_VIRTUAL", "INSTANCE_SET", "INSTANCE_ITEM", "STAR", "ROCKET", "LIGHTNING", "WAND", "WRENCH"],
+    "attributes":["GENDER_MALE", "GENDER_FEMALE", "EYE_CLOSED", "MOUTH_OPEN"]    
+}

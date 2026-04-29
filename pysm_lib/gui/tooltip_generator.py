@@ -163,9 +163,67 @@ def generate_instance_tooltip_html(
     <div><b>{locale_manager.get("tooltips.instance.label_instance_id")}</b> {instance_entry.instance_id}</div>
     {overridden_desc_html}
     {overridden_params_html}
-    {end_html}
     <hr>
     <b>{locale_manager.get("tooltips.instance.double_click_hint")}</b>
     """
     
     return resolve_themed_text(final_html, theme_manager)
+    
+def generate_favorite_tooltip_html(
+    script_info: ScriptInfoModel,
+    instance_entry: ScriptSetEntryModel,
+    locale_manager: LocaleManager,
+    theme_manager: ThemeManager # <--- ИЗМЕНЕННЫЙ АРГУМЕНТ
+) -> str:
+    """Генерирует HTML-разметку для всплывающей подсказки экземпляра скрипта."""
+    if not script_info:
+        return f"<b>{locale_manager.get('tooltips.instance.label_instance_id')}</b> {instance_entry.instance_id}<br><b style='color:red;'>{locale_manager.get('tooltips.script.label_error')}</b> {locale_manager.get('tooltips.instance.script_not_found', id=instance_entry.id)}"
+
+    #header_html = _generate_header_script_html(script_info, locale_manager)
+    end_html = _generate_end_script_html(script_info, locale_manager)
+
+    overridden_desc_html = ""
+    if instance_entry.description:
+        # Описание не обрабатываем здесь, так как оно может содержать пользовательский HTML
+        desc_html = instance_entry.description.replace("\n", "<br>")
+        overridden_desc_html = f"<div style='margin-top:5px;'><b>{locale_manager.get('tooltips.script.label_description')}</b><div style='padding-left: 10px;'>{desc_html}</div></div>"
+    
+    overridden_params_html = ""
+    active_args = {
+        k: v for k, v in instance_entry.command_line_args.items() if v.enabled
+    }
+    if active_args:
+        param_lines = []
+        for name, entry_value in active_args.items():
+            value_str = str(entry_value.value) if entry_value.value is not None else ""
+            escaped_value = value_str.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            
+            # КОММЕНТАРИЙ: Вставляем плейсхолдер для цвета значения аргумента
+            display_value = (
+                f"<span style=\"{{theme.tooltip_arg_value}}\">'{escaped_value}'</span>"
+                if entry_value.value is not None
+                else locale_manager.get("tooltips.instance.flag_present_text")
+            )
+            param_lines.append(
+                locale_manager.get(
+                    "tooltips.instance.param_format", name=name, value=display_value
+                )
+            )
+
+        # КОММЕНТАРИЙ: Вставляем плейсхолдер для фона всего блока
+        overridden_params_html = f"""
+        <div style='margin-top:10px; {{theme.tooltip_instance_args_block}}'>
+            <b>{locale_manager.get("tooltips.instance.label_overridden_params")}</b>
+            <div style='padding-left: 10px;'>{"<br>".join(param_lines)}</div>
+        </div>
+        """
+
+    final_html = f"""
+    <div><b>{instance_entry.name or script_info.name}</b></div>
+    {overridden_desc_html}
+    {overridden_params_html}
+    <hr>
+    <b>{locale_manager.get("tooltips.instance.context_menu_hint")}</b>
+    """
+    
+    return resolve_themed_text(final_html, theme_manager)    

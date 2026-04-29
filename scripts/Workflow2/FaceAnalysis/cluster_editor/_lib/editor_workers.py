@@ -5,6 +5,7 @@ import os
 import concurrent.futures
 import re
 import traceback
+import sys
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Any
 
@@ -39,7 +40,6 @@ except ImportError as e:
 
 from .editor_delegates import THUMBNAIL_SIZE
 
-
 logger = logging.getLogger(__name__)
 
 TEXT_VERTICAL_ANCHOR_PCT = 0.85 
@@ -52,9 +52,9 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
     source_path = task_data["source_path"]
     output_path = task_data["output_path"]
     child_name = task_data["child_name"]
-    raw_faces_bboxes = task_data.get("faces_bboxes", [])
+    raw_faces_bboxes = task_data.get("faces_bboxes", list())
     
-    factors = task_data.get("factors", {})
+    factors = task_data.get("factors", dict())
     target_size = task_data.get("target_size")
     target_dpi = task_data.get("target_dpi", (300, 300))
     quality = task_data.get("quality", 95)
@@ -87,13 +87,13 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
             # 3. ВОДЯНЫЕ ЗНАКИ
             if apply_watermarks:
                 # Масштабируем BBox'ы лиц под новый размер
-                scaled_bboxes = []
+                scaled_bboxes = list()
                 if target_size:
                     scale_x = target_w / original_w
                     scale_y = target_h / original_h
                     for bbox in raw_faces_bboxes:
                         if len(bbox) == 4:
-                            sb = [bbox[0] * scale_x, bbox[1] * scale_y, bbox[2] * scale_x, bbox[3] * scale_y]
+                            sb =[bbox[0] * scale_x, bbox[1] * scale_y, bbox[2] * scale_x, bbox[3] * scale_y]
                             scaled_bboxes.append(sb)
                 else:
                     scaled_bboxes = raw_faces_bboxes
@@ -131,14 +131,12 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
                     
                     num_bbox = draw_main.textbbox((0, 0), file_number, font=font_main)
                     num_w = num_bbox[2] - num_bbox[0]
-                    
-                    # textsize legacy check omitted for brevity as PIL 10+ uses textbbox
                 except AttributeError:
                     name_w, name_h = draw_main.textsize(child_name, font=font_main)
                     num_w, num_h = draw_main.textsize(file_number, font=font_main)
 
                 anchor_y = int(target_h * TEXT_VERTICAL_ANCHOR_PCT)
-                text_top_y = anchor_y - ((name_h + TEXT_LINE_SPACING + name_h) // 2) # approx height
+                text_top_y = anchor_y - ((name_h + TEXT_LINE_SPACING + name_h) // 2)
                 
                 name_pos = ((target_w - name_w) / 2, text_top_y)
                 num_pos = ((target_w - num_w) / 2, text_top_y + name_h + TEXT_LINE_SPACING)
@@ -155,7 +153,6 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
 
 
 class ChunkedImageLoader(QObject):
-    # Оставляем без изменений (только импорты PIL обновились глобально)
     chunk_ready = Signal(list) 
     progress_updated = Signal(int)
     finished = Signal()
@@ -167,9 +164,13 @@ class ChunkedImageLoader(QObject):
         self.num_threads = min(num_threads, (os.cpu_count() or 4) * 2)
 
         self._is_interruption_requested = False
+        self._executor = None
 
     def requestInterruption(self):
         self._is_interruption_requested = True
+        # Немедленная отмена всех задач в очереди (решает проблему лагов UI при быстром переключении)
+        if self._executor:
+            self._executor.shutdown(wait=False, cancel_futures=True)
 
     def _load_single_image(self, task: Dict) -> Optional[Tuple[str, QImage]]:
         if self._is_interruption_requested: return None
@@ -177,7 +178,9 @@ class ChunkedImageLoader(QObject):
         cache_key = task.get("cache_key", task["filename"])
         bbox = task.get("bbox")
         draw_rect = task.get("draw_face_rect", False)
+        
         if not full_path or not full_path.exists(): return None
+        
         try:
             if bbox and Image:
                 with Image.open(str(full_path)) as pil_img:
@@ -212,33 +215,61 @@ class ChunkedImageLoader(QObject):
             return None
 
     def run(self):
-        total_tasks = len(self.tasks)
+        if self._is_interruption_requested:
+            self.finished.emit()
+            return
+
         processed_count = 0
         current_batch_size = 5 
         max_batch_size = 20
-        batch_buffer = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_threads) as executor:
-            future_to_task = {executor.submit(self._load_single_image, task): task for task in self.tasks}
+        batch_buffer = list()
+        
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.num_threads)
+        
+        try:
+            future_to_task = dict()
+            # Безопасное добавление задач (с защитой от мгновенного shutdown)
+            for task in self.tasks:
+                if self._is_interruption_requested:
+                    break
+                try:
+                    future = self._executor.submit(self._load_single_image, task)
+                    future_to_task[future] = task
+                except RuntimeError:
+                    # Пул потоков был принудительно остановлен извне
+                    break
+            
             for future in concurrent.futures.as_completed(future_to_task):
                 if self._is_interruption_requested: break
                 try:
                     result = future.result()
                     if result: batch_buffer.append(result)
                 except Exception: pass
+                
                 processed_count += 1
+                
                 if len(batch_buffer) >= current_batch_size:
                     self.chunk_ready.emit(batch_buffer)
-                    batch_buffer = []
+                    batch_buffer = list()
                     self.progress_updated.emit(processed_count)
                     if current_batch_size < max_batch_size: current_batch_size += 5
-        if batch_buffer and not self._is_interruption_requested:
-            self.chunk_ready.emit(batch_buffer)
-            self.progress_updated.emit(processed_count)
+                    
+            if batch_buffer and not self._is_interruption_requested:
+                self.chunk_ready.emit(batch_buffer)
+                self.progress_updated.emit(processed_count)
+                
+        finally:
+            if self._executor:
+                self._executor.shutdown(wait=False, cancel_futures=True)
+                self._executor = None
+
         self.finished.emit()
+
 
 class ExportWorker(QObject):
     progress_updated = Signal(int)
     finished = Signal(str)
+    
     def __init__(self, tasks: List[Dict], num_threads: int, 
                  enhancement_factors: Dict, target_size: Tuple[int, int], 
                  target_dpi: Tuple[int, int], quality: int, apply_watermarks: bool):
@@ -252,34 +283,60 @@ class ExportWorker(QObject):
             "quality": quality,
             "apply_watermarks": apply_watermarks
         }
+        
+        self._is_interruption_requested = False
+        self._executor = None
+
+    def requestInterruption(self):
+        """Безопасная отмена экспорта и уничтожение процессов."""
+        self._is_interruption_requested = True
+        if self._executor:
+            self._executor.shutdown(wait=False, cancel_futures=True)
 
     def run(self):
         total = len(self.tasks)
         processed_count = 0
         watermarks_text = ""
+        
         if self.common_settings["apply_watermarks"]:
             watermarks_text = " с водяными знаками"
+            
         logger.info(f"\n{icon_info} Экспорт <b>{total}</b> файла(ов){watermarks_text}...")
-        prepared_tasks = []
+        
+        prepared_tasks = list()
         for task in self.tasks:
             full_task = task.copy()
             full_task.update(self.common_settings)
             full_task["source_path"] = str(full_task["source_path"])
             full_task["output_path"] = str(full_task["output_path"])
             prepared_tasks.append(full_task)
-        errors = []
-        with concurrent.futures.ProcessPoolExecutor(max_workers=self.num_processes) as executor:
-            futures = [executor.submit(run_export_task, task_data) for task_data in prepared_tasks]
+            
+        errors = list()
+        self._executor = concurrent.futures.ProcessPoolExecutor(max_workers=self.num_processes)
+        
+        try:
+            futures =[self._executor.submit(run_export_task, task_data) for task_data in prepared_tasks]
+            
             for future in concurrent.futures.as_completed(futures):
+                if self._is_interruption_requested: break
                 try:
                     res = future.result()
                     if res != "OK": errors.append(res)
-                except Exception as e: errors.append(str(e))
+                except Exception as e: 
+                    errors.append(str(e))
+                    
                 processed_count += 1
                 self.progress_updated.emit(processed_count)
-        if errors:
-            logger.error(f"Errors during export ({len(errors)}):")
-            for e in errors[:5]: logger.error(e)
+                
+        finally:
+            if self._executor:
+                self._executor.shutdown(wait=False, cancel_futures=True)
+                self._executor = None
 
-           
-        self.finished.emit(f"Экспорт завершен. Обработано {total} файлов. Ошибок: {len(errors)}.")
+        if self._is_interruption_requested:
+            self.finished.emit(f"Экспорт прерван. Обработано {processed_count} из {total} файлов.")
+        else:
+            if errors:
+                logger.error(f"Errors during export ({len(errors)}):")
+                for e in errors[:5]: logger.error(e)
+            self.finished.emit(f"Экспорт завершен. Обработано {total} файлов. Ошибок: {len(errors)}.")

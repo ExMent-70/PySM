@@ -1,7 +1,7 @@
 # pysm_lib/gui/widgets/editor_context.py
 
 from dataclasses import dataclass
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Tuple
 
 from ...models import ScriptSetEntryModel, ScriptInfoModel
 from ...theme_manager import ThemeManager
@@ -16,4 +16,5 @@ class EditorContext:
     theme_manager: ThemeManager
     locale_manager: LocaleManager
     get_script_info_func: Callable[[str], Optional[ScriptInfoModel]]
-    script_entries: List[ScriptSetEntryModel]
+    script_entries: List[Tuple[str, ScriptSetEntryModel]]
+    current_instance_id: Optional[str] = None

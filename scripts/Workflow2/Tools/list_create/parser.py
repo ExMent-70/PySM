@@ -11,33 +11,13 @@ import json
 import pathlib
 import sys
 # Используем regex из стандартной библиотеки или сторонней, если нужно (в оригинале было regex as re)
-import regex as re 
+import re 
 from typing import List, Dict, Any, Tuple, Optional
 
 # Импорт моделей данных
 from domain import Student
 
-# Опциональные зависимости
-try:
-    from natasha import NamesExtractor
-except ImportError:
-    NamesExtractor = None
 
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    BeautifulSoup = None
-
-try:
-    import pymorphy3
-except ImportError:
-    pymorphy3 = None
-
-try:
-    from ipymarkup.palette import Palette, Color, Rgb
-    from pysm_lib.pysm_theme_api import format_ipymarkup_box
-except ImportError:
-    Palette, Color, Rgb, format_ipymarkup_box = None, None, None, None
 
 
 def smart_capitalize(text: str) -> str:
@@ -69,8 +49,8 @@ def simple_parse_text(text: str) -> List[Student]:
     """
     students: List[Student] = []
     lines = text.splitlines()
-    # Паттерн ищет два слова, состоящие из букв и дефисов
-    pattern = re.compile(r"^[ \d.\-)]*([\p{L}-]+)[ ,]+([\p{L}-]+)", flags=re.UNICODE)
+    # ИЗМЕНЕНО: Паттерн теперь использует стандартные классы символов для букв
+    pattern = re.compile(r"^[ \d.\-)]*([A-Za-zА-Яа-яЁё\-]+)[ ,]+([A-Za-zА-Яа-яЁё\-]+)")
     
     for line in lines:
         line = line.strip()
@@ -90,58 +70,34 @@ class SmartParser:
     """
     Парсер, использующий Natasha для извлечения имен и ipymarkup для визуализации.
     """
+# --- ИЗМЕНЕННЫЙ БЛОК 2: parser.py (Метод __init__ в SmartParser) ---
+class SmartParser:
+    """
+    Парсер, использующий Natasha для извлечения имен и ipymarkup для визуализации.
+    (Использует отложенную загрузку для ускорения запуска приложения).
+    """
     def __init__(
         self,
         surname_style: Dict[str, str],
         name_style: Dict[str, str],
         fio_style: Dict[str, str],
     ):
-        """
-        Инициализирует парсер, принимая словари со стилями (CSS).
-        """
         self.morph = None
         self.extractor = None
         self.palette = None
         self.normalization_dict = {}
         
-        # Извлекаем HEX-коды из словарей для Fallback логики (если ipymarkup не сработает)
+        # Сохраняем стили в экземпляре класса, чтобы инициализировать палитру позже
+        self._surname_style = surname_style
+        self._name_style = name_style
+        self._fio_style = fio_style
+        
         self.SURNAME_COLOR_HEX = surname_style.get("background-color", "#e3f2fd")
         self.NAME_COLOR_HEX = name_style.get("background-color", "#e8f5e9")
 
-        # Инициализация палитры ipymarkup
-        if Palette and Color and Rgb:
-            try:
-                final_surname_color = Color(
-                    "Фамилия",
-                    background=Rgb(self.SURNAME_COLOR_HEX),
-                    border=Rgb(surname_style.get("border-color", "#bbdefb")),
-                    text=Rgb(surname_style.get("color", "#0d47a1")),
-                )
-                final_name_color = Color(
-                    "Имя",
-                    background=Rgb(self.NAME_COLOR_HEX),
-                    border=Rgb(name_style.get("border-color", "#c8e6c9")),
-                    text=Rgb(name_style.get("color", "#1b5e20")),
-                )
-                final_fio_color = Color(
-                    "ФИО",
-                    background=Rgb(fio_style.get("background-color", "#fff3e0")),
-                    border=Rgb(fio_style.get("border-color", "#ffe0b2")),
-                    text=Rgb(fio_style.get("color", "#e65100")),
-                )
-                self.palette = Palette([final_surname_color, final_name_color, final_fio_color])
-            except (ValueError, TypeError) as e:
-                print(f"IPYMARKUP INIT ERROR: {e}", file=sys.stderr)
-
-        # Инициализация Natasha
-        if pymorphy3 and NamesExtractor:
-            try:
-                self.morph = pymorphy3.MorphAnalyzer()
-                self.extractor = NamesExtractor(self.morph)
-            except Exception as e:
-                print(f"Ошибка Natasha: {e}", file=sys.stderr)
-        
         self._load_normalization_dict()
+        
+        # ВАЖНО: Инициализация Natasha и ipymarkup убрана отсюда в метод _lazy_init
 
     def _load_normalization_dict(self):
         """Загружает словарь нормализации имен (Саша -> Александр)."""
@@ -166,19 +122,63 @@ class SmartParser:
         """Нормализует имя по словарю."""
         return self.normalization_dict.get(name.capitalize(), name.capitalize())
 
+
+# --- ИЗМЕНЕННЫЙ БЛОК 3: parser.py (Новый _lazy_init и начало parse_text) ---
+    def _lazy_init(self) -> bool:
+        """Отложенная загрузка библиотек. Вызывается только при первом парсинге."""
+        if self.extractor is not None:
+            return True # Уже инициализировано
+            
+        try:
+            import pymorphy3
+            from natasha import NamesExtractor
+            from ipymarkup.palette import Palette, Color, Rgb
+            
+            # Загрузка ML-моделей
+            self.morph = pymorphy3.MorphAnalyzer()
+            self.extractor = NamesExtractor(self.morph)
+            
+            # Инициализация палитры ipymarkup
+            final_surname_color = Color(
+                "Фамилия", background=Rgb(self.SURNAME_COLOR_HEX),
+                border=Rgb(self._surname_style.get("border-color", "#bbdefb")),
+                text=Rgb(self._surname_style.get("color", "#0d47a1"))
+            )
+            final_name_color = Color(
+                "Имя", background=Rgb(self.NAME_COLOR_HEX),
+                border=Rgb(self._name_style.get("border-color", "#c8e6c9")),
+                text=Rgb(self._name_style.get("color", "#1b5e20"))
+            )
+            final_fio_color = Color(
+                "ФИО", background=Rgb(self._fio_style.get("background-color", "#fff3e0")),
+                border=Rgb(self._fio_style.get("border-color", "#ffe0b2")),
+                text=Rgb(self._fio_style.get("color", "#e65100"))
+            )
+            self.palette = Palette([final_surname_color, final_name_color, final_fio_color])
+            return True
+            
+        except ImportError as e:
+            print(f"Lazy Load Error: {e}", file=sys.stderr)
+            return False
+
     def parse_text(self, text: str) -> Tuple[List[Student], str]:
         """
-        Извлекает имена и фамилии с помощью Natasha, генерирует HTML-разметку,
-        а затем парсит эту разметку для извлечения цветов.
-        
-        Returns:
-            Tuple[List[Student], str]: Список объектов Student и HTML-код разметки.
+        Извлекает имена и фамилии с помощью Natasha, генерирует HTML-разметку.
         """
-        if not self.extractor or not self.morph:
-            return [], "<p style='color: red;'>Парсер не инициализирован (отсутствуют библиотеки).</p>"
+        # 1. Проверяем и подгружаем тяжелые библиотеки
+        if not self._lazy_init():
+            return[], "<p style='color: red;'>Парсер не инициализирован (отсутствуют библиотеки natasha, pymorphy3, ipymarkup).</p>"
+
+        # 2. Локальные импорты вспомогательных библиотек (быстро, кэшируется питоном)
+        try:
+            from bs4 import BeautifulSoup
+            from pysm_lib.pysm_theme_api import format_ipymarkup_box
+        except ImportError:
+            BeautifulSoup = None
+            format_ipymarkup_box = None
 
         # Временный список словарей для сбора данных перед конвертацией в Student
-        parsed_dicts: List[Dict[str, Any]] = []
+        parsed_dicts: List[Dict[str, Any]] =[]
         spans = []
         matches = self.extractor(text)
         

@@ -1,8 +1,8 @@
 {
-  "description": "Конвертирует исходные файлы (RAW, PSD) в JPEG. Высокопроизводительная многопроцессорная версия с поддержкой кириллических путей и защитой от утечек памяти.\nПути к рабочим папкам могут передаваться явно или формироваться из переменных контекста:\n<b>input_dir</b> =<i> {wf_session_path} / {wf_session_name} / Capture / {wf_photo_session}</i>\n<b>output_dir</b> =<i> {wf_session_path} / {wf_session_name} / Output / Analysis_{wf_photo_session} / JPG</i>",
+  "description": "Конвертирует исходные файлы (RAW, PSD) в JPEG. Высокопроизводительная многопоточная версия с поддержкой кириллических путей, рекурсивного обхода папок и защитой от утечек памяти.\nПути к рабочим папкам могут передаваться явно или формироваться из переменных контекста:\n<b>input_dir</b> =<i> {wf_session_path} / {wf_session_name} / Capture / {wf_photo_session}</i>\n<b>output_dir</b> =<i> {wf_session_path} / {wf_session_name} / Output / Analysis_{wf_photo_session} / JPG</i>",
   "category": "Подготовка данных",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.03.16",
+  "version": "v2.2026.04.25",
   "command_line_args_meta": {
     "input_dir": {
       "type": "file_path",
@@ -39,11 +39,23 @@
       "required": false,
       "default": 95
     },
+    "recursive_read": {
+      "type": "bool",
+      "description": "Включить рекурсивный поиск файлов во вложенных подпапках.",
+      "required": false,
+      "default": false
+    },
+    "keep_structure": {
+      "type": "bool",
+      "description": "Сохранять исходную структуру вложенных папок при сохранении JPEG-файлов.",
+      "required": false,
+      "default": false
+    },
     "all_threads": {
       "type": "int",
-      "description": "Количество процессов (workers) для параллельной обработки. 0 - авто (по числу ядер CPU).",
+      "description": "Количество потоков (workers) для параллельной обработки. 0 - авто (по числу ядер CPU).",
       "required": false,
-      "default": 0
+      "default": 12
     }
   }
 }

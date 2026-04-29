@@ -111,6 +111,22 @@ QToolBar QToolButton::menu-arrow {
 }
 QToolBar QToolButton::menu-arrow:open { border-top: none; border-bottom: 2px solid @textColor; }
 
+/* Панель избранного (Quick Access) */
+QToolButton[class~="favorite-btn"] {
+    background-color: transparent; 
+    border: 1px solid transparent; 
+    padding: 5px;
+    border-radius: 5px; 
+    margin: 2px;
+}
+QToolButton[class~="favorite-btn"]:hover { 
+    background-color: @bgColorHover; 
+    border: 1px solid @borderColor; 
+}
+QToolButton[class~="favorite-btn"]:pressed { 
+    background-color: @accentColor; 
+    border: 1px solid @accentColor; 
+}
 
 /* --- [4] ПОЛЯ ВВОДА --- */
 QLineEdit, QTextEdit, QPlainTextEdit {

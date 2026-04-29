@@ -7,11 +7,11 @@ from typing import List, Optional, Dict, Union, TYPE_CHECKING, Set, Tuple
 from PySide6.QtCore import Qt, QSize, Slot, QModelIndex, QMimeData
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QTreeView, QPushButton,
-    QAbstractItemView, QStyle, QMessageBox, QComboBox, QLabel, QMenu,
-    QInputDialog, QCheckBox, QToolButton, QSizePolicy
+    QAbstractItemView, QStyle, QMessageBox, QComboBox, QLabel, QMenu, QDialog,
+    QInputDialog, QCheckBox, QToolButton, QSizePolicy, QScrollArea, QFrame
 )
 from PySide6.QtGui import (
-    QStandardItemModel, QStandardItem, QColor, QAction, QBrush, QPalette
+    QStandardItemModel, QStandardItem, QColor, QAction, QBrush, QPalette, QWheelEvent
 )
 
 from ..models import (
@@ -24,10 +24,32 @@ from .gui_utils import resolve_themed_text
 from ..app_enums import SetRunMode, AppState, ScriptRunStatus
 from ..locale_manager import LocaleManager
 from .dialogs import ScriptPropertiesDialog, EditMode
-from .tooltip_generator import generate_instance_tooltip_html
+from .tooltip_generator import generate_instance_tooltip_html, generate_favorite_tooltip_html
+from .widgets.icon_selection_dialog import IconSelectionDialog
 
 if TYPE_CHECKING:
     from ..app_controller import AppController
+
+# --- НАЧАЛО ИЗМЕНЕНИЙ ---
+class HorizontalScrollArea(QScrollArea):
+    """Кастомная область прокрутки, которая переводит вертикальное колесико мыши в горизонтальный скролл."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+
+    def wheelEvent(self, event: QWheelEvent):
+        # Получаем значение поворота колесика
+        delta = event.angleDelta().y()
+        if delta == 0:
+            delta = event.angleDelta().x()
+            
+        # Двигаем скрытый горизонтальный ползунок
+        scroll_bar = self.horizontalScrollBar()
+        scroll_bar.setValue(scroll_bar.value() - delta)
+# --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 
 class CollectionModel(QStandardItemModel):
@@ -121,6 +143,23 @@ class ScriptCollectionWidget(QWidget):
             self.collection_tree_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
             self.collection_tree_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             self.collection_tree_view.setUniformRowHeights(True)
+
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # Панель избранных скриптов (Quick Access)
+            # Используем наш кастомный класс для работы колесика мыши
+            self.favorites_scroll = HorizontalScrollArea()
+            self.favorites_scroll.setFixedHeight(44) # Высота для кнопок 36x36 + отступы
+            
+            self.favorites_container = QWidget()
+            self.favorites_layout = QHBoxLayout(self.favorites_container)
+            self.favorites_layout.setContentsMargins(0, 0, 0, 0)
+            self.favorites_layout.setSpacing(5)
+            self.favorites_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            
+            self.favorites_scroll.setWidget(self.favorites_container)
+            collection_layout.addWidget(self.favorites_scroll)
+            self.favorites_scroll.setVisible(False)
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
             collection_layout.addWidget(self.collection_tree_view)
             self.collection_model = CollectionModel()
@@ -218,6 +257,7 @@ class ScriptCollectionWidget(QWidget):
             # --- УДАЛИТЬ ЭТУ СТРОКУ (сигнал удален из контроллера) ---
             # self.controller.run_mode_restored.connect(self.on_run_mode_restored)
             # ---------------------------------------------------------
+            self.controller.favorites_updated.connect(self._update_favorites_panel)
             
             self.collection_tree_view.expanded.connect(self._on_item_expanded)
             self.collection_tree_view.collapsed.connect(self._on_item_collapsed)
@@ -320,6 +360,11 @@ class ScriptCollectionWidget(QWidget):
         
         tooltip_html = generate_instance_tooltip_html(script_info, updated_entry, self.locale_manager, self.theme_manager)
         item.setToolTip(tooltip_html)
+
+        # 4. ОБНОВЛЯЕМ ВИЗУАЛ (Иконку и цвет статуса)
+        current_status = self.controller.script_run_statuses.get(updated_entry.instance_id)
+        self._update_item_visuals(item, current_status)        
+        
         self.collection_tree_view.setCurrentIndex(item.index())
 
     @Slot(bool)
@@ -375,46 +420,23 @@ class ScriptCollectionWidget(QWidget):
             if QColor.isValidColor(color_val := bg_match.group(1).strip()): bg_color = QColor(color_val)
         return fg_color, bg_color
 
-    """
-    def _update_item_visuals(self, item: QStandardItem, status: Optional[ScriptRunStatus]):
-        dynamic_styles = self.theme_manager.get_active_theme_dynamic_styles()
-        default_fg = self.palette().color(QPalette.ColorRole.Text)
-        item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileLinkIcon))
-        item.setBackground(QBrush(Qt.GlobalColor.transparent))
-        item.setForeground(QBrush(default_fg))
-
-        status_css_map = {
-            ScriptRunStatus.RUNNING: dynamic_styles.get("status_running"),
-            ScriptRunStatus.SUCCESS: dynamic_styles.get("status_success"),
-            ScriptRunStatus.ERROR: dynamic_styles.get("status_error"),
-            ScriptRunStatus.PENDING: dynamic_styles.get("status_pending"),
-            ScriptRunStatus.SKIPPED: dynamic_styles.get("status_skipped"),
-        }
-        
-        if css_str := status_css_map.get(status):
-            fg_color, bg_color = self._parse_status_style(css_str, default_fg, QColor(Qt.GlobalColor.transparent))
-            item.setBackground(QBrush(bg_color))
-            item.setForeground(QBrush(fg_color))
-
-        icon_map = {
-            ScriptRunStatus.RUNNING: QStyle.StandardPixmap.SP_MediaPlay,
-            ScriptRunStatus.SUCCESS: QStyle.StandardPixmap.SP_DialogApplyButton,
-            ScriptRunStatus.ERROR: QStyle.StandardPixmap.SP_DialogCancelButton,
-            ScriptRunStatus.PENDING: QStyle.StandardPixmap.SP_ArrowRight,
-            ScriptRunStatus.SKIPPED: QStyle.StandardPixmap.SP_DialogDiscardButton,
-        }
-        if status in icon_map:
-            item.setIcon(self.style().standardIcon(icon_map[status]))"""
-
     def _update_item_visuals(self, item: QStandardItem, status: Optional[ScriptRunStatus]):
         dynamic_styles = self.theme_manager.get_active_theme_dynamic_styles()
         
         # Сбрасываем стили к значениям по умолчанию для текущей палитры
         default_fg = self.palette().color(QPalette.ColorRole.Text)
-        item.setIcon(icons.get_qicon("INSTANCE_ITEM"))
+        
+        # --- ИСПРАВЛЕНИЕ: Получаем данные из элемента перед их использованием ---
+        item_data = item.data(Qt.ItemDataRole.UserRole)
+        base_icon = getattr(item_data, "icon_name", "INSTANCE_ITEM") if item_data else "INSTANCE_ITEM"
+        icon_color = getattr(item_data, "icon_color", None) if item_data else None
+        
+        # Устанавливаем пользовательскую иконку
+        item.setIcon(icons.get_qicon(base_icon, color=icon_color))
+        # ------------------------------------------------------------------------
+        
         item.setBackground(QBrush(Qt.GlobalColor.transparent))
         item.setForeground(QBrush(default_fg))
-
 
         status_css_map = {
             ScriptRunStatus.RUNNING: dynamic_styles.get("status_running"),
@@ -423,8 +445,6 @@ class ScriptCollectionWidget(QWidget):
             ScriptRunStatus.PENDING: dynamic_styles.get("status_pending"),
             ScriptRunStatus.SKIPPED: dynamic_styles.get("status_skipped"),
         }
-
-
 
         css_str = status_css_map.get(status)
         if css_str:
@@ -434,28 +454,21 @@ class ScriptCollectionWidget(QWidget):
                 default_fg,
                 QColor(Qt.GlobalColor.transparent)
             )
-            
-            # --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
             # Устанавливаем ТОЛЬКО фон. Цвет текста оставляем по умолчанию.
             item.setBackground(QBrush(bg_color))
-            # Строка item.setForeground(QBrush(fg_color)) удалена
 
-        # 3. Устанавливаем иконки (как в оригинале)
+        # Переопределение иконок в зависимости от статуса выполнения
         if status == ScriptRunStatus.RUNNING:
-            #item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
             item.setIcon(icons.get_qicon("PLAY"))
         elif status == ScriptRunStatus.SUCCESS:
             item.setIcon(icons.get_qicon("OK"))
         elif status == ScriptRunStatus.ERROR:
             item.setIcon(icons.get_qicon("ERROR"))
         elif status == ScriptRunStatus.PENDING:
-            #item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowRight))
             item.setIcon(icons.get_qicon("ARROW_SUB"))
         elif status == ScriptRunStatus.SKIPPED:
             item.setIcon(icons.get_qicon("WARNING", color="gray"))
-            # --- ИЗМЕНЕНИЕ ---
-            # Для пропущенных явно устанавливаем серый цвет текста
-            item.setForeground(QColor("gray"))          
+            item.setForeground(QBrush(QColor("gray")))
 
     def _restore_expanded_state(self, parent_item: QStandardItem):
         for row in range(parent_item.rowCount()):
@@ -685,6 +698,46 @@ class ScriptCollectionWidget(QWidget):
 
         if isinstance(item_data, ScriptSetEntryModel):
             menu.addSeparator()
+
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # Управление избранным
+            is_fav = self.controller.set_manager.is_favorite(item_data.instance_id)
+            fav_text_key = "collection_widget.context_menu.remove_favorite" if is_fav else "collection_widget.context_menu.add_favorite"
+            action_toggle_fav = QAction(self.locale_manager.get(fav_text_key), self)
+            action_toggle_fav.setIcon(icons.get_qicon("STAR"))
+
+            # Извлекаем иконку экземпляра (по умолчанию INSTANCE_ITEM, если пользователь ее не менял)
+            icon_to_use = getattr(item_data, "icon_name", "INSTANCE_ITEM")
+            color_to_use = getattr(item_data, "icon_color", None)
+            
+            # Передаем icon_to_use в слот
+            action_toggle_fav.triggered.connect(
+                lambda: self._toggle_favorite_action(item_data.instance_id, icon_to_use, color_to_use)
+            )            
+           
+            menu.addAction(action_toggle_fav)
+            menu.addSeparator()
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---            
+            
+            # Смена иконки для самого экземпляра
+            action_change_tree_icon = QAction(self.locale_manager.get("collection_widget.context_menu.change_icon"), self)
+            action_change_tree_icon.setIcon(icons.get_qicon("SETTINGS"))
+            
+            # Находим ID родительского набора, он нужен для обновления
+            parent_set_id = None
+            if item and item.parent():
+                parent_data = item.parent().data(Qt.ItemDataRole.UserRole)
+                if isinstance(parent_data, ScriptSetNodeModel):
+                    parent_set_id = parent_data.id
+            
+            if parent_set_id:
+                action_change_tree_icon.triggered.connect(
+                    lambda: self._change_instance_icon_in_tree(parent_set_id, item_data)
+                )
+                menu.addAction(action_change_tree_icon)
+                
+            menu.addSeparator()
+            
             action_params = QAction(self.locale_manager.get("collection_widget.context_menu.configure_params"), self)
             entry_data_copy = item_data.model_copy(deep=True)
             action_params.triggered.connect(lambda: self._show_script_instance_properties_dialog(entry_data_copy))
@@ -735,6 +788,19 @@ class ScriptCollectionWidget(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self.controller.remove_script_from_active_set_node(entry_data.instance_id)
 
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    @Slot(str, ScriptSetEntryModel)
+    def _change_instance_icon_in_tree(self, set_id: str, entry_data: ScriptSetEntryModel):
+        """Открывает диалог выбора иконки для экземпляра скрипта в основном дереве."""
+        dialog = IconSelectionDialog(self.locale_manager, current_color=entry_data.icon_color, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            icon_name, icon_color = dialog.get_selected()
+            if icon_name:
+                updated_entry = entry_data.model_copy(deep=True)
+                updated_entry.icon_name = icon_name
+                updated_entry.icon_color = icon_color
+                self.controller.update_script_instance_in_active_set_node(updated_entry)
+
     def _show_script_instance_properties_dialog(self, entry_data: ScriptSetEntryModel):
         script_info = self.controller.get_script_info_by_id(entry_data.id)
         if not script_info:
@@ -742,16 +808,28 @@ class ScriptCollectionWidget(QWidget):
                                  self.locale_manager.get("collection_widget.error.script_info_not_found", id=entry_data.id))
             return
         
-        active_set_model = self.controller.selected_set_node_model
-        all_entries_in_set = active_set_model.script_entries if active_set_model else []
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
+        # Собираем ВСЕ экземпляры из всей коллекции для выпадающих списков
+        all_entries_in_collection: List[Tuple[str, ScriptSetEntryModel]] =[]
+        def find_entries(nodes):
+            for n in nodes:
+                if isinstance(n, ScriptSetNodeModel):
+                    for e in n.script_entries:
+                        all_entries_in_collection.append((n.name, e))
+                elif isinstance(n, SetFolderNodeModel) and n.children:
+                    find_entries(n.children)
+                    
+        root_nodes = self.controller.set_manager.current_collection_model.root_nodes
+        find_entries(root_nodes)
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
         
         dialog = ScriptPropertiesDialog(
             edit_mode=EditMode.INSTANCE, 
             script_info=script_info.model_copy(deep=True),
             instance_entry=entry_data, 
             locale_manager=self.locale_manager,
-            theme_manager=self.theme_manager, # Эта строка уже была добавлена, проверяем
-            available_script_entries=all_entries_in_set,
+            theme_manager=self.theme_manager,
+            available_script_entries=all_entries_in_collection, # <--- Передаем полный список
             get_script_name_func=self.controller.get_script_info_by_id,
             parent=self
         )
@@ -759,6 +837,7 @@ class ScriptCollectionWidget(QWidget):
         if dialog.exec():
             if updated_instance_model := dialog.get_updated_instance_entry_model():
                 self.controller.update_script_instance_in_active_set_node(updated_instance_model)
+
 
     @Slot(QModelIndex)
     def _on_double_clicked(self, index: QModelIndex):
@@ -796,3 +875,126 @@ class ScriptCollectionWidget(QWidget):
             self.controller.reorder_scripts_in_active_set_node(current_ids)
             return True
         return False
+        
+    # ==============================================================================
+    # БЛОК: Обработка избранного (Quick Access)
+    # ==============================================================================
+    @Slot()
+    def _update_favorites_panel(self):
+        """Очищает и перерисовывает панель избранных скриптов."""
+        # Очистка старых кнопок
+        while self.favorites_layout.count():
+            item = self.favorites_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        favorites = self.controller.set_manager.get_all_favorites()
+        self.favorites_scroll.setVisible(len(favorites) > 0)
+        
+        for fav in favorites:
+            entry = self.controller.set_manager.find_script_entry_by_instance_id(fav.instance_id)
+            if not entry:
+                continue
+                
+            script_info = self.controller.get_script_info_by_id(entry.id)
+            
+            btn = QToolButton()
+            btn.setIcon(icons.get_qicon(fav.icon_name, size=32, color=fav.icon_color))
+            btn.setIconSize(QSize(32, 32))
+            # Строго фиксируем размер, чтобы они не сжимались, а уходили за край экрана
+            btn.setFixedSize(42, 42)            
+            btn.setAutoRaise(True)
+            # Меняем курсор на "руку" при наведении
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setProperty("class", "favorite-btn")
+
+            
+            # Применяем тот же тултип, что и в основном дереве
+            tooltip_html = generate_favorite_tooltip_html(
+                script_info=script_info,
+                instance_entry=entry,
+                locale_manager=self.locale_manager,
+                theme_manager=self.theme_manager
+            )
+            btn.setToolTip(tooltip_html)
+
+            # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+            # Разрешаем кастомное контекстное меню для кнопки
+            btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            # Привязываем сигнал меню. Используем lambda для захвата текущей кнопки и instance_id
+            btn.customContextMenuRequested.connect(
+                lambda pos, b=btn, i_id=fav.instance_id: self._show_favorite_context_menu(b, pos, i_id)
+            )
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---            
+            
+            
+            # Подключаем запуск
+            btn.clicked.connect(lambda checked=False, i_id=fav.instance_id: self._run_favorite_script(i_id))
+            self.favorites_layout.addWidget(btn)
+
+    @Slot(str)
+    def _run_favorite_script(self, instance_id: str):
+        """Запускает скрипт из панели избранного."""
+        if self.controller.is_busy():
+            return
+            
+        set_id = self.controller.set_manager.find_parent_set_id_for_instance(instance_id)
+        if not set_id:
+            QMessageBox.warning(
+                self, 
+                self.locale_manager.get("collection_widget.run_error.title"), 
+                self.locale_manager.get("collection_widget.run_error.parent_set_not_found")
+            )
+            return
+            
+        continue_on_error = self.chk_continue_on_error.isChecked()
+        self.controller.run_script_set(set_id, SetRunMode.SINGLE_FROM_SET, instance_id, continue_on_error)
+
+    @Slot(str, str, str) # Типизацию слота можно оставить так, или убрать @Slot для надежности с None
+    def _toggle_favorite_action(self, instance_id: str, icon_name: str = "STAR", icon_color: Optional[str] = None):
+        self.controller.toggle_script_favorite(instance_id, icon_name, icon_color)
+
+    @Slot(str)
+    def _change_favorite_icon_action(self, instance_id: str):
+        # Находим текущий цвет, чтобы передать в диалог
+        current_color = None
+        for fav in self.controller.set_manager.get_all_favorites():
+            if fav.instance_id == instance_id:
+                current_color = fav.icon_color
+                break
+                
+        dialog = IconSelectionDialog(self.locale_manager, current_color=current_color, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            icon_name, icon_color = dialog.get_selected()
+            if icon_name:
+                self.controller.change_favorite_icon(instance_id, icon_name, icon_color)
+
+    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    @Slot(object, "QPoint", str)
+    def _show_favorite_context_menu(self, button: QToolButton, pos, instance_id: str):
+        """Отображает контекстное меню при клике ПКМ по кнопке в панели избранного."""
+        menu = QMenu(self)
+        
+        # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+        # Добавляем действие "Показать в дереве"
+        action_locate = QAction(self.locale_manager.get("collection_widget.context_menu.locate_in_tree"), self)
+        action_locate.setIcon(icons.get_qicon("TARGET"))
+        action_locate.triggered.connect(lambda: self._select_item_by_id(instance_id))
+        menu.addAction(action_locate)
+        
+        menu.addSeparator()
+        # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+        
+        action_change_icon = QAction(self.locale_manager.get("collection_widget.context_menu.change_icon"), self)
+        action_change_icon.setIcon(icons.get_qicon("SETTINGS"))
+        action_change_icon.triggered.connect(lambda: self._change_favorite_icon_action(instance_id))
+        menu.addAction(action_change_icon)
+        
+        menu.addSeparator()
+        
+        action_remove = QAction(self.locale_manager.get("collection_widget.context_menu.remove_favorite"), self)
+        action_remove.setIcon(icons.get_qicon("DELETE"))
+        action_remove.triggered.connect(lambda: self._toggle_favorite_action(instance_id))
+        menu.addAction(action_remove)
+        
+        menu.exec(button.mapToGlobal(pos))

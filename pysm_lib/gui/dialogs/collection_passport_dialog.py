@@ -1,6 +1,6 @@
 # pysm_lib/gui/dialogs/collection_passport_dialog.py
 
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any, Dict, List, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -31,7 +31,7 @@ class CollectionPassportDialog(QDialog):
         collection_model: "ScriptSetsCollectionModel",
         locale_manager: LocaleManager,
         theme_manager: ThemeManager,
-        script_entries: List[ScriptSetEntryModel],
+        script_entries: List[Tuple[str, ScriptSetEntryModel]],
         get_script_name_func: callable,
         parent: Optional[QWidget] = None,
     ):

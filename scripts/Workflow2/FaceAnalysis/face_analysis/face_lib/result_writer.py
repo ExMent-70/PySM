@@ -2,11 +2,11 @@
 
 import logging
 import gc
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, TYPE_CHECKING
 import numpy as np
 
 # Импортируем только для аннотации типов, сам класс передается в __init__
-if False:
+if TYPE_CHECKING:
     from _common.face_storage import FaceStorageManager
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class AnalysisResultWriter:
         self.batch_size = batch_size
         
         # Буфер хранит кортежи: (filename, faces_meta, embeddings_list, original_shape)
-        self._buffer: List[Tuple[str, List[Dict], List[np.ndarray], Tuple[int, int]]] = []
+        self._buffer: List[Tuple[str, List[Dict], List[np.ndarray], Tuple[int, int]]] = list()
 
     def add_result(self, filename: str, meta: List[Dict], embeddings: List[np.ndarray], original_shape: Tuple[int, int]):
         """

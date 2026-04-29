@@ -2,7 +2,7 @@
 
 import pathlib
 import sys
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from PySide6.QtCore import Slot, QTimer, Qt
 from PySide6.QtWidgets import (
@@ -33,7 +33,7 @@ class ScriptPropertiesDialog(QDialog):
         locale_manager: LocaleManager,
         theme_manager: ThemeManager,
         instance_entry: Optional[ScriptSetEntryModel] = None,
-        available_script_entries: Optional[List[ScriptSetEntryModel]] = None,
+        available_script_entries: Optional[List[Tuple[str, ScriptSetEntryModel]]] = None,
         get_script_name_func: Optional[callable] = None,
         parent: Optional[QWidget] = None,
     ):
@@ -155,6 +155,8 @@ class ScriptPropertiesDialog(QDialog):
             theme_manager=self.theme_manager,
             script_entries=self.available_script_entries,
             get_script_name_func=self.get_script_name_func,
+            # Передаем ID текущего редактируемого экземпляра
+            current_instance_id=self.instance_entry_model.instance_id if self.instance_entry_model else None,
         )
         params_container_layout.addWidget(self.parameter_editor)
 

@@ -2,50 +2,37 @@
 # Конфигурационный файл для этапа анализа лиц (run_analyze_faces.py)
 # ==============================================================================
 
-# --- Настройки путей ---
-# Эти пути являются относительными от местоположения этого config.toml
 [paths]
-# Корневая папка, где лежат подпапки с моделями (insightface, FACEONNX)
 model_root = "../../../../_BIN"
 
-
-# --- Настройки ONNX Runtime Provider ---
 [provider]
-# Имя провайдера. Оставьте пустым для автовыбора.
-# Варианты: "TensorrtExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"
 provider_name = ""
-# ID видеокарты (для CUDA/TensorRT)
 device_id = 0
-# Путь для кэша TensorRT (относительно этого файла)
 tensorRT_cache_path = "../../../../_BIN/TensorRT_cache"
 
-
-# --- Настройки моделей ---
 [model]
-# Имя набора моделей insightface (например, "antelopev2", "buffalo_l")
-name = "buffalo_l"
-# Порог уверенности для детектора лиц (от 0.0 до 1.0)
-det_thresh = 0.5
-# Размер изображения, до которого оно будет уменьшено для детекции
-det_size = [1280, 1280]
-
-# --- Пути к моделям анализа атрибутов (относительно 'paths.model_root') ---
 gender_model = "models/FACEONNX/gender_efficientnet_b2.onnx"
 emotion_model = "models/FACEONNX/emotion_cnn.onnx"
 age_model = "models/FACEONNX/age_efficientnet_b2.onnx"
 beauty_model = "models/FACEONNX/beauty_resnet18.onnx"
 eyeblink_model = "models/FACEONNX/eye_blink_cnn.onnx"
 
-# Метки для модели эмоций
-emotion_labels = ["Neutral", "Happiness", "Surprise", "Sadness", "Anger", "Disgust", "Fear"]
+emotion_labels =["Neutral", "Happiness", "Surprise", "Sadness", "Anger", "Disgust", "Fear"]
 
+[eye_thresholds]
+# Новые границы размеров лиц в пикселях (под высокое разрешение)
+size_limits = [180, 300]
+# --- Категория размера: SMALL ---
+# Всего проанализировано глаз: 8007
+# Статистика: Min=0.002, Q1=0.014, Median=0.023, Q3=0.075, Max=1.000
+thresholds_small =[0.014, 0.023]
 
-# --- Флаги для включения/отключения задач ---
-[task_flags]
-analyze_gender = true
-analyze_emotion = true
-analyze_age = true
-analyze_beauty = false
-analyze_eyeblink = true
-# Сохранять ли отладочные изображения с нанесенными ключевыми точками
-save_debug_kps = false
+# --- Категория размера: MEDIUM ---
+# Всего проанализировано глаз: 3528
+# Статистика: Min=0.000, Q1=0.868, Median=0.984, Q3=0.998, Max=1.000
+thresholds_medium =[0.2, 0.4]
+
+# --- Категория размера: LARGE ---
+# Всего проанализировано глаз: 4
+# Статистика: Min=0.983, Q1=0.996, Median=1.000, Q3=1.000, Max=1.000
+thresholds_large =[0.3, 0.600]

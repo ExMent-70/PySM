@@ -29,7 +29,7 @@ from argparse import Namespace
 from typing import Any
 
 IS_MANAGED_RUN = False
-# Добавляем корневую папку 'analize' в sys.path
+
 try:
     current_script_path = Path(__file__).resolve()
     project_root = current_script_path.parent.parent
@@ -161,6 +161,8 @@ def evaluate_condition(actual_value: Any, operator: str, comparison_value: str) 
 
 # 4. БЛОК: Основная логика
 # ==============================================================================
+# 4. БЛОК: Основная логика
+# ==============================================================================
 def main():
     """Основная функция-оркестратор."""
     log_level = pysm_context.get("sys_log_level", "INFO") if IS_MANAGED_RUN and pysm_context else "INFO"
@@ -180,11 +182,9 @@ def main():
     if is_true:
         target_id = config.then_instance_id
         branch = icon_ok
-        #logger.info("Результат: <b>ИСТИНА</b>")
     else:
         target_id = config.else_instance_id
         branch = icon_error
-        #logger.info(f"{icon_error}Результат: <b>ЛОЖЬ</b>")
 
     logger.info(f"{branch} Значение переменной <b>{config.if_variable_name.upper()}</b> [<i>{str(actual_value).upper()}</i>] <b>{config.if_operator}</b> [<i>{config.if_comparison_value.upper()}</i>]")
 
@@ -193,23 +193,19 @@ def main():
         logger.info(f"{icon_delete} Очистка переменной <b>{config.if_variable_name.upper()}</b>")
         pysm_context.remove(config.if_variable_name)
 
-    logger.debug(f"{icon_info} Порядок выполнения скриптов изменён, следующий скрипт:")
-
     # 3. Устанавливаем следующий скрипт или продолжаем по умолчанию
     if target_id:
         try:
-            # Получаем имя целевого скрипта для красивого лога
-            all_instances = {inst['id']: inst['name'] for inst in pysm_context.list_instances()}
-            target_name = all_instances.get(target_id, "Неизвестное имя")
-            
+            # Отправляем команду маршрутизации в PySM (только ID). 
+            # Точное имя целевого скрипта и набора теперь выведет сам Оркестратор!
             pysm_context.set_next_script(target_id)
-            logger.info(f" {icon_play} Следующий скрипт: <b>{target_name.upper()}</b> (ID: <i>{target_id}</i>)<br>")
+            logger.debug(f" {icon_play} Запрошен переход к скрипту с ID: <i>{target_id}</i><br>")
         except Exception as e:
-            logger.error(f"КРИТИЧЕСКАЯ ОШИБКА при установке следующего скрипта: {e}")
+            logger.error(f"КРИТИЧЕСКАЯ ОШИБКА при отправке команды перехода: {e}")
             sys.exit(1)
     elif not is_true:
         # Это случай, когда условие ложно и `else_instance_id` не указан
-        logger.info("Ветка 'Else' не определена. Выполнение будет продолжено по умолчанию.")
+        logger.info(f" {icon_info} Ветка 'Else' не определена. Выполнение будет продолжено по умолчанию.")
     
     sys.exit(0)
 

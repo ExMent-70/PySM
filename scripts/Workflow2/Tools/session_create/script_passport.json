@@ -14,7 +14,7 @@
       "type": "dir_path",
       "description": "Путь к папке, содержащей исходные RAW-файлы. Используется как базовый путь для PSD по умолчанию.",
       "required": true,
-      "default": "{wf_raw_path}"
+      "default": "{wf_source_file_path}"
     },
     "wf_session_path": {
       "type": "dir_path",

@@ -14,11 +14,11 @@
    - `pysm_context.set("my_variable", new_value)`
    - `pysm_context.set_next_script("instance_id_123")`
 
-Глобальные функции-обертки были удалены в пользу этого единого,
-объектно-ориентированного подхода для повышения чистоты и предсказуемости API.
+Данные автоматически сохраняются в файл при завершении работы скрипта.
 """
 
 import argparse
+import atexit  # <-- НОВЫЙ ИМПОРТ ДЛЯ АВТОСОХРАНЕНИЯ
 import base64
 import os
 import json
@@ -29,8 +29,6 @@ import xml.etree.ElementTree as ET
 from argparse import Namespace
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
-
-
 
 
 try:
@@ -90,21 +88,26 @@ def _safe_get_attr(obj: Any, attr_name: str, attr_type: type, default: Any = Non
         return default
 
 
-# 2. БЛОК: Основной класс для управления контекстом выполнения
 # ==============================================================================
-
+# ОСНОВНОЙ КЛАСС УПРАВЛЕНИЯ КОНТЕКСТОМ ВЫПОЛНЕНИЯ
+# ==============================================================================
 
 class PySMContext:
     """
     Класс, инкапсулирующий логику чтения, записи и управления данными
     в общем файле контекста (`pysm_context.json`).
+    Поддерживает кэширование записи (Lazy Write) для оптимизации I/O.
     """
 
     def __init__(self):
-        """Инициализирует объект, находит путь к файлу контекста и кэширует его."""
+        """Инициализирует объект, находит путь к файлу контекста и настраивает кэш."""
         self._context_file_path: Optional[pathlib.Path] = None
         self._raw_context_data_cache: Optional[Dict[str, Any]] = None
+        self._is_dirty: bool = False  # Флаг наличия несохраненных изменений
         self._initialize()
+        
+        # Регистрируем автоматическое сохранение при нормальном завершении скрипта
+        atexit.register(self.commit)
 
     def _initialize(self):
         """
@@ -140,14 +143,37 @@ class PySMContext:
             self._raw_context_data_cache = {}
             return self._raw_context_data_cache
 
-    def _write_data(self, data: Dict[str, Any]) -> None:
-        """Записывает данные в файл контекста и обновляет кэш."""
+    def commit(self) -> None:
+        """
+        Принудительно записывает кэшированные данные в файл контекста,
+        если были произведены изменения (is_dirty == True).
+        """
+        if not self._is_dirty:
+            return
+            
         path = self._context_file_path
         if not path:
-            raise IOError("Путь к файлу контекста не определен.")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+            # Если файл не передан (запуск вне PySM), мы просто сбрасываем флаг,
+            # позволяя скрипту штатно работать с контекстом в ОЗУ
+            self._is_dirty = False
+            return
+            
+        if self._raw_context_data_cache is None:
+            return
+
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self._raw_context_data_cache, f, indent=2, ensure_ascii=False)
+            self._is_dirty = False
+        except Exception as e:
+            print(f"PySM Context Error: Не удалось сохранить файл контекста: {e}", file=sys.stderr)
+
+    def _mark_dirty(self, data: Dict[str, Any], force_commit: bool = False) -> None:
+        """Обновляет кэш в памяти и помечает его для отложенного сохранения."""
         self._raw_context_data_cache = data
+        self._is_dirty = True
+        if force_commit:
+            self.commit()
 
     def _infer_type_from_value(self, value: Any) -> str:
         """Определяет тип переменной по ее значению."""
@@ -185,49 +211,31 @@ class PySMContext:
                     return default
         return value
 
-    # Заменить в классе PySMContext
-    # ==============================================================================
 
-    def set(self, key: str, value: Any, var_type: Optional[str] = None) -> None:
-        """
-        Устанавливает или создает переменную в контексте.
+    def _send_ipc_update(self, action: str, **kwargs):
+        """Отправляет мгновенную команду обновления контекста в процесс PySM."""
+        try:
+            payload = {"action": action}
+            payload.update(kwargs)
+            print(f"PYSM_CONTEXT_UPDATE:{json.dumps(payload)}", file=sys.stderr, flush=True)
+        except Exception as e:
+            print(f"PySM API Error: Failed to send context update. Reason: {e}", file=sys.stderr)
 
-        Этот метод реализует логику "UPSERT" (UPDATE or INSERT).
-
-        - Если переменная с ключом `key` существует, он обновляет ее значение.
-          Если при этом передан `var_type`, тип переменной также будет обновлен.
-        - Если переменная не существует, она будет создана.
-          Тип будет взят из `var_type`, если он указан, иначе будет определен
-          автоматически по значению.
-
-        Args:
-            key (str): Ключ (имя) переменной.
-            value (Any): Новое значение переменной.
-            var_type (Optional[str], optional): Явное указание типа переменной
-                                                (например, "dir_path", "int").
-        """
+    def set(self, key: str, value: Any, var_type: Optional[str] = None, commit: bool = False) -> None:
+        """Устанавливает или создает переменную в контексте (UPSERT)."""
         data = self._read_data()
         variable_data = data.get(key)
 
-        # Сценарий 1: Переменная уже существует
+        final_type = var_type
         if variable_data and isinstance(variable_data, dict):
-            # Проверяем, не защищена ли она от записи
             if variable_data.get("read_only", False):
-                print(
-                    f"PySM Context Warning: Переменная '{key}' защищена от записи.",
-                    file=sys.stderr,
-                )
+                print(f"PySM Context Warning: Переменная '{key}' защищена от записи.", file=sys.stderr)
                 return
-
-            # Обновляем значение
             variable_data["value"] = value
-            # Если тип указан явно, обновляем и его
             if var_type:
                 variable_data["type"] = var_type
-
-        # Сценарий 2: Переменная не существует, создаем новую
+            final_type = var_type or variable_data.get("type", "string")
         else:
-            # Если тип не указан явно, определяем его по значению
             final_type = var_type if var_type else self._infer_type_from_value(value)
             data[key] = {
                 "type": final_type,
@@ -237,99 +245,150 @@ class PySMContext:
                 "choices": None,
             }
 
-        # Записываем обновленные данные в файл
-        self._write_data(data)
+        self._mark_dirty(data, force_commit=commit)
+        # Мгновенно отправляем изменения в оперативную память PySM
+        self._send_ipc_update("set", key=key, value=value, var_type=final_type)
+        
+    def set_structured(self, key_path: str, value: Any, commit: bool = False) -> None:
+        """
+        Устанавливает значение переменной, поддерживая точечную нотацию для вложенных JSON-структур.
+        Если переменная не вложена (нет точек в ключе), работает аналогично стандартному set().
+        
+        Пример: 
+        key_path="wf_school_info.city", value="Иркутск" -> Обновит только 'city' внутри словаря.
+        """
+        if "." not in key_path:
+            self.set(key_path, value, commit=commit)
+            return
 
-    def update(self, update_dict: Dict[str, Any]) -> None:
+        keys = key_path.split(".")
+        base_key = keys[0]
+
+        data = self._read_data()
+        variable_data = data.get(base_key)
+
+        # Если базовая переменная существует, проверяем ее
+        if variable_data and isinstance(variable_data, dict):
+            if variable_data.get("read_only", False):
+                print(f"PySM Context Warning: Переменная '{base_key}' защищена от записи.", file=sys.stderr)
+                return
+            
+            # Точечная нотация применима только к JSON-объектам (словарям)
+            if variable_data.get("type") != "json" or not isinstance(variable_data.get("value"), dict):
+                print(f"PySM Context Error: Невозможно применить точечную нотацию к '{base_key}', так как это не 'json' объект.", file=sys.stderr)
+                return
+            
+            root_value = variable_data["value"]
+        else:
+            # Если переменной нет, создаем новую корневую JSON-структуру
+            root_value = {}
+            variable_data = {
+                "type": "json",
+                "value": root_value,
+                "description": "Auto-created by script via structured set",
+                "read_only": False,
+                "choices": None,
+            }
+            data[base_key] = variable_data
+
+        # Спускаемся вглубь словаря до предпоследнего ключа, создавая уровни при необходимости
+        current_level = root_value
+        for sub_key in keys[1:-1]:
+            if sub_key not in current_level or not isinstance(current_level[sub_key], dict):
+                current_level[sub_key] = {}
+            current_level = current_level[sub_key]
+
+        # Устанавливаем целевое значение для последнего ключа
+        target_key = keys[-1]
+        current_level[target_key] = value
+
+        self._mark_dirty(data, force_commit=commit)
+        # Отправляем IPC-обновление для ВСЕГО базового объекта, чтобы UI синхронизировался
+        self._send_ipc_update("set", key=base_key, value=root_value, var_type="json")        
+
+
+    def update(self, update_dict: Dict[str, Any], commit: bool = False) -> None:
         """Обновляет несколько переменных в контексте из словаря."""
         data = self._read_data()
         for key, value in update_dict.items():
             variable_data = data.get(key)
+            final_type = "string"
             if variable_data and isinstance(variable_data, dict):
                 if variable_data.get("read_only", False):
-                    print(
-                        f"PySM Context Warning: Переменная '{key}' защищена от записи.",
-                        file=sys.stderr,
-                    )
+                    print(f"PySM Context Warning: Переменная '{key}' защищена от записи.", file=sys.stderr)
                     continue
                 variable_data["value"] = value
+                final_type = variable_data.get("type", "string")
             else:
-                inferred_type = self._infer_type_from_value(value)
+                final_type = self._infer_type_from_value(value)
                 data[key] = {
-                    "type": inferred_type,
+                    "type": final_type,
                     "value": value,
                     "description": "Auto-created by script",
                     "read_only": False,
                     "choices": None,
                 }
-        self._write_data(data)
+            self._send_ipc_update("set", key=key, value=value, var_type=final_type)
+            
+        self._mark_dirty(data, force_commit=commit)
 
-    def remove(self, keys_to_remove: Optional[Union[str, List[str]]] = None) -> None:
+    def remove(self, keys_to_remove: Optional[Union[str, List[str]]] = None, commit: bool = False) -> None:
         """Удаляет переменные из контекста."""
         data = self._read_data()
-        keys_for_deletion = []
+        keys_for_deletion =[]
         if keys_to_remove is None:
-            keys_for_deletion = [k for k in data.keys() if k not in _RESERVED_KEYS]
+            keys_for_deletion =[k for k in data.keys() if k not in _RESERVED_KEYS]
         elif isinstance(keys_to_remove, str):
             keys_for_deletion = [keys_to_remove]
         elif isinstance(keys_to_remove, list):
             keys_for_deletion = keys_to_remove
+            
         if not keys_for_deletion:
             return
+            
         for key in keys_for_deletion:
             data.pop(key, None)
-        self._write_data(data)
+            
+        self._mark_dirty(data, force_commit=commit)
+        # Сообщаем PySM об удалении
+        self._send_ipc_update("remove", keys=keys_for_deletion)
+
 
     def get_all(self) -> Dict[str, Any]:
         """Возвращает все переменные и их значения из контекста."""
         raw_data = self._read_data()
         return {k: v.get("value") for k, v in raw_data.items()}
 
-    """
     def resolve_template(self, template_string: Optional[str]) -> str:
-        if not template_string or "{" not in template_string:
+        """
+        Рекурсивно заменяет плейсхолдеры {key} в строке на значения из контекста.
+        Выполняется до тех пор, пока все возможные плейсхолдеры не будут разрешены.
+        """
+        if not template_string or not isinstance(template_string, str) or "{" not in template_string:
             return template_string if template_string is not None else ""
-        placeholders = re.findall(r"{([^}]+)}", template_string)
+
         resolved_string = template_string
-        for key in set(placeholders):
-            value = self.get_structured(key, default=f"{{{key}}}")
-            resolved_string = resolved_string.replace(f"{{{key}}}", str(value))
-        return resolved_string
-    """
-    
-    def resolve_template(self, template_string: Optional[str]) -> str:
-            """
-            Рекурсивно заменяет плейсхолдеры {key} в строке на значения из контекста.
-            Выполняется до тех пор, пока все возможные плейсхолдеры не будут разрешены.
-            """
-            if not template_string or not isinstance(template_string, str) or "{" not in template_string:
-                return template_string if template_string is not None else ""
+        max_depth = 10  # Защита от бесконечной рекурсии
 
-            resolved_string = template_string
-            max_depth = 10  # Защита от бесконечной рекурсии (напр., a={b}, b={a})
+        for _ in range(max_depth):
+            placeholders = re.findall(r"{([^}]+)}", resolved_string)
+            if not placeholders:
+                break
 
-            for _ in range(max_depth):
-                placeholders = re.findall(r"{([^}]+)}", resolved_string)
-                if not placeholders:
-                    break
+            made_changes = False
+            for key in set(placeholders):
+                val = self.get_structured(key, default=None)
 
-                made_changes = False
-                for key in set(placeholders):
-                    # Пытаемся получить значение. Если ключа нет, вернется None
-                    val = self.get_structured(key, default=None)
+                if val is not None:
+                    str_val = str(val)
+                    if str_val != f"{{{key}}}":
+                        resolved_string = resolved_string.replace(f"{{{key}}}", str_val)
+                        made_changes = True
 
-                    if val is not None:
-                        str_val = str(val)
-                        # Предотвращаем зацикливание, если значение равно самому плейсхолдеру
-                        if str_val != f"{{{key}}}":
-                            resolved_string = resolved_string.replace(f"{{{key}}}", str_val)
-                            made_changes = True
+            if not made_changes:
+                break
 
-                # Если за весь проход не было сделано ни одной замены, прерываем цикл
-                if not made_changes:
-                    break
-
-            return resolved_string        
+        return resolved_string        
 
     def resolve_path(self, path_str: str) -> pathlib.Path:
         """Преобразует относительный путь в абсолютный, используя директорию коллекции как базу."""
@@ -347,36 +406,25 @@ class PySMContext:
         """Возвращает полную модель переменной (словарь) по ключу."""
         return self._read_data().get(key)
 
-    # 1. БЛОК: Метод set_next_script (ИЗМЕНЕН)
-    def set_next_script(self, instance_id: str) -> None:
+    def set_next_script(self, instance_id: str, commit: bool = False) -> None:
         """
-        Указывает, какой скрипт должен быть запущен следующим,
-        переопределяя стандартную последовательность.
+        Отправляет команду маршрутизации (переход к другому скрипту)
+        в главный процесс PyScriptManager через stderr.
+        Параметр commit оставлен для обратной совместимости, но игнорируется.
         """
-        # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
-        # Теперь мы сохраняем не просто ID, а словарь с ID и именем
-        instance_name = instance_id  # Имя по умолчанию, если не найдено
-        all_instances = self.list_instances()  # Используем новый метод
-
-        # Ищем экземпляр с нужным ID в списке всех экземпляров
-        for instance_data in all_instances:
-            if (
-                isinstance(instance_data, dict)
-                and instance_data.get("id") == instance_id
-            ):
-                instance_name = instance_data.get("name", instance_id)
-                break
-
-        value_to_set = {"id": instance_id, "name": instance_name}
-        self.set("pysm_next_script", value_to_set)
+        try:
+            routing_data = {"target_id": instance_id}
+            # Отправляем специальный маркер, который перехватит ScriptRunner "на лету"
+            print(f"PYSM_ROUTING_CMD:{json.dumps(routing_data)}", file=sys.stderr, flush=True)
+        except Exception as e:
+            print(f"PySM API Error: Failed to send routing command. Reason: {e}", file=sys.stderr)
 
     def list_instances(self) -> List[Dict[str, str]]:
         """
         Возвращает список данных о всех экземплярах в текущем наборе.
         Каждый элемент - это словарь {"id": "...", "name": "..."}.
         """
-        return self.get("pysm_set_instance_ids", [])
-
+        return self.get("pysm_set_instance_ids",[])
 
     def log_image(
         self,
@@ -400,7 +448,7 @@ class PySMContext:
             ext = path.suffix.lower().lstrip(".")
             mime_type = (
                 f"image/{ext}"
-                if ext in ["png", "jpg", "jpeg", "gif", "bmp"]
+                if ext in["png", "jpg", "jpeg", "gif", "bmp"]
                 else "image/png"
             )
 
@@ -452,12 +500,12 @@ class PySMContext:
                 file=sys.stderr,
             )
 
-    # 1. БЛОК: Метод log_html (ДОБАВИТЬ в класс PySMContext)
     def log_html(
         self,
         html_content: str,
         align: str = "left",
         margin: int = 5,
+        padding: int = 10,
     ) -> None:
         """
         Выводит произвольный HTML-контент в консоль PyScriptManager.
@@ -472,9 +520,9 @@ class PySMContext:
             # Заменяем их на пробелы, чтобы не склеить слова.
             clean_content = html_content.replace("\n", "<br>").replace("\r", "")
 
-            styles = f"text-align: {align}; margin-top: {margin}px; margin-bottom: {margin}px;"
-            wrapped_html = f'<div style="{styles}">{clean_content}</div>'
-            #wrapped_html = f'{clean_content}'
+            styles = f"text-align: {align}; margin-top: {margin}px; margin-bottom: {margin}px; padding: {padding}px;"
+            #wrapped_html = f'<div style="{styles}">{clean_content}</div>'
+            wrapped_html = f'{clean_content}'
 
             print(f"PYSM_HTML_BLOCK:{wrapped_html}", file=sys.stderr, flush=True)
 
@@ -483,7 +531,6 @@ class PySMContext:
                 f"PySM API Error: Failed to log HTML content. Reason: {e}",
                 file=sys.stderr,
             )
-
 
     def get_available_metadata_fields(self) -> List[str]:
         """Возвращает список поддерживаемых полей метаданных."""
@@ -547,7 +594,7 @@ class PySMContext:
                 raise RuntimeError("Не удалось получить доступ к документу Photoshop.")
 
             if clear_before_write:
-                all_possible_vars_to_clear = [
+                all_possible_vars_to_clear =[
                     f"{prefix}{key}" for key in FIELD_MAP.keys()
                 ]
                 all_possible_vars_to_clear.append(f"{prefix}doc")
@@ -557,58 +604,31 @@ class PySMContext:
                     file=sys.stderr,
                 )
 
-            # --- БЛОК 1: ИЗВЛЕЧЕНИЕ СИСТЕМНЫХ МЕТАДАННЫХ (С ЯВНЫМ ПРИВЕДЕНИЕМ ТИПОВ) ---
             doc_info_dict = {}
-            try:
-                doc_info_dict["name"] = str(doc.name)
-            except Exception:
-                pass
-            try:
-                doc_info_dict["fullName"] = str(doc.fullName)
-            except Exception:
-                pass
-            try:
-                doc_info_dict["width"] = int(doc.width)
-            except Exception:
-                pass
-            try:
-                doc_info_dict["height"] = int(doc.height)
-            except Exception:
-                pass
-            try:
-                doc_info_dict["resolution"] = float(doc.resolution)
-            except Exception:
-                pass
-            try:
-                doc_info_dict["colorProfileName"] = str(doc.colorProfileName)
-            except Exception:
-                pass
-            try:
-                doc_info_dict["bitsPerChannel"] = str(doc.bitsPerChannel)
-            except Exception:
-                pass
-            try:
-                doc_info_dict["mode"] = str(doc.mode)
-            except Exception:
-                pass
+            try: doc_info_dict["name"] = str(doc.name)
+            except Exception: pass
+            try: doc_info_dict["fullName"] = str(doc.fullName)
+            except Exception: pass
+            try: doc_info_dict["width"] = int(doc.width)
+            except Exception: pass
+            try: doc_info_dict["height"] = int(doc.height)
+            except Exception: pass
+            try: doc_info_dict["resolution"] = float(doc.resolution)
+            except Exception: pass
+            try: doc_info_dict["colorProfileName"] = str(doc.colorProfileName)
+            except Exception: pass
+            try: doc_info_dict["bitsPerChannel"] = str(doc.bitsPerChannel)
+            except Exception: pass
+            try: doc_info_dict["mode"] = str(doc.mode)
+            except Exception: pass
 
             if final_doc_path and os.path.exists(final_doc_path):
-                try:
-                    doc_info_dict["file_size"] = os.path.getsize(final_doc_path)
-                except Exception:
-                    pass
-                try:
-                    doc_info_dict["creation_time"] = datetime.fromtimestamp(
-                        os.path.getctime(final_doc_path)
-                    ).isoformat()
-                except Exception:
-                    pass
-                try:
-                    doc_info_dict["modification_time"] = datetime.fromtimestamp(
-                        os.path.getmtime(final_doc_path)
-                    ).isoformat()
-                except Exception:
-                    pass
+                try: doc_info_dict["file_size"] = os.path.getsize(final_doc_path)
+                except Exception: pass
+                try: doc_info_dict["creation_time"] = datetime.fromtimestamp(os.path.getctime(final_doc_path)).isoformat()
+                except Exception: pass
+                try: doc_info_dict["modification_time"] = datetime.fromtimestamp(os.path.getmtime(final_doc_path)).isoformat()
+                except Exception: pass
 
             # --- Логика извлечения XMP-данных ---
             results_to_update = {}
@@ -644,7 +664,7 @@ class PySMContext:
                             if field_type == "simple":
                                 result_value = node.text
                             elif field_type in ["array", "structure"]:
-                                items = [
+                                items =[
                                     li.text
                                     for li in node.findall(".//rdf:li", XML_NAMESPACES)
                                     if li.text
@@ -654,9 +674,7 @@ class PySMContext:
                                     for item in items:
                                         if ":" in item:
                                             key_part, val_part = item.split(":", 1)
-                                            structured_dict[key_part.strip()] = (
-                                                val_part.strip()
-                                            )
+                                            structured_dict[key_part.strip()] = val_part.strip()
                                     result_value = structured_dict
                                 else:
                                     result_value = items
@@ -675,15 +693,16 @@ class PySMContext:
 
         return results_to_update
 
-# 3. БЛОК: Создание глобального экземпляра-синглтона
 # ==============================================================================
-# Этот объект является единственной точкой входа для пользовательских скриптов
-# для взаимодействия с контекстом.
+# СИНГЛТОН КОНТЕКСТА
+# ==============================================================================
 pysm_context = PySMContext()
 
 
-# 1. БЛОК: Класс ConfigResolver (ИЗМЕНЕН)
 # ==============================================================================
+# ВСПОМОГАТЕЛЬНЫЕ КЛАССЫ
+# ==============================================================================
+
 class ConfigResolver:
     """
     Универсальный помощник для получения конфигурации скрипта с учетом приоритетов
@@ -705,8 +724,6 @@ class ConfigResolver:
       проходят через обработчик шаблонов, который заменяет в них
       плейсхолдеры вида {имя_переменной_контекста}.
     """
-# 1. БЛОК: Класс ConfigResolver (ПОЛНОСТЬЮ ПЕРЕРАБОТАН)
-# ==============================================================================
     PATH_KEYWORDS = {"path", "dir", "file", "folder"}
     _MISSING = object()  # Уникальный маркер для проверки отсутствия значения
 
@@ -728,7 +745,6 @@ class ConfigResolver:
     def _detect_explicit_cli_args(self) -> set[str]:
         """Определяет, какие аргументы были явно переданы через командную строку."""
         explicit_args = set()
-        
         for action in self._parser._actions:
             if action.option_strings:
                 # Опциональные аргументы: ищем совпадения напрямую в sys.argv
@@ -742,7 +758,6 @@ class ConfigResolver:
                 cli_val = getattr(self._cli_args, action.dest, None)
                 if cli_val != self._parser.get_default(action.dest):
                     explicit_args.add(action.dest)
-                    
         return explicit_args
 
     def _get_raw_value(self, param_name: str) -> Any:
@@ -804,7 +819,6 @@ class ConfigResolver:
         raw_value = self._get_raw_value(param_name)
         processed_value = self._process_string_value(param_name, raw_value)
         final_value = self._convert_to_expected_type(param_name, processed_value)
-        
         return final_value if final_value is not None else default
 
     def resolve_all(self) -> Namespace:

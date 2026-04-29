@@ -16,6 +16,7 @@ from .models import (
     ScriptSetEntryModel,
     ScriptRootModel,
     ContextVariableModel,
+    FavoriteScriptModel,
 )
 
 from pydantic import ValidationError
@@ -166,6 +167,25 @@ class SetManager:
         self._rebuild_nodes_cache()
         self._set_dirty(True)
         return self.current_collection_model
+        
+    # --- НАЧАЛО ИЗМЕНЕНИЙ (Добавлен новый метод) ---
+    def create_collection_from_current(self) -> ScriptSetsCollectionModel:
+        logger.info("SetManager: Создание рабочего процесса из шаблона.")
+        
+        # Делаем глубокую копию текущей модели (все настройки, переменные и структура сохранятся)
+        new_model = self.current_collection_model.model_copy(deep=True)
+        
+        # Сбрасываем имя коллекции на дефолтное "Новый рабочий процесс"
+        new_model.collection_name = locale_manager.get("set_manager.new_collection_name")        
+        
+        # Устанавливаем новую модель, сбрасываем путь к файлу и помечаем как "измененную"
+        self.current_collection_model = new_model
+        self.current_collection_file_path = None
+        self._rebuild_nodes_cache()
+        self._set_dirty(True)
+        
+        return self.current_collection_model
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---        
 
     def load_collection_from_file(self, file_path: pathlib.Path) -> bool:
         logger.info(
@@ -461,6 +481,7 @@ class SetManager:
         _, parent_list, index = find_result
         parent_list.pop(index)
         self._rebuild_nodes_cache()
+        self._cleanup_orphaned_favorites()
         self._set_dirty(True)
         return True
 
@@ -556,6 +577,7 @@ class SetManager:
             if e.instance_id != instance_id_to_remove
         ]
         if len(target_set.script_entries) < initial_len:
+            self._cleanup_orphaned_favorites()
             self._set_dirty(True)
             return True
         return False
@@ -755,3 +777,116 @@ class SetManager:
                 exc_info=True,
             )
             return None        
+
+    # ==============================================================================
+    # БЛОК: Управление избранными скриптами (Quick Access)
+    # ==============================================================================
+
+    def toggle_favorite(self, instance_id: str, icon_name: str = "STAR", icon_color: Optional[str] = None) -> bool:
+        favorites = self.current_collection_model.favorite_scripts
+        for i, fav in enumerate(favorites):
+            if fav.instance_id == instance_id:
+                favorites.pop(i)
+                self._set_dirty(True)
+                return False 
+        
+        favorites.append(FavoriteScriptModel(instance_id=instance_id, icon_name=icon_name, icon_color=icon_color))
+        self._set_dirty(True)
+        return True
+
+    def update_favorite_icon(self, instance_id: str, new_icon_name: str, new_icon_color: Optional[str] = None) -> bool:
+        for fav in self.current_collection_model.favorite_scripts:
+            if fav.instance_id == instance_id:
+                if fav.icon_name != new_icon_name or fav.icon_color != new_icon_color:
+                    fav.icon_name = new_icon_name
+                    fav.icon_color = new_icon_color
+                    self._set_dirty(True)
+                    return True
+                return False
+        return False
+
+    def is_favorite(self, instance_id: str) -> bool:
+        """Проверяет, находится ли скрипт в избранном."""
+        return any(fav.instance_id == instance_id for fav in self.current_collection_model.favorite_scripts)
+
+    def get_favorite_icon(self, instance_id: str) -> str:
+        """Возвращает имя иконки для избранного скрипта или STAR по умолчанию."""
+        for fav in self.current_collection_model.favorite_scripts:
+            if fav.instance_id == instance_id:
+                return fav.icon_name
+        return "STAR"
+
+    def get_all_favorites(self) -> List[FavoriteScriptModel]:
+        """Возвращает список всех избранных скриптов."""
+        return self.current_collection_model.favorite_scripts
+
+    def find_script_entry_by_instance_id(self, instance_id: str) -> Optional[ScriptSetEntryModel]:
+        """Ищет ScriptSetEntryModel во всей коллекции по instance_id."""
+        def _search_in_nodes(nodes: List[SetHierarchyNodeType]) -> Optional[ScriptSetEntryModel]:
+            for node in nodes:
+                if isinstance(node, ScriptSetNodeModel):
+                    for entry in node.script_entries:
+                        if entry.instance_id == instance_id:
+                            return entry
+                elif isinstance(node, SetFolderNodeModel) and node.children:
+                    found = _search_in_nodes(node.children)
+                    if found:
+                        return found
+            return None
+        return _search_in_nodes(self.current_collection_model.root_nodes)
+
+    def find_parent_set_id_for_instance(self, instance_id: str) -> Optional[str]:
+        """Ищет ID родительского набора (ScriptSetNodeModel) по instance_id."""
+        def _search_in_nodes(nodes: List[SetHierarchyNodeType]) -> Optional[str]:
+            for node in nodes:
+                if isinstance(node, ScriptSetNodeModel):
+                    for entry in node.script_entries:
+                        if entry.instance_id == instance_id:
+                            return node.id
+                elif isinstance(node, SetFolderNodeModel) and node.children:
+                    found = _search_in_nodes(node.children)
+                    if found:
+                        return found
+            return None
+        return _search_in_nodes(self.current_collection_model.root_nodes)
+
+    def _cleanup_orphaned_favorites(self):
+        """Удаляет из избранного ссылки на несуществующие экземпляры скриптов."""
+        existing_instance_ids = set()
+        def _collect_ids(nodes: List[SetHierarchyNodeType]):
+            for node in nodes:
+                if isinstance(node, ScriptSetNodeModel):
+                    for entry in node.script_entries:
+                        existing_instance_ids.add(entry.instance_id)
+                elif isinstance(node, SetFolderNodeModel) and node.children:
+                    _collect_ids(node.children)
+                    
+        _collect_ids(self.current_collection_model.root_nodes)
+        
+        initial_count = len(self.current_collection_model.favorite_scripts)
+        self.current_collection_model.favorite_scripts =[
+            fav for fav in self.current_collection_model.favorite_scripts
+            if fav.instance_id in existing_instance_ids
+        ]
+        
+        if len(self.current_collection_model.favorite_scripts) != initial_count:
+            self._set_dirty(True)            
+
+    def find_entry_and_parent_set(self, instance_id: str) -> Optional[Tuple[ScriptSetEntryModel, ScriptSetNodeModel]]:
+        """
+        Выполняет глобальный поиск по всей коллекции.
+        Возвращает кортеж (экземпляр скрипта, родительский набор), если скрипт найден.
+        """
+        def _search_in_nodes(nodes: List[SetHierarchyNodeType]) -> Optional[Tuple[ScriptSetEntryModel, ScriptSetNodeModel]]:
+            for node in nodes:
+                if isinstance(node, ScriptSetNodeModel):
+                    for entry in node.script_entries:
+                        if entry.instance_id == instance_id:
+                            return entry, node
+                elif isinstance(node, SetFolderNodeModel) and node.children:
+                    found = _search_in_nodes(node.children)
+                    if found:
+                        return found
+            return None
+            
+        return _search_in_nodes(self.current_collection_model.root_nodes)

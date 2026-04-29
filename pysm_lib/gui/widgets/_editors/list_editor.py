@@ -1,6 +1,6 @@
 # pysm_lib/gui/widgets/_editors/list_editor.py
 
-from typing import Optional, List
+from typing import Optional, List, Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -16,10 +16,19 @@ from ....app_constants import COLLECTION_DEFAULT_FOLDER
 
 @register_editor("list")
 class ListEditorWidget(BaseEditor):
-    def __init__(self, value: Optional[List[str]], context: EditorContext, **kwargs):
+    def __init__(self, value: Any, context: EditorContext, **kwargs):
         super().__init__(value, context, **kwargs)
-        self.current_value = value or[]
         
+        # --- ЗАЩИТА ТИПОВ ---
+        # Если из БД пришла старая одиночная строка (из-за ошибки в паспорте) 
+        # или многострочный текст, корректно преобразуем в список строк
+        if isinstance(value, list):
+            self.current_value =[str(v) for v in value]
+        elif isinstance(value, str):
+            self.current_value =[line.strip() for line in value.splitlines() if line.strip()]
+        else:
+            self.current_value =[]
+            
         layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(3)
@@ -75,9 +84,8 @@ class ListEditorWidget(BaseEditor):
         right_layout.addWidget(button_box)
         
         splitter.addWidget(right_container)
-        splitter.setSizes([250, 600])
+        splitter.setSizes([300, 550])
         
-        # --- Обработчик применения шаблона ---
         def on_template_applied(text: str, replace: bool):
             if replace:
                 editor.setPlainText(text)

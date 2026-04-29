@@ -42,6 +42,8 @@ class Student:
     # Порядок и идентификация
     surname: str = ""
     name: str = ""
+    patronymic: str = ""         # НОВОЕ: Отчество
+    rank: str = "ученик"         # НОВОЕ: Ранг (ученик, учитель, директор и т.д.)
     shoot_order: Optional[int] = None
     alpha_order: int = 0
 
@@ -56,8 +58,7 @@ class Student:
     service_cost: int = 0
     extra_services: List[ExtraService] = field(default_factory=list)
     
-    # --- НОВОЕ: Дополнительная информация (Цитаты, Хобби и т.д.) ---
-    # Ключ: Название поля (из схемы), Значение: Текст пользователя
+    # Дополнительная информация (Цитаты, Хобби и т.д.)
     info: Dict[str, str] = field(default_factory=dict)
 
     @property

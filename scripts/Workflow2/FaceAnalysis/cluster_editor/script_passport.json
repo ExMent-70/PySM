@@ -1,8 +1,8 @@
 {
-  "description": "Интерактивный GUI-редактор для визуальной проверки и исправления результатов кластеризации.\n<br><b>Поддерживаемые режимы:</b>\n<br> • <b>face</b>: редактирование кластеров лиц.\n<br> • <b>location</b>: редактирование кластеров локаций.\n<br> • <b>matches</b>: просмотр и ручная коррекция совпадений между портретами и групповыми фото.\n\n<br><b>Важно:</b> Скрипт требует явного указания путей к файлам `info_portrait_faces.json` и `info_group_faces.json`. В режиме `matches` позволяет динамически загружать данные из разных съемок, обрабатывать неопознанные лица и сохранять результаты в `matches_portrait_to_group.json` и `error_matches.json`.",
+  "description": "Интерактивный GUI-редактор для визуальной проверки и исправления результатов кластеризации.\n<br><b>Доступные режимы работы:</b>\n• <b>cleaning</b>: техническое редактирование кластеров лиц.\n• <b>face</b>: редактирование кластеров лиц.\n• <b>location</b>: редактирование кластеров локаций.\n• <b>matches</b>: просмотр и ручная коррекция совпадений между портретами и групповыми фото.\n\n<b>Важно:</b> Скрипт требует явного указания пути к папке с файлом `info_faces.json`. \nВ режиме `matches` позволяет динамически загружать данные из разных съемок, обрабатывать неопознанные лица и сохранять результаты в `matches_portrait_to_group.json` и `error_matches.json`.",
   "category": "Утилиты",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "v2.2026.02.12",
+  "version": "v2.2026.02.22",
   "command_line_args_meta": {
     "ce_working_dir": {
       "type": "dir_path",
@@ -11,10 +11,22 @@
       "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
     },
     "ce_reference_dir": {
-      "type": "file_path",
+      "type": "dir_path",
       "description": "Папка с эталонами (для matches)",
       "required": false,
       "default": ""
+    },
+    "ce_export_dir": {
+      "type": "dir_path",
+      "description": "Папка для экспорта фотографий с водяными знаками",
+      "required": false,
+      "default": "{wf_psd_path}/{wf_session_name}"
+    },
+    "ce_win_state_var_name": {
+      "type": "string",
+      "description": "Имя переменной контекста для сохранения геометрии окна",
+      "required": true,
+      "default": "win_state_claster_editor"
     },
     "all_threads": {
       "type": "int",
@@ -33,12 +45,6 @@
         "matches",
         "cleaning"
       ]
-    },
-    "var_export_jpg": {
-      "type": "string",
-      "description": "Имя переменной контекста для сохранения флага экспорта",
-      "required": true,
-      "default": "var_export_jpg"
     }
   }
 }

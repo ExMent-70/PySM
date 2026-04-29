@@ -57,6 +57,7 @@ class AppController(QObject):
     controller_state_updated = Signal()
     config_updated = Signal()
     scan_state_changed = Signal(bool)
+    favorites_updated = Signal()
 
 
     def __init__(
@@ -101,6 +102,7 @@ class AppController(QObject):
 
         self._app_state: AppState = AppState.IDLE
         self.script_run_statuses: Dict[str, ScriptRunStatus] = {}
+        self.suggested_save_dir: Optional[pathlib.Path] = None
 
         self._apply_path_updates_to_current_process()
         QTimer.singleShot(0, self.load_initial_state)
@@ -530,7 +532,19 @@ class AppController(QObject):
                 exc_info=True,
             )
 
+
+# --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    def _update_suggested_save_dir(self):
+        """Сохраняет родительскую директорию (на уровень выше) текущего проекта."""
+        if self.current_collection_file_path:
+            self.suggested_save_dir = self.current_collection_file_path.parent.parent
+        elif self.config_manager.last_used_sets_collection_file:
+            last_path = pathlib.Path(self.config_manager.last_used_sets_collection_file)
+            if last_path.is_file():
+                self.suggested_save_dir = last_path.parent.parent
+
     def new_collection_requested_by_gui(self):
+        self._update_suggested_save_dir()
         self.set_manager.create_new_empty_collection()
         self.current_collection_file_path = None
         self.log_message_to_console.emit(
@@ -545,6 +559,29 @@ class AppController(QObject):
         self.status_message_updated.emit(
             self.locale_manager.get("app_controller.status_new_collection")
         )
+
+    def new_collection_from_template_requested_by_gui(self):
+        self._update_suggested_save_dir()
+        self.set_manager.create_collection_from_current()
+        self.current_collection_file_path = None
+        
+        self.clear_console_request.emit()
+        self._log_welcome_message()
+        self.log_message_to_console.emit(
+            "runner_info", self.locale_manager.get("user_actions.collection_new_from_template")
+        )
+
+        self.config_manager.last_used_sets_collection_file = ""
+        self.set_active_script_set_node(None)
+        self.config_manager.save_config()
+        
+        self._request_collection_view_update()
+        self.collection_dirty_state_changed.emit(self.set_manager.is_dirty)
+        self.status_message_updated.emit(
+            self.locale_manager.get("app_controller.status_new_collection")
+        )
+    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
 
     def save_current_collection_requested_by_gui(
         self, target_file_path: Optional[pathlib.Path]
@@ -661,6 +698,7 @@ class AppController(QObject):
         self.current_collection_updated.emit(
             self.set_manager.get_all_nodes_for_display(), node_id_to_select
         )
+        self.favorites_updated.emit()
 
     def _request_collection_view_update(self, node_id_to_select: Optional[str] = None):
         QTimer.singleShot(0, lambda: self._emit_collection_updated(node_id_to_select))
@@ -930,6 +968,38 @@ class AppController(QObject):
                 return widget
         return None
 
+    @Slot(dict)
+    def _on_ipc_context_update(self, update_data: dict):
+        """Мгновенно обновляет контекст в оперативной памяти PySM без пометки коллекции как грязной."""
+        action = update_data.get("action")
+        current_context = self.set_manager.current_collection_model.context_data
+        is_changed = False
+
+        if action == "set":
+            key = update_data.get("key")
+            val = update_data.get("value")
+            var_type = update_data.get("var_type", "string")
+            
+            if key:
+                if key in current_context:
+                    current_context[key].value = val
+                    current_context[key].type = var_type
+                else:
+                    from .models import ContextVariableModel
+                    current_context[key] = ContextVariableModel(type=var_type, value=val)
+                is_changed = True
+                
+        elif action == "remove":
+            keys = update_data.get("keys",[])
+            for k in keys:
+                if k in current_context:
+                    del current_context[k]
+                    is_changed = True
+
+        if is_changed and self.current_orchestrator:
+            # Заставляем UI (ContextEditorWidget) обновить таблицу в реальном времени!
+            self.current_orchestrator.context_reloaded.emit()
+
 
     def run_script_set(
         self,
@@ -963,27 +1033,40 @@ class AppController(QObject):
         
         self.script_run_statuses.clear()
 
+
         # Создаем оркестратор, передавая ему все необходимые зависимости.
-        # Теперь ОН будет отвечать за подготовку контекста.
         self.current_orchestrator = SetRunnerOrchestrator(
             set_node=set_node,
             run_mode=run_mode,
             continue_on_error=continue_on_error,
             get_script_info_func=self.get_script_info_by_id,
             config_manager=self.config_manager,
-            theme_manager=self.theme_manager,  # <--- Передаем новый ThemeManager
+            theme_manager=self.theme_manager,
             locale_manager=self.locale_manager,
             context_file_path=context_file_path,
             selected_instance_id=selected_instance_id,
+            get_set_manager_func=lambda: self.set_manager, # <--- ДОБАВЛЕНО (Лямбда для доступа)
         )
+        
+        # Подключаем новый сигнал (уже был, но мы сменили его логику в оркестраторе)
+        self.current_orchestrator.context_reloaded.connect(self._request_collection_view_update)
 
         # Подключение сигналов остается прежним
         self.current_orchestrator.log_message.connect(self.log_message_to_console)
         self.current_orchestrator.clear_console.connect(self.clear_console_request)
         self.current_orchestrator.run_started.connect(self.set_run_started)
+
+        # Теперь используем наши новые слоты-перехватчики
         self.current_orchestrator.instance_status_changed.connect(
-            self.script_instance_status_changed
+            self._on_orchestrator_instance_status_changed
         )
+        self.current_orchestrator.context_reloaded.connect(
+            self._on_orchestrator_context_reloaded
+        )
+        self.current_orchestrator.context_ipc_update_received.connect( # <--- ДОБАВЛЕНО
+            self._on_ipc_context_update
+        )
+        
         self.current_orchestrator.progress_updated.connect(self.script_progress_updated)
         self.current_orchestrator.app_state_changed.connect(self._set_app_state)
         self.current_orchestrator.run_completed.connect(self._on_orchestrator_finished)
@@ -1011,6 +1094,23 @@ class AppController(QObject):
 
         # ВАЖНО: Сбрасываем состояние в IDLE после завершения
         self._set_app_state(AppState.IDLE)
+
+    @Slot(str, object)
+    def _on_orchestrator_instance_status_changed(self, instance_id: str, status: Optional[ScriptRunStatus]):
+        """Сохраняет статус в словарь контроллера перед отправкой в UI."""
+        if status is None:
+            self.script_run_statuses.pop(instance_id, None)
+        else:
+            self.script_run_statuses[instance_id] = status
+        # Пробрасываем сигнал дальше в виджеты
+        self.script_instance_status_changed.emit(instance_id, status)
+
+    @Slot()
+    def _on_orchestrator_context_reloaded(self):
+        """Тихо обновляет контекст в памяти без перерисовки всего дерева UI."""
+        if self.set_manager.current_collection_file_path:
+            self.set_manager.reload_context_from_file()
+
 
     def proceed_to_next_script_in_set_step(self):
         if self.current_orchestrator and self.is_waiting_for_next_step():
@@ -1196,3 +1296,18 @@ class AppController(QObject):
                     "app_controller.message_box.import_read_failed", path=file_path, error=e
                 ),
             )
+            
+    # ==============================================================================
+    # БЛОК: Управление избранным (Quick Access)
+    # ==============================================================================
+    def toggle_script_favorite(self, instance_id: str, icon_name: str = "STAR", icon_color: Optional[str] = None):
+        is_added = self.set_manager.toggle_favorite(instance_id, icon_name, icon_color)
+        msg_key = "user_actions.favorite_added" if is_added else "user_actions.favorite_removed"
+        self.log_message_to_console.emit("runner_info", self.locale_manager.get(msg_key))
+        self.favorites_updated.emit()
+        self.collection_dirty_state_changed.emit(True)
+
+    def change_favorite_icon(self, instance_id: str, icon_name: str, icon_color: Optional[str] = None):
+        if self.set_manager.update_favorite_icon(instance_id, icon_name, icon_color):
+            self.favorites_updated.emit()
+            self.collection_dirty_state_changed.emit(True)

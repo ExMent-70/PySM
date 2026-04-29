@@ -41,16 +41,15 @@ class ModelConfig(BaseModel):
     """Настройки моделей для анализа."""
     name: str = "antelopev2"
     det_thresh: float = 0.5
-    det_size: List[int] = Field(default=[1280, 1280])
+    det_size: List[int] = Field(default_factory=lambda: list([1280, 1280]))
     gender_model: str = "FACEONNX/gender_efficientnet_b2.onnx"
     emotion_model: str = "FACEONNX/emotion_cnn.onnx"
     age_model: str = "FACEONNX/age_efficientnet_b2.onnx"
     beauty_model: str = "FACEONNX/beauty_resnet18.onnx"
     eyeblink_model: str = "FACEONNX/eye_blink_cnn.onnx"
-    emotion_labels: List[str] = Field(default=["Neutral", "Happiness", "Surprise", "Sadness", "Anger", "Disgust", "Fear"])
+    emotion_labels: List[str] = Field(default_factory=lambda: list(["Neutral", "Happiness", "Surprise", "Sadness", "Anger", "Disgust", "Fear"]))
 
 class TaskFlags(BaseModel):
-    """Флаги для включения/отключения задач анализа."""
     analyze_gender: bool = True
     analyze_emotion: bool = True
     analyze_age: bool = True
@@ -58,12 +57,20 @@ class TaskFlags(BaseModel):
     analyze_eyeblink: bool = True
     save_debug_kps: bool = False
 
+class EyeThresholdsConfig(BaseModel):
+    """Настройки порогов для анализа глаз (по размеру лица)."""
+    size_limits: List[int] = Field(default_factory=lambda: list([80, 200]))
+    thresholds_small: List[float] = Field(default_factory=lambda: list([0.15, 0.25]))
+    thresholds_medium: List[float] = Field(default_factory=lambda: list([0.20, 0.30]))
+    thresholds_large: List[float] = Field(default_factory=lambda: list([0.25, 0.35]))
+
 class AppConfig(BaseModel):
     """Корневая модель конфигурации."""
     paths: PathsConfig = Field(default_factory=PathsConfig)
     provider: ProviderConfig = Field(default_factory=ProviderConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     task_flags: TaskFlags = Field(default_factory=TaskFlags)
+    eye_thresholds: EyeThresholdsConfig = Field(default_factory=EyeThresholdsConfig)
 
 
 # --- Блок 2: Класс ConfigManager ---
@@ -132,4 +139,3 @@ class ConfigManager:
             return value
         except (KeyError, TypeError):
             return default
-

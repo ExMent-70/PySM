@@ -40,12 +40,6 @@
       "required": false,
       "default": "Masks"
     },
-    "update-xmp": {
-      "type": "bool",
-      "description": "Включить операцию обновления XMP-тегов (запись локации).",
-      "required": false,
-      "default": false
-    },
     "rename-files": {
       "type": "bool",
       "description": "Включить операцию переименования файлов при копировании.",

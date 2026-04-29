@@ -3,6 +3,7 @@
 
 """
 Модуль делегатов (Delegates) для кастомной отрисовки элементов списков.
+ОПТИМИЗИРОВАНО: Убраны буферы QPixmap для выделений (ускорена отрисовка).
 """
 
 from typing import Dict, Any, Optional
@@ -20,7 +21,7 @@ from PySide6.QtGui import (
     QColor, 
     QPalette, 
     QPen,
-    QBrush # <--- Добавлено
+    QBrush
 )
 from PySide6.QtCore import Qt, QRect, QSize, QRectF
 
@@ -32,14 +33,14 @@ from PySide6.QtCore import Qt, QRect, QSize, QRectF
 THUMBNAIL_SIZE = 180  # Размер квадратной миниатюры в галерее
 PREVIEW_SIZE = 180    # Размер миниатюры в списке кластеров
 FACE_SIZE = 130       # Базовый размер лица (используется в других модулях)
-FACE_SIZE_PORTRAIT = 290       # Базовый размер лица (используется в других модулях)
+FACE_SIZE_PORTRAIT = 290 # Базовый размер лица
 FACE_MIN = 100        # Мин. размер слайдера лиц
 FACE_MAX = 400        # Макс. размер слайдера лиц
 
 # --- Отступы и рамки ---
 ITEM_PADDING = 6           # Внутренний отступ от края ячейки до контента
 BORDER_RADIUS = 3          # Радиус скругления серой подложки
-BORDER_RADIUS_BG = 8       # <--- Радиус скругления фона выделения (Сделали побольше)
+BORDER_RADIUS_BG = 8       # Радиус скругления фона выделения
 CHANGED_INDICATOR_H = 3    # Высота цветной полоски "Изменено"
 DROP_BORDER_WIDTH = 2      # Толщина рамки при Drag&Drop
 
@@ -55,6 +56,7 @@ FONT_SIZE_COUNT = 9
 
 try:
     from pysm_lib import theme_api
+    from pysm_lib.pysm_icons import icons as pysm_icons
 except ImportError:
     class ThemeAPIMock:
         def get_parsed_style(self, key: str, *args, **kwargs) -> Dict[str, str]:
@@ -64,14 +66,13 @@ except ImportError:
                 "delegate_secondary_text": {"color": "#555555"},
                 "delegate_hover_border": {"color": "#0078d7"}
             }
-            return defaults.get(key, {})
+            return defaults.get(key, dict())
     theme_api = ThemeAPIMock()
+    pysm_icons = None
 
 
 class ClusterItemDelegate(QStyledItemDelegate):
-    """
-    Делегат для отрисовки карточки кластера в левой панели.
-    """
+    """Делегат для отрисовки карточки кластера в левой панели."""
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -91,10 +92,12 @@ class ClusterItemDelegate(QStyledItemDelegate):
         Основной метод отрисовки.
         """
         painter.save()
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # --- Шаг 2: Извлечение данных (Подняли наверх для проверки флагов) ---
-        item_data = index.data(Qt.ItemDataRole.UserRole) or {}
+        item_data = index.data(Qt.ItemDataRole.UserRole)
+        if item_data is None:
+            item_data = dict()
+            
         cluster_name = item_data.get("name", "N/A")
         count = item_data.get("count", 0)
         pixmap: Optional[QPixmap] = item_data.get("pixmap")
@@ -105,43 +108,26 @@ class ClusterItemDelegate(QStyledItemDelegate):
         
         bg_rect = option.rect
 
-        # --- Шаг 1: Отрисовка скругленного фона (Texture Buffer Method) ---
-        # Мы рисуем фон только если элемент выделен или под курсором (оптимизация)
+        # --- Шаг 1: Отрисовка скругленного фона (ОПТИМИЗИРОВАНО) ---
         if is_selected or is_hovered:
-            # 1.1. Создаем временный буфер (QPixmap) размером с ячейку
-            # Это позволяет нам отрисовать стиль темы (QSS) в картинку
-            buffer = QPixmap(option.rect.size())
-            buffer.fill(Qt.transparent)
-            
-            p = QPainter(buffer)
-            # Создаем копию опций, смещенную в 0,0 (локальные координаты буфера)
-            temp_option = QStyleOptionViewItem(option)
-            temp_option.rect = QRect(0, 0, option.rect.width(), option.rect.height())
-            # Убираем текст и иконки, нам нужен только фон от стиля
-            temp_option.text = "" 
-            temp_option.features &= ~QStyleOptionViewItem.ViewItemFeature.HasDecoration
-            
-            # Просим стиль нарисовать фон (учитывая цвета темы hover/select)
-            option.widget.style().drawControl(QStyle.ControlElement.CE_ItemViewItem, temp_option, p, option.widget)
-            p.end()
-            
-            # 1.2. Рисуем этот буфер как текстуру (Brush) внутри скругленного прямоугольника
-            # drawRoundedRect поддерживает качественный антиалиасинг, в отличие от setClipPath
-            painter.setBrush(QBrush(buffer))
-            painter.setBrushOrigin(option.rect.topLeft()) # Важно: совмещаем текстуру с ячейкой
-            painter.setPen(Qt.NoPen)
-            
-            # Небольшой отступ, чтобы выделения не слипались
+            if is_selected:
+                bg_color = option.palette.color(QPalette.ColorRole.Highlight)
+            else:
+                base_color = option.palette.color(QPalette.ColorRole.WindowText)
+                bg_color = QColor(base_color.red(), base_color.green(), base_color.blue(), 15)
+                
+            painter.setBrush(QBrush(bg_color))
+            painter.setPen(Qt.PenStyle.NoPen)
             draw_rect = QRectF(option.rect).adjusted(1, 1, -1, -1)
             painter.drawRoundedRect(draw_rect, BORDER_RADIUS_BG, BORDER_RADIUS_BG)
 
-        # --- Шаг 3: Индикатор изменений ---
+        # --- Шаг 2: Индикатор изменений ---
         if is_changed:
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(self.changed_indicator_color)
             painter.drawRect(bg_rect.x(), bg_rect.y(), bg_rect.width(), CHANGED_INDICATOR_H)
 
-        # --- Шаг 4: Подложка под миниатюру ---
+        # --- Шаг 3: Подложка под миниатюру ---
         preview_bg_rect = QRect(
             bg_rect.x() + ITEM_PADDING, 
             bg_rect.y() + ITEM_PADDING, 
@@ -152,7 +138,7 @@ class ClusterItemDelegate(QStyledItemDelegate):
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(preview_bg_rect, BORDER_RADIUS, BORDER_RADIUS)
 
-        # --- Шаг 5: Отрисовка миниатюры ---
+        # --- Шаг 4: Отрисовка миниатюры ---
         if pixmap and not pixmap.isNull():
             target_rect = QRect(0, 0, pixmap.width(), pixmap.height())
             target_rect.moveCenter(preview_bg_rect.center())
@@ -161,11 +147,11 @@ class ClusterItemDelegate(QStyledItemDelegate):
             painter.setPen(self.secondary_text_color)
             painter.drawText(preview_bg_rect, Qt.AlignmentFlag.AlignCenter, "No Preview")
 
-        # --- Шаг 6: Отрисовка Названия кластера ---
+        # --- Шаг 5: Отрисовка Названия кластера ---
         if is_selected:
             text_color = option.palette.color(QPalette.ColorRole.HighlightedText)
         elif is_hovered:
-            text_color = QColor(0, 0, 0) # Черный при наведении
+            text_color = option.palette.color(QPalette.ColorRole.WindowText)
         else:
             text_color = option.palette.color(QPalette.ColorRole.WindowText)
 
@@ -183,7 +169,7 @@ class ClusterItemDelegate(QStyledItemDelegate):
         )
         painter.drawText(name_rect, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, cluster_name)
 
-        # --- Шаг 7: Отрисовка Счетчика фото ---
+        # --- Шаг 6: Отрисовка Счетчика фото ---
         font.setBold(False)
         font.setPointSize(FONT_SIZE_COUNT)
         painter.setFont(font)
@@ -196,7 +182,7 @@ class ClusterItemDelegate(QStyledItemDelegate):
         count_rect = QRect(name_rect.bottomLeft(), QSize(PREVIEW_SIZE, TEXT_COUNT_HEIGHT))
         painter.drawText(count_rect, Qt.AlignmentFlag.AlignCenter, f"Фото: {count}")
 
-        # --- Шаг 8: Рамка Drag&Drop ---
+        # --- Шаг 7: Рамка Drag&Drop ---
         widget = option.widget
         if hasattr(widget, 'drop_target_item') and isinstance(widget, QListWidget):
             current_item = widget.item(index.row())
@@ -218,49 +204,51 @@ class ClusterItemDelegate(QStyledItemDelegate):
 
 
 class ImageItemDelegate(QStyledItemDelegate):
-    """
-    Делегат для отрисовки карточки изображения в галерее.
-    """
+    """Делегат для отрисовки карточки изображения в галерее."""
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         preview_styles = theme_api.get_parsed_style("delegate_preview_background")
         self.preview_bg_color = QColor(preview_styles.get("color", "#e8e8e8"))
+        self._icon_cache = dict() # Кэш иконок для максимальной производительности
+
+    def _get_cached_icon(self, icon_name: str, size: int):
+        if not pysm_icons: return None
+        cache_key = f"{icon_name}_{size}"
+        if cache_key not in self._icon_cache:
+            self._icon_cache[cache_key] = pysm_icons.get_qicon(icon_name, size=size)
+        return self._icon_cache[cache_key]
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index):
         painter.save()
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # --- Шаг 1: Отрисовка скругленного фона (Texture Buffer Method) ---
         is_selected = option.state & QStyle.StateFlag.State_Selected
         is_hovered = option.state & QStyle.StateFlag.State_MouseOver
 
+        bg_rect = option.rect
+        # Создаем квадратную область специально для картинки (верхняя часть)
+        img_size = bg_rect.width()
+        img_rect = QRect(bg_rect.x(), bg_rect.y(), img_size, img_size)
+
+        # --- Шаг 1: Отрисовка скругленного фона (на всю высоту, включая текст) ---
         if is_selected or is_hovered:
-            buffer = QPixmap(option.rect.size())
-            buffer.fill(Qt.transparent)
-            
-            p = QPainter(buffer)
-            temp_option = QStyleOptionViewItem(option)
-            temp_option.rect = QRect(0, 0, option.rect.width(), option.rect.height())
-            temp_option.text = "" 
-            temp_option.features &= ~QStyleOptionViewItem.ViewItemFeature.HasDecoration
-            
-            option.widget.style().drawControl(QStyle.ControlElement.CE_ItemViewItem, temp_option, p, option.widget)
-            p.end()
-            
-            painter.setBrush(QBrush(buffer))
-            painter.setBrushOrigin(option.rect.topLeft())
-            painter.setPen(Qt.NoPen)
-            
+            if is_selected:
+                bg_color = option.palette.color(QPalette.ColorRole.Highlight)
+            else:
+                base_color = option.palette.color(QPalette.ColorRole.WindowText)
+                bg_color = QColor(base_color.red(), base_color.green(), base_color.blue(), 15)
+                
+            painter.setBrush(QBrush(bg_color))
+            painter.setPen(Qt.PenStyle.NoPen)
             draw_rect = QRectF(option.rect).adjusted(1, 1, -1, -1)
             painter.drawRoundedRect(draw_rect, BORDER_RADIUS_BG, BORDER_RADIUS_BG)
 
         # --- Шаг 2: Данные ---
         pixmap: QPixmap = index.data(Qt.ItemDataRole.DecorationRole)
-        bg_rect = option.rect
 
-        # --- Шаг 3: Серая подложка ---
-        preview_bg_rect = bg_rect.adjusted(ITEM_PADDING, ITEM_PADDING, -ITEM_PADDING, -ITEM_PADDING)
+        # --- Шаг 3: Серая подложка (только для квадратной области картинки) ---
+        preview_bg_rect = img_rect.adjusted(ITEM_PADDING, ITEM_PADDING, -ITEM_PADDING, -ITEM_PADDING)
         
         painter.setBrush(self.preview_bg_color)
         painter.setPen(Qt.PenStyle.NoPen)
@@ -275,8 +263,72 @@ class ImageItemDelegate(QStyledItemDelegate):
             painter.setPen(option.palette.color(QPalette.ColorRole.Mid))
             painter.drawText(preview_bg_rect, Qt.AlignmentFlag.AlignCenter, "Image\nNot Found")
 
+        # --- Шаг 5: Отрисовка информационных значков (overlays) ---
+        user_data = index.data(Qt.ItemDataRole.UserRole)
+        if user_data and "overlays" in user_data and pysm_icons:
+            overlays = user_data["overlays"]
+            icon_size = 20
+            padding = 6
+            
+            current_x = preview_bg_rect.right() - icon_size - padding
+            current_y = preview_bg_rect.top() + padding
+            
+            for icon_name in overlays:
+                qicon = self._get_cached_icon(icon_name, icon_size)
+                if qicon and not qicon.isNull():
+                    bg_badge = QRectF(current_x - 3, current_y - 3, icon_size + 6, icon_size + 6)
+                    painter.setBrush(QColor(0, 0, 0, 140))
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.drawRoundedRect(bg_badge, (icon_size+6)/2, (icon_size+6)/2)
+                    
+                    icon_rect = QRect(int(current_x), int(current_y), icon_size, icon_size)
+                    qicon.paint(painter, icon_rect, Qt.AlignmentFlag.AlignCenter)
+                    
+                    current_y += (icon_size + padding + 6)
+
+        # --- Шаг 6: Отрисовка Beauty Score ---
+        if user_data and "beauty_score" in user_data:
+            b_score = user_data["beauty_score"]
+            badge_size = 22
+            padding = 6
+            bx = preview_bg_rect.left() + padding
+            by = preview_bg_rect.top() + padding
+
+            bg_badge = QRectF(bx, by, badge_size, badge_size)
+            painter.setBrush(QColor(230, 80, 150, 210))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(bg_badge, badge_size/2, badge_size/2)
+
+            painter.setPen(QColor("white"))
+            font = painter.font()
+            font.setPointSize(9)
+            font.setBold(True)
+            painter.setFont(font)
+            painter.drawText(bg_badge, Qt.AlignmentFlag.AlignCenter, str(b_score))
+
+        # --- Шаг 7: Отрисовка имени файла ---
+        text = index.data(Qt.ItemDataRole.DisplayRole)
+        if text:
+            # Место под текст — нижняя часть после img_rect
+            text_rect = QRect(bg_rect.x() + ITEM_PADDING, img_rect.bottom(), bg_rect.width() - (ITEM_PADDING * 2), bg_rect.height() - img_size)
+            
+            if is_selected:
+                painter.setPen(option.palette.color(QPalette.ColorRole.HighlightedText))
+            else:
+                painter.setPen(option.palette.color(QPalette.ColorRole.WindowText))
+                
+            font = painter.font()
+            font.setPointSize(9)
+            painter.setFont(font)
+            
+            # Экранируем слишком длинные имена файлов точками (...)
+            metrics = painter.fontMetrics()
+            elided_text = metrics.elidedText(text, Qt.TextElideMode.ElideRight, text_rect.width())
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, elided_text)
+
         painter.restore()
 
     def sizeHint(self, option, index) -> QSize:
         size = THUMBNAIL_SIZE + (ITEM_PADDING * 2)
-        return QSize(size, size)
+        text_height = 24 # Выделяем 24 пикселя по высоте для имени файла
+        return QSize(size, size + text_height)

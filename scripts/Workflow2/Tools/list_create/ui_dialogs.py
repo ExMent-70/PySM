@@ -17,8 +17,8 @@ from PySide6.QtCore import Qt, QEvent  # Добавили QEvent
 from PySide6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QDialogButtonBox, QHeaderView,
-    QMessageBox, QComboBox, QSpinBox, QLineEdit, QListWidget, 
-    QInputDialog, QFormLayout, QLabel, QScrollArea, QPlainTextEdit, QFrame, QTabWidget, QTextEdit, QApplication
+    QMessageBox, QComboBox, QSpinBox, QLineEdit, QListWidget, QListWidgetItem,
+    QInputDialog, QFormLayout, QLabel, QScrollArea, QPlainTextEdit, QFrame, QTabWidget, QTextEdit, QApplication 
 )
 from PySide6.QtGui import QKeySequence, QShortcut
 
@@ -33,7 +33,7 @@ class ServicesEditorDialog(QDialog):
     def __init__(self, services_data: Dict[str, int], parent: QWidget = None):
         super().__init__(parent)
         self.setWindowTitle("Редактор Услуг")
-        self.setMinimumSize(450, 350)
+        self.setMinimumSize(450, 750)
 
         self.layout = QVBoxLayout(self)
         
@@ -68,7 +68,8 @@ class ServicesEditorDialog(QDialog):
 
     def _populate_table(self, data: Dict[str, int]) -> None:
         self.table.setRowCount(len(data))
-        for i, (name, cost) in enumerate(data.items()):
+        # ИЗМЕНЕНО: Сортировка ключей (названий услуг) по алфавиту
+        for i, (name, cost) in enumerate(sorted(data.items())):
             self.table.setItem(i, 0, QTableWidgetItem(name))
             self.table.setItem(i, 1, QTableWidgetItem(str(cost)))
 
@@ -118,10 +119,10 @@ class ExtraServicesDialog(QDialog):
     def __init__(self, current_extras: List[ExtraService], services_dict: Dict[str, int], parent: QWidget = None):
         super().__init__(parent)
         self.setWindowTitle("Дополнительные услуги")
-        self.setMinimumSize(600, 400)
+        self.setMinimumSize(600, 500)
         
         self.services_dict = services_dict or {}
-        self.available_services = list(self.services_dict.keys())
+        self.available_services = sorted(self.services_dict.keys())
         
         try:
             temp_dicts = [ex.to_dict() for ex in current_extras]
@@ -152,14 +153,16 @@ class ExtraServicesDialog(QDialog):
         tb_layout.addWidget(add_btn)
         tb_layout.addWidget(del_btn)
         tb_layout.addStretch()
-        self.layout.addLayout(tb_layout)
+
 
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.button(QDialogButtonBox.StandardButton.Save).setText("Сохранить")
         self.button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Отмена")
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
-        self.layout.addWidget(self.button_box)
+        
+        tb_layout.addWidget(self.button_box)
+        self.layout.addLayout(tb_layout)
 
         self._populate_table()
 
@@ -252,7 +255,7 @@ class NamesEditorDialog(QDialog):
     def __init__(self, names_data: Dict[str, str], parent: QWidget = None):
         super().__init__(parent)
         self.setWindowTitle("Редактор Словаря Имен")
-        self.setMinimumSize(450, 400)
+        self.setMinimumSize(450, 750)
 
         self.layout = QVBoxLayout(self)
         self.table = QTableWidget()
@@ -286,7 +289,8 @@ class NamesEditorDialog(QDialog):
 
     def _populate_table(self, data: Dict[str, str]) -> None:
         self.table.setRowCount(len(data))
-        for i, (short, full) in enumerate(data.items()):
+        # ИЗМЕНЕНО: Сортировка ключей (сокращенных имен) по алфавиту
+        for i, (short, full) in enumerate(sorted(data.items())):
             self.table.setItem(i, 0, QTableWidgetItem(short))
             self.table.setItem(i, 1, QTableWidgetItem(full))
 
@@ -322,6 +326,72 @@ class NamesEditorDialog(QDialog):
         return names_dict
 
 
+# --- ИЗМЕНЕННЫЙ БЛОК 3: ui_dialogs.py (НОВЫЙ КЛАСС RanksEditorDialog) ---
+class RanksEditorDialog(QDialog):
+    """
+    Диалоговое окно для редактирования списка рангов.
+    """
+    def __init__(self, ranks_data: List[str], parent: QWidget = None):
+        super().__init__(parent)
+        self.setWindowTitle("Редактор Рангов")
+        self.setMinimumSize(400, 400)
+
+        self.layout = QVBoxLayout(self)
+        self.list_widget = QListWidget()
+        
+        # Сортируем и добавляем элементы, игнорируя возможные дубли
+        for rank in sorted(set(ranks_data)):
+            self._add_item_to_list(rank)
+            
+        self.layout.addWidget(self.list_widget)
+
+        button_layout = QHBoxLayout()
+        add_btn = QPushButton("Добавить")
+        del_btn = QPushButton("Удалить")
+        add_btn.clicked.connect(self._add_row)
+        del_btn.clicked.connect(self._remove_row)
+        
+        button_layout.addWidget(add_btn)
+        button_layout.addWidget(del_btn)
+        button_layout.addStretch()
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+
+        self.button_box.button(QDialogButtonBox.StandardButton.Save).setText("Сохранить")
+        self.button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Отмена")
+        
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        
+        #self.layout.addLayout(button_layout)
+        #self.layout.addWidget(self.button_box)
+        button_layout.addWidget(self.button_box)
+        self.layout.addLayout(button_layout)        
+
+    def _add_item_to_list(self, text: str):
+        item = QListWidgetItem(text)
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)
+        self.list_widget.addItem(item)
+
+    def _add_row(self):
+        self._add_item_to_list("Новый_ранг")
+        item = self.list_widget.item(self.list_widget.count() - 1)
+        self.list_widget.setCurrentItem(item)
+        self.list_widget.editItem(item)
+
+    def _remove_row(self):
+        row = self.list_widget.currentRow()
+        if row >= 0:
+            self.list_widget.takeItem(row)
+
+    def get_ranks(self) -> List[str]:
+        ranks = set()
+        for i in range(self.list_widget.count()):
+            text = self.list_widget.item(i).text().strip()
+            if text:
+                ranks.add(text)
+        return sorted(list(ranks))
+
 # ==============================================================================
 # НОВЫЕ КЛАССЫ ДЛЯ РАБОТЫ С ДОП. ИНФОРМАЦИЕЙ
 # ==============================================================================
@@ -330,6 +400,7 @@ class InfoSchemaEditorDialog(QDialog):
     """
     Редактор схемы полей (заголовков) для дополнительной информации.
     """
+# --- ИЗМЕНЕННЫЙ БЛОК: ui_dialogs.py (Весь метод __init__ в InfoSchemaEditorDialog) ---
     def __init__(self, current_columns: List[str], parent: QWidget = None):
         super().__init__(parent)
         self.setWindowTitle("Настройка полей информации")
@@ -341,9 +412,13 @@ class InfoSchemaEditorDialog(QDialog):
         main_layout = QHBoxLayout()
         self.layout.addLayout(main_layout)
 
+        # 1. СНАЧАЛА создаем виджет
         self.list_widget = QListWidget()
-        for col in current_columns:
+        
+        # 2. ЗАТЕМ добавляем в него отсортированные элементы
+        for col in sorted(current_columns):
             self.list_widget.addItem(col)
+            
         main_layout.addWidget(self.list_widget)
 
         btn_layout = QVBoxLayout()
@@ -450,6 +525,8 @@ class StudentInfoEditorDialog(QDialog):
         self.current_index = current_index
         self.info_columns = info_columns
         self.field_widgets: Dict[str, QPlainTextEdit] = {}
+        # НОВОЕ: Хранилище изменений (Ключ - индекс строки, Значение - новый словарь info)
+        self.staged_changes: Dict[int, Dict[str, str]] = {}
 
         # --- Основная верстка (без изменений) ---
         self.main_layout = QVBoxLayout(self)
@@ -554,25 +631,31 @@ class StudentInfoEditorDialog(QDialog):
         
         self.current_index = index
         student = self.students[index]
-        
         self.name_label.setText(f"{student.surname} {student.name}")
         
+        # Берем либо уже измененные данные, либо копию оригинальных
+        current_info = self.staged_changes.get(index, student.info.copy())
+        
         for col, widget in self.field_widgets.items():
-            val = student.info.get(col, "")
+            val = current_info.get(col, "")
             widget.setPlainText(val)
             
         self.btn_prev.setEnabled(index > 0)
         self.btn_next.setEnabled(index < len(self.students) - 1)
 
     def _save_current(self):
-        student = self.students[self.current_index]
+        new_info = {}
         for col, widget in self.field_widgets.items():
             txt = widget.toPlainText().strip()
             if txt:
-                student.info[col] = txt
-            else:
-                if col in student.info:
-                    del student.info[col]
+                new_info[col] = txt
+        # Сохраняем изменения во временный словарь
+        self.staged_changes[self.current_index] = new_info
+
+    def get_changes(self) -> Dict[int, Dict[str, str]]:
+        """НОВОЕ: Возвращает все накопленные изменения."""
+        return self.staged_changes
+
 
     def _go_prev(self):
         self._save_current()
@@ -687,12 +770,10 @@ class AIParsingDialog(QDialog):
         if not json_text: return
 
         # Очистка от markdown (```json ... ```) если нейросеть добавила их
-        if json_text.startswith("```json"):
-            json_text = json_text[7:]
-        if json_text.startswith("```"):
-            json_text = json_text[3:]
-        if json_text.endswith("```"):
-            json_text = json_text[:-3]
+        import re
+        match = re.search(r'\[.*\]', json_text, re.DOTALL)
+        if match:
+            json_text = match.group(0)
         
         try:
             imported_data = json.loads(json_text)

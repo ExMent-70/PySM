@@ -36,6 +36,7 @@ class Face:
     original_temp_label: Optional[int] = None
 
     original_matched_label: Optional[int] = None
+    original_gender_faceonnx: Optional[str] = None
 
     # UI поля
     filename: str = ""
@@ -51,10 +52,13 @@ class Face:
             self.temp_cluster_label != self.original_temp_label):
             return True
             
-        # --- НОВАЯ ПРОВЕРКА: Matches ---
+        # --- ПРОВЕРКА: Matches ---
         # Проверяем, изменился ли лейбл сопоставления в extra_data
         current_match = self.extra_data.get('matched_portrait_cluster_label')
         if current_match != self.original_matched_label:
+            return True
+        # --- ПРОВЕРКА ИЗМЕНЕНИЯ ПОЛА ---
+        if self.extra_data.get('gender_faceonnx') != self.original_gender_faceonnx:
             return True
             
         return False
@@ -70,6 +74,7 @@ class Face:
         self.original_temp_label = self.temp_cluster_label
         # Фиксируем состояние матчинга
         self.original_matched_label = self.extra_data.get('matched_portrait_cluster_label')
+        self.original_gender_faceonnx = self.extra_data.get('gender_faceonnx')
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Face":
@@ -89,6 +94,7 @@ class Face:
         
         # Инициализируем исходное состояние матчинга из extra_data
         instance.original_matched_label = extra_data.get('matched_portrait_cluster_label')
+        instance.original_gender_faceonnx = extra_data.get('gender_faceonnx') 
         
         return instance
 

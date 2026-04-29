@@ -5,6 +5,7 @@
 """
 
 import logging
+import threading
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple, Any, Callable
 
@@ -14,21 +15,20 @@ import numpy as np
 from .config_loader import ConfigManager
 from .face_data_processor_interface import FaceDataProcessorInterface
 from _common.onnx_manager import ONNXModelManager
-#import datetime
 
 logger = logging.getLogger(__name__)
 
 
 # --- Блок 1: Вспомогательные функции и константы ---
 # ==============================================================================
-EYE_LEFT_INDICES = [35, 36, 37, 38, 39, 40, 41, 42]
-EYE_RIGHT_INDICES = [89, 90, 91, 92, 93, 94, 95, 96]
+EYE_LEFT_INDICES = list([35, 36, 37, 38, 39, 40, 41, 42])
+EYE_RIGHT_INDICES = list([89, 90, 91, 92, 93, 94, 95, 96])
 IMAGENET_MEAN_RGB = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD_RGB = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 BEAUTY_MEAN_BGR = np.array([104.0, 117.0, 123.0], dtype=np.float32).reshape(3, 1, 1)
 
 def softmax(x: np.ndarray) -> np.ndarray:
-    if x.size == 0: return np.array([])
+    if x.size == 0: return np.array(list())
     try:
         e_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
         return e_x / np.sum(e_x, axis=-1, keepdims=True)
@@ -40,7 +40,7 @@ def get_eye_bbox_from_landmarks(
     eye_indices: List[int],
     padding_ratio: float = 0.15,
 ) -> Optional[Tuple[int, int, int, int]]:
-    if landmarks is None or len(landmarks) < max(eye_indices) + 1: return None
+    if landmarks is None or len(landmarks) < 97: return None
     try:
         eye_points = landmarks[eye_indices]
         min_x, max_x = int(np.min(eye_points[:, 0])), int(np.max(eye_points[:, 0]))
@@ -59,29 +59,31 @@ class AttributeAnalyzer:
     _is_enabled: bool
 
     def __init__(self, config_manager: ConfigManager, onnx_manager: ONNXModelManager):
-        # (Код __init__ и _collect_models_info без изменений)
         self.config_manager = config_manager
         self.onnx_manager = onnx_manager
-        self.model_config = self.config_manager.get("model", {})
-        self.task_flags = self.config_manager.get("task_flags", {})
+        self.model_config = self.config_manager.get("model", dict())
+        self.task_flags = self.config_manager.get("task_flags", dict())
         self.model_root = Path(self.config_manager.get("paths.model_root"))
         self._is_enabled = any(self.task_flags.values())
         self.models_info: Dict[str, Dict[str, Any]] = self._collect_models_info()
+        
+        # Коллектор телеметрии глаз для калибровки
+        self._eye_stats = list()
+        self._stats_lock = threading.Lock()
 
     @property
     def is_enabled(self) -> bool:
         return self._is_enabled
 
     def _collect_models_info(self) -> Dict[str, Any]:
-        # (Логика _collect_models_info без изменений)
-        if not self.is_enabled: return {}
-        info = {}
+        if not self.is_enabled: return dict()
+        info = dict()
         model_meta = {
-            "gender": {"input_shape": (3, 224, 224), "input_name": "input", "output_names": ["output"]},
-            "emotion": {"input_shape": (1, 48, 48), "input_name": "input.1", "output_names": ["97"]},
-            "age": {"input_shape": (3, 224, 224), "input_name": "input", "output_names": ["output"]},
-            "beauty": {"input_shape": (3, 224, 224), "input_name": "input", "output_names": ["output"]},
-            "eyeblink": {"input_shape": (1, 26, 34), "input_name": "input_3", "output_names": ["activation_5"]},
+            "gender": {"input_shape": (3, 224, 224), "input_name": "input", "output_names": list(["output"])},
+            "emotion": {"input_shape": (1, 48, 48), "input_name": "input.1", "output_names": list(["97"])},
+            "age": {"input_shape": (3, 224, 224), "input_name": "input", "output_names": list(["output"])},
+            "beauty": {"input_shape": (3, 224, 224), "input_name": "input", "output_names": list(["output"])},
+            "eyeblink": {"input_shape": (1, 26, 34), "input_name": "input_3", "output_names": list(["activation_5"])},
         }
         for task_name, meta in model_meta.items():
             if self.task_flags.get(f"analyze_{task_name}"):
@@ -97,25 +99,18 @@ class AttributeAnalyzer:
         logger.info(f"AttributeAnalyzer сконфигурирован для анализа: <b>{list(info.keys())}</b>")
         return info
 
-    # Добавить этот метод в класс AttributeAnalyzer
-    # ==============================================================================
-    # В файле analize/analyze_faces/face_lib/attribute_analyzer.py
-
     def preload_models(self):
         """
         Принудительно загружает и ПРОГОНЯЕТ модели (Warmup inference).
         """
         if not self.is_enabled: return
-
-        # Определяем размер dummy-данных для каждой задачи
         dummy_shapes = {
             "gender": (1, 3, 224, 224),
             "age": (1, 3, 224, 224),
             "beauty": (1, 3, 224, 224),
-            "emotion": (1, 1, 48, 48),    # Grayscale
-            "eyeblink": (1, 26, 34, 1)    # Specfic shape
+            "emotion": (1, 1, 48, 48),
+            "eyeblink": (1, 26, 34, 1)
         }
-
         for task_name, model_info in self.models_info.items():
             try:
                 # 1. Получение сессии (загрузка файла)
@@ -130,15 +125,14 @@ class AttributeAnalyzer:
                 # Берем форму из словаря или дефолтную
                 shape = dummy_shapes.get(task_name, (1, 3, 112, 112))
                 dummy_input = np.zeros(shape, dtype=np.float32)
-                
-                # Run!
-                session.run(None, {input_name: dummy_input})
-                
+                feed = dict()
+                feed[input_name] = dummy_input
+                session.run(None, feed)
             except Exception as e:
                 logger.warning(f"Ошибка при прогреве модели '{task_name}': {e}")
 
 
-    # --- Методы предобработки с ВОССТАНОВЛЕННОЙ обработкой ошибок ---
+    # --- Методы предобработки ---
     def _preprocess_gender_age(self, image: np.ndarray, target_shape: tuple) -> Optional[np.ndarray]:
         try:
             _c, h, w = target_shape
@@ -190,24 +184,21 @@ class AttributeAnalyzer:
         }
         return mapping.get(task_name)
 
-    # --- Методы постобработки с ВОССТАНОВЛЕННОЙ обработкой ошибок ---
-    def _postprocess_gender(self, outputs: List[np.ndarray]) -> Optional[str]:
-        try:
-            return "Male" if np.argmax(outputs[0].flatten()) == 0 else "Female"
-        except Exception as e:
-            logger.error(f"Ошибка _postprocess_gender: {e}")
-            return None
+    # --- Методы постобработки с поддержкой КОНТЕКСТА ---
+    def _postprocess_gender(self, outputs: List[np.ndarray], context: Dict[str, Any] = None) -> Optional[str]:
+        try: return "Male" if np.argmax(outputs[0].flatten()) == 0 else "Female"
+        except Exception: return None
 
-    def _postprocess_emotion(self, outputs: List[np.ndarray]) -> Optional[str]:
+    def _postprocess_emotion(self, outputs: List[np.ndarray], context: Dict[str, Any] = None) -> Optional[str]:
         try:
-            labels = self.model_config.get("emotion_labels", [])
+            labels = self.model_config.get("emotion_labels", list())
             scores = outputs[0].flatten()
-            return labels[np.argmax(softmax(scores))]
+            return labels[np.argmax(softmax(scores))] if labels else None
         except Exception as e:
             logger.error(f"Ошибка _postprocess_emotion: {e}")
             return None
 
-    def _postprocess_age(self, outputs: List[np.ndarray]) -> Optional[int]:
+    def _postprocess_age(self, outputs: List[np.ndarray], context: Dict[str, Any] = None) -> Optional[int]:
         try:
             age = int(round(outputs[0].flatten()[0]))
             return age if 0 <= age <= 120 else None
@@ -216,21 +207,54 @@ class AttributeAnalyzer:
             return None
 
 
-    def _postprocess_beauty(self, outputs: List[np.ndarray]) -> Optional[float]:
+    def _postprocess_beauty(self, outputs: List[np.ndarray], context: Dict[str, Any] = None) -> Optional[float]:
         try:
             score = float(outputs[0].flatten()[0])
-            # --- ИЗМЕНЕНИЕ: Округление ---
             return round(score, 4) if not (np.isnan(score) or np.isinf(score)) else None
         except Exception as e:
             logger.error(f"Ошибка _postprocess_beauty: {e}")
             return None
 
-    def _postprocess_eyeblink(self, outputs: List[np.ndarray]) -> Optional[Tuple[str, float]]:
+    def _postprocess_eyeblink(self, outputs: List[np.ndarray], context: Dict[str, Any] = None) -> Optional[Tuple[str, float]]:
         try:
+            if context is None:
+                context = dict()
+                
             score = float(outputs[0].flatten()[0])
             if np.isnan(score) or np.isinf(score): return None
-            state = "Open" if score > 0.5 else "Closed"
-            # --- ИЗМЕНЕНИЕ: Округление ---
+            
+            face_width = context.get("face_width", 100)
+            side = context.get("side", "unknown")
+            eye_config = self.config_manager.get("eye_thresholds", dict())
+            
+            # Разделение на категории (Small, Medium, Large)
+            limits = eye_config.get("size_limits", list([80, 200]))
+            if face_width < limits[0]:
+                cat = "small"
+                thresh = eye_config.get("thresholds_small", list([0.15, 0.25]))
+            elif face_width < limits[1]:
+                cat = "medium"
+                thresh = eye_config.get("thresholds_medium", list([0.20, 0.30]))
+            else:
+                cat = "large"
+                thresh = eye_config.get("thresholds_large", list([0.25, 0.35]))
+                
+            # Классификация из 3-х состояний
+            if score < thresh[0]:
+                state = "Closed"
+            elif score <= thresh[1]:
+                state = "Squinting"
+            else:
+                state = "Open"
+            
+            # Собираем телеметрию для калибровки
+            with self._stats_lock:
+                stat_entry = dict()
+                stat_entry["size_category"] = cat
+                stat_entry["side"] = side
+                stat_entry["score"] = score
+                self._eye_stats.append(stat_entry)
+                
             return state, round(score, 4)
         except Exception as e:
             logger.error(f"Ошибка _postprocess_eyeblink: {e}")
@@ -246,13 +270,12 @@ class AttributeAnalyzer:
         }
         return mapping.get(task_name)
 
-    def _run_analysis(self, image: np.ndarray, task: str) -> Any:
+    def _run_analysis(self, image: np.ndarray, task: str, context: Dict[str, Any] = None) -> Any:
         if image is None or image.size == 0: return None
         model_info = self.models_info.get(task)
         if not model_info: return None
 
         session = self.onnx_manager.get_session(model_info["path"])
-        
         if not session: return None
 
         preprocess_func = self._get_preprocess_func(task)
@@ -264,15 +287,18 @@ class AttributeAnalyzer:
             return None
             
         try:
-            #print(f"{datetime.datetime.now()} - Запуск сессии - attribute_analyzer.py/_run_analysis/строка - outputs = session.run")
-
-            outputs = session.run(model_info["output_names"], {model_info["input_name"]: input_blob})
-
+            # Надежное получение имени входного слоя напрямую из сессии
+            input_name = session.get_inputs()[0].name if session.get_inputs() else model_info["input_name"]
+            
+            feed = dict()
+            feed[input_name] = input_blob
+            outputs = session.run(None, feed)
             
             postprocess_func = self._get_postprocess_func(task)
             if not postprocess_func: return None
             
-            return postprocess_func(outputs)
+            ctx = context if context is not None else dict()
+            return postprocess_func(outputs, ctx)
         except Exception as e:
             logger.error(f"Ошибка выполнения модели '{task}': {e}", exc_info=True)
         return None
@@ -283,8 +309,11 @@ class AttributeAnalyzer:
         try:
             face_crop = face_data_bundle.get("face_crop")
             if face_crop is None: return
+            
+            # Вычисляем ширину текущего лица
+            face_width = face_crop.shape[1]
 
-            for task in ["gender", "emotion", "age", "beauty"]:
+            for task in list(["gender", "emotion", "age", "beauty"]):
                 if self.task_flags.get(f"analyze_{task}"):
                     result = self._run_analysis(face_crop, task)
                     face_data_dict[f"{task}_faceonnx"] = result
@@ -292,25 +321,95 @@ class AttributeAnalyzer:
             if self.task_flags.get("analyze_eyeblink"):
                 full_image = face_data_bundle.get("full_image")
                 landmarks = face_data_dict.get("landmark_2d_106")
+                
                 if full_image is not None and landmarks is not None:
                     landmarks_np = np.array(landmarks)
                     img_h, img_w = full_image.shape[:2]
+
+                    # Динамически получаем нижний порог из конфига для фильтра резкости
+                    eye_config = self.config_manager.get("eye_thresholds", dict())
+                    size_limits = eye_config.get("size_limits", list([80, 200]))
+                    sharpen_threshold = size_limits[0]
+
+                    # Ядро для повышения резкости (Sharpening kernel)
+                    sharpen_kernel = np.array(list([list([0, -1, 0]), list([-1, 5, -1]), list([0, -1, 0])]))
 
                     left_bbox = get_eye_bbox_from_landmarks(landmarks_np, EYE_LEFT_INDICES)
                     if left_bbox:
                         x1, y1, x2, y2 = left_bbox
                         eye_left_img = full_image[max(0, y1):min(img_h, y2), max(0, x1):min(img_w, x2)]
-                        res = self._run_analysis(eye_left_img, "eyeblink")
+                        
+                        # --- ДОБАВЛЕН ФИЛЬТР РЕЗКОСТИ ДЛЯ МЕЛКИХ ЛИЦ ---
+                        if face_width < sharpen_threshold and eye_left_img.size > 0:
+                            eye_left_img = cv2.filter2D(eye_left_img, -1, sharpen_kernel)
+                        
+                        ctx_left = dict()
+                        ctx_left["face_width"] = face_width
+                        ctx_left["side"] = "left"
+                        res = self._run_analysis(eye_left_img, "eyeblink", context=ctx_left)
                         if res: face_data_dict["eye_left_state"], face_data_dict["eye_left_score"] = res
-
 
                     right_bbox = get_eye_bbox_from_landmarks(landmarks_np, EYE_RIGHT_INDICES)
                     if right_bbox:
                         x1, y1, x2, y2 = right_bbox
                         eye_right_img = full_image[max(0, y1):min(img_h, y2), max(0, x1):min(img_w, x2)]
-                        res = self._run_analysis(eye_right_img, "eyeblink")
+                        
+                        # --- ДОБАВЛЕН ФИЛЬТР РЕЗКОСТИ ДЛЯ МЕЛКИХ ЛИЦ ---
+                        if face_width < sharpen_threshold and eye_right_img.size > 0:
+                            eye_right_img = cv2.filter2D(eye_right_img, -1, sharpen_kernel)
+                        
+                        ctx_right = dict()
+                        ctx_right["face_width"] = face_width
+                        ctx_right["side"] = "right"
+                        res = self._run_analysis(eye_right_img, "eyeblink", context=ctx_right)
                         if res: face_data_dict["eye_right_state"], face_data_dict["eye_right_score"] = res
         except Exception as e:
-            filename = face_data_bundle.get("filename", "unknown")
-            face_idx = face_data_bundle.get("face_index", -1)
-            logger.error(f"Критическая ошибка в AttributeAnalyzer.process_face_data для {filename}[{face_idx}]: {e}", exc_info=True)
+            logger.error(f"Критическая ошибка в AttributeAnalyzer: {e}", exc_info=True)
+
+    def generate_recommendations(self, output_dir: Path):
+        """Анализирует накопленную статистику и генерирует рекомендательный файл."""
+        if not self.is_enabled or not self.task_flags.get("analyze_eyeblink"):
+            return
+
+        # ИСПРАВЛЕНИЕ: Динамически получаем текущие лимиты из конфига
+        eye_config = self.config_manager.get("eye_thresholds", dict())
+        current_limits = eye_config.get("size_limits", list([80, 200]))
+
+        recs = list([
+            "# Рекомендации по настройке порогов для состояний глаз (eye_thresholds) в config.toml",
+            "# Сгенерировано на основе статистики (CNN Scores) обработанных лиц.",
+            "# Вставьте предложенный блок в ваш config.toml для тонкой настройки.\n",
+            "[eye_thresholds]",
+            f"size_limits = {current_limits}\n"
+        ])
+
+        categories = list(["small", "medium", "large"])
+
+        with self._stats_lock:
+            for cat in categories:
+                scores = list([item["score"] for item in self._eye_stats if item["size_category"] == cat])
+                valid_scores = list([v for v in scores if v is not None and np.isfinite(v)])
+
+                recs.append(f"# --- Категория размера: {cat.upper()} ---")
+                recs.append(f"# Всего проанализировано глаз: {len(valid_scores)}")
+
+                if len(valid_scores) > 0:
+                    q1 = float(np.percentile(valid_scores, 25))
+                    median = float(np.median(valid_scores))
+                    q3 = float(np.percentile(valid_scores, 75))
+                    min_v = float(np.min(valid_scores))
+                    max_v = float(np.max(valid_scores))
+
+                    recs.append(f"# Статистика: Min={min_v:.3f}, Q1={q1:.3f}, Median={median:.3f}, Q3={q3:.3f}, Max={max_v:.3f}")
+                    # Рассчитываем пороги: закрытые до Q1, прищуренные до Медианы, открытые выше.
+                    recs.append(f"thresholds_{cat} =[{q1:.3f}, {median:.3f}]\n")
+                else:
+                    recs.append("# Недостаточно данных для рекомендаций.\n")
+
+        try:
+            rec_path = output_dir / "eye_thresholds_recommendations.txt"
+            with open(rec_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(recs))
+            logger.debug(f"Файл рекомендаций сохранен: {rec_path.name}")
+        except Exception as e:
+            logger.error(f"Не удалось сохранить рекомендации: {e}")

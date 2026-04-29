@@ -19,12 +19,17 @@ try:
     
     from pysm_lib.pysm_context import ConfigResolver, pysm_context
     from pysm_lib.pysm_progress_reporter import tqdm
+    from pysm_lib.pysm_report_api import ResourceNode, StandardTreeBuilder
     IS_MANAGED_RUN = True
 except ImportError:
     IS_MANAGED_RUN = False
     ConfigResolver = None
     pysm_context = None
     tqdm = lambda x, **kwargs: x
+
+
+
+from _common import icon_ok, icon_warning, icon_error, icon_info, icon_save, icon_save_warning, icon_save_error
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
@@ -268,8 +273,6 @@ class KeypointAnalyzer:
         rec_path = data_dir / filename
         try:
             rec_path.write_text("\n".join(recs), encoding="utf-8")
-            if IS_MANAGED_RUN and pysm_context:
-                pysm_context.log_link(str(rec_path), f"Открыть {filename}")
         except Exception as e:
             logger.error(f"Не удалось сохранить рекомендации: {e}")
 
@@ -289,7 +292,7 @@ def get_cli_config() -> argparse.Namespace:
     return ConfigResolver(parser).resolve_all() if IS_MANAGED_RUN else parser.parse_args()
 
 def main():
-    logger.info("<b>Анализ ключевых точек лица</b>")
+    logger.info("<b>АНАЛИЗ КЛЮЧЕВЫХ ТОЧЕК ЛИЦА</b><br>")
     cli_config = get_cli_config()
     
     data_dir = Path(cli_config.a_ak_data_dir)
@@ -360,14 +363,15 @@ def main():
                 detailed_metrics.append(results)
                 updates_count += 1
 
+
     # 3. Сохранение
-    logger.info(f"Обновлено записей: {updates_count}")
     try:
         with open(faces_json_path, 'w', encoding='utf-8') as f:
             json.dump(faces_data, f, ensure_ascii=False, indent=2)
-        logger.info(f"Результаты сохранены в {faces_json_path.name}")
+        logger.info(f"{icon_save} файл <i>{faces_json_path.name}</i> сохранен (обновлено {updates_count} записей)")
+
     except Exception as e:
-        logger.critical(f"Ошибка сохранения JSON: {e}")
+        logger.critical(f"{icon_error} Ошибка сохранения JSON: {e}")
         sys.exit(1)
 
     # 4. Статистика
@@ -380,9 +384,16 @@ def main():
             
             analyzer._generate_recommendations(stats, data_dir, "recommendations_keypoints.txt")
         except Exception as e:
-            logger.error(f"Ошибка сохранения статистики: {e}")
+            logger.error(f"{icon_error} Ошибка сохранения статистики: {e}")
 
-    logger.info("\n")
+    tv_builder = StandardTreeBuilder(icon_size=28)
+
+    root_node_config = ResourceNode("Конфигурация", Path(config_path), "file", "Файл конфигурации config.toml")
+    root_node_rec = ResourceNode("Рекомендации", Path(data_dir) / "recommendations_keypoints.txt", "file", "Рекомендации по настройке порогов в config.toml")
+    
+    tv_builder.add_section("",[root_node_config, root_node_rec])
+    pysm_context.log_html(tv_builder.get_html())
+
 
 if __name__ == "__main__":
     main()

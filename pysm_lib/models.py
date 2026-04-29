@@ -229,6 +229,17 @@ class ScriptSetEntryModel(BaseModel):
         default=False,
         description="Если True, при запуске не выводится служебная информация (имя, параметры и т.д.).",
     )
+    
+    icon_name: str = Field(
+        default="INSTANCE_ITEM",
+        description="Системное имя иконки для отображения в дереве.",
+    )    
+
+    icon_color: Optional[str] = Field(
+        default=None,
+        description="Пользовательский цвет иконки в формате HEX.",
+    )    
+
     # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
     command_line_args: Dict[str, ScriptSetEntryValueEnabled] = Field(
         default_factory=dict
@@ -301,6 +312,13 @@ class SetFolderNodeModel(BaseModel):
 SetHierarchyNodeType = Union[SetFolderNodeModel, ScriptSetNodeModel]
 
 
+class FavoriteScriptModel(BaseModel):
+    instance_id: str
+    icon_name: str = "STAR"
+    icon_color: Optional[str] = None
+    model_config = ConfigDict(validate_assignment=True)
+
+
 class ScriptSetsCollectionModel(BaseModel):
     collection_name: str = Field(
         default_factory=lambda: locale_manager.get("models.collection.default_name")
@@ -318,6 +336,7 @@ class ScriptSetsCollectionModel(BaseModel):
     )
 
     root_nodes: List[SetHierarchyNodeType] = Field(default_factory=list)
+    favorite_scripts: List[FavoriteScriptModel] = Field(default_factory=list)
 
     context_data: Dict[str, ContextVariableModel] = Field(
         default_factory=dict, exclude=True

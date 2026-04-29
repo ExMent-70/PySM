@@ -33,6 +33,36 @@
       "default": 5,
       "min_val": 0,
       "max_val": 100
+    },
+    "html_padding": {
+      "type": "int",
+      "description": "Смещение текста в от края блока в пикселях.",
+      "required": false,
+      "default": 10,
+      "min_val": 0,
+      "max_val": 100
+    },
+    "html_style": {
+      "type": "choice",
+      "description": "Стиль оформления html-блока",
+      "required": false,
+      "default": "",
+      "choices": [
+        "script_description",
+        "script_error_block",
+        "script_header_block",
+        "script_info",
+        "script_success_block",
+        "collection_info",
+        "set_header",
+        "status_error",
+        "status_pending",
+        "status_running",
+        "status_skipped",
+        "status_success",
+        "tooltip_instance_args_block",
+        "tooltip_script_args_block"
+      ]
     }
   }
 }

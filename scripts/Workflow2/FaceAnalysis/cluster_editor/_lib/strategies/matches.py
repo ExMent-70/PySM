@@ -2,22 +2,16 @@
 
 import logging
 import json
-import re # Необходим для натуральной сортировки
 from typing import Dict, List, Optional
 from pathlib import Path
 from collections import defaultdict
 
 from ..data_models import ImageRecord, Face
-from .base import EditorStrategy
+from .base import EditorStrategy, natural_sort_key
 
 logger = logging.getLogger(__name__)
 
 class MatchesModeStrategy(EditorStrategy):
-    """
-    Стратегия для режима 'matches'.
-    Цель: Сопоставить лица на групповых фото с эталонными портретными кластерами.
-    """
-
     @property
     def mode_name(self) -> str:
         return "matches"
@@ -36,7 +30,6 @@ class MatchesModeStrategy(EditorStrategy):
 
     def get_clusters(self, records: Dict[str, ImageRecord]) -> Dict[str, List[Face]]:
         clusters: Dict[str, List[Face]] = defaultdict(list)
-        
         for record in records.values():
             if record.image_type == 'portrait' and record.faces:
                 face = record.faces[0]
@@ -53,60 +46,36 @@ class MatchesModeStrategy(EditorStrategy):
                 clusters[cid].append(face)
         return dict(clusters)
 
-    def get_files_for_cluster(self, cluster_id: str, records: Dict[str, ImageRecord]) -> List[str]:
-        # Вспомогательная функция натуральной сортировки
-        def natural_keys(text):
-            return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', text)]
-
-        if cluster_id == "error_matches":
-            # Возвращаем файлы, где есть хотя бы одно лицо без матча
-            files = [
-                fn for fn, rec in records.items() 
-                if (rec.face_count > 1 or rec.image_type == 'group') and 
-                any(f.extra_data.get('matched_portrait_cluster_label') is None for f in rec.faces)
-            ]
-            # Сортируем по имени файла
-            return sorted(files, key=natural_keys)
-
-        matches = []
-        target_id_str = str(cluster_id)
-
+    def _build_files_cache(self, records: Dict[str, ImageRecord]) -> Dict[str, List[str]]:
+        cache = defaultdict(set)
         for filename, record in records.items():
-            # Ищем совпадения на любых фото
-            found = False
+            if record.face_count > 1 or record.image_type == 'group':
+                if any(f.extra_data.get('matched_portrait_cluster_label') is None for f in record.faces):
+                    cache["error_matches"].add(filename)
+            
             for face in record.faces:
                 lbl = face.extra_data.get('matched_portrait_cluster_label')
                 if lbl is not None:
-                    if str(lbl) == target_id_str:
-                        found = True
-                        break # Достаточно одного совпадения на файл
-            
-            if found:
-                matches.append(filename)
-        
-        # --- ИЗМЕНЕНИЕ: Сортируем найденные по имени файла (было по дистанции) ---
-        return sorted(matches, key=natural_keys)
+                    cache[str(lbl)].add(filename)
+        return {k: sorted(list(v), key=natural_sort_key) for k, v in cache.items()}
 
     def move_images(self, source_id: str, target_id: str, filenames: List[str], 
                     records: Dict[str, ImageRecord], 
                     face_selection_map: Optional[Dict[str, int]] = None,
                     target_name: Optional[str] = None) -> None:
         
+        self.invalidate_cache()
         if target_id == "error_matches":
             for fname in filenames:
                 record = records.get(fname)
                 if record:
-                    # Если source_id известен, снимаем только этот матч
                     for face in record.faces:
                         if source_id.isdigit():
                              if str(face.extra_data.get('matched_portrait_cluster_label')) == source_id:
                                  face.extra_data['matched_portrait_cluster_label'] = None
                                  face.extra_data['matched_child_name'] = None
-                        else:
-                             pass
             return
 
-        # Назначение матча
         new_id_val = int(target_id) if target_id.isdigit() else None
         clean_name = self._strip_name_prefix(target_name) if target_name else None
         
@@ -131,7 +100,7 @@ class MatchesModeStrategy(EditorStrategy):
                 face.extra_data['match_distance'] = 0.0
 
     def rename_cluster(self, cluster_id: str, new_name: str, records: Dict[str, ImageRecord]) -> None:
-        pass 
+        self.invalidate_cache()
 
     def save(self, records: Dict[str, ImageRecord], paths_config: Dict[str, Path]) -> bool:
         json_path = paths_config.get("json_path")
@@ -141,10 +110,7 @@ class MatchesModeStrategy(EditorStrategy):
         matches_path = work_dir / "matches_portrait_to_group.json"
         error_path = work_dir / "error_matches.json"
         
-        logger.info(f"Matches Strategy: Saving to {matches_path}...")
-        
-        # 1. Сбор данных для matches.json
-        output_matches = {}
+        output_matches = dict()
         clusters = self.get_clusters(records)
         sorted_ids = sorted(clusters.keys(), key=lambda x: int(x) if x.isdigit() else 9999)
         
@@ -152,18 +118,13 @@ class MatchesModeStrategy(EditorStrategy):
 
         for cid in sorted_ids:
             if cid in ["-1", "group"]: continue
-            
-            # Внимание: для сохранения порядка в JSON нам тоже нужно получить отсортированные файлы
-            # get_files_for_cluster теперь возвращает sorted(list), так что порядок будет верным
             files = self.get_files_for_cluster(cid, records)
-            
             cname = clusters[cid][0].effective_name if clusters[cid] else f"Cluster {cid}"
             
-            group_photos_data = []
+            group_photos_data = list()
             for fname in files:
                 rec = records[fname]
                 min_dist = 0.0
-                
                 for f in rec.faces:
                     lbl = f.extra_data.get('matched_portrait_cluster_label')
                     if lbl is not None and str(lbl) == cid:
@@ -177,20 +138,16 @@ class MatchesModeStrategy(EditorStrategy):
                 })
             
             total_matches_count += len(group_photos_data)
-            
             output_matches[cid] = {
                 "child_name": self._strip_name_prefix(cname),
                 "group_photos": group_photos_data
             }
 
-        logger.info(f"Matches Strategy: Found {total_matches_count} matches in {len(output_matches)} clusters.")
-
-        # 2. Сбор данных для error_matches.json
-        unmatched_files = []
+        unmatched_files = list()
         total_errors = 0
         for filename, record in records.items():
             if record.face_count > 1 or record.image_type == 'group':
-                unmatched_faces = []
+                unmatched_faces = list()
                 for i, face in enumerate(record.faces):
                     if face.extra_data.get('matched_portrait_cluster_label') is None:
                         unmatched_faces.append({
@@ -209,14 +166,12 @@ class MatchesModeStrategy(EditorStrategy):
         try:
             with open(matches_path, 'w', encoding='utf-8') as f:
                 json.dump(output_matches, f, ensure_ascii=False, indent=2)
-            
             with open(error_path, 'w', encoding='utf-8') as f:
                 json.dump({
                     "description": "Manually updated via Cluster Editor",
                     "unmatched_files": unmatched_files,
                     "total": total_errors
                 }, f, indent=2)
-            
             return False 
         except Exception as e:
             logger.error(f"Matches Save Error: {e}")

@@ -1,8 +1,8 @@
 {
-  "description": "Кластеризует или классифицирует фотографии по локациям на основе визуального содержимого.<br>Поддерживает два режима:<br>1. <b>Clustering</b>: Автоматическая группировка (DBSCAN). Рекомендуется использовать маски.<br>2. <b>Classification</b>: Поиск соответствий текстовым описаниям (CLIP Zero-shot). Рекомендуется использовать оригиналы.<br><div style=\"{theme.tooltip_instance_args_block}\">\n<b>base_dir</b> = <i>{wf_session_path} / {wf_session_name}</i>\n<b>data_dir</b> = <i>{base_dir} / Output / Analysis_{photo_session}</i>\n</div>",
+  "description": "Скрипт выполняет кластеризацию/классификацию фотографии по сюжетам съемки на основе визуального содержимого.\n<br><b>Доступные режимы работы:</b>\n• <b>clustering</b> - кластеризация фотография с использование алгоритма  DBSCAN. Флаг <b>use_origanal</b> = <i>False</i>.\n• <b>classification</b> - классфикация изображений в соответствии с текстовым описаниям (CLIP Zero-shot). Флаг <b>use_origanal</b> = <i>False</i>.\n<div style=\"{theme.tooltip_instance_args_block}\">\nВ качестве значения параметра <b>a_cl_data_dir</b> можно использовать переменные контекста:\n<i>{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}</i>\n</div>",
   "category": "Анализ и AI",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.5.0",
+  "version": "v2.2026.02.05",
   "command_line_args_meta": {
     "mode": {
       "type": "choice",

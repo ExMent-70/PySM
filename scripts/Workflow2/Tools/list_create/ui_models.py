@@ -5,11 +5,11 @@ ui_models.py
 """
 
 import sys
-import regex as re
+import re
 from typing import List, Dict, Any, Optional
 
 from PySide6.QtCore import (
-    Qt, QAbstractTableModel, QModelIndex, QEvent, Signal, QTimer
+    Qt, QAbstractTableModel, QModelIndex, QEvent, Signal, QTimer, QSortFilterProxyModel
 )
 from PySide6.QtGui import (
     QBrush, QColor
@@ -31,31 +31,36 @@ class StudentTableModel(QAbstractTableModel):
     Модель таблицы для отображения списка учеников (Student).
     Поддерживает динамические колонки для доп. информации.
     """
-    row_focus_requested = Signal(int, int)
 
     # Индексы фиксированных колонок
     COL_SHOOT_ORDER = 0
     COL_ALPHA_ORDER = 1
     COL_SURNAME = 2
     COL_NAME = 3
-    COL_SERVICE = 4
-    COL_EXTRAS = 5
-    COL_TOTAL = 6
+    COL_PATRONYMIC = 4   # НОВОЕ: Отчество
+    COL_RANK = 5         # НОВОЕ: Ранг
+    COL_SERVICE = 6
+    COL_EXTRAS = 7
+    COL_TOTAL = 8
     
     # Количество фиксированных колонок
-    FIXED_COL_COUNT = 7
+    FIXED_COL_COUNT = 9
 
     # Колонки, доступные для редактирования (фиксированные)
-    # Динамические колонки также будут редактируемыми
-    EDITABLE_FIXED_COLUMNS = {COL_SHOOT_ORDER, COL_SURNAME, COL_NAME, COL_SERVICE}
+    EDITABLE_FIXED_COLUMNS = {
+        COL_SHOOT_ORDER, COL_SURNAME, COL_NAME, 
+        COL_PATRONYMIC, COL_RANK, COL_SERVICE
+    }
     
-    SORTABLE_COLUMNS = {COL_SHOOT_ORDER, COL_SURNAME, COL_TOTAL}
 
-    NAME_VALIDATION_PATTERN = re.compile(r"^[\p{L}\s-]+\Z", flags=re.UNICODE)
+
+    # Паттерн валидации (обновленный)
+    NAME_VALIDATION_PATTERN = re.compile(r"^[A-Za-zА-Яа-яЁё\s\-]+$")
 
     def __init__(self, 
                  data: List[Student] = None, 
                  services: Dict[str, int] = None,
+                 ranks: List[str] = None,
                  surname_style: Dict[str, str] = None, 
                  name_style: Dict[str, str] = None,
                  base_bg_color: QColor = None, 
@@ -63,13 +68,15 @@ class StudentTableModel(QAbstractTableModel):
         super().__init__()
         self._data: List[Student] = data or []
         self.services = services or {}
+        self.ranks = ranks or ["ученик"]
         self.info_columns: List[str] = [] # Список заголовков доп. полей
 
-        self._base_headers = ["№ съемки", "№ п/п", "Фамилия", "Имя", "Услуга", "Доп.", "Итого"]
+        self._base_headers =["№ съемки", "№ п/п", "Фамилия", "Имя", "Отчество", "Ранг", "Услуга", "Доп.", "Итого"]
 
         # Настройка стилей
         surname_style = surname_style or {}
         name_style = name_style or {}
+        
         self.base_bg_brush = QBrush(base_bg_color) if base_bg_color else QBrush()
         self.alternate_bg_brush = QBrush(alternate_bg_color) if alternate_bg_color else QBrush()
         self._bg_brush_cache: Dict[str, QBrush] = {}
@@ -106,7 +113,7 @@ class StudentTableModel(QAbstractTableModel):
         col = index.column()
         student = self._data[row]
         
-        if role in [Qt.DisplayRole, Qt.EditRole]:
+        if role in[Qt.DisplayRole, Qt.EditRole]:
             # Обработка фиксированных колонок
             if col == self.COL_SHOOT_ORDER:
                 return str(student.shoot_order) if student.shoot_order is not None else ""
@@ -116,6 +123,10 @@ class StudentTableModel(QAbstractTableModel):
                 return student.surname
             elif col == self.COL_NAME:
                 return student.name
+            elif col == self.COL_PATRONYMIC:   # НОВОЕ
+                return student.patronymic
+            elif col == self.COL_RANK:         # НОВОЕ
+                return student.rank
             elif col == self.COL_SERVICE:
                 return student.service_type
             elif col == self.COL_EXTRAS:
@@ -177,22 +188,33 @@ class StudentTableModel(QAbstractTableModel):
                 else:
                     new_val = int(value)
                     if new_val <= 0: raise ValidationError("Номер съемки должен быть > 0.")
-                    # Проверка уникальности (упрощенная)
-                    if any(i != row and s.shoot_order == new_val for i, s in enumerate(self._data)):
+                    # ИЗМЕНЕНО: Оптимизированная проверка уникальности через set (хэш-таблицу)
+                    used_orders = {s.shoot_order for i, s in enumerate(self._data) if i != row and s.shoot_order is not None}
+                    if new_val in used_orders:
                         raise ValidationError(f"Номер '{new_val}' уже используется.")
                     student.shoot_order = new_val
 
             elif col == self.COL_SURNAME:
                 val_str = str(value).strip()
                 if not val_str or not self.NAME_VALIDATION_PATTERN.match(val_str):
-                    raise ValidationError("Только буквы и дефис.")
+                    raise ValidationError("Только буквы, пробелы и дефисы.")
                 student.surname = val_str
 
             elif col == self.COL_NAME:
                 val_str = str(value).strip()
                 if not val_str or not self.NAME_VALIDATION_PATTERN.match(val_str):
-                    raise ValidationError("Только буквы и дефис.")
+                    raise ValidationError("Только буквы, пробелы и дефисы.")
                 student.name = val_str
+                
+            elif col == self.COL_PATRONYMIC:  # НОВОЕ
+                val_str = str(value).strip()
+                # Отчество может быть пустым, проверяем только если ввели текст
+                if val_str and not self.NAME_VALIDATION_PATTERN.match(val_str):
+                    raise ValidationError("Только буквы, пробелы и дефисы.")
+                student.patronymic = val_str
+                
+            elif col == self.COL_RANK:        # НОВОЕ
+                student.rank = str(value).strip()
                 
             elif col == self.COL_SERVICE:
                 new_service_name = str(value)
@@ -232,7 +254,7 @@ class StudentTableModel(QAbstractTableModel):
             flags |= Qt.ItemIsEditable
         return flags
 
-    def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
+
         if column not in self.SORTABLE_COLUMNS and column < self.FIXED_COL_COUNT:
             return
         
@@ -256,6 +278,19 @@ class StudentTableModel(QAbstractTableModel):
 
         self.layoutChanged.emit()
 
+
+    def sort_and_renumber(self):
+        """
+        Принудительно сортирует исходные данные по алфавиту 
+        и пересчитывает порядковые номера (№ п/п).
+        Вызывается после парсинга, загрузки или изменения количества строк.
+        """
+        self.layoutAboutToBeChanged.emit()
+        self._data.sort(key=lambda x: (x.surname.lower(), x.name.lower()))
+        for i, student in enumerate(self._data, 1):
+            student.alpha_order = i
+        self.layoutChanged.emit()
+
     def swap_name_surname(self, row: int) -> bool:
         if 0 <= row < len(self._data):
             s = self._data[row]
@@ -266,15 +301,6 @@ class StudentTableModel(QAbstractTableModel):
             return True
         return False
 
-    def sort_and_refocus(self, row: int, col: int) -> None:
-        if 0 <= row < len(self._data):
-            item_to_track = self._data[row]
-            self.sort(self.COL_SURNAME)
-            try:
-                new_row_index = self._data.index(item_to_track)
-                self.row_focus_requested.emit(new_row_index, col)
-            except ValueError:
-                pass
 
     def update_data(self, data: List[Student]):
         self.beginResetModel()
@@ -306,6 +332,20 @@ class StudentTableModel(QAbstractTableModel):
             student.service_cost = s_cost
         if self.rowCount() > 0:
             self.dataChanged.emit(self.index(0, self.COL_SERVICE), self.index(self.rowCount() - 1, self.COL_TOTAL))
+
+    def update_info_bulk(self, changes: Dict[int, Dict[str, str]]):
+        """Безопасно применяет изменения доп. информации и уведомляет View."""
+        for row, new_info in changes.items():
+            if 0 <= row < len(self._data):
+                self._data[row].info = new_info
+                
+        # Если были изменения, сообщаем таблице, что динамические колонки нужно перерисовать
+        if changes and len(self.info_columns) > 0:
+            start_row = min(changes.keys())
+            end_row = max(changes.keys())
+            start_idx = self.index(start_row, self.FIXED_COL_COUNT)
+            end_idx = self.index(end_row, self.columnCount() - 1)
+            self.dataChanged.emit(start_idx, end_idx, [Qt.DisplayRole])
             
     def update_extras(self, row: int, extras: List[ExtraService]):
         if 0 <= row < len(self._data):
@@ -316,15 +356,27 @@ class StudentTableModel(QAbstractTableModel):
 
 
 class EnterKeyDelegate(QStyledItemDelegate):
-    def __init__(self, parent=None, services: List[str] = None):
+    def __init__(self, parent=None, services: List[str] = None, ranks: List[str] = None):
         super().__init__(parent)
-        self.services = services or []
+        # ИЗМЕНЕНО: Сортируем списки для комбобоксов
+        self.services = sorted(services) if services else[]
+        self.ranks = sorted(ranks) if ranks else[]
 
+# --- ИЗМЕНЕННЫЙ БЛОК: ui_models.py (Метод createEditor в EnterKeyDelegate) ---
     def createEditor(self, parent, option, index):
-        # Комбобокс только для колонки Услуга
-        if index.column() == StudentTableModel.COL_SERVICE:
+        col = index.column()
+        
+        # Комбобокс для Услуг
+        if col == StudentTableModel.COL_SERVICE:
             editor = QComboBox(parent)
             editor.addItems(self.services)
+            
+        # НОВОЕ: Комбобокс для Рангов
+        elif col == StudentTableModel.COL_RANK:
+            editor = QComboBox(parent)
+            editor.addItems(self.ranks)
+            
+        # Обычное текстовое поле для остальных редактируемых колонок
         else:
             editor = QLineEdit(parent)
         
@@ -362,3 +414,29 @@ class EnterKeyDelegate(QStyledItemDelegate):
                         view.setCurrentIndex(idx.model().index(next_row, idx.column()))
                 return True
         return super().eventFilter(editor, event)
+        
+# --- ИЗМЕНЕННЫЙ БЛОК 2: ui_models.py (Новый класс StudentProxyModel) ---
+class StudentProxyModel(QSortFilterProxyModel):
+    """
+    Прокси-модель для умной сортировки (понимает где числа, а где текст).
+    """
+    def lessThan(self, source_left: QModelIndex, source_right: QModelIndex) -> bool:
+        col = source_left.column()
+        model = self.sourceModel()
+        
+        # Получаем оригинальные объекты Student для честного сравнения (числа с числами)
+        student_left = model._data[source_left.row()]
+        student_right = model._data[source_right.row()]
+        
+        if col == model.COL_SHOOT_ORDER:
+            val_l = student_left.shoot_order if student_left.shoot_order is not None else float('inf')
+            val_r = student_right.shoot_order if student_right.shoot_order is not None else float('inf')
+            return val_l < val_r
+        elif col == model.COL_ALPHA_ORDER:
+            return student_left.alpha_order < student_right.alpha_order
+        elif col == model.COL_SURNAME or col == model.COL_NAME:
+            return (student_left.surname, student_left.name) < (student_right.surname, student_right.name)
+        elif col == model.COL_TOTAL:
+            return student_left.total_cost < student_right.total_cost
+            
+        return super().lessThan(source_left, source_right)        

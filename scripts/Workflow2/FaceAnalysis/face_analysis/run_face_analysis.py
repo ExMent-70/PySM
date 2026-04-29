@@ -1,143 +1,202 @@
 # analize/analyze_faces/run_analyze_faces.py
 
 """   
-    TODO: construct_analysis_paths() - формирует пути для анализа на основе переменных контекста PySM.
-    1. Путь к папке output_dir передавать в качества параметра командной строки (обязательный параметр).
-    2. Путь к папке input_dir передавать в качества параметра командной строки (не обязательный параметр). Если параметр пустой или отсутствует, то input_dir = output_dir / "JPG"
+    Скрипт поддерживает режим Smart Sync (--a_af_mode sync) для точечного
+    обновления координат лиц на фотографиях, откадрированных в Photoshop,
+    без потери привязки к кластерам и именам.
 """
 
 print("<b>ПОИСК ЛИЦ НА ФОТОГРАФИЯХ</b>")
 print("<i>Инициализация...</i><br>")
+
 import warnings
-
-# Игнорируем специфичное FutureWarning от numpy
-warnings.filterwarnings(
-    "ignore",
-    category=FutureWarning,
-    message="`rcond` parameter will change to the default of machine precision",
-    module="insightface.utils.transform"
-)
-
-warnings.filterwarnings(
-    "ignore",
-    category=FutureWarning,
-    message="Please use `SimilarityTransform.from_estimate` class constructor instead",
-    module="insightface.utils.face_align"
-)
+warnings.filterwarnings("ignore", category=FutureWarning, message="`rcond` parameter will change to the default of machine precision", module="insightface.utils.transform")
+warnings.filterwarnings("ignore", category=FutureWarning, message="Please use `SimilarityTransform.from_estimate` class constructor instead", module="insightface.utils.face_align")
 
 
-# --- Блок 1: Импорты и настройка путей ---
-# ==============================================================================
+
 import argparse
 import logging
 import os
 import sys
-import cv2
 import json
+import cv2
+import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
-import numpy as np
 
-# Добавляем корневую папку 'analize' в sys.path
 try:
     current_script_path = Path(__file__).resolve()
     project_root = current_script_path.parent.parent
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
     
-    # Импорт нового менеджера хранения
     from _common.face_storage import FaceStorageManager
-    
-    # Импорт компонентов локальной библиотеки
     from face_analysis.face_lib import ConfigManager, FaceAnalyzer
     from face_analysis.face_lib.result_writer import AnalysisResultWriter    
     
-    # Импорт PySM
     from pysm_lib import pysm_context
     from pysm_lib.pysm_context import ConfigResolver
     from pysm_lib.pysm_progress_reporter import tqdm
-    from pysm_lib.pysm_report_api import ResourceNode, StandardTreeBuilder, DashboardBuilder
+    from pysm_lib.pysm_report_api import ResourceNode, StandardTreeBuilder
 
     IS_MANAGED_RUN = True
 except ImportError as e:
     print(f"Критическая ошибка импорта: {e}", file=sys.stderr)
-    print("Убедитесь, что структура папок верна и все зависимости установлены.", file=sys.stderr)
     sys.exit(1)
 
-from _common import (
-    icon_ok, 
-    icon_warning, 
-    icon_error, 
-    icon_info,
-    icon_save,
-    icon_save_warning,
-    icon_save_error
-)
+from _common import icon_ok, icon_warning, icon_error, icon_info, icon_save, icon_save_warning, icon_save_error
 
-
-
-# Инициализируем глобальный логгер
 logger = logging.getLogger(__name__)
 
 
-# --- Блок 2: Вспомогательные функции ---
-# ==============================================================================
-def construct_analysis_paths() -> Dict[str, Optional[Path]]:
-    """
-    Формирует пути для анализа на основе переменных контекста PySM.
-    TODO:
-    1. Путь к папке output_dir передавать в качества параметра командной строки (обязательный параметр).
-    2. Путь к папке input_dir передавать в качества параметра командной строки (не обязательный параметр). Если параметр пустой или отсутствует, то input_dir = output_dir / "JPG"
-    """
-    if not IS_MANAGED_RUN or not pysm_context:
-        logger.critical("Ошибка: Скрипт запущен без окружения PySM, автоматическое формирование путей невозможно.")
-        return {"input": None, "output": None}
+class SmartSyncManager:
+    """Управляет точечным обновлением геометрии лиц с использованием биометрического матчинга."""
+    
+    def __init__(self, output_dir: Path, embeddings_path: Path):
+        self.output_dir = output_dir
+        self.embeddings_path = embeddings_path
+        self.global_embeddings = None
+        
+        if self.embeddings_path.exists():
+            try:
+                # Читаем файл с диска без полной загрузки в RAM
+                self.global_embeddings = np.load(self.embeddings_path, mmap_mode='r')
+            except Exception as e:
+                logger.error(f"Не удалось загрузить глобальные эмбеддинги для синхронизации: {e}")
 
-    photo_session = pysm_context.get("wf_photo_session")
-    session_name = pysm_context.get("wf_session_name")
-    session_path_str = pysm_context.get("wf_session_path")
+    def apply_updates(self, updates: List[Tuple[str, List[Dict], List[np.ndarray]]]):
+        if not updates: 
+            return
 
-    if not all([session_path_str, session_name, photo_session]):
-        logger.critical("Критическая ошибка: Одна или несколько переменных контекста не найдены.")
-        return {"input": None, "output": None}
+        logger.info("<br><b>Синхронизация: биометрический матчинг и обновление JSON...</b>")
 
-    base_path = Path(session_path_str) / session_name
-    # Выходная папка для всего анализа
-    output_dir = base_path / "Output" / f"Analysis_{photo_session}"
-    # Входная папка - это подпапка JPG в общей выходной папке
-    input_dir = output_dir / "JPG"
+        files_to_patch = dict()
+        # ИСПРАВЛЕНО: Убран избыточный вызов list() для уже заполненных списков
+        files_to_patch[self.output_dir / "info_faces.json"] = ["bbox", "original_bbox", "kps"]
+        files_to_patch[self.output_dir / "info_faces_landmarks.json"] =["landmark_2d_106", "landmark_3d_68"]
 
-    return {"input": input_dir, "output": output_dir}
+        for filepath, allowed_keys in files_to_patch.items():
+            if not filepath.exists(): 
+                continue
+            
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                # ИСПРАВЛЕНО: Оптимизация O(N) поиска через Lookup Dictionary вместо вложенного цикла
+                data_dict = dict()
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and "filename" in item:
+                            data_dict[item["filename"]] = item
+                elif isinstance(data, dict):
+                    data_dict = data
+
+                changed = False
+                for filename, new_meta, new_embs in updates:
+                    # Быстрый поиск файла за O(1)
+                    entry = data_dict.get(filename)
+                    if not entry:
+                        continue
+
+                    faces_list = None
+                    if isinstance(entry, dict) and "faces" in entry:
+                        faces_list = entry["faces"]
+                    elif isinstance(entry, list):
+                        faces_list = entry
+
+                    if faces_list and isinstance(faces_list, list):
+                        # ИСПРАВЛЕНО: Логирование ошибки вместо "тихого отказа", если эмбеддингов нет
+                        if self.global_embeddings is None:
+                            logger.error(f"Пропуск {filename}: файл эмбеддингов не загружен, биометрический матчинг невозможен.")
+                            continue
+
+                        old_faces = faces_list
+                        
+                        # 1. Извлекаем старые векторы по их глобальному индексу
+                        old_embs = list()
+                        for face in old_faces:
+                            idx = face.get("face_index")
+                            if idx is not None and idx < self.global_embeddings.shape[0]:
+                                old_embs.append(self.global_embeddings[idx])
+                            else:
+                                # Если индекса нет, кладем нулевой вектор (матчинг по нему провалится)
+                                old_embs.append(np.zeros(512, dtype=np.float32))
+                                
+                        # 2. Жадный биометрический матчинг (Cosine Similarity)
+                        matches = dict() # new_idx -> old_idx
+                        used_old = set()
+                        
+                        for new_idx, new_emb in enumerate(new_embs):
+                            best_old_idx = -1
+                            max_sim = -1.0
+                            
+                            norm_new = np.linalg.norm(new_emb)
+                            if norm_new == 0: continue
+                                
+                            for old_idx, old_emb in enumerate(old_embs):
+                                if old_idx in used_old:
+                                    continue
+                                
+                                norm_old = np.linalg.norm(old_emb)
+                                if norm_old == 0: continue
+                                
+                                # Формула косинусного сходства (от -1.0 до 1.0)
+                                sim = np.dot(new_emb, old_emb) / (norm_new * norm_old)
+                                
+                                if sim > max_sim:
+                                    max_sim = sim
+                                    best_old_idx = old_idx
+                            
+                            if best_old_idx != -1:
+                                matches[new_idx] = best_old_idx
+                                used_old.add(best_old_idx)
+
+                        # 3. Применяем хирургическое обновление координат
+                        for new_idx, old_idx in matches.items():
+                            old_face = old_faces[old_idx]
+                            new_face = new_meta[new_idx]
+                            
+                            for key in allowed_keys:
+                                if key in new_face:
+                                    old_face[key] = new_face[key]
+                        
+                        changed = True
+
+                if changed:
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
+                    logger.info(f"{icon_save} Координаты в <i>{filepath.name}</i> успешно обновлены.")
+
+            except Exception as e:
+                logger.error(f"Ошибка при обновлении {filepath.name}: {e}", exc_info=True)
 
 
-# --- Блок 3: Конфигурация и выполнение ---
-# ==============================================================================
 def get_config() -> argparse.Namespace:
-    """Определяет CLI-аргументы и разрешает их с помощью ConfigResolver."""
     parser = argparse.ArgumentParser(description="Анализ лиц на изображениях.")
     
     default_config_path = Path(__file__).parent / "config.toml"
-    parser.add_argument(
-        "--a_af_config_file",
-        type=str,
-        dest="a_af_config_file",
-        default=str(default_config_path),
-        help="Путь к файлу конфигурации для этапа анализа."
-    )
-    # Основные пути
-    parser.add_argument(f"--a_af_output_dir", type=str, required=True, help="Выходная папка")
-    parser.add_argument(f"--a_af_input_dir", type=str, required=False, default=None, help="Папка с файлами JPG")
 
-    # Динамические параметры
-    parser.add_argument("--all_threads", type=int, dest="all_threads", default=0, help="Количество потоков (0=авто).")
+    parser.add_argument("--a_af_config_file", type=str, dest="a_af_config_file", default=str(default_config_path))
+    parser.add_argument(f"--a_af_output_dir", type=str, required=True)
+    parser.add_argument(f"--a_af_input_dir", type=str, required=False, default=None)
+    parser.add_argument("--all_threads", type=int, dest="all_threads", default=0)
+    
+    # --- Перенесенные параметры из конфига ---
+    parser.add_argument("--a_af_model_name", type=str, dest="a_af_model_name", default="buffalo_l")
+    parser.add_argument("--a_af_det_size", type=int, dest="a_af_det_size", default=1280)
+    parser.add_argument("--a_af_det_thresh", type=float, dest="a_af_det_thresh", default=0.5)
     parser.add_argument(
-        "--a_af_det_thresh",
-        type=float,
-        dest="a_af_det_thresh",
-        default=None,
-        help="Переопределить порог уверенности для детектора лиц."
+        "--a_af_tasks", 
+        type=str, 
+        nargs='*', 
+        dest="a_af_tasks", 
+        default=list(["gender", "emotion", "age", "beauty", "eyeblink"])
     )
+    # Режим работы Smart Sync
+    parser.add_argument("--a_af_mode", type=str, dest="a_af_mode", choices=list(['create', 'sync']), default='create')
     
     if IS_MANAGED_RUN and ConfigResolver:
         return ConfigResolver(parser).resolve_all()
@@ -145,13 +204,7 @@ def get_config() -> argparse.Namespace:
 
 
 def load_and_process_task(analyzer: FaceAnalyzer, image_path: Path) -> Tuple[str, Any]:
-    """
-    Функция-воркер для треда.
-    1. Читает файл (I/O)
-    2. Вызывает анализ (CPU/GPU)
-    """
     try:
-        # Чтение с поддержкой Unicode путей
         with open(image_path, "rb") as f:
             img_buffer = np.frombuffer(f.read(), np.uint8)
         img = cv2.imdecode(img_buffer, cv2.IMREAD_COLOR)
@@ -167,33 +220,39 @@ def load_and_process_task(analyzer: FaceAnalyzer, image_path: Path) -> Tuple[str
 
 
 def main():
-
     log_level = pysm_context.get("sys_log_level", "INFO") if IS_MANAGED_RUN and pysm_context else "INFO"
     logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO), format="%(message)s", stream=sys.stdout)
 
     cli_config = get_config()
 
-    # 1. Загрузка конфига
     try:
         config_manager = ConfigManager(Path(cli_config.a_af_config_file))
     except Exception as e:
         logger.critical(f"Ошибка конфига: {e}")
         sys.exit(1)
 
+
+    # --- ПЕРЕОПРЕДЕЛЕНИЕ ПАРАМЕТРОВ ИЗ CLI ---
+    config_manager.config['model']['name'] = cli_config.a_af_model_name
+    config_manager.config['model']['det_size'] = list([cli_config.a_af_det_size, cli_config.a_af_det_size])
     if cli_config.a_af_det_thresh is not None:
         config_manager.config['model']['det_thresh'] = cli_config.a_af_det_thresh
 
-    # 2. Пути
+    # Трансформация списка строк в булевы флаги
+    tasks = cli_config.a_af_tasks if cli_config.a_af_tasks is not None else list()
+    config_manager.config['task_flags']['analyze_gender'] = 'gender' in tasks
+    config_manager.config['task_flags']['analyze_emotion'] = 'emotion' in tasks
+    config_manager.config['task_flags']['analyze_age'] = 'age' in tasks
+    config_manager.config['task_flags']['analyze_beauty'] = 'beauty' in tasks
+    config_manager.config['task_flags']['analyze_eyeblink'] = 'eyeblink' in tasks
+
+
     output_dir = Path(cli_config.a_af_output_dir)    
     if cli_config.a_af_input_dir is not None:
         input_dir = Path(cli_config.a_af_input_dir)
     else:    
         input_dir = output_dir / "JPG"
 
-      
-    # 2. Пути
-    #paths = construct_analysis_paths()
-    #input_dir, output_dir = paths.get("input"), paths.get("output")
     if not input_dir or not output_dir or not input_dir.is_dir():
         logger.critical(f"Проблема с путями: input={input_dir}, output={output_dir}")
         sys.exit(1)
@@ -202,52 +261,106 @@ def main():
     logger.debug(f"<br>Вход: <i>{input_dir.resolve()}</i>")
     logger.debug(f"Выход: <i>{output_dir.resolve()}</i><br>")
 
-    # 3. Инициализация компонентов
-    face_analyzer = FaceAnalyzer(config_manager, output_dir_override=output_dir)
-    
-    # --- ИЗМЕНЕНИЕ: Инициализация системы хранения ---
-    storage_manager = FaceStorageManager(output_dir)
-    result_writer = AnalysisResultWriter(storage_manager, batch_size=50) # Батч 50 фото
-    
-    # 4. Поиск файлов
+    state_file = output_dir / "sync_state.json"
+    old_state = dict()
+    if cli_config.a_af_mode == 'sync' and state_file.exists():
+        try:
+            with open(state_file, 'r', encoding='utf-8') as f:
+                old_state = json.load(f)
+        except Exception:
+            pass
+
     image_files = sorted([p for p in input_dir.glob("*.jpg") if p.is_file()])
     if not image_files:
         logger.warning("JPEG-файлы не найдены.")
         sys.exit(0)
 
-    num_workers = cli_config.all_threads or (os.cpu_count() or 4)
-    logger.info(f"Потоков: <b>{num_workers}</b>. Найдено <b>{len(image_files)}</b> изображений.")
+    files_to_process = list()
+    modified_files_set = set(list())
+    new_state = dict()
+    new_state.update(old_state)
 
-    # 5. Основной цикл
+    for p in image_files:
+        try:
+            st = p.stat()
+            curr_mtime = st.st_mtime
+            curr_size = st.st_size
+            
+            if cli_config.a_af_mode == 'sync':
+                old_info = old_state.get(p.name)
+                if not old_info:
+                    files_to_process.append(p) 
+                elif old_info.get("mtime") != curr_mtime or old_info.get("size") != curr_size:
+                    modified_files_set.add(p.name)
+                    files_to_process.append(p) 
+                else:
+                    pass 
+            else:
+                files_to_process.append(p) 
+        except Exception:
+            files_to_process.append(p)
+
+    if not files_to_process:
+        logger.info(f"{icon_ok} Режим <b>Sync</b>: Изменений в файлах не обнаружено. Анализ не требуется.")
+        sys.exit(0)
+
+    num_workers = cli_config.all_threads or (os.cpu_count() or 4)
+    logger.info(f"Потоков: <b>{num_workers}</b>. Изображений для обработки: <b>{len(files_to_process)}</b> из {len(image_files)}.")
+
+    face_analyzer = FaceAnalyzer(config_manager, output_dir_override=output_dir)
+    # ИСПРАВЛЕНИЕ: Передаем хранилищу флаг полной очистки, если выбран режим 'create'
+    is_create_mode = (cli_config.a_af_mode == 'create')
+    storage_manager = FaceStorageManager(output_dir, clear_existing=is_create_mode)
+    
+    result_writer = AnalysisResultWriter(storage_manager, batch_size=50)    
     face_analyzer.prepare_models()
     
     processed_count = 0
     faces_found_total = 0
-    skipped_files = []
+    skipped_files = list()
+    is_finalized = False
+    
+    updates_buffer = list()
 
     try:
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            futures = {executor.submit(load_and_process_task, face_analyzer, path): path for path in image_files}
-            progress = tqdm(futures.items(), total=len(image_files), desc="Анализ изображений")
+            futures = {executor.submit(load_and_process_task, face_analyzer, path): path for path in files_to_process}
+            progress = tqdm(futures.items(), total=len(files_to_process), desc="Анализ изображений")
             
             for future, path in progress:
                 filename, (result_meta, result_embeddings, original_shape) = future.result()
                 
                 if result_meta and result_embeddings:
-                    # Делегируем буферизацию и сохранение в ResultWriter
-                    result_writer.add_result(filename, result_meta, result_embeddings, original_shape)
+                    if filename in modified_files_set:
+                        updates_buffer.append((filename, result_meta, result_embeddings))
+                    else:
+                        result_writer.add_result(filename, result_meta, result_embeddings, original_shape)
+                    
                     faces_found_total += len(result_meta)
+                    
+                    st = path.stat()
+                    new_state[filename] = dict(mtime=st.st_mtime, size=st.st_size)
                 else:
                     skipped_files.append(filename)
                 
                 processed_count += 1
 
-        # 6. Финализация сохранения
-        # Сначала сбрасываем остатки из буфера
         result_writer.close()
 
-        # Затем собираем временные файлы в итоговые
         if storage_manager.finalize():
+            is_finalized = True
+            
+            if updates_buffer:
+                emb_path = storage_manager.embeddings_dir / "faces_embeddings.npy"
+                sync_manager = SmartSyncManager(output_dir, emb_path)
+                sync_manager.apply_updates(updates_buffer)
+
+            try:
+                with open(state_file, 'w', encoding='utf-8') as f:
+                    json.dump(new_state, f, ensure_ascii=False, indent=4)
+            except Exception as e:
+                logger.error(f"Не удалось сохранить состояние файлов: {e}")
+
             if skipped_files:
                 skipped_path = output_dir / "skipped_images.json"
                 try:
@@ -255,46 +368,33 @@ def main():
                         json.dump(skipped_files, f, ensure_ascii=False, indent=4)
                     logger.info(f"{icon_save_warning} файл <i>skipped_images.json</i> сохранен (пропущено <b>{len(skipped_files)}</b> изображений)<br>")
                 except Exception as e:
-                    logger.error(f"{icon_save_error} не удалось сохранить список пропущенных файлов: {e}<br>")
+                    pass
 
             logger.debug(f"<br>Анализ завершен. Обработано файлов: <b>{processed_count}</b>. Найденных лиц: <b>{faces_found_total}</b>.<br>")
         else:
-            logger.error("<br>{icon_save_error} Анализ завершен с ошибками при сохранении данных<br>")
+            is_finalized = True
+            logger.error(f"<br>{icon_save_error} Анализ завершен с ошибками при сохранении данных<br>")
 
     except KeyboardInterrupt:
-        logger.warning("\nПрерывание пользователем. Попытка сохранить обработанные данные...")
-        result_writer.close()
-        storage_manager.finalize()
+        logger.warning("\nПрерывание пользователем.")
+        if not is_finalized:
+            result_writer.close()
+            storage_manager.finalize()
         raise
     finally:
-        # 7. Завершение и очистка ресурсов
         face_analyzer.shutdown()
 
-
-       
-    # 1. Инициализация
     script_dir = Path(__file__).resolve().parent
-
     tv_builder = StandardTreeBuilder(icon_size=28)
 
-
-    root_node_config = ResourceNode("config.toml", Path(script_dir) / "config.toml", "file", "Файл конфигурации (дополнительные настройки скрипта)")
-
-    root_node_target = ResourceNode("Исходная<br>папка", Path(input_dir), "folder", "Исходная папка с файлами JPG")
-
-    # 2. Подготовка данных
-    root_node = ResourceNode("Рабочая<br>папка", Path(output_dir), "folder", "Папка с результатами AI-анализа фотографий")
-    root_node.children.append(ResourceNode("info_faces.json", Path(output_dir) / "info_faces.json", "code", "Подробная информация о всех лицах обнаруженных на фотографиях текущей фотосессии"))
-    root_node.children.append(ResourceNode("skipped_images.json", Path(output_dir) / "skipped_images.json", "code", "Список необработанных фотографий"))
+    root_node_config = ResourceNode("config.toml", Path(script_dir) / "config.toml", "file", "Файл конфигурации")
+    root_node_target = ResourceNode("Исходная<br>папка", Path(input_dir), "folder", "Исходная папка")
+    root_node = ResourceNode("Рабочая<br>папка", Path(output_dir), "folder", "Результаты анализа")
+    root_node.children.append(ResourceNode("info_faces.json", Path(output_dir) / "info_faces.json", "code", ""))
+    root_node.children.append(ResourceNode("sync_state.json", Path(output_dir) / "sync_state.json", "code", ""))
     
-
-    tv_builder.add_section("<br>Рабочие папки и файлы", [root_node_config, root_node_target, root_node])
-
-
-    # 4. Вывод
+    tv_builder.add_section("",[root_node_config, root_node_target, root_node])
     pysm_context.log_html(tv_builder.get_html())
 
-# --- Блок 4: Точка входа ---
-# ==============================================================================
 if __name__ == "__main__":
     main()

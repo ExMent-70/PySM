@@ -53,15 +53,20 @@
       "flag_present_text": "(флаг)",
       "param_format": "--{name}: {value}",
       "label_instance_name": "Имя экземпляра скрипта:",
-      "label_overridden_params": "Переопределенные параметры:"
+	  "label_link_instance_name": "Связанный экземпляра скрипта:",
+      "label_overridden_params": "Переопределенные параметры:",
+ 	  "context_menu_hint": "Используйте контекстное меню для настройки"
     }
   },
   "main_window": {
-    "base_title": "PySM - Менеджер Python-скриптов",
+    "base_title": "Python Script Manager (PySM)",
     "dirty_indicator": "*",
     "toolbar": {
       "main_toolbar_title": "Главная панель инструментов",
       "new_collection": "Новый рабочий процесс...",
+	  "new_collection_empty": "Создать новый рабочий процесс",
+      "new_collection_template": "Создать копию активного рабочего процесса",
+      "new_collection_tooltip": "Создать новый рабочий процесс",
       "open_collection": "Открыть рабочий процесс...",
       "save_collection": "Сохранить рабочий процесс",
 	  "save_collection_as": "Сохранить как...",
@@ -126,7 +131,8 @@
     "run_error": {
       "title": "Запуск невозможен",
       "no_set_selected": "Выберите набор или отдельный скрипт в наборе для запуска",
-      "no_script_in_set": "Выберите конкретный скрипт в наборе"
+      "no_script_in_set": "Выберите конкретный скрипт в наборе",
+	  "parent_set_not_found": "Родительский набор для этого скрипта не найден."
     },
     "context_menu": {
           "create_folder": "Создать папку здесь",
@@ -139,7 +145,11 @@
           "duplicate_instance": "Создать дубликат",
           "paste_instance": "Вставить Экземпляр",
 		  "import_set": "Импортировать набор сюда...",
-		  "export_set": "Экспортировать набор..."		  
+		  "export_set": "Экспортировать набор...",
+		  "add_favorite": "Добавить в избранное",
+          "remove_favorite": "Удалить из избранного",
+          "change_icon": "Изменить иконку...",
+		  "locate_in_tree": "Перейти к скрипту"
     },
     "create_folder": {
       "title": "Создание папки",
@@ -189,9 +199,26 @@
   },
   "dialogs": {
     "instance_editor": {
-        "title": "Выбор экземпляра скрипта",
-        "none_selected": "(не выбрано)"
+		"title": "Выбор экземпляра скрипта",
+        "none_selected": "(не выбрано)",
+        "expand_all": "Развернуть всё",
+        "collapse_all": "Свернуть всё",
+        "clear_selection": "Снять отметки"
     },
+	"icon_selection": {
+		"title": "Выберите иконку и цвет",
+		"color_label": "Цвет иконки:",
+		"default_color": "По умолчанию (зависит от темы)",
+		"custom_color": "Свой цвет..."
+    },
+    "icon_categories": {
+		"system": "Базовые и Системные",
+		"files": "Файлы, Документы, Таблицы",
+		"actions": "Действия и Приложения",
+		"statuses": "Статусы и Метки",
+		"pysm": "Специфичные (PySM)",
+		"attributes": "Атрибуты лица"
+    },	
     "script_properties": {
       "title_passport": "Свойства скрипта: {name}",
       "title_instance": "Параметры экземпляра: {name}",
@@ -393,6 +420,7 @@
     "collection_opened": "Загружен рабочий процесс '{name}'",
     "config_saved": "Конфигурация приложения сохранена.",
     "config_save_error": "ОШИБКА: Не удалось сохранить конфигурацию приложения.",
+	"collection_new_from_template": "Создан новый рабочий процесс на основе текущего.",
     "collection_renamed": "Рабочий процесс '{old_name}' переименована в '{new_name}'.",
     "collection_props_updated": "Свойства рабочего процесса обновлены.",
 	"collection_saved": "Рабочий процесс сохранена в '{path}'",
@@ -411,7 +439,9 @@
     "script_root_removed": "Удалена корневая директория.",
     "script_root_updated": "Обновлена корневая директория.",
     "set_exported": "Набор '{name}' экспортирован в файл: {path}",
-    "set_imported": "Набор '{name}' импортирован из файла: {path}"
+    "set_imported": "Набор '{name}' импортирован из файла: {path}",
+	"favorite_added": "Экземпляр скрипта добавлен в панель быстрого запуска.",
+    "favorite_removed": "Экземпляр скрипта удален из панели быстрого запуска."
   },
   "app_controller": {
     "log_info": {
