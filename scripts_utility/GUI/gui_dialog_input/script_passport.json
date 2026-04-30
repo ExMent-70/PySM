@@ -36,12 +36,27 @@
       "choices": [
         "none",
         "not_empty",
-		"filename_txt",
+        "filename_txt",
+        "dirname_windows",
         "integer",
         "positive_integer",
         "float",
         "email",
         "custom"
+      ]
+    },
+    "dlg_input_value_type": {
+      "type": "choice",
+      "description": "Тип преобразования введенного значения",
+      "required": true,
+      "default": "auto",
+      "choices": [
+        "auto",
+        "string",
+        "int",
+        "float",
+        "bool",
+        "json"
       ]
     },
     "dlg_input_custom_regexp": {
