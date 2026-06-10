@@ -1,0 +1,14 @@
+{
+  "description": "Закрывает Adobe Photoshop. Сначала пытается выполнить штатное закрытие через API, при необходимости может принудительно завершить процесс Photoshop.",
+  "category": "Photoshop",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.00.00",
+  "command_line_args_meta": {
+    "force_kill": {
+      "type": "bool",
+      "description": "Принудительно завершить процесс Photoshop, если штатное закрытие через API не удалось.",
+      "required": false,
+      "default": false
+    }
+  }
+}

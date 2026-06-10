@@ -5,6 +5,7 @@ import pathlib
 import json
 import time
 import shlex
+import os
 from typing import List, Dict, Optional, Callable
 from datetime import datetime
 
@@ -78,6 +79,14 @@ class SetRunnerOrchestrator(QObject):
         self.script_start_time: float = 0
         self._stop_requested: bool = False
 
+    def _atomic_write_json(self, target_path: pathlib.Path, data_to_dump: dict) -> None:
+        """Write JSON atomically so context reloads never observe a truncated file."""
+
+        temp_path = target_path.with_name(f"{target_path.name}.{os.getpid()}.{id(data_to_dump)}.tmp")
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data_to_dump, f, indent=2, ensure_ascii=False)
+        os.replace(temp_path, target_path)
+
     def _prepare_context_file(self):
         """Сбрасывает актуальное состояние RAM (пользовательские переменные + системные) на жесткий диск."""
         try:
@@ -119,8 +128,7 @@ class SetRunnerOrchestrator(QObject):
             }
 
             # Молча перезаписываем файл на диске
-            with open(self.context_file_path, "w", encoding="utf-8") as f:
-                json.dump(context_data, f, indent=2, ensure_ascii=False)
+            self._atomic_write_json(self.context_file_path, context_data)
 
         except (IOError, json.JSONDecodeError) as e:
             logger.error(f"Не удалось подготовить файл контекста: {e}", exc_info=True)
@@ -519,7 +527,7 @@ class SetRunnerOrchestrator(QObject):
         # Удаляем устаревшие поля, если они вдруг есть
         if self.context_file_path.is_file():
             try:
-                with open(self.context_file_path, "r+", encoding="utf-8") as f:
+                with open(self.context_file_path, "r", encoding="utf-8") as f:
                     context_data = json.load(f)
                     cleaned = False
                     if "pysm_next_script" in context_data:
@@ -529,9 +537,7 @@ class SetRunnerOrchestrator(QObject):
                         del context_data["pysm_set_instance_ids"]
                         cleaned = True
                     if cleaned:
-                        f.seek(0)
-                        f.truncate()
-                        json.dump(context_data, f, indent=2, ensure_ascii=False)
+                        self._atomic_write_json(self.context_file_path, context_data)
             except (IOError, json.JSONDecodeError) as e:
                 logger.warning(f"Не удалось очистить файл контекста: {e}")
 

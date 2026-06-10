@@ -1123,12 +1123,12 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         # --- ДОБАВЛЕНО: Сохранение состояния окна и сплиттеров ---
         if IS_MANAGED_RUN and pysm_context and self.win_state_var_name and WindowStateManager:
-            mode_var_name = f"{self.win_state_var_name}_{self.mode}"
+            mode_var_name = f"{self.win_state_var_name}.{self.mode}"
             window_state = WindowStateManager.save_state(
                 window=self,
                 splitters={'main': self.main_splitter}
             )
-            pysm_context.set(mode_var_name, window_state)
+            pysm_context.set_structured(mode_var_name, window_state)
         # --- ИСПРАВЛЕНИЕ: Останавливаем загрузчик фото перед выходом ---
         self._stop_loader()
       

@@ -127,6 +127,14 @@ class PySMContext:
         sys.argv = [sys.argv[0]] + remaining_argv
         self._read_data()
 
+    def _atomic_write_json(self, target_path: pathlib.Path, data_to_dump: Dict[str, Any]) -> None:
+        """Write JSON via a same-directory temp file so readers never see an empty file."""
+
+        temp_path = target_path.with_name(f"{target_path.name}.{os.getpid()}.{id(data_to_dump)}.tmp")
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data_to_dump, f, indent=2, ensure_ascii=False)
+        os.replace(temp_path, target_path)
+
     def _read_data(self) -> Dict[str, Any]:
         """Читает данные из файла контекста и кэширует их."""
         if self._raw_context_data_cache is not None:
@@ -162,8 +170,7 @@ class PySMContext:
             return
 
         try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(self._raw_context_data_cache, f, indent=2, ensure_ascii=False)
+            self._atomic_write_json(path, self._raw_context_data_cache)
             self._is_dirty = False
         except Exception as e:
             print(f"PySM Context Error: Не удалось сохранить файл контекста: {e}", file=sys.stderr)
@@ -198,19 +205,175 @@ class PySMContext:
             return variable_data.get("value", default)
         return default
 
-    def get_structured(self, key: str, default: Any = None) -> Any:
-        """Получает вложенное значение, используя точечную нотацию (например, 'a.b.c')."""
+    def _is_list_index_token(self, token: str) -> bool:
+        """Проверяет, можно ли сегмент dot-notation использовать как индекс списка."""
+        if not token:
+            return False
+        return token.isdigit()
+
+    def _get_nested_value(self, root_value: Any, path_parts: List[str], default: Any = None) -> Any:
+        """
+        Получает вложенное значение из dict/list-структуры.
+
+        Поддерживает:
+        - ключи словаря: a.b.c
+        - индексы списка: items.0.name
+        """
+        current_value = root_value
+
+        for part in path_parts:
+            if isinstance(current_value, dict):
+                if part not in current_value:
+                    return default
+                current_value = current_value[part]
+                continue
+
+            if isinstance(current_value, list):
+                if not self._is_list_index_token(part):
+                    return default
+                index = int(part)
+                if index < 0 or index >= len(current_value):
+                    return default
+                current_value = current_value[index]
+                continue
+
+            return default
+
+        return current_value
+
+    def _nested_path_exists(self, root_value: Any, path_parts: List[str]) -> bool:
+        """
+        Проверяет существование вложенного пути внутри dict/list-структуры.
+
+        Отличает отсутствующий путь от существующего значения None.
+        """
+        current_value = root_value
+
+        for part in path_parts:
+            if isinstance(current_value, dict):
+                if part not in current_value:
+                    return False
+                current_value = current_value[part]
+                continue
+
+            if isinstance(current_value, list):
+                if not self._is_list_index_token(part):
+                    return False
+                index = int(part)
+                if index < 0 or index >= len(current_value):
+                    return False
+                current_value = current_value[index]
+                continue
+
+            return False
+
+        return True
+
+    def _resolve_nested_parent(
+        self,
+        root_value: Any,
+        path_parts: List[str],
+        create_missing_dicts: bool = False,
+    ) -> Tuple[Optional[Any], Optional[str]]:
+        """
+        Возвращает родительский контейнер и последний сегмент пути.
+
+        Для dict допускается автоматическое создание промежуточных словарей.
+        Для list автоматическое расширение не выполняется намеренно, чтобы не
+        создавать скрытых мутаций и не угадывать структуру данных.
+        """
+        if not path_parts:
+            return None, None
+
+        current_value = root_value
+
+        for part in path_parts[:-1]:
+            if isinstance(current_value, dict):
+                if part not in current_value:
+                    if create_missing_dicts:
+                        current_value[part] = {}
+                    else:
+                        return None, None
+
+                if not isinstance(current_value[part], (dict, list)):
+                    if create_missing_dicts:
+                        current_value[part] = {}
+                    else:
+                        return None, None
+
+                current_value = current_value[part]
+                continue
+
+            if isinstance(current_value, list):
+                if not self._is_list_index_token(part):
+                    return None, None
+                index = int(part)
+                if index < 0 or index >= len(current_value):
+                    return None, None
+                current_value = current_value[index]
+                continue
+
+            return None, None
+
+        return current_value, path_parts[-1]
+
+    def exists(self, key: str) -> bool:
+        """
+        Проверяет существование переменной или вложенного значения.
+
+        В отличие от get()/get_structured(), корректно отличает отсутствующий
+        ключ от существующего значения None.
+
+        Примеры:
+        - exists("my_var")
+        - exists("wf_school_info.city")
+        - exists("templates.0.name")
+        """
+        if not key:
+            return False
+
+        data = self._read_data()
         keys = key.split(".")
         base_key = keys[0]
-        value = self.get(base_key, default if len(keys) == 1 else {})
-        if len(keys) > 1 and isinstance(value, dict):
-            for sub_key in keys[1:]:
-                try:
-                    value = value.get(sub_key, default)
-                except (AttributeError, TypeError):
-                    return default
-        return value
 
+        if base_key not in data:
+            return False
+
+        if len(keys) == 1:
+            return True
+
+        variable_data = data.get(base_key)
+        if not variable_data or not isinstance(variable_data, dict):
+            return False
+
+        root_value = variable_data.get("value")
+        return self._nested_path_exists(root_value, keys[1:])
+
+    def get_structured(self, key: str, default: Any = None) -> Any:
+        """
+        Получает значение переменной или вложенное значение по dot-notation.
+
+        Поддерживает:
+        - верхнеуровневые переменные;
+        - вложенные dict-ключи: a.b.c;
+        - индексы списков: items.0.name.
+
+        Если путь отсутствует, возвращает default.
+        """
+        if not key:
+            return default
+
+        keys = key.split(".")
+        base_key = keys[0]
+        value = self.get(base_key, default if len(keys) == 1 else None)
+
+        if len(keys) == 1:
+            return value
+
+        if value is None:
+            return default
+
+        return self._get_nested_value(value, keys[1:], default)
 
     def _send_ipc_update(self, action: str, **kwargs):
         """Отправляет мгновенную команду обновления контекста в процесс PySM."""
@@ -251,12 +414,18 @@ class PySMContext:
         
     def set_structured(self, key_path: str, value: Any, commit: bool = False) -> None:
         """
-        Устанавливает значение переменной, поддерживая точечную нотацию для вложенных JSON-структур.
-        Если переменная не вложена (нет точек в ключе), работает аналогично стандартному set().
-        
-        Пример: 
-        key_path="wf_school_info.city", value="Иркутск" -> Обновит только 'city' внутри словаря.
+        Устанавливает значение переменной, поддерживая dot-notation.
+
+        Поведение:
+        - без точки работает как set();
+        - для JSON-словарей создаёт отсутствующие промежуточные dict-узлы;
+        - поддерживает существующие индексы списков, например: items.0.name;
+        - не расширяет списки автоматически, чтобы не создавать скрытых структур.
         """
+        if not key_path:
+            print("PySM Context Error: Empty key path is not allowed.", file=sys.stderr)
+            return
+
         if "." not in key_path:
             self.set(key_path, value, commit=commit)
             return
@@ -267,20 +436,21 @@ class PySMContext:
         data = self._read_data()
         variable_data = data.get(base_key)
 
-        # Если базовая переменная существует, проверяем ее
         if variable_data and isinstance(variable_data, dict):
             if variable_data.get("read_only", False):
                 print(f"PySM Context Warning: Переменная '{base_key}' защищена от записи.", file=sys.stderr)
                 return
-            
-            # Точечная нотация применима только к JSON-объектам (словарям)
+
             if variable_data.get("type") != "json" or not isinstance(variable_data.get("value"), dict):
-                print(f"PySM Context Error: Невозможно применить точечную нотацию к '{base_key}', так как это не 'json' объект.", file=sys.stderr)
+                print(
+                    f"PySM Context Error: Невозможно применить точечную нотацию к '{base_key}', "
+                    "так как это не 'json' объект.",
+                    file=sys.stderr,
+                )
                 return
-            
+
             root_value = variable_data["value"]
         else:
-            # Если переменной нет, создаем новую корневую JSON-структуру
             root_value = {}
             variable_data = {
                 "type": "json",
@@ -291,21 +461,39 @@ class PySMContext:
             }
             data[base_key] = variable_data
 
-        # Спускаемся вглубь словаря до предпоследнего ключа, создавая уровни при необходимости
-        current_level = root_value
-        for sub_key in keys[1:-1]:
-            if sub_key not in current_level or not isinstance(current_level[sub_key], dict):
-                current_level[sub_key] = {}
-            current_level = current_level[sub_key]
+        parent_container, target_key = self._resolve_nested_parent(
+            root_value,
+            keys[1:],
+            create_missing_dicts=True,
+        )
 
-        # Устанавливаем целевое значение для последнего ключа
-        target_key = keys[-1]
-        current_level[target_key] = value
+        if parent_container is None or target_key is None:
+            print(f"PySM Context Error: Не удалось разрешить путь '{key_path}'.", file=sys.stderr)
+            return
+
+        if isinstance(parent_container, dict):
+            parent_container[target_key] = value
+        elif isinstance(parent_container, list):
+            if not self._is_list_index_token(target_key):
+                print(
+                    f"PySM Context Error: Сегмент '{target_key}' не является индексом списка.",
+                    file=sys.stderr,
+                )
+                return
+            index = int(target_key)
+            if index < 0 or index >= len(parent_container):
+                print(
+                    f"PySM Context Error: Индекс '{index}' вне диапазона списка для пути '{key_path}'.",
+                    file=sys.stderr,
+                )
+                return
+            parent_container[index] = value
+        else:
+            print(f"PySM Context Error: Родительский контейнер пути '{key_path}' не поддерживает запись.", file=sys.stderr)
+            return
 
         self._mark_dirty(data, force_commit=commit)
-        # Отправляем IPC-обновление для ВСЕГО базового объекта, чтобы UI синхронизировался
         self._send_ipc_update("set", key=base_key, value=root_value, var_type="json")        
-
 
     def update(self, update_dict: Dict[str, Any], commit: bool = False) -> None:
         """Обновляет несколько переменных в контексте из словаря."""
@@ -333,25 +521,102 @@ class PySMContext:
         self._mark_dirty(data, force_commit=commit)
 
     def remove(self, keys_to_remove: Optional[Union[str, List[str]]] = None, commit: bool = False) -> None:
-        """Удаляет переменные из контекста."""
+        """
+        Удаляет переменные из контекста.
+
+        Поддерживает:
+        - удаление верхнеуровневых переменных;
+        - удаление вложенных dict-ключей по dot-notation;
+        - удаление элементов list по числовому индексу в dot-notation.
+
+        Примеры:
+        - remove("my_var")
+        - remove("wf_school_info.city")
+        - remove("template.override_labels.0")
+        """
         data = self._read_data()
-        keys_for_deletion =[]
+
         if keys_to_remove is None:
-            keys_for_deletion =[k for k in data.keys() if k not in _RESERVED_KEYS]
+            keys_for_deletion = [k for k in data.keys() if k not in _RESERVED_KEYS]
         elif isinstance(keys_to_remove, str):
             keys_for_deletion = [keys_to_remove]
         elif isinstance(keys_to_remove, list):
             keys_for_deletion = keys_to_remove
-            
+        else:
+            return
+
         if not keys_for_deletion:
             return
-            
+
+        removed_top_level_keys: List[str] = []
+        updated_structured_keys: set[str] = set()
+
         for key in keys_for_deletion:
-            data.pop(key, None)
-            
+            if not key:
+                continue
+
+            if key in data:
+                if key in _RESERVED_KEYS:
+                    continue
+                data.pop(key, None)
+                removed_top_level_keys.append(key)
+                continue
+
+            if "." not in key:
+                continue
+
+            keys = key.split(".")
+            base_key = keys[0]
+            variable_data = data.get(base_key)
+
+            if not variable_data or not isinstance(variable_data, dict):
+                continue
+
+            if variable_data.get("read_only", False):
+                print(f"PySM Context Warning: variable '{base_key}' is read-only.", file=sys.stderr)
+                continue
+
+            root_value = variable_data.get("value")
+            if variable_data.get("type") != "json" or not isinstance(root_value, dict):
+                continue
+
+            parent_container, target_key = self._resolve_nested_parent(
+                root_value,
+                keys[1:],
+                create_missing_dicts=False,
+            )
+
+            if parent_container is None or target_key is None:
+                continue
+
+            removed = False
+
+            if isinstance(parent_container, dict):
+                if target_key in parent_container:
+                    del parent_container[target_key]
+                    removed = True
+
+            elif isinstance(parent_container, list):
+                if self._is_list_index_token(target_key):
+                    index = int(target_key)
+                    if 0 <= index < len(parent_container):
+                        parent_container.pop(index)
+                        removed = True
+
+            if removed:
+                updated_structured_keys.add(base_key)
+
+        if not removed_top_level_keys and not updated_structured_keys:
+            return
+
         self._mark_dirty(data, force_commit=commit)
-        # Сообщаем PySM об удалении
-        self._send_ipc_update("remove", keys=keys_for_deletion)
+
+        if removed_top_level_keys:
+            self._send_ipc_update("remove", keys=removed_top_level_keys)
+
+        for base_key in updated_structured_keys:
+            root_value = data[base_key]["value"]
+            self._send_ipc_update("set", key=base_key, value=root_value, var_type="json")
 
 
     def get_all(self) -> Dict[str, Any]:
@@ -405,6 +670,21 @@ class PySMContext:
     def get_variable(self, key: str) -> Optional[Dict[str, Any]]:
         """Возвращает полную модель переменной (словарь) по ключу."""
         return self._read_data().get(key)
+
+    def get_schema(self, key: str, default: Any = None) -> Any:
+        """
+        Возвращает JSON-схему для переменной контекста.
+
+        Соглашение:
+        - данные хранятся в переменной <key>;
+        - схема хранится в переменной <key>_schema.
+
+        Пример:
+        - get_schema("wf_school_info") читает "wf_school_info_schema".
+        """
+        if not key:
+            return default
+        return self.get_structured(f"{key}_schema", default=default)
 
     def set_next_script(self, instance_id: str, commit: bool = False) -> None:
         """

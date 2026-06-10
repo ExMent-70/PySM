@@ -1,8 +1,8 @@
 {
-  "description": "Скрипт выполняет кластеризацию/классификацию фотографии по сюжетам съемки на основе визуального содержимого.\n<br><b>Доступные режимы работы:</b>\n• <b>clustering</b> - кластеризация фотография с использование алгоритма  DBSCAN. Флаг <b>use_origanal</b> = <i>False</i>.\n• <b>classification</b> - классфикация изображений в соответствии с текстовым описаниям (CLIP Zero-shot). Флаг <b>use_origanal</b> = <i>False</i>.\n<div style=\"{theme.tooltip_instance_args_block}\">\nВ качестве значения параметра <b>a_cl_data_dir</b> можно использовать переменные контекста:\n<i>{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}</i>\n</div>",
+  "description": "Скрипт выполняет кластеризацию/классификацию фотографий по сюжетам съемки на основе визуального содержимого.\n<br><b>Доступные режимы работы:</b>\n• <b>clustering</b> - кластеризация фотографий с использованием DBSCAN. Обычно используется с масками: <b>use_originals</b> = <i>False</i>.\n• <b>classification</b> - классификация изображений по текстовым описаниям локаций/сюжетов. Обычно используется с оригиналами: <b>use_originals</b> = <i>True</i>.\n<div style=\"{theme.tooltip_instance_args_block}\">\nВ качестве значения параметра <b>a_cl_data_dir</b> можно использовать переменные контекста:\n<i>{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}</i>\n</div>",
   "category": "Анализ и AI",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "v2.2026.05.02",
+  "version": "v2.2026.05.08",
   "command_line_args_meta": {
     "mode": {
       "type": "choice",
@@ -36,18 +36,52 @@
       "type": "float",
       "description": "Порог уверенности для классификации (0.0-1.0). Если ниже, фото считается неклассифицированным.",
       "required": false,
-      "default": 0.25
+      "default": 0.11
+    },
+    "model_backend": {
+      "type": "choice",
+      "description": "Модель/backend для эмбеддингов: SigLIP2 ONNX или CLIP ONNX.",
+      "required": false,
+      "default": "siglip2_onnx",
+      "choices": [
+        "siglip2_onnx",
+        "clip"
+      ]
+    },
+    "spatial_strategy": {
+      "type": "choice",
+      "description": "Способ сжатия spatial embeddings SigLIP2 ONNX для режима clustering.",
+      "required": false,
+      "default": "grid_9x9",
+      "choices": [
+        "grid_9x9",
+        "grid_6x6",
+        "grid_3x3",
+        "mean_std",
+        "flatten_axis1_norm",
+        "flatten",
+        "pooler"
+      ]
     },
     "a_cl_location_prompts": {
       "type": "list",
       "description": "Список текстовых описаний локаций (для режима classification).",
-      "required": false
+      "required": false,
+      "default": [
+        "A 3/4-length photo of a teenager standing near a desk in front of an abstract gray background",
+        "Photo of two teenagers sitting at a school desk against a background of a rack of books",
+        "Group photo of teenagers (4-8 people) against a background of a rack of books",
+        "Horizontal photo of teenagers (6-10 people) against a background of graffiti. Children are standing or sitting",
+        "Vertical photo of 2-3 teenagers, against a background of graffiti",
+        "Vertical class group photo on a narrow staircase",
+        "Horizontal photo of a large group of teenagers in 2 rows. The first row is sitting, and the second row is standing"
+      ]
     },
     "a_cl_cluster_eps": {
       "type": "float",
       "description": "Параметр 'eps' для DBSCAN (для режима clustering).",
       "required": false,
-      "default": 0.14
+      "default": 0.18
     },
     "a_cl_mask_suffix": {
       "type": "str",
@@ -59,13 +93,24 @@
       "type": "int",
       "description": "Количество потоков (0 - авто).",
       "required": false,
-      "default": "12"
+      "default": 12
     },
     "batch_size": {
       "type": "int",
       "description": "Размера пакета изображений (Batch Size).",
       "required": false,
       "default": 32
+    },
+    "cache_mode": {
+      "type": "choice",
+      "description": "Режим работы кеша эмбеддингов: use, refresh или off.",
+      "required": false,
+      "default": "use",
+      "choices": [
+        "use",
+        "refresh",
+        "off"
+      ]
     }
   }
 }

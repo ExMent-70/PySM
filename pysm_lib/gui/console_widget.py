@@ -168,8 +168,17 @@ class ConsoleWidget(QWidget):
                     "console_widget.progress_bar.active_format", text=progress_text
                 )
             )
+        elif current >= 0 and isinstance(text_obj, str) and text_obj:
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setRange(0, 0)
+            self.progress_bar.setFormat(
+                self.locale_manager.get(
+                    "console_widget.progress_bar.active_format", text=text_obj
+                )
+            )
         else:
             self.progress_bar.setVisible(False)
+            self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(0)
             self.progress_bar.setFormat(
                 self.locale_manager.get("console_widget.progress_bar.default_format")

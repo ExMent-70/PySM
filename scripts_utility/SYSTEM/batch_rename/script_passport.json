@@ -1,0 +1,105 @@
+{
+  "description": "Пакетно переименовывает файлы после выбранной сортировки: по дате создания, по дате изменения, по имени или без сортировки. Подходит для RAW-файлов с карт памяти, где нумерация камеры переходит с 9999 на 0001.",
+  "category": "Файловые операции",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2.2026.05.10",
+  "command_line_args_meta": {
+    "br_source_dir": {
+      "type": "dir_path",
+      "description": "Папка с файлами для переименования. Можно использовать шаблоны вида {var_name}.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}"
+    },
+    "br_include": {
+      "type": "list",
+      "description": "Паттерны для включения файлов (glob-синтаксис, каждый с новой строки).",
+      "required": true,
+      "default": [
+        "*.CR3"
+      ]
+    },
+    "br_template": {
+      "type": "choice",
+      "description": "Шаблон нового имени файла. Токены скрипта: %index%, %ext%, %stem%, %name%, %prefix%, %suffix%, %created_date%, %created_time%. Переменные PySM вида {session_name} тоже можно использовать.",
+      "required": true,
+      "default": "{wf_session_name}_%index%%ext%",
+      "choices": [
+        "%prefix%%index%%suffix%%ext%",
+        "%index%%ext%",
+        "RAW_%index%%ext%",
+        "{wf_session_name}_%index%%ext%",
+        "{wf_session_name}_RAW_%index%%ext%",
+        "%created_date%_%index%%ext%",
+        "%created_date%_%created_time%_%index%%ext%",
+        "%index%_%stem%%ext%"
+      ]
+    },
+    "br_prefix": {
+      "type": "string",
+      "description": "Префикс для токена %prefix%.",
+      "required": false,
+      "default": ""
+    },
+    "br_suffix": {
+      "type": "string",
+      "description": "Суффикс для токена %suffix%.",
+      "required": false,
+      "default": ""
+    },
+    "br_start_index": {
+      "type": "int",
+      "description": "Первый порядковый номер.",
+      "required": false,
+      "default": 1,
+      "min_val": 0,
+      "max_val": 999999
+    },
+    "br_index_digits": {
+      "type": "int",
+      "description": "Количество цифр в токене %index%. Значение 4 дает 0001, 0002, 0003.",
+      "required": false,
+      "default": 4,
+      "min_val": 0,
+      "max_val": 12
+    },
+    "br_on_conflict": {
+      "type": "choice",
+      "description": "Действие при конфликте имен: error - остановить, skip - пропустить файл, rename - подобрать уникальное имя.",
+      "required": false,
+      "default": "rename",
+      "choices": [
+        "error",
+        "skip",
+        "rename"
+      ]
+    },
+    "br_sort_method": {
+      "type": "choice",
+      "description": "Метод сортировки файлов перед переименованием: created_time - по дате создания, modified_time - по дате изменения, name - по имени, none - без сортировки.",
+      "required": false,
+      "default": "modified_time",
+      "choices": [
+        "created_time",
+        "modified_time",
+        "name",
+        "none"
+      ]
+    },
+    "br_mode": {
+      "type": "choice",
+      "description": "Режим работы: rename - реально переименовать файлы, dry_run - только показать план.",
+      "required": false,
+      "default": "rename",
+      "choices": [
+        "rename",
+        "dry_run"
+      ]
+    },
+    "br_recursive": {
+      "type": "bool",
+      "description": "Искать файлы во вложенных папках. Нумерация остается общей, переименование происходит в текущей папке каждого файла.",
+      "required": false,
+      "default": false
+    }
+  }
+}

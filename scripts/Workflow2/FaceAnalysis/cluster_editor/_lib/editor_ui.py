@@ -267,8 +267,8 @@ class EditorUIBuilder:
         
         # --- Загрузка состояния окна и сплиттеров ---
         if IS_MANAGED_RUN and pysm_context and window.win_state_var_name and WindowStateManager:
-            mode_var_name = f"{window.win_state_var_name}_{window.mode}"
-            saved_state = pysm_context.get(mode_var_name, dict())
+            mode_var_name = f"{window.win_state_var_name}.{window.mode}"
+            saved_state = pysm_context.get_structured(mode_var_name, dict())
             if saved_state:
                 WindowStateManager.restore_state(
                     window=window,

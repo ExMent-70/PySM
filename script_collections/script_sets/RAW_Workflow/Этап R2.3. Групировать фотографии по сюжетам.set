@@ -96,7 +96,7 @@
       }
     },
     {
-      "id": "root_790d968b/Workflow2/FaceAnalysis/cluster_locations",
+      "id": "root_790d968b/Workflow2/FaceAnalysis/cluster_locations2",
       "instance_id": "instance_16e406c5f3e1",
       "name": "Группировать фотографии по сюжетам",
       "description": null,
@@ -147,6 +147,10 @@
         },
         "batch_size": {
           "value": 32,
+          "enabled": true
+        },
+        "cache_mode": {
+          "value": "use",
           "enabled": true
         }
       }

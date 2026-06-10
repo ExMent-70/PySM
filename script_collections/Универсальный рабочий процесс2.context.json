@@ -1,0 +1,853 @@
+{
+  "sys_log_level": {
+    "type": "string",
+    "value": "INFO",
+    "description": null,
+    "read_only": true,
+    "choices": null
+  },
+  "enhancer_settings": {
+    "type": "json",
+    "value": {
+      "brightness": 1.03,
+      "contrast": 1.0,
+      "color": 1.09,
+      "sharpness": 1.2,
+      "temperature": 2.0,
+      "tint": -7.0,
+      "black_point": 30.0,
+      "white_point": -25.0,
+      "wm_stripe_alpha": 55.0,
+      "wm_mask_fill": 51.0,
+      "wm_pad_w": 0.1,
+      "wm_pad_h": 0.2,
+      "wm_text": "Оронгой - 4 класс",
+      "wm_text_alpha": 150.0,
+      "export_dpi": 300,
+      "export_quality": 95,
+      "export_watermarks": true,
+      "export_keep_ratio": true
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_school_info": {
+    "type": "json",
+    "value": {
+      "Полное название школы": "Средняя общеобразовательная школа №27",
+      "Название школы": "СОШ №27",
+      "Год": "2026",
+      "Класс": "Б",
+      "Параллель": 9,
+      "Город": "Улан-Удэ"
+    },
+    "description": null,
+    "read_only": false,
+    "choices": null
+  },
+  "wf_session_path": {
+    "type": "dir_path",
+    "value": "G:/2026_Capture_One_Session",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_psd_path": {
+    "type": "dir_path",
+    "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_children_file_name": {
+    "type": "string",
+    "value": "children.txt",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_idsgn_catalog": {
+    "type": "file_path",
+    "value": "E:/YandexDisk/ФОТОСЕССИИ/СЕЗОН_2026/_БАЗА_/ШАБЛОНЫ/catalog.template",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_session_name": {
+    "type": "string",
+    "value": "Школа для видео",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_photo_session": {
+    "type": "string",
+    "value": "SCHOOL",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_source_file_type": {
+    "type": "string",
+    "value": "JPG",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_source_file_path": {
+    "type": "dir_path",
+    "value": "G:/2026_Фото для видео/9 класс",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "sys_location_name_SCHOOL": {
+    "type": "json",
+    "value": {
+      "portrait": "IMG_8164.jpg",
+      "group_photo_table": "IMG_9060.jpg",
+      "group_photo_down": "IMG_9429.jpg",
+      "group_photo_all_01": "IMG_9439.jpg",
+      "group_photo_04": "IMG_9493.jpg",
+      "group_photo_all_02": "IMG_9524.jpg",
+      "group_photo_01": "IMG_9638.jpg",
+      "group_photo_02": "IMG_9670.jpg",
+      "group_photo_03": "IMG_9711.jpg",
+      "group_photo_v_01": "IMG_9874.jpg",
+      "portrait_A6": "",
+      "portrait_A5": "",
+      "portrait_A4": ""
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_portrait_session": {
+    "type": "string",
+    "value": "SCHOOL",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_folder_count": {
+    "type": "string",
+    "value": "0",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "win_state": {
+    "type": "json",
+    "value": {
+      "idsgn_catalog": {
+        "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAABNgAAAIIAAAZJAAAEBQAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+        "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+        "splitters": {
+          "main": "AAAA/wAAAAEAAAACAAACgAAAAQQB/////wEAAAACAA==",
+          "top": "AAAA/wAAAAEAAAADAAABFQAABLIAAAGlAf////8BAAAAAQA="
+        }
+      },
+      "claster_editor": {
+        "matches": {
+          "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAAA5gAAAKUAAAaZAAAEKAAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+          "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+          "splitters": {
+            "main": "AAAA/wAAAAEAAAADAAACgAAAA1wAAAGIAf////8BAAAAAQA="
+          }
+        },
+        "location": {
+          "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAAA5gAAAKUAAAaZAAAEKAAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+          "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+          "splitters": {
+            "main": "AAAA/wAAAAEAAAADAAACiAAAA14AAAF+Af////8BAAAAAQA="
+          }
+        },
+        "face": {
+          "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAAA5gAAAKUAAAaZAAAEKAAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+          "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+          "splitters": {
+            "main": "AAAA/wAAAAEAAAADAAABtwAABC8AAAF+Af////8BAAAAAQA="
+          }
+        },
+        "cleaning": {
+          "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAAA5gAAAKUAAAaZAAAEKAAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+          "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+          "splitters": {
+            "main": "AAAA/wAAAAEAAAACAAABswAABbYB/////wEAAAABAA=="
+          }
+        }
+      }
+    },
+    "description": "Auto-created by script via structured set",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_indsgn_template": {
+    "type": "json",
+    "value": {
+      "default": {
+        "id": "a69c49f1-9809-4606-9b6c-58351ee432ed",
+        "name": "Конструктор виньеток (вертикальных)",
+        "category": "Виньетки",
+        "template_path": "templates/01-Виньетки/Конструктор виньеток (вертикальных).idml",
+        "active_master_spread": "u159",
+        "masters": {
+          "u159": {
+            "graphic_tags": [
+              "portrait_0",
+              "portrait_1",
+              "portrait_10",
+              "portrait_11",
+              "portrait_12",
+              "portrait_13",
+              "portrait_14",
+              "portrait_15",
+              "portrait_16",
+              "portrait_17",
+              "portrait_18",
+              "portrait_19",
+              "portrait_2",
+              "portrait_20",
+              "portrait_21",
+              "portrait_22",
+              "portrait_23",
+              "portrait_24",
+              "portrait_25",
+              "portrait_26",
+              "portrait_27",
+              "portrait_28",
+              "portrait_29",
+              "portrait_3",
+              "portrait_4",
+              "portrait_5",
+              "portrait_6",
+              "portrait_7",
+              "portrait_8",
+              "portrait_9",
+              "portraitlarge",
+              "teacher_0"
+            ]
+          }
+        },
+        "layers": [
+          {
+            "uid": "ubc",
+            "name": "Разметка",
+            "visible": true,
+            "locked": true
+          },
+          {
+            "uid": "u118",
+            "name": "Фон",
+            "visible": true,
+            "locked": true
+          }
+        ],
+        "snippets": [
+          {
+            "snippet_id": "b19a4034-053b-4491-9f29-7f92fdaf02fc",
+            "target_master_spread": "u159",
+            "order": 1,
+            "enabled": true,
+            "placement_mode": "preserve_created_position",
+            "target_layer_uid": "__source_layers__",
+            "graphic_tags": [],
+            "text_tags": [
+              "ПОЛНОЕ НАЗВАНИЕ ШКОЛЫ"
+            ],
+            "added_graphic_tags": [],
+            "added_text_tags": [
+              "полное название школы"
+            ],
+            "source_page_width": 575.5209448818898,
+            "source_page_height": 864.4818897637797
+          },
+          {
+            "snippet_id": "668b6a96-ae4a-4acd-b334-7112355310ad",
+            "target_master_spread": "u159",
+            "order": 2,
+            "enabled": true,
+            "placement_mode": "preserve_created_position",
+            "target_layer_uid": "__source_layers__",
+            "graphic_tags": [],
+            "text_tags": [],
+            "added_graphic_tags": [],
+            "added_text_tags": [],
+            "source_page_width": 575.5209448818898,
+            "source_page_height": 864.4818897637797
+          },
+          {
+            "snippet_id": "3419c3e8-8bc1-4ca9-94b7-04a544a0fa0c",
+            "target_master_spread": "u159",
+            "order": 3,
+            "enabled": true,
+            "placement_mode": "preserve_created_position",
+            "target_layer_uid": "__source_layers__",
+            "graphic_tags": [
+              "portrait_0",
+              "portrait_1",
+              "portrait_10",
+              "portrait_11",
+              "portrait_12",
+              "portrait_13",
+              "portrait_14",
+              "portrait_15",
+              "portrait_16",
+              "portrait_17",
+              "portrait_18",
+              "portrait_19",
+              "portrait_2",
+              "portrait_20",
+              "portrait_21",
+              "portrait_22",
+              "portrait_23",
+              "portrait_24",
+              "portrait_25",
+              "portrait_26",
+              "portrait_27",
+              "portrait_28",
+              "portrait_29",
+              "portrait_3",
+              "portrait_4",
+              "portrait_5",
+              "portrait_6",
+              "portrait_7",
+              "portrait_8",
+              "portrait_9",
+              "portraitlarge"
+            ],
+            "text_tags": [
+              "child_fullname",
+              "child_lastname_0",
+              "child_lastname_1",
+              "child_lastname_10",
+              "child_lastname_11",
+              "child_lastname_12",
+              "child_lastname_13",
+              "child_lastname_14",
+              "child_lastname_15",
+              "child_lastname_16",
+              "child_lastname_17",
+              "child_lastname_18",
+              "child_lastname_19",
+              "child_lastname_2",
+              "child_lastname_20",
+              "child_lastname_21",
+              "child_lastname_22",
+              "child_lastname_23",
+              "child_lastname_24",
+              "child_lastname_25",
+              "child_lastname_26",
+              "child_lastname_27",
+              "child_lastname_28",
+              "child_lastname_29",
+              "child_lastname_3",
+              "child_lastname_4",
+              "child_lastname_5",
+              "child_lastname_6",
+              "child_lastname_7",
+              "child_lastname_8",
+              "child_lastname_9",
+              "child_name_0",
+              "child_name_1",
+              "child_name_10",
+              "child_name_11",
+              "child_name_12",
+              "child_name_13",
+              "child_name_14",
+              "child_name_15",
+              "child_name_16",
+              "child_name_17",
+              "child_name_18",
+              "child_name_19",
+              "child_name_2",
+              "child_name_20",
+              "child_name_21",
+              "child_name_22",
+              "child_name_23",
+              "child_name_24",
+              "child_name_25",
+              "child_name_26",
+              "child_name_27",
+              "child_name_28",
+              "child_name_29",
+              "child_name_3",
+              "child_name_4",
+              "child_name_5",
+              "child_name_6",
+              "child_name_7",
+              "child_name_8",
+              "child_name_9"
+            ],
+            "added_graphic_tags": [
+              "portrait_0",
+              "portrait_1",
+              "portrait_10",
+              "portrait_11",
+              "portrait_12",
+              "portrait_13",
+              "portrait_14",
+              "portrait_15",
+              "portrait_16",
+              "portrait_17",
+              "portrait_18",
+              "portrait_19",
+              "portrait_2",
+              "portrait_20",
+              "portrait_21",
+              "portrait_22",
+              "portrait_23",
+              "portrait_24",
+              "portrait_25",
+              "portrait_26",
+              "portrait_27",
+              "portrait_28",
+              "portrait_29",
+              "portrait_3",
+              "portrait_4",
+              "portrait_5",
+              "portrait_6",
+              "portrait_7",
+              "portrait_8",
+              "portrait_9",
+              "portraitlarge"
+            ],
+            "added_text_tags": [
+              "child_fullname",
+              "child_lastname_0",
+              "child_lastname_1",
+              "child_lastname_10",
+              "child_lastname_11",
+              "child_lastname_12",
+              "child_lastname_13",
+              "child_lastname_14",
+              "child_lastname_15",
+              "child_lastname_16",
+              "child_lastname_17",
+              "child_lastname_18",
+              "child_lastname_19",
+              "child_lastname_2",
+              "child_lastname_20",
+              "child_lastname_21",
+              "child_lastname_22",
+              "child_lastname_23",
+              "child_lastname_24",
+              "child_lastname_25",
+              "child_lastname_26",
+              "child_lastname_27",
+              "child_lastname_28",
+              "child_lastname_29",
+              "child_lastname_3",
+              "child_lastname_4",
+              "child_lastname_5",
+              "child_lastname_6",
+              "child_lastname_7",
+              "child_lastname_8",
+              "child_lastname_9",
+              "child_name_0",
+              "child_name_1",
+              "child_name_10",
+              "child_name_11",
+              "child_name_12",
+              "child_name_13",
+              "child_name_14",
+              "child_name_15",
+              "child_name_16",
+              "child_name_17",
+              "child_name_18",
+              "child_name_19",
+              "child_name_2",
+              "child_name_20",
+              "child_name_21",
+              "child_name_22",
+              "child_name_23",
+              "child_name_24",
+              "child_name_25",
+              "child_name_26",
+              "child_name_27",
+              "child_name_28",
+              "child_name_29",
+              "child_name_3",
+              "child_name_4",
+              "child_name_5",
+              "child_name_6",
+              "child_name_7",
+              "child_name_8",
+              "child_name_9"
+            ],
+            "source_page_width": 575.5209448818898,
+            "source_page_height": 864.4818897637797
+          },
+          {
+            "snippet_id": "bc29a0f5-c8e9-4ec1-82e9-15241e108161",
+            "target_master_spread": "u159",
+            "order": 4,
+            "enabled": true,
+            "placement_mode": "preserve_created_position",
+            "target_layer_uid": "__source_layers__",
+            "graphic_tags": [
+              "teacher_0"
+            ],
+            "text_tags": [
+              "teacher_lastname_0",
+              "teacher_name_0",
+              "teacher_patronymic_0"
+            ],
+            "added_graphic_tags": [
+              "teacher_0"
+            ],
+            "added_text_tags": [
+              "teacher_lastname_0",
+              "teacher_name_0",
+              "teacher_patronymic_0"
+            ],
+            "source_page_width": 575.5209448818898,
+            "source_page_height": 864.4818897637797
+          },
+          {
+            "snippet_id": "325cd2f7-9327-4c98-84ad-b855788f4faa",
+            "target_master_spread": "u159",
+            "order": 5,
+            "enabled": true,
+            "placement_mode": "preserve_created_position",
+            "target_layer_uid": "__source_layers__",
+            "graphic_tags": [],
+            "text_tags": [
+              "КЛАСС",
+              "ПАРАЛЛЕЛЬ"
+            ],
+            "added_graphic_tags": [],
+            "added_text_tags": [
+              "класс",
+              "параллель"
+            ],
+            "source_page_width": 575.5209448818898,
+            "source_page_height": 864.4818897637797
+          }
+        ],
+        "generation_mode": "personal_vignette",
+        "mode_options": {
+          "personal_vignette": {
+            "move_duplicate_small_portrait": false
+          }
+        },
+        "positioning": {
+          "default": {},
+          "by_prefix": {
+            "portrait_": {
+              "eye_line": 0.32,
+              "face_scale": 0.4
+            }
+          },
+          "by_label": {
+            "portraitlarge": {
+              "eye_line": 0.19,
+              "face_scale": 0.19
+            },
+            "teacher_0": {
+              "eye_line": 0.24,
+              "face_scale": 0.24
+            }
+          }
+        },
+        "placeholder_map": {
+          "portrait_0": "portrait",
+          "portrait_1": "portrait",
+          "portrait_10": "portrait",
+          "portrait_11": "portrait",
+          "portrait_12": "portrait",
+          "portrait_13": "portrait",
+          "portrait_14": "portrait",
+          "portrait_15": "portrait",
+          "portrait_16": "portrait",
+          "portrait_17": "portrait",
+          "portrait_18": "portrait",
+          "portrait_19": "portrait",
+          "portrait_2": "portrait",
+          "portrait_20": "portrait",
+          "portrait_21": "portrait",
+          "portrait_22": "portrait",
+          "portrait_23": "portrait",
+          "portrait_24": "portrait",
+          "portrait_25": "portrait",
+          "portrait_26": "portrait",
+          "portrait_27": "portrait",
+          "portrait_28": "portrait",
+          "portrait_29": "portrait",
+          "portrait_3": "portrait",
+          "portrait_4": "portrait",
+          "portrait_5": "portrait",
+          "portrait_6": "portrait",
+          "portrait_7": "portrait",
+          "portrait_8": "portrait",
+          "portrait_9": "portrait",
+          "portraitlarge": "portrait",
+          "teacher_0": "portrait"
+        },
+        "override_labels": [
+          "portraitlarge"
+        ],
+        "override_text_labels": [
+          "child_fullname"
+        ]
+      },
+      "auto_cover": {
+        "id": "af13d540-09af-47f2-93e5-877c8739713d",
+        "name": "Персональная обложка (до 8 страниц)",
+        "category": "9-11 класс/Черный бархат",
+        "template_path": "templates/01-Черный_бархат/01-Персональная обложка.idml",
+        "active_master_spread": "u17a",
+        "masters": {
+          "u17a": {
+            "graphic_tags": [
+              "group_photo_01",
+              "portrait"
+            ]
+          }
+        },
+        "placeholder_map": {
+          "group_photo_01": "group_photo_all_02",
+          "portrait": "portrait"
+        },
+        "override_labels": [
+          "portrait"
+        ],
+        "override_text_labels": [
+          "child_fullname"
+        ],
+        "generation_mode": "sheet",
+        "positioning": {
+          "default": {},
+          "by_prefix": {},
+          "by_label": {
+            "group_photo_01": {
+              "eye_line": 0.19,
+              "face_scale": 0.18
+            },
+            "portrait": {
+              "eye_line": 0.19,
+              "face_scale": 0.17
+            }
+          }
+        },
+        "mode_options": {}
+      },
+      "auto_vignette": {
+        "id": "9eeaf04b-ce0b-44ce-9c70-de4dda07f0e7",
+        "name": "Виньетка с цитатами",
+        "category": "9-11 класс/Черный бархат",
+        "template_path": "templates/01-Черный_бархат/01-Виньетка.idml",
+        "active_master_spread": "u1f1",
+        "masters": {
+          "u1f1": {
+            "graphic_tags": [
+              "portrait_0",
+              "portrait_1",
+              "portrait_10",
+              "portrait_11",
+              "portrait_12",
+              "portrait_13",
+              "portrait_14",
+              "portrait_15",
+              "portrait_16",
+              "portrait_17",
+              "portrait_18",
+              "portrait_19",
+              "portrait_2",
+              "portrait_20",
+              "portrait_21",
+              "portrait_22",
+              "portrait_23",
+              "portrait_24",
+              "portrait_25",
+              "portrait_3",
+              "portrait_4",
+              "portrait_5",
+              "portrait_6",
+              "portrait_7",
+              "portrait_8",
+              "portrait_9",
+              "teacher_0"
+            ]
+          }
+        },
+        "placeholder_map": {
+          "portrait_0": "portrait",
+          "portrait_1": "portrait",
+          "portrait_10": "portrait",
+          "portrait_11": "portrait",
+          "portrait_12": "portrait",
+          "portrait_13": "portrait",
+          "portrait_14": "portrait",
+          "portrait_15": "portrait",
+          "portrait_16": "portrait",
+          "portrait_17": "portrait",
+          "portrait_18": "portrait",
+          "portrait_19": "portrait",
+          "portrait_2": "portrait",
+          "portrait_20": "portrait",
+          "portrait_21": "portrait",
+          "portrait_22": "portrait",
+          "portrait_23": "portrait",
+          "portrait_24": "portrait",
+          "portrait_25": "portrait",
+          "portrait_3": "portrait",
+          "portrait_4": "portrait",
+          "portrait_5": "portrait",
+          "portrait_6": "portrait",
+          "portrait_7": "portrait",
+          "portrait_8": "portrait",
+          "portrait_9": "portrait",
+          "teacher_0": "portrait"
+        },
+        "override_labels": [],
+        "override_text_labels": [],
+        "generation_mode": "vignette",
+        "positioning": {
+          "default": {},
+          "by_prefix": {
+            "portrait_": {
+              "eye_line": 0.29,
+              "face_scale": 0.34
+            }
+          },
+          "by_label": {
+            "teacher_0": {
+              "eye_line": 0.2,
+              "face_scale": 0.24
+            }
+          }
+        },
+        "mode_options": {}
+      },
+      "auto_group": {
+        "id": "62117ed4-c171-4743-a82b-20100dd0e769",
+        "name": "Альбомный разворот (3 фотографии)",
+        "category": "9-11 класс/Черный бархат",
+        "template_path": "templates/01-Черный_бархат/01-Разворот-3.idml",
+        "active_master_spread": "u15a",
+        "masters": {
+          "u15a": {
+            "graphic_tags": [
+              "group_photo_01",
+              "group_photo_02",
+              "group_photo_all_01"
+            ]
+          }
+        },
+        "placeholder_map": {
+          "group_photo_01": "group_photo_table",
+          "group_photo_02": "group_photo_down",
+          "group_photo_all_01": "group_photo_all_01"
+        },
+        "override_labels": [
+          "group_photo_01",
+          "group_photo_02"
+        ],
+        "override_text_labels": [
+          "child_fullname"
+        ],
+        "generation_mode": "sheet",
+        "positioning": {
+          "default": {
+            "eye_line": 0.3,
+            "face_scale": 0.2
+          },
+          "by_prefix": {},
+          "by_label": {
+            "group_photo_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_02": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_all_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            }
+          }
+        },
+        "mode_options": {}
+      },
+      "auto_graf": {
+        "id": "a9a2f50c-b66c-4a25-8d9e-65e36ff5cdfa",
+        "name": "Альбомный разворот (4 фотографии)",
+        "category": "9-11 класс/Черный бархат",
+        "template_path": "templates/01-Черный_бархат/01-Разворот-4.idml",
+        "active_master_spread": "u15b",
+        "masters": {
+          "u15b": {
+            "graphic_tags": [
+              "group_photo_01",
+              "group_photo_02",
+              "group_photo_03",
+              "group_photo_v_01"
+            ]
+          }
+        },
+        "placeholder_map": {
+          "group_photo_01": "group_photo_01",
+          "group_photo_02": "group_photo_02",
+          "group_photo_03": "group_photo_03",
+          "group_photo_v_01": "group_photo_v_01"
+        },
+        "override_labels": [
+          "group_photo_v_01"
+        ],
+        "override_text_labels": [
+          "child_fullname"
+        ],
+        "generation_mode": "sheet",
+        "positioning": {
+          "default": {},
+          "by_prefix": {},
+          "by_label": {
+            "group_photo_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_02": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_03": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_v_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            }
+          }
+        },
+        "mode_options": {}
+      }
+    },
+    "description": "Auto-created by script via structured set",
+    "read_only": false,
+    "choices": null
+  },
+  "var_claster_run": {
+    "type": "json",
+    "value": {
+      "SCHOOL": {
+        "face": "yes",
+        "matches": "yes",
+        "location": "yes"
+      }
+    },
+    "description": "Auto-created by script via structured set",
+    "read_only": false,
+    "choices": null
+  },
+  "dlg_msg_user_var": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  }
+}

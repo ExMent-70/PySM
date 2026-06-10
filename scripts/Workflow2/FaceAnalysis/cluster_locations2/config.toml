@@ -21,10 +21,38 @@ provider_name = ""
 device_id = 0
 tensorRT_cache_path = "../../../../_BIN/TensorRT_cache"
 
-[model_params]
-# Размер входного изображения для модели CLIP (обычно 224x224 или 336x336 для L/14@336px)
+[model]
+backend = "siglip2_onnx"
+name = "SigLIP2 SO400M ONNX"
+
+[clip]
+name = "CLIP ViT-L-14"
+model_onnx = "models/CLIP/ViT-L-14.onnx"
+tokenizer_path = "models/tokenizer/clip-vit-large-patch14"
 input_size = [224, 224]
 
+[siglip2_onnx]
+name = "SigLIP2 SO400M ONNX"
+model_dir = "models/SigLIP2/siglip2-so400m-patch14-384-ONNX"
+vision_model = "vision_model.onnx"
+text_model = "text_model.onnx"
+tokenizer_path = "models/tokenizer/siglip2-so400m-patch14-384"
+image_output = "last_hidden_state"
+input_size = [384, 384]
+# flatten_axis1_norm - old full spatial descriptor (~839808 floats/image)
+# grid_9x9 - compressed spatial descriptor (~93312 floats/image)
+# grid_6x6 - compressed spatial descriptor (~41472 floats/image)
+# grid_3x3 - compressed spatial descriptor (~10368 floats/image)
+# mean_std - very compact descriptor (~2304 floats/image)
+spatial_strategy = "grid_9x9"
+
+[cache]
+# use - use session cache when manifest matches
+# refresh - recompute embeddings and overwrite cache
+# off - recompute embeddings without reading or writing cache
+mode = "use"
+
+[model_params]
 # Суффикс, который добавляется к имени оригинального файла при генерации маски.
 # Используется для поиска оригинального фото по маске.
 mask_suffix = "_BiRefNet-portrait_output.jpg"
@@ -36,8 +64,8 @@ metric = "cosine"
 # Порог eps для косинусного расстояния. 
 # Для CLIP эмбеддингов значения обычно лежат в диапазоне 0.05 - 0.20.
 # Чем меньше значение, тем более строгая группировка (меньше ложных срабатываний, но больше дробления).
-eps = 0.14
+eps = 0.18
 
 [classification]
 # Порог уверенности (similarity score) для Zero-shot классификации по тексту.
-match_threshold = 0.09
+match_threshold = 0.11

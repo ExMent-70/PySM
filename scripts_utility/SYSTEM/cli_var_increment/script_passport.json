@@ -1,0 +1,41 @@
+{
+  "description": "Увеличивает или уменьшает числовое значение переменной контекста на заданное число.",
+  "category": "Системные утилиты",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "1.00.00",
+  "command_line_args_meta": {
+    "inc_var_name": {
+      "type": "string",
+      "description": "Имя числовой переменной контекста, значение которой нужно изменить.",
+      "required": true,
+      "default": "counter"
+    },
+    "inc_delta": {
+      "type": "string",
+      "description": "Число, на которое нужно изменить текущее значение переменной.",
+      "required": false,
+      "default": "1"
+    },
+    "inc_operation": {
+      "type": "choice",
+      "description": "Операция изменения значения: add — увеличить, subtract — уменьшить.",
+      "required": false,
+      "default": "add",
+      "choices": [
+        "add",
+        "subtract"
+      ]
+    },
+    "inc_value_type": {
+      "type": "choice",
+      "description": "Тип результата: auto — определить автоматически, int — целое число, float — число с плавающей точкой.",
+      "required": false,
+      "default": "auto",
+      "choices": [
+        "auto",
+        "int",
+        "float"
+      ]
+    }
+  }
+}

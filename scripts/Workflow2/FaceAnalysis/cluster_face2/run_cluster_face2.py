@@ -149,7 +149,7 @@ def main():
 
         strategy.run(config, data_manager)
         photo_session = pysm_context.get("ws_photo_session", "SCHOOL")        
-        pysm_context.set(f"var_{photo_session}_claster_{mode}", "yes")
+        pysm_context.set_structured(f"var_claster_run.{photo_session}.{mode}", "yes")
         logger.debug("=== ВЫПОЛНЕНИЕ ЗАВЕРШЕНО УСПЕШНО ===")
        
     except Exception as e:

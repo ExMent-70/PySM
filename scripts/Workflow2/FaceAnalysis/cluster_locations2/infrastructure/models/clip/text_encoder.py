@@ -1,14 +1,15 @@
 import numpy as np
 from pathlib import Path
 
-from ...model_loader import ModelLoader
+from .clip_model_loader import ClipModelLoader
 from .clip_tokenizer import ClipTokenizerWrapper
 
 
 class TextEncoder:
-    def __init__(self, model_loader: ModelLoader, tokenizer_path: Path):
+    def __init__(self, model_loader: ClipModelLoader, tokenizer_path: Path, input_size=(224, 224)):
         self.model = model_loader
         self.tokenizer_path = tokenizer_path
+        self.input_size = tuple(input_size)
         self.tokenizer: ClipTokenizerWrapper | None = None
 
     def _ensure_tokenizer(self):
@@ -33,7 +34,8 @@ class TextEncoder:
                 feed[name] = attention_mask
             elif key == "pixel":
                 # Заглушка для image branch
-                feed[name] = np.zeros((len(texts), 3, 224, 224), dtype=np.float32)
+                width, height = self.input_size
+                feed[name] = np.zeros((len(texts), 3, height, width), dtype=np.float32)
 
         out = self.model.session.run(
             [self.model.outputs["text"]],
@@ -41,4 +43,5 @@ class TextEncoder:
         )[0]
 
         norms = np.linalg.norm(out, axis=1, keepdims=True)
+        norms[norms == 0] = 1
         return out / norms

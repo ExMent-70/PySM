@@ -4,6 +4,7 @@ import pathlib
 import json
 import logging
 import os
+import time
 import uuid
 from typing import List, Optional, Dict, Tuple, Union
 
@@ -88,8 +89,16 @@ class SetManager:
                     path=context_file_path,
                 )
             )
-            with open(context_file_path, "r", encoding="utf-8") as f:
-                raw_context_data = json.load(f)
+            raw_context_data = None
+            for attempt in range(3):
+                try:
+                    with open(context_file_path, "r", encoding="utf-8") as f:
+                        raw_context_data = json.load(f)
+                    break
+                except json.JSONDecodeError:
+                    if attempt == 2:
+                        raise
+                    time.sleep(0.05)
 
             if isinstance(raw_context_data, dict):
                 # Валидируем только пользовательские переменные

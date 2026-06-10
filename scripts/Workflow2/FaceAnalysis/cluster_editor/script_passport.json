@@ -26,7 +26,7 @@
       "type": "string",
       "description": "Имя переменной контекста для сохранения геометрии окна",
       "required": true,
-      "default": "win_state_claster_editor"
+      "default": "win_state.claster_editor"
     },
     "all_threads": {
       "type": "int",

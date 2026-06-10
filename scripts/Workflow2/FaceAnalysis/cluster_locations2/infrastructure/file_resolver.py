@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 class FileResolver:
     def __init__(self, mask_suffix: str):
         self.mask_suffix = mask_suffix
+        self.original_exts = (".jpg", ".jpeg", ".png")
 
     def resolve(self, paths: List[Path], input_is_mask: bool) -> List[ResolvedImage]:
         resolved = []
@@ -20,16 +21,16 @@ class FileResolver:
                 continue
 
             name = p.name
-            if self.mask_suffix not in name:
+            if not name.endswith(self.mask_suffix):
                 logger.warning(f"Invalid mask filename: {name}")
                 continue
 
-            base = name.replace(self.mask_suffix, "")
+            base = name[: -len(self.mask_suffix)]
             parent = p.parent.parent
 
             candidates = [
-                parent / f"{base}.jpg",
-                parent / f"{base}.jpeg",
+                parent / f"{base}{ext}"
+                for ext in self.original_exts
             ]
 
             original = next((c for c in candidates if c.exists()), None)

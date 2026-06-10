@@ -1,19 +1,21 @@
 import numpy as np
 import cv2
 
-from ...model_loader import ModelLoader
+from .clip_model_loader import ClipModelLoader
 
 
 class ImageEncoder:
-    def __init__(self, model_loader: ModelLoader, input_size=(224, 224)):
+    def __init__(self, model_loader: ClipModelLoader, input_size=(224, 224)):
         self.model = model_loader
         self.input_size = input_size
+        self.mean = np.array([0.48145466, 0.4578275, 0.40821073], dtype=np.float32)
+        self.std = np.array([0.26862954, 0.26130258, 0.27577711], dtype=np.float32)
 
     def _preprocess(self, img: np.ndarray) -> np.ndarray:
         img = cv2.resize(img, self.input_size)
         img = img[:, :, ::-1]
         img = img.astype(np.float32) / 255.0
-        img = (img - 0.5) / 0.5
+        img = (img - self.mean) / self.std
         img = np.transpose(img, (2, 0, 1))
         return img
 
@@ -40,4 +42,5 @@ class ImageEncoder:
         )[0]
 
         norms = np.linalg.norm(out, axis=1, keepdims=True)
+        norms[norms == 0] = 1
         return out / norms

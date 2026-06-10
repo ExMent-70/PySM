@@ -8,10 +8,13 @@
 # 1. БЛОК: Импорты
 # ==============================================================================
 import concurrent.futures
+from datetime import datetime
 import pathlib
+import re
 import shutil
 import sys
 import os
+import uuid
 
 
 # Импортируем зависимые компоненты из нашей же библиотеки
@@ -94,7 +97,56 @@ def _cleanup_empty_dirs(path_to_clean: pathlib.Path):
         print(f"Cleaned up {cleaned_count} empty subdirectories in the source folder.")
 # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
-# 3. БЛОК: Публичная функция API для операций с директориями
+
+# 3. БЛОК: Приватные вспомогательные функции для `perform_batch_rename_operation`
+# ==============================================================================
+_WINDOWS_INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def _sanitize_windows_filename(filename: str, replacement: str = "_") -> str:
+    """Заменяет символы, которые нельзя использовать в имени файла Windows."""
+    safe_name = _WINDOWS_INVALID_FILENAME_CHARS.sub(replacement, filename)
+    safe_name = safe_name.rstrip(" .")
+    return safe_name
+
+
+def _format_batch_rename_index(index: int, digits: int) -> str:
+    """Форматирует порядковый номер для шаблона переименования."""
+    if digits <= 0:
+        return str(index)
+    return str(index).zfill(digits)
+
+
+def _render_batch_rename_template(
+    template: str,
+    source_path: pathlib.Path,
+    index: int,
+    index_digits: int,
+    prefix: str,
+    suffix: str,
+    lowercase_extension: bool,
+) -> str:
+    """Подставляет внутренние токены batch rename в имя файла."""
+    stat_result = source_path.stat()
+    modified_dt = datetime.fromtimestamp(stat_result.st_mtime)
+    ext = source_path.suffix.lower() if lowercase_extension else source_path.suffix
+    replacements = {
+        "%index%": _format_batch_rename_index(index, index_digits),
+        "%stem%": source_path.stem,
+        "%name%": source_path.name,
+        "%ext%": ext,
+        "%prefix%": prefix or "",
+        "%suffix%": suffix or "",
+        "%created_date%": modified_dt.strftime("%Y-%m-%d"),
+        "%created_time%": modified_dt.strftime("%H-%M-%S"),
+    }
+    rendered = template
+    for token, value in replacements.items():
+        rendered = rendered.replace(token, value)
+    return rendered
+
+
+# 4. БЛОК: Публичная функция API для операций с директориями
 # ==============================================================================
 def perform_directory_operation(
     source_dir_str: str,
@@ -232,7 +284,7 @@ def perform_directory_operation(
     return 1 if stats["error"] > 0 else 0
 
 
-# 4. БЛОК: Публичная функция API для операций с файлами
+# 5. БЛОК: Публичная функция API для операций с файлами
 # ==============================================================================
 def perform_file_operation(
     operation: str,
@@ -288,3 +340,263 @@ def perform_file_operation(
             f"--- ERROR during '{operation}' operation: {type(e).__name__}: {e} ---"
         )
         return 1
+
+
+# 6. БЛОК: Публичная функция API для пакетного переименования файлов
+# ==============================================================================
+def perform_batch_rename_operation(
+    source_dir_str: str,
+    include_patterns: list[str],
+    rename_template: str,
+    start_index: int,
+    index_digits: int,
+    prefix: str = "",
+    suffix: str = "",
+    recursive: bool = False,
+    on_conflict: str = "error",
+    dry_run: bool = False,
+    sort_method: str = "modified_time",
+    lowercase_extension: bool = False,
+    sanitize_filename: bool = True,
+) -> int:
+    """
+    Переименовывает набор файлов по шаблону после выбранной сортировки.
+
+    Внутренние токены шаблона используют синтаксис %token%, чтобы не конфликтовать
+    с переменными контекста PySM вида {var_name}.
+
+    :return: 0 при успехе, 1 при ошибке.
+    """
+    text_main = theme_api.get_parsed_style("script_stdout", default="color: #2c3e50")
+    text_color = text_main.get("color")
+    name_style = f"color: {text_color};"
+    icon_error = icons.ERROR()
+    icon_info = icons.INFO()
+    icon_sub = icons.ARROW_SUB()
+    icon_ok = icons.OK()
+    icon_folder = icons.FOLDER()
+    icon_warning = icons.WARNING()
+
+    print("<b>ПАКЕТНОЕ ПЕРЕИМЕНОВАНИЕ ФАЙЛОВ</b>")
+
+    source_dir = pathlib.Path(source_dir_str)
+    if not source_dir.is_dir():
+        html = f'<div style="{name_style}"><br>{icon_error} Операция отменена. Исходная папка не найдена:</div>'
+        html += f'<div style="{name_style}"><i>{source_dir}</i><br></div>'
+        pysm_context.log_html(html)
+        return 1
+
+    if not rename_template:
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_error} Операция отменена. Шаблон имени не задан.</div>'
+        )
+        return 1
+
+    if pathlib.PureWindowsPath(rename_template).name != rename_template:
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_error} Шаблон должен задавать только имя файла, без папок: <b>{rename_template}</b></div>'
+        )
+        return 1
+
+    include_patterns = include_patterns or ["*"]
+    html = ""
+    html += f'<div style="{name_style}">{icon_sub} шаблон имени: <b>{rename_template}</b></div>'
+    html += f'<div style="{name_style}">{icon_sub} паттерны файлов: <b>{include_patterns}</b></div>'
+    html += f'<div style="{name_style}">{icon_sub} метод сортировки: <b>{sort_method}</b></div>'
+    html += f'<div style="{name_style}">{icon_sub} рекурсивно: <b>{recursive}</b></div>'
+    html += f'<div style="{name_style}">{icon_sub} dry-run: <b>{dry_run}</b></div>'
+    pysm_context.log_html(html)
+
+    items_to_process = []
+    for pattern in include_patterns:
+        iterator = source_dir.rglob(pattern) if recursive else source_dir.glob(pattern)
+        items_to_process.extend(list(iterator))
+    items_to_process = list(set(item for item in items_to_process if item.is_file()))
+
+    if sort_method == "created_time":
+        items_to_process = sorted(
+            items_to_process,
+            key=lambda item: (item.stat().st_ctime_ns, item.name.lower()),
+        )
+    elif sort_method == "modified_time":
+        items_to_process = sorted(
+            items_to_process,
+            key=lambda item: (item.stat().st_mtime_ns, item.name.lower()),
+        )
+    elif sort_method == "name":
+        items_to_process = sorted(
+            items_to_process,
+            key=lambda item: str(item.relative_to(source_dir)).lower(),
+        )
+    elif sort_method == "none":
+        items_to_process = list(items_to_process)
+    else:
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_error} Неизвестный метод сортировки: <b>{sort_method}</b></div>'
+        )
+        return 1
+
+    if not items_to_process:
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_warning} Файлы по паттернам <b>{include_patterns}</b> не найдены.</div>'
+        )
+        return 0
+
+    pysm_context.log_html(
+        f'<div style="{name_style}">{icon_info} Найдено файлов для переименования: <b>{len(items_to_process)}</b></div>'
+    )
+
+    candidate_entries = []
+    assigned_targets: set[pathlib.Path] = set()
+    plan = []
+    stats = {"planned": 0, "skipped": 0, "error": 0}
+
+    for offset, source_path in enumerate(items_to_process):
+        current_index = start_index + offset
+        rendered_name = _render_batch_rename_template(
+            template=rename_template,
+            source_path=source_path,
+            index=current_index,
+            index_digits=index_digits,
+            prefix=prefix,
+            suffix=suffix,
+            lowercase_extension=lowercase_extension,
+        )
+
+        if sanitize_filename:
+            rendered_name = _sanitize_windows_filename(rendered_name)
+
+        if not rendered_name:
+            tqdm.write(f"[FAIL] Empty target filename for {source_path}")
+            stats["error"] += 1
+            continue
+
+        if pathlib.PureWindowsPath(rendered_name).name != rendered_name:
+            tqdm.write(f"[FAIL] Target filename contains path separators: {rendered_name}")
+            stats["error"] += 1
+            continue
+
+        target_path = source_path.with_name(rendered_name)
+        candidate_entries.append((source_path, target_path))
+
+    renamed_sources = {
+        source_path.resolve()
+        for source_path, target_path in candidate_entries
+        if source_path.resolve() != target_path.resolve()
+    }
+
+    for source_path, target_path in candidate_entries:
+        target_resolved = target_path.resolve()
+
+        while True:
+            target_already_assigned = target_resolved in assigned_targets
+            target_is_current_source = source_path.resolve() == target_resolved
+            target_is_external_existing = (
+                target_path.exists()
+                and not target_is_current_source
+                and target_resolved not in renamed_sources
+            )
+            if not target_already_assigned and not target_is_external_existing:
+                break
+            if on_conflict == "skip":
+                stats["skipped"] += 1
+                target_path = None
+                break
+            if on_conflict == "rename":
+                target_path = _get_unique_path_for_dir_op(target_path)
+                target_resolved = target_path.resolve()
+                continue
+            stats["error"] += 1
+            tqdm.write(f"[FAIL] Target file already exists: {target_path}")
+            target_path = None
+            break
+
+        if target_path is None:
+            continue
+
+        assigned_targets.add(target_resolved)
+        if source_path.resolve() == target_resolved:
+            stats["skipped"] += 1
+            continue
+
+        plan.append((source_path, target_path))
+        stats["planned"] += 1
+
+    if stats["error"] > 0:
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_error} План переименования содержит ошибки: <b>{stats["error"]}</b>. Файлы не изменены.</div>'
+        )
+        return 1
+
+    if not plan:
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_ok} Нет файлов, требующих переименования. Пропущено: <b>{stats["skipped"]}</b></div>'
+        )
+        return 0
+
+    preview_lines = []
+    for source_path, target_path in plan[:10]:
+        preview_lines.append(f"{source_path.name} -> {target_path.name}")
+    preview_html = "<br>".join(preview_lines)
+    if len(plan) > 10:
+        preview_html += f"<br>... и ещё {len(plan) - 10}"
+    pysm_context.log_html(
+        f'<div style="{name_style}">{icon_info} План переименования:<br><code>{preview_html}</code></div>'
+    )
+
+    if dry_run:
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_ok} Dry-run завершён. Запланировано переименований: <b>{len(plan)}</b>, пропущено: <b>{stats["skipped"]}</b></div>'
+        )
+        pysm_context.log_link(
+            url_or_path=str(source_dir),
+            text=f"{icon_folder} Исходная папка<br>",
+        )
+        return 0
+
+    temp_plan = []
+    operation_id = uuid.uuid4().hex
+
+    try:
+        prepare_progress = tqdm(
+            enumerate(plan, start=1),
+            total=len(plan),
+            desc="Preparing rename",
+            unit="file",
+        )
+        for step_index, (source_path, target_path) in prepare_progress:
+            temp_path = source_path.with_name(
+                f".pysm_rename_tmp_{operation_id}_{step_index}{source_path.suffix}"
+            )
+            while temp_path.exists():
+                temp_path = source_path.with_name(
+                    f".pysm_rename_tmp_{uuid.uuid4().hex}_{step_index}{source_path.suffix}"
+                )
+            source_path.rename(temp_path)
+            temp_plan.append((temp_path, source_path, target_path))
+
+        progress_bar = tqdm(temp_plan, total=len(temp_plan), desc="Renaming", unit="file")
+        for temp_path, _source_path, target_path in progress_bar:
+            temp_path.rename(target_path)
+
+    except Exception as e:
+        tqdm.write(f"[FATAL] Batch rename failed: {type(e).__name__}: {e}")
+        for temp_path, source_path, _target_path in reversed(temp_plan):
+            if temp_path.exists() and not source_path.exists():
+                try:
+                    temp_path.rename(source_path)
+                except Exception as rollback_error:
+                    tqdm.write(f"[FAIL] Rollback failed for {temp_path}: {rollback_error}")
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_error} Переименование прервано: <b>{type(e).__name__}</b>: {e}</div>'
+        )
+        return 1
+
+    pysm_context.log_html(
+        f'<div style="{name_style}">{icon_ok} Переименовано: <b>{len(plan)}</b>, пропущено: <b>{stats["skipped"]}</b></div>'
+    )
+    pysm_context.log_link(
+        url_or_path=str(source_dir),
+        text=f"{icon_folder} Исходная папка<br>",
+    )
+    return 0

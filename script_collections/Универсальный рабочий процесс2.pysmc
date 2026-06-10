@@ -1,5 +1,5 @@
 {
-  "collection_name": "Универсальный рабочий процесс",
+  "collection_name": "Универсальный рабочий процесс2",
   "description": "<br>\n<div style=\"{theme.collection_info}\">\n<h3>УНИВЕРСАЛЬНЫЙ РАБОЧИЙ ПРОЦЕСС</h3>\n</div>\n<div style=\" {theme.script_description}\">\n<p>Коллекция авторских скриптов для автоматизации работы школьного фотографа</p>\n</div>\n<div style=\"{theme.collection_info}\">\n<p> </p>\n<p>Скрипты организованы в универсальный рабочий процесс,  охватывающий основные этапы работы школьного фотографа. Начиная с формирования списка класса/группы для заключения договора, и заканчивая версткой альбомов для отправки электронного макета в типографию.</p>\n\n<p>Рабочий процесс можно использовать как ШАБЛОН для создания индивидуальных рабочих процессов для каждого класса/группы.</p>\n</div>\n<div style=\"{theme.tooltip_script_args_block}\">\n<h3>ВНИМАНИЕ</h3>\n\n<p>Для начало работы с новым классом/группой просто сохраните этот рабочий процесс под новым именем</p>\n</div>",
   "data_format_version": "1.1",
   "script_roots": [
@@ -189,16 +189,6 @@
                       "enabled": true
                     }
                   }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/show_icons",
-                  "instance_id": "instance_af70e2aac61d",
-                  "name": "show_icons",
-                  "description": null,
-                  "silent_mode": false,
-                  "icon_name": "INSTANCE_ITEM",
-                  "icon_color": null,
-                  "command_line_args": {}
                 }
               ]
             },
@@ -246,7 +236,7 @@
                 {
                   "id": "root_7617c03c/GUI/gui_dialog_input",
                   "instance_id": "instance_ec99ca4859ce",
-                  "name": "Указать школу/параллель/класс",
+                  "name": "Уникальное имя папки для всех файлов текущего проекта",
                   "description": null,
                   "silent_mode": true,
                   "icon_name": "VAR_SET",
@@ -261,7 +251,7 @@
                       "enabled": true
                     },
                     "dlg_input_msg": {
-                      "value": "Укажите название школы, параллель и класс.\n\nНапример, Школа56_4а_класс",
+                      "value": "Уникальное имя папки для всех файлов текущего проекта.\n\nНапример, Школа56_4а_класс",
                       "enabled": true
                     },
                     "dlg_input_dvalue": {
@@ -269,7 +259,11 @@
                       "enabled": true
                     },
                     "dlg_input_valid_type": {
-                      "value": "not_empty",
+                      "value": "dirname_windows",
+                      "enabled": true
+                    },
+                    "dlg_input_value_type": {
+                      "value": "string",
                       "enabled": true
                     },
                     "dlg_input_custom_regexp": {
@@ -279,6 +273,25 @@
                     "dlg_input_custom_regexp_desc": {
                       "value": null,
                       "enabled": false
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_json_editor",
+                  "instance_id": "instance_748845cf5dbe",
+                  "name": "Название и номер школы, класс, параллель (для альбома)",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "VAR_SET",
+                  "icon_color": "#3498DB",
+                  "command_line_args": {
+                    "var_name": {
+                      "value": "wf_school_info",
+                      "enabled": true
+                    },
+                    "title": {
+                      "value": "Редактор JSON",
+                      "enabled": true
                     }
                   }
                 },
@@ -465,33 +478,6 @@
                   }
                 },
                 {
-                  "id": "root_7617c03c/GUI/gui_dialog_open",
-                  "instance_id": "instance_a291f1f7646d",
-                  "name": "Выбрать папку с исходными файлами (RAW или JPG)",
-                  "description": null,
-                  "silent_mode": true,
-                  "icon_name": "FOLDER_OPEN",
-                  "icon_color": "#3498DB",
-                  "command_line_args": {
-                    "dlg_open_var": {
-                      "value": "wf_source_file_path",
-                      "enabled": true
-                    },
-                    "dlg_open_type": {
-                      "value": "directory",
-                      "enabled": true
-                    },
-                    "dlg_open_title": {
-                      "value": "Папка с исходными {var_source_file_type} файлами",
-                      "enabled": true
-                    },
-                    "dlg_open_filter": {
-                      "value": "Все файлы (*.*)",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
                   "id": "root_7617c03c/SYSTEM/py_if_else",
                   "instance_id": "instance_a261503aeac2",
                   "name": "Обрабатываем RAW-файлы? (да/нет)",
@@ -513,11 +499,11 @@
                       "enabled": true
                     },
                     "then-instance-id": {
-                      "value": "instance_405fc193fa5a,instance_2c739ae45371,instance_ddc9a5825b0f",
+                      "value": "instance_fb09cee26fd9",
                       "enabled": true
                     },
                     "else-instance-id": {
-                      "value": "instance_261ac90212e1",
+                      "value": "instance_a291f1f7646d",
                       "enabled": true
                     },
                     "clear-variable": {
@@ -527,85 +513,16 @@
                   }
                 },
                 {
-                  "id": "root_7617c03c/SYSTEM/dir_operation",
-                  "instance_id": "instance_405fc193fa5a",
-                  "name": "Копировать RAW-файлы  в папку сессии",
-                  "description": "<div style=\" {theme.script_description}\">\nСкрипт копирует исходные RAW-файлы в папку Capture.\n</div>",
-                  "silent_mode": true,
+                  "id": "root_7617c03c/SYSTEM/py_goto",
+                  "instance_id": "instance_fb09cee26fd9",
+                  "name": "Обработка RAW-файлов",
+                  "description": null,
+                  "silent_mode": false,
                   "icon_name": "COPY_RAW",
                   "icon_color": "#27AE60",
                   "command_line_args": {
-                    "do_source_dir": {
-                      "value": "{wf_source_file_path}",
-                      "enabled": true
-                    },
-                    "do_dest_dir": {
-                      "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "do_mode": {
-                      "value": "copy",
-                      "enabled": true
-                    },
-                    "do_on_conflict": {
-                      "value": "overwrite",
-                      "enabled": true
-                    },
-                    "do_copy_base_folder": {
-                      "value": false,
-                      "enabled": true
-                    },
-                    "do_include": {
-                      "value": [
-                        "*.cr3"
-                      ],
-                      "enabled": true
-                    },
-                    "all_threads": {
-                      "value": "12",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow2/Tools/raw2jpeg",
-                  "instance_id": "instance_2c739ae45371",
-                  "name": "Конвертировать RAW в JPEG",
-                  "description": "<div style=\"{theme.script_description}\">\nСкрипт, конвертирует исходные файлы изображений (RAW или PSD) в формат JPEG для последующего анализа другими скриптами.\n\nЕсли ваши изображения уже в формате JPG, то данный скрипт можно не запускать.\n</div>",
-                  "silent_mode": true,
-                  "icon_name": "CONVER_RAW",
-                  "icon_color": "#27AE60",
-                  "command_line_args": {
-                    "input_dir": {
-                      "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "output_dir": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG",
-                      "enabled": true
-                    },
-                    "a_r2j_image_type": {
-                      "value": "raw",
-                      "enabled": true
-                    },
-                    "a_r2j_preview_size": {
-                      "value": "2048",
-                      "enabled": true
-                    },
-                    "a_r2j_jpeg_quality": {
-                      "value": 95,
-                      "enabled": true
-                    },
-                    "recursive_read": {
-                      "value": false,
-                      "enabled": true
-                    },
-                    "keep_structure": {
-                      "value": false,
-                      "enabled": true
-                    },
-                    "all_threads": {
-                      "value": "12",
+                    "dlg_goto_script_id": {
+                      "value": "instance_cd0087c594d3,instance_a37fbad9e7cb,instance_1b63c5e1c8da,instance_b9d4f88d90ee,instance_f28b510e57db,instance_ac1db1c316af,instance_f45e4c7bc17f,instance_2fd78d6d5c53,instance_4fa325f66e65",
                       "enabled": true
                     }
                   }
@@ -621,6 +538,33 @@
                   "command_line_args": {
                     "dlg_goto_script_id": {
                       "value": "instance_e233278037dc",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_dialog_open",
+                  "instance_id": "instance_a291f1f7646d",
+                  "name": "Выбрать папку с исходными файлами JPG",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "FOLDER_OPEN",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "dlg_open_var": {
+                      "value": "wf_source_file_path",
+                      "enabled": true
+                    },
+                    "dlg_open_type": {
+                      "value": "directory",
+                      "enabled": true
+                    },
+                    "dlg_open_title": {
+                      "value": "Папка с исходными {var_source_file_type} файлами",
+                      "enabled": true
+                    },
+                    "dlg_open_filter": {
+                      "value": "Все файлы (*.*)",
                       "enabled": true
                     }
                   }
@@ -879,7 +823,7 @@
                   "icon_color": null,
                   "command_line_args": {
                     "dlg_goto_script_id": {
-                      "value": "instance_e54e52e11083,instance_ca04e3b83d36,instance_adcf7f452b82,instance_16e406c5f3e1,instance_fc4a7cea3533,instance_bbe407ae71bf",
+                      "value": "instance_e54e52e11083,instance_ca04e3b83d36,instance_adcf7f452b82,instance_22c580186803,instance_fc4a7cea3533,instance_bbe407ae71bf",
                       "enabled": true
                     }
                   }
@@ -1064,7 +1008,7 @@
                   "icon_color": "#E67E22",
                   "command_line_args": {
                     "dlg_goto_script_id": {
-                      "value": "instance_9c5b411f4b79,instance_ea81730ecbe7",
+                      "value": "instance_9c5b411f4b79",
                       "enabled": true
                     }
                   }
@@ -1079,7 +1023,7 @@
                   "icon_color": "#27AE60",
                   "command_line_args": {
                     "dlg_goto_script_id": {
-                      "value": "instance_d19807739742,instance_6c57562bfa75,instance_2743e67f346b,instance_87e14f606857,instance_c73bb7a8bc66",
+                      "value": "instance_ea81730ecbe7,instance_6c57562bfa75,instance_2743e67f346b,instance_87e14f606857,instance_c73bb7a8bc66",
                       "enabled": true
                     }
                   }
@@ -1250,6 +1194,21 @@
                   }
                 },
                 {
+                  "id": "root_790d968b/Photoshop/ps_photoshop_close",
+                  "instance_id": "instance_bcc5a08b051d",
+                  "name": "Закрыть Фотошоп",
+                  "description": null,
+                  "silent_mode": false,
+                  "icon_name": "INSTANCE_ITEM",
+                  "icon_color": null,
+                  "command_line_args": {
+                    "force_kill": {
+                      "value": true,
+                      "enabled": true
+                    }
+                  }
+                },
+                {
                   "id": "root_7617c03c/SYSTEM/py_goto",
                   "instance_id": "instance_53cb1f3953e7",
                   "name": "Завершить блок",
@@ -1356,7 +1315,7 @@
                       "enabled": true
                     },
                     "idsgn_template_var": {
-                      "value": "wf_template_name",
+                      "value": "wf_indsgn_template.default",
                       "enabled": true
                     },
                     "idsgn_msg": {
@@ -1364,7 +1323,7 @@
                       "enabled": true
                     },
                     "idsgn_win_state_var": {
-                      "value": "win_state_idsgn_catalog",
+                      "value": "win_state.idsgn_catalog",
                       "enabled": true
                     }
                   }
@@ -1379,7 +1338,7 @@
                   "icon_color": "#9B59B6",
                   "command_line_args": {
                     "idsgn_template_var": {
-                      "value": "wf_template_name",
+                      "value": "wf_indsgn_template.default",
                       "enabled": true
                     },
                     "data_json_file": {
@@ -1402,17 +1361,13 @@
                       "value": "wf_school_info",
                       "enabled": true
                     },
+                    "idsgn_snippets_catalog": {
+                      "value": "",
+                      "enabled": true
+                    },
                     "generation_mode": {
                       "value": "auto",
                       "enabled": true
-                    },
-                    "face_scale": {
-                      "value": "0.18",
-                      "enabled": false
-                    },
-                    "eye_line": {
-                      "value": "0.2",
-                      "enabled": false
                     },
                     "placeholder_image": {
                       "value": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png",
@@ -1424,6 +1379,18 @@
                     },
                     "validate": {
                       "value": false,
+                      "enabled": true
+                    },
+                    "log_sections": {
+                      "value": [
+                        "general",
+                        "validation",
+                        "resources",
+                        "plan",
+                        "text",
+                        "images",
+                        "thumbnails"
+                      ],
                       "enabled": true
                     }
                   }
@@ -1439,6 +1406,29 @@
                   "command_line_args": {
                     "dlg_goto_script_id": {
                       "value": "instance_466f31be16fe,instance_e3161ae22d25,instance_82cda087c34c,instance_5b5bff800866,instance_8cc9279df09a",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_json_editor",
+                  "instance_id": "instance_006df9666dd9",
+                  "name": "gui_json_editor",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "INSTANCE_ITEM",
+                  "icon_color": null,
+                  "command_line_args": {
+                    "var_name": {
+                      "value": "wf_template_name",
+                      "enabled": true
+                    },
+                    "title": {
+                      "value": "Редактор JSON",
+                      "enabled": true
+                    },
+                    "msg": {
+                      "value": "<b>Настройки экспорта</b><br>\nПроверьте качество JPEG и включение водяных знаков перед запуском финального экспорта.",
                       "enabled": true
                     }
                   }
@@ -1509,385 +1499,329 @@
           "children": [
             {
               "type": "script_set",
-              "id": "setnode_2b9443e8b646",
-              "name": "ПРОЦЕСС: InDesign-Настройка шаблона",
+              "id": "setnode_d5a3dce1eeb9",
+              "name": "ПРОЦЕСС: Обработка RAW-файлов",
               "description": null,
               "script_entries": [
                 {
-                  "id": "root_790d968b/Workflow2/InDesign/idsgn_catalog",
-                  "instance_id": "instance_de337fa5c87c",
-                  "name": "Настройка персональной обложки",
-                  "description": "<div style=\" {theme.script_description}\">Скрипт позволяет выбрать и настроить шаблон InDesign для автоматической генерации фотографий, виньеток и  альбомных разворотов.\n\nНастройки шаблона сохраняются в переменной контекста <b>WF_TEMPLATE_NAME</b></div>",
-                  "silent_mode": true,
-                  "icon_name": "COPY_INDD",
-                  "icon_color": "#9B59B6",
-                  "command_line_args": {
-                    "idsgn_catalog": {
-                      "value": "{wf_idsgn_catalog}",
-                      "enabled": true
-                    },
-                    "idsgn_template_var": {
-                      "value": "indsgn_template_cover",
-                      "enabled": true
-                    },
-                    "idsgn_msg": {
-                      "value": "Конфигуратор шаблонов InDesign",
-                      "enabled": true
-                    },
-                    "idsgn_win_state_var": {
-                      "value": "win_state_idsgn_catalog",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow2/InDesign/idsgn_catalog",
-                  "instance_id": "instance_54b60ac718cd",
-                  "name": "Настройка виньетки",
-                  "description": "<div style=\" {theme.script_description}\">Скрипт позволяет выбрать и настроить шаблон InDesign для автоматической генерации фотографий, виньеток и  альбомных разворотов.\n\nНастройки шаблона сохраняются в переменной контекста <b>WF_TEMPLATE_NAME</b></div>",
-                  "silent_mode": true,
-                  "icon_name": "COPY_INDD",
-                  "icon_color": "#9B59B6",
-                  "command_line_args": {
-                    "idsgn_catalog": {
-                      "value": "{wf_idsgn_catalog}",
-                      "enabled": true
-                    },
-                    "idsgn_template_var": {
-                      "value": "indsgn_template_vignette",
-                      "enabled": true
-                    },
-                    "idsgn_msg": {
-                      "value": "Конфигуратор шаблонов InDesign",
-                      "enabled": true
-                    },
-                    "idsgn_win_state_var": {
-                      "value": "win_state_idsgn_catalog",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow2/InDesign/idsgn_catalog",
-                  "instance_id": "instance_8df7f23b50f7",
-                  "name": "Настройка 1 разворота (общее фото)",
-                  "description": "<div style=\" {theme.script_description}\">Скрипт позволяет выбрать и настроить шаблон InDesign для автоматической генерации фотографий, виньеток и  альбомных разворотов.\n\nНастройки шаблона сохраняются в переменной контекста <b>WF_TEMPLATE_NAME</b></div>",
-                  "silent_mode": true,
-                  "icon_name": "COPY_INDD",
-                  "icon_color": "#9B59B6",
-                  "command_line_args": {
-                    "idsgn_catalog": {
-                      "value": "{wf_idsgn_catalog}",
-                      "enabled": true
-                    },
-                    "idsgn_template_var": {
-                      "value": "indsgn_template_group",
-                      "enabled": true
-                    },
-                    "idsgn_msg": {
-                      "value": "Конфигуратор шаблонов InDesign",
-                      "enabled": true
-                    },
-                    "idsgn_win_state_var": {
-                      "value": "win_state_idsgn_catalog",
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow2/InDesign/idsgn_catalog",
-                  "instance_id": "instance_7ee0ab24a97c",
-                  "name": "Настройка 2 разворота (граффити)",
-                  "description": "<div style=\" {theme.script_description}\">Скрипт позволяет выбрать и настроить шаблон InDesign для автоматической генерации фотографий, виньеток и  альбомных разворотов.\n\nНастройки шаблона сохраняются в переменной контекста <b>WF_TEMPLATE_NAME</b></div>",
-                  "silent_mode": true,
-                  "icon_name": "COPY_INDD",
-                  "icon_color": "#9B59B6",
-                  "command_line_args": {
-                    "idsgn_catalog": {
-                      "value": "{wf_idsgn_catalog}",
-                      "enabled": true
-                    },
-                    "idsgn_template_var": {
-                      "value": "indsgn_template_graf",
-                      "enabled": true
-                    },
-                    "idsgn_msg": {
-                      "value": "Конфигуратор шаблонов InDesign",
-                      "enabled": true
-                    },
-                    "idsgn_win_state_var": {
-                      "value": "win_state_idsgn_catalog",
-                      "enabled": true
-                    }
-                  }
-                }
-              ]
-            },
-            {
-              "type": "script_set",
-              "id": "setnode_ec7534284d2f",
-              "name": "ПРОЦЕСС: InDesign-Автоматическая верстка",
-              "description": null,
-              "script_entries": [
-                {
-                  "id": "root_790d968b/Workflow2/InDesign/idsgn_spread_generator",
-                  "instance_id": "instance_466f31be16fe",
-                  "name": "Создать персональную обложку",
+                  "id": "root_7617c03c/SYSTEM/cli_var_set",
+                  "instance_id": "instance_cd0087c594d3",
+                  "name": "Количество папок с RAW-файлами: var_folder_count = 0",
                   "description": null,
                   "silent_mode": true,
-                  "icon_name": "APP_INDD",
-                  "icon_color": "#9B59B6",
-                  "command_line_args": {
-                    "idsgn_template_var": {
-                      "value": "indsgn_template_cover",
-                      "enabled": true
-                    },
-                    "data_json_file": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
-                      "enabled": true
-                    },
-                    "info_list_file": {
-                      "value": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list",
-                      "enabled": true
-                    },
-                    "source_photos_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "output_file": {
-                      "value": null,
-                      "enabled": false
-                    },
-                    "idsgn_global_vars": {
-                      "value": "wf_school_info",
-                      "enabled": true
-                    },
-                    "generation_mode": {
-                      "value": "auto",
-                      "enabled": true
-                    },
-                    "face_scale": {
-                      "value": "0.18",
-                      "enabled": false
-                    },
-                    "eye_line": {
-                      "value": "0.2",
-                      "enabled": false
-                    },
-                    "placeholder_image": {
-                      "value": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png",
-                      "enabled": true
-                    },
-                    "magic_word": {
-                      "value": "База",
-                      "enabled": true
-                    },
-                    "validate": {
-                      "value": false,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow2/InDesign/idsgn_spread_generator",
-                  "instance_id": "instance_e3161ae22d25",
-                  "name": "Создать виньетку",
-                  "description": null,
-                  "silent_mode": true,
-                  "icon_name": "APP_INDD",
-                  "icon_color": "#9B59B6",
-                  "command_line_args": {
-                    "idsgn_template_var": {
-                      "value": "indsgn_template_vignette",
-                      "enabled": true
-                    },
-                    "data_json_file": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
-                      "enabled": true
-                    },
-                    "info_list_file": {
-                      "value": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list",
-                      "enabled": true
-                    },
-                    "source_photos_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "output_file": {
-                      "value": null,
-                      "enabled": false
-                    },
-                    "idsgn_global_vars": {
-                      "value": "wf_school_info",
-                      "enabled": true
-                    },
-                    "generation_mode": {
-                      "value": "auto",
-                      "enabled": true
-                    },
-                    "face_scale": {
-                      "value": "0.18",
-                      "enabled": false
-                    },
-                    "eye_line": {
-                      "value": "0.2",
-                      "enabled": false
-                    },
-                    "placeholder_image": {
-                      "value": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png",
-                      "enabled": true
-                    },
-                    "magic_word": {
-                      "value": "База",
-                      "enabled": true
-                    },
-                    "validate": {
-                      "value": false,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow2/InDesign/idsgn_spread_generator",
-                  "instance_id": "instance_82cda087c34c",
-                  "name": "Создать разворот №1 (общее фото)",
-                  "description": null,
-                  "silent_mode": true,
-                  "icon_name": "APP_INDD",
-                  "icon_color": "#9B59B6",
-                  "command_line_args": {
-                    "idsgn_template_var": {
-                      "value": "indsgn_template_group",
-                      "enabled": true
-                    },
-                    "data_json_file": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
-                      "enabled": true
-                    },
-                    "info_list_file": {
-                      "value": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list",
-                      "enabled": true
-                    },
-                    "source_photos_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "output_file": {
-                      "value": null,
-                      "enabled": false
-                    },
-                    "idsgn_global_vars": {
-                      "value": "wf_school_info",
-                      "enabled": true
-                    },
-                    "generation_mode": {
-                      "value": "auto",
-                      "enabled": true
-                    },
-                    "face_scale": {
-                      "value": "0.18",
-                      "enabled": false
-                    },
-                    "eye_line": {
-                      "value": "0.2",
-                      "enabled": false
-                    },
-                    "placeholder_image": {
-                      "value": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png",
-                      "enabled": true
-                    },
-                    "magic_word": {
-                      "value": "База",
-                      "enabled": true
-                    },
-                    "validate": {
-                      "value": false,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow2/InDesign/idsgn_spread_generator",
-                  "instance_id": "instance_5b5bff800866",
-                  "name": "Создать разворот №2 (граффити)",
-                  "description": null,
-                  "silent_mode": true,
-                  "icon_name": "APP_INDD",
-                  "icon_color": "#9B59B6",
-                  "command_line_args": {
-                    "idsgn_template_var": {
-                      "value": "indsgn_template_graf",
-                      "enabled": true
-                    },
-                    "data_json_file": {
-                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
-                      "enabled": true
-                    },
-                    "info_list_file": {
-                      "value": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list",
-                      "enabled": true
-                    },
-                    "source_photos_dir": {
-                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
-                      "enabled": true
-                    },
-                    "output_file": {
-                      "value": null,
-                      "enabled": false
-                    },
-                    "idsgn_global_vars": {
-                      "value": "wf_school_info",
-                      "enabled": true
-                    },
-                    "generation_mode": {
-                      "value": "auto",
-                      "enabled": true
-                    },
-                    "face_scale": {
-                      "value": "0.18",
-                      "enabled": false
-                    },
-                    "eye_line": {
-                      "value": "0.2",
-                      "enabled": false
-                    },
-                    "placeholder_image": {
-                      "value": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png",
-                      "enabled": true
-                    },
-                    "magic_word": {
-                      "value": "База",
-                      "enabled": true
-                    },
-                    "validate": {
-                      "value": false,
-                      "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_790d968b/Workflow2/Tools/session_report",
-                  "instance_id": "instance_8cc9279df09a",
-                  "name": "Информационная панель: список разворотов",
-                  "description": null,
-                  "silent_mode": true,
-                  "icon_name": "REPORT",
+                  "icon_name": "VAR_SET",
                   "icon_color": "#3498DB",
                   "command_line_args": {
-                    "template": {
-                      "value": "dashboard",
+                    "set_var_name": {
+                      "value": "var_folder_count",
                       "enabled": true
                     },
-                    "scope": {
-                      "value": "full",
+                    "set_var_value": {
+                      "value": "0",
                       "enabled": true
                     },
-                    "icon_size_tree": {
-                      "value": 24,
+                    "set_valid_type": {
+                      "value": "integer",
                       "enabled": true
                     },
-                    "icon_size_dashboard": {
-                      "value": "40",
+                    "set_custom_regexp": {
+                      "value": null,
+                      "enabled": false
+                    },
+                    "set_custom_regexp_desc": {
+                      "value": null,
+                      "enabled": false
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_dialog_open",
+                  "instance_id": "instance_a37fbad9e7cb",
+                  "name": "Выбрать папку с исходными RAW-файлами",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "FOLDER_OPEN",
+                  "icon_color": "#27AE60",
+                  "command_line_args": {
+                    "dlg_open_var": {
+                      "value": "wf_source_file_path",
+                      "enabled": true
+                    },
+                    "dlg_open_type": {
+                      "value": "directory",
+                      "enabled": true
+                    },
+                    "dlg_open_title": {
+                      "value": "Папка с исходными {var_source_file_type} файлами",
+                      "enabled": true
+                    },
+                    "dlg_open_filter": {
+                      "value": "Все файлы (*.*)",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/dir_operation",
+                  "instance_id": "instance_1b63c5e1c8da",
+                  "name": "Копировать RAW-файлы  в папку сессии",
+                  "description": "<div style=\" {theme.script_description}\">\nСкрипт копирует исходные RAW-файлы в папку Capture.\n</div>",
+                  "silent_mode": true,
+                  "icon_name": "COPY_RAW",
+                  "icon_color": "#27AE60",
+                  "command_line_args": {
+                    "do_source_dir": {
+                      "value": "{wf_source_file_path}",
+                      "enabled": true
+                    },
+                    "do_dest_dir": {
+                      "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
+                      "enabled": true
+                    },
+                    "do_mode": {
+                      "value": "copy",
+                      "enabled": true
+                    },
+                    "do_on_conflict": {
+                      "value": "overwrite",
+                      "enabled": true
+                    },
+                    "do_copy_base_folder": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "do_include": {
+                      "value": [
+                        "*.cr3"
+                      ],
+                      "enabled": true
+                    },
+                    "all_threads": {
+                      "value": "12",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/cli_var_increment",
+                  "instance_id": "instance_b9d4f88d90ee",
+                  "name": "Количество папок с RAW-файлами: var_folder_count + 1",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "VAR_SET",
+                  "icon_color": "#27AE60",
+                  "command_line_args": {
+                    "inc_var_name": {
+                      "value": "var_folder_count",
+                      "enabled": true
+                    },
+                    "inc_delta": {
+                      "value": "1",
+                      "enabled": true
+                    },
+                    "inc_operation": {
+                      "value": "add",
+                      "enabled": true
+                    },
+                    "inc_value_type": {
+                      "value": "int",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_dialog_msg",
+                  "instance_id": "instance_f28b510e57db",
+                  "name": "Копировать RAW-файлы еще из одной папки?",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "WARNING",
+                  "icon_color": "#27AE60",
+                  "command_line_args": {
+                    "dlg_msg_var": {
+                      "value": "var_raw_multi_folder",
+                      "enabled": true
+                    },
+                    "dlg_msg_type": {
+                      "value": "yes_no",
+                      "enabled": true
+                    },
+                    "dlg_msg_title": {
+                      "value": "Подтверждение",
+                      "enabled": true
+                    },
+                    "dlg_msg_message": {
+                      "value": "Копировать RAW-файлы еще из одной папки?",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/py_if_else",
+                  "instance_id": "instance_ac1db1c316af",
+                  "name": "Повторить операцию копирования (да/нет)?",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "LOGIC_IF",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "if-variable-name": {
+                      "value": "var_raw_multi_folder",
+                      "enabled": true
+                    },
+                    "if-operator": {
+                      "value": "равно",
+                      "enabled": true
+                    },
+                    "if-comparison-value": {
+                      "value": "yes",
+                      "enabled": true
+                    },
+                    "then-instance-id": {
+                      "value": "instance_a37fbad9e7cb",
+                      "enabled": true
+                    },
+                    "else-instance-id": {
+                      "value": "instance_f45e4c7bc17f",
+                      "enabled": true
+                    },
+                    "clear-variable": {
+                      "value": true,
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/py_if_else",
+                  "instance_id": "instance_f45e4c7bc17f",
+                  "name": "Скопированы файлы из нескольких папок (да/нет)?",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "LOGIC_IF",
+                  "icon_color": "#E67E22",
+                  "command_line_args": {
+                    "if-variable-name": {
+                      "value": "var_folder_count",
+                      "enabled": true
+                    },
+                    "if-operator": {
+                      "value": "больше",
+                      "enabled": true
+                    },
+                    "if-comparison-value": {
+                      "value": "1",
+                      "enabled": true
+                    },
+                    "then-instance-id": {
+                      "value": "instance_2fd78d6d5c53",
+                      "enabled": true
+                    },
+                    "else-instance-id": {
+                      "value": "instance_4fa325f66e65",
+                      "enabled": true
+                    },
+                    "clear-variable": {
+                      "value": true,
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/SYSTEM/batch_rename",
+                  "instance_id": "instance_2fd78d6d5c53",
+                  "name": "Переименовать RAW-файлы",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "COPY_RAW",
+                  "icon_color": "#27AE60",
+                  "command_line_args": {
+                    "br_source_dir": {
+                      "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
+                      "enabled": true
+                    },
+                    "br_include": {
+                      "value": [
+                        "*.CR3"
+                      ],
+                      "enabled": true
+                    },
+                    "br_template": {
+                      "value": "{wf_session_name}_%index%%ext%",
+                      "enabled": true
+                    },
+                    "br_prefix": {
+                      "value": "",
+                      "enabled": true
+                    },
+                    "br_suffix": {
+                      "value": "",
+                      "enabled": true
+                    },
+                    "br_start_index": {
+                      "value": 1,
+                      "enabled": true
+                    },
+                    "br_index_digits": {
+                      "value": 4,
+                      "enabled": true
+                    },
+                    "br_on_conflict": {
+                      "value": "rename",
+                      "enabled": true
+                    },
+                    "br_sort_method": {
+                      "value": "modified_time",
+                      "enabled": true
+                    },
+                    "br_mode": {
+                      "value": "rename",
+                      "enabled": true
+                    },
+                    "br_recursive": {
+                      "value": false,
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_790d968b/Workflow2/Tools/raw2jpeg",
+                  "instance_id": "instance_4fa325f66e65",
+                  "name": "Конвертировать RAW в JPEG",
+                  "description": "<div style=\"{theme.script_description}\">\nСкрипт, конвертирует исходные файлы изображений (RAW или PSD) в формат JPEG для последующего анализа другими скриптами.\n\nЕсли ваши изображения уже в формате JPG, то данный скрипт можно не запускать.\n</div>",
+                  "silent_mode": true,
+                  "icon_name": "CONVER_RAW",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "input_dir": {
+                      "value": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}",
+                      "enabled": true
+                    },
+                    "output_dir": {
+                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG",
+                      "enabled": true
+                    },
+                    "a_r2j_image_type": {
+                      "value": "raw",
+                      "enabled": true
+                    },
+                    "a_r2j_preview_size": {
+                      "value": "2048",
+                      "enabled": true
+                    },
+                    "a_r2j_jpeg_quality": {
+                      "value": 95,
+                      "enabled": true
+                    },
+                    "recursive_read": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "keep_structure": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "all_threads": {
+                      "value": "12",
                       "enabled": true
                     }
                   }
@@ -1936,8 +1870,8 @@
                   }
                 },
                 {
-                  "id": "root_7617c03c/SYSTEM/cli_var_set",
-                  "instance_id": "instance_430c30b30eb0",
+                  "id": "root_7617c03c/SYSTEM/cli_var_json_set",
+                  "instance_id": "instance_8d86e998a3a1",
                   "name": "var_claster_cleaning = no",
                   "description": null,
                   "silent_mode": true,
@@ -1945,11 +1879,15 @@
                   "icon_color": "#9B59B6",
                   "command_line_args": {
                     "set_var_name": {
-                      "value": "var_{wf_photo_session}_claster_cleaning",
+                      "value": "var_claster_run.{wf_photo_session}.cleaning",
                       "enabled": true
                     },
                     "set_var_value": {
                       "value": "no",
+                      "enabled": true
+                    },
+                    "set_value_type": {
+                      "value": "string",
                       "enabled": true
                     },
                     "set_valid_type": {
@@ -1967,8 +1905,8 @@
                   }
                 },
                 {
-                  "id": "root_7617c03c/SYSTEM/cli_var_set",
-                  "instance_id": "instance_8d25a0991024",
+                  "id": "root_7617c03c/SYSTEM/cli_var_json_set",
+                  "instance_id": "instance_c56859ed85e9",
                   "name": "var_claster_face = no",
                   "description": null,
                   "silent_mode": true,
@@ -1976,11 +1914,15 @@
                   "icon_color": "#9B59B6",
                   "command_line_args": {
                     "set_var_name": {
-                      "value": "var_{wf_photo_session}_claster_face",
+                      "value": "var_claster_run.{wf_photo_session}.face",
                       "enabled": true
                     },
                     "set_var_value": {
                       "value": "no",
+                      "enabled": true
+                    },
+                    "set_value_type": {
+                      "value": "string",
                       "enabled": true
                     },
                     "set_valid_type": {
@@ -1998,8 +1940,8 @@
                   }
                 },
                 {
-                  "id": "root_7617c03c/SYSTEM/cli_var_set",
-                  "instance_id": "instance_0aaa29f52a2e",
+                  "id": "root_7617c03c/SYSTEM/cli_var_json_set",
+                  "instance_id": "instance_d1fb9cefcef6",
                   "name": "var_claster_matches = no",
                   "description": null,
                   "silent_mode": true,
@@ -2007,11 +1949,15 @@
                   "icon_color": "#9B59B6",
                   "command_line_args": {
                     "set_var_name": {
-                      "value": "var_{wf_photo_session}_claster_matches",
+                      "value": "var_claster_run.{wf_photo_session}.matches",
                       "enabled": true
                     },
                     "set_var_value": {
                       "value": "no",
+                      "enabled": true
+                    },
+                    "set_value_type": {
+                      "value": "string",
                       "enabled": true
                     },
                     "set_valid_type": {
@@ -2029,8 +1975,8 @@
                   }
                 },
                 {
-                  "id": "root_7617c03c/SYSTEM/cli_var_set",
-                  "instance_id": "instance_13553984695a",
+                  "id": "root_7617c03c/SYSTEM/cli_var_json_set",
+                  "instance_id": "instance_ef9f28a2cd77",
                   "name": "var_claster_location = no",
                   "description": null,
                   "silent_mode": true,
@@ -2038,11 +1984,15 @@
                   "icon_color": "#9B59B6",
                   "command_line_args": {
                     "set_var_name": {
-                      "value": "var_{wf_photo_session}_claster_location",
+                      "value": "var_claster_run.{wf_photo_session}.location",
                       "enabled": true
                     },
                     "set_var_value": {
                       "value": "no",
+                      "enabled": true
+                    },
+                    "set_value_type": {
+                      "value": "string",
                       "enabled": true
                     },
                     "set_valid_type": {
@@ -2077,7 +2027,7 @@
                   "icon_color": "#9B59B6",
                   "command_line_args": {
                     "if-variable-name": {
-                      "value": "var_{wf_photo_session}_claster_cleaning",
+                      "value": "var_claster_run.{wf_photo_session}.cleaning",
                       "enabled": true
                     },
                     "if-operator": {
@@ -2241,7 +2191,7 @@
                       "enabled": false
                     },
                     "ce_win_state_var_name": {
-                      "value": "win_state_claster_editor",
+                      "value": "win_state.claster_editor",
                       "enabled": true
                     },
                     "all_threads": {
@@ -2272,7 +2222,7 @@
                   "icon_color": "#9B59B6",
                   "command_line_args": {
                     "if-variable-name": {
-                      "value": "var_{wf_photo_session}_claster_face",
+                      "value": "var_claster_run.{wf_photo_session}.face",
                       "enabled": true
                     },
                     "if-operator": {
@@ -2436,7 +2386,7 @@
                       "enabled": true
                     },
                     "ce_win_state_var_name": {
-                      "value": "win_state_claster_editor",
+                      "value": "win_state.claster_editor",
                       "enabled": true
                     },
                     "all_threads": {
@@ -2467,7 +2417,7 @@
                   "icon_color": "#9B59B6",
                   "command_line_args": {
                     "if-variable-name": {
-                      "value": "var_{wf_photo_session}_claster_location",
+                      "value": "var_claster_run.{wf_photo_session}.location",
                       "enabled": true
                     },
                     "if-operator": {
@@ -2483,7 +2433,7 @@
                       "enabled": true
                     },
                     "else-instance-id": {
-                      "value": "instance_16e406c5f3e1",
+                      "value": "instance_22c580186803",
                       "enabled": true
                     },
                     "clear-variable": {
@@ -2541,7 +2491,7 @@
                       "enabled": true
                     },
                     "then-instance-id": {
-                      "value": "instance_16e406c5f3e1",
+                      "value": "instance_22c580186803",
                       "enabled": true
                     },
                     "else-instance-id": {
@@ -2555,8 +2505,8 @@
                   }
                 },
                 {
-                  "id": "root_790d968b/Workflow2/FaceAnalysis/cluster_locations",
-                  "instance_id": "instance_16e406c5f3e1",
+                  "id": "root_790d968b/Workflow2/FaceAnalysis/cluster_locations2",
+                  "instance_id": "instance_22c580186803",
                   "name": "Кластеризация/классификация фото по сюжетам",
                   "description": null,
                   "silent_mode": true,
@@ -2583,12 +2533,27 @@
                       "value": "0.09",
                       "enabled": true
                     },
+                    "model_backend": {
+                      "value": "siglip2_onnx",
+                      "enabled": true
+                    },
+                    "spatial_strategy": {
+                      "value": "grid_9x9",
+                      "enabled": true
+                    },
                     "a_cl_location_prompts": {
-                      "value": null,
+                      "value": [
+                        "A student's full-length portrait against a map background",
+                        "A photo of two students sitting at a school desk",
+                        "A group photo of children (4 or more people) against a light background",
+                        "A horizontal photo of children (4 or more people) against a graffiti background. The children are standing or sitting on a chair and a stepladder",
+                        "A vertical photo of 2-3 students standing or sitting on a stepladder against a graffiti background",
+                        "A photo of a class on a narrow staircase"
+                      ],
                       "enabled": true
                     },
                     "a_cl_cluster_eps": {
-                      "value": "0.12",
+                      "value": "0.18",
                       "enabled": true
                     },
                     "a_cl_mask_suffix": {
@@ -2602,37 +2567,10 @@
                     "batch_size": {
                       "value": 32,
                       "enabled": true
-                    }
-                  }
-                },
-                {
-                  "id": "root_7617c03c/SYSTEM/cli_var_set",
-                  "instance_id": "instance_fc4a7cea3533",
-                  "name": "Установка флага выполнения кластеризации фото по сюжетам",
-                  "description": "<div style=\" {theme.script_description}\">\nУстановка флага выполнения операции кластеризации фотографий по сюжетам/локациям.\n<b>wf_temp_location_claster = yes</b>\n</div>",
-                  "silent_mode": true,
-                  "icon_name": "VAR_SET",
-                  "icon_color": "#9B59B6",
-                  "command_line_args": {
-                    "set_var_name": {
-                      "value": "var_{wf_photo_session}_claster_location",
+                    },
+                    "cache_mode": {
+                      "value": "use",
                       "enabled": true
-                    },
-                    "set_var_value": {
-                      "value": "yes",
-                      "enabled": true
-                    },
-                    "set_valid_type": {
-                      "value": "not_empty",
-                      "enabled": true
-                    },
-                    "set_custom_regexp": {
-                      "value": null,
-                      "enabled": false
-                    },
-                    "set_custom_regexp_desc": {
-                      "value": null,
-                      "enabled": false
                     }
                   }
                 },
@@ -2658,7 +2596,7 @@
                       "enabled": true
                     },
                     "ce_win_state_var_name": {
-                      "value": "win_state_claster_editor",
+                      "value": "win_state.claster_editor",
                       "enabled": true
                     },
                     "all_threads": {
@@ -2689,7 +2627,7 @@
                   "icon_color": "#9B59B6",
                   "command_line_args": {
                     "if-variable-name": {
-                      "value": "var_{wf_photo_session}_claster_matches",
+                      "value": "var_claster_run.{wf_photo_session}.matches",
                       "enabled": true
                     },
                     "if-operator": {
@@ -2890,7 +2828,7 @@
                       "enabled": true
                     },
                     "ce_win_state_var_name": {
-                      "value": "win_state_claster_editor",
+                      "value": "win_state.claster_editor",
                       "enabled": true
                     },
                     "all_threads": {
@@ -2951,7 +2889,7 @@
                   "instance_id": "instance_c55cc1126412",
                   "name": "Отметить фотографии выбранные клиентами (RAW-файлы)",
                   "description": null,
-                  "silent_mode": false,
+                  "silent_mode": true,
                   "icon_name": "FILE_RAW",
                   "icon_color": "#27AE60",
                   "command_line_args": {
@@ -2994,7 +2932,7 @@
                   "instance_id": "instance_9c5b411f4b79",
                   "name": "Запуск Capture One. Обработка и экспорт выбранных файлов в PSD",
                   "description": "<div style=\" {theme.script_description}\"><b>ВНИМАНИЕ!</b>\nЦветокоррекция фотографий, отобранных клиентом, и их экспорт в формат PSD для дальнейшей ретуши.\n\nПри экспорте используйте рецепт <b>_PSD_8bit_</b>\n</div>",
-                  "silent_mode": false,
+                  "silent_mode": true,
                   "icon_name": "APP_C1",
                   "icon_color": "#E67E22",
                   "command_line_args": {
@@ -3009,7 +2947,7 @@
                   "instance_id": "instance_ea81730ecbe7",
                   "name": "Ждем завершения работы Сapture One",
                   "description": null,
-                  "silent_mode": false,
+                  "silent_mode": true,
                   "icon_name": "WARNING",
                   "icon_color": "#E67E22",
                   "command_line_args": {
@@ -3323,6 +3261,464 @@
                     },
                     "dlg_goto_script_id": {
                       "value": null,
+                      "enabled": true
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "script_set",
+              "id": "setnode_2b9443e8b646",
+              "name": "ПРОЦЕСС: InDesign-Настройка шаблона",
+              "description": null,
+              "script_entries": [
+                {
+                  "id": "root_790d968b/Workflow2/InDesign/idsgn_catalog",
+                  "instance_id": "instance_de337fa5c87c",
+                  "name": "Настройка персональной обложки",
+                  "description": "<div style=\" {theme.script_description}\">Скрипт позволяет выбрать и настроить шаблон InDesign для автоматической генерации фотографий, виньеток и  альбомных разворотов.\n\nНастройки шаблона сохраняются в переменной контекста <b>WF_TEMPLATE_NAME</b></div>",
+                  "silent_mode": true,
+                  "icon_name": "COPY_INDD",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "idsgn_catalog": {
+                      "value": "{wf_idsgn_catalog}",
+                      "enabled": true
+                    },
+                    "idsgn_template_var": {
+                      "value": "wf_indsgn_template.auto_cover",
+                      "enabled": true
+                    },
+                    "idsgn_msg": {
+                      "value": "Конфигуратор шаблонов InDesign",
+                      "enabled": true
+                    },
+                    "idsgn_win_state_var": {
+                      "value": "win_state.idsgn_catalog",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_790d968b/Workflow2/InDesign/idsgn_catalog",
+                  "instance_id": "instance_54b60ac718cd",
+                  "name": "Настройка виньетки",
+                  "description": "<div style=\" {theme.script_description}\">Скрипт позволяет выбрать и настроить шаблон InDesign для автоматической генерации фотографий, виньеток и  альбомных разворотов.\n\nНастройки шаблона сохраняются в переменной контекста <b>WF_TEMPLATE_NAME</b></div>",
+                  "silent_mode": true,
+                  "icon_name": "COPY_INDD",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "idsgn_catalog": {
+                      "value": "{wf_idsgn_catalog}",
+                      "enabled": true
+                    },
+                    "idsgn_template_var": {
+                      "value": "wf_indsgn_template.auto_vignette",
+                      "enabled": true
+                    },
+                    "idsgn_msg": {
+                      "value": "Конфигуратор шаблонов InDesign",
+                      "enabled": true
+                    },
+                    "idsgn_win_state_var": {
+                      "value": "win_state.idsgn_catalog",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_790d968b/Workflow2/InDesign/idsgn_catalog",
+                  "instance_id": "instance_8df7f23b50f7",
+                  "name": "Настройка 1 разворота (общее фото)",
+                  "description": "<div style=\" {theme.script_description}\">Скрипт позволяет выбрать и настроить шаблон InDesign для автоматической генерации фотографий, виньеток и  альбомных разворотов.\n\nНастройки шаблона сохраняются в переменной контекста <b>WF_TEMPLATE_NAME</b></div>",
+                  "silent_mode": true,
+                  "icon_name": "COPY_INDD",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "idsgn_catalog": {
+                      "value": "{wf_idsgn_catalog}",
+                      "enabled": true
+                    },
+                    "idsgn_template_var": {
+                      "value": "wf_indsgn_template.auto_group",
+                      "enabled": true
+                    },
+                    "idsgn_msg": {
+                      "value": "Конфигуратор шаблонов InDesign",
+                      "enabled": true
+                    },
+                    "idsgn_win_state_var": {
+                      "value": "win_state.idsgn_catalog",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_790d968b/Workflow2/InDesign/idsgn_catalog",
+                  "instance_id": "instance_7ee0ab24a97c",
+                  "name": "Настройка 2 разворота (граффити)",
+                  "description": "<div style=\" {theme.script_description}\">Скрипт позволяет выбрать и настроить шаблон InDesign для автоматической генерации фотографий, виньеток и  альбомных разворотов.\n\nНастройки шаблона сохраняются в переменной контекста <b>WF_TEMPLATE_NAME</b></div>",
+                  "silent_mode": true,
+                  "icon_name": "COPY_INDD",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "idsgn_catalog": {
+                      "value": "{wf_idsgn_catalog}",
+                      "enabled": true
+                    },
+                    "idsgn_template_var": {
+                      "value": "wf_indsgn_template.auto_graf",
+                      "enabled": true
+                    },
+                    "idsgn_msg": {
+                      "value": "Конфигуратор шаблонов InDesign",
+                      "enabled": true
+                    },
+                    "idsgn_win_state_var": {
+                      "value": "win_state.idsgn_catalog",
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_7617c03c/GUI/gui_json_editor",
+                  "instance_id": "instance_635708fc5c03",
+                  "name": "gui_json_editor",
+                  "description": null,
+                  "silent_mode": false,
+                  "icon_name": "INSTANCE_ITEM",
+                  "icon_color": null,
+                  "command_line_args": {
+                    "var_name": {
+                      "value": "wf_indsgn_template",
+                      "enabled": true
+                    },
+                    "title": {
+                      "value": "Редактор JSON",
+                      "enabled": true
+                    },
+                    "msg": {
+                      "value": "<b>Настройки экспорта</b><br>\nПроверьте качество JPEG и включение водяных знаков перед запуском финального экспорта.",
+                      "enabled": true
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "script_set",
+              "id": "setnode_ec7534284d2f",
+              "name": "ПРОЦЕСС: InDesign-Автоматическая верстка",
+              "description": null,
+              "script_entries": [
+                {
+                  "id": "root_790d968b/Workflow2/InDesign/idsgn_spread_generator",
+                  "instance_id": "instance_466f31be16fe",
+                  "name": "Создать персональную обложку",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "APP_INDD",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "idsgn_template_var": {
+                      "value": "wf_indsgn_template.auto_cover",
+                      "enabled": true
+                    },
+                    "data_json_file": {
+                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
+                      "enabled": true
+                    },
+                    "info_list_file": {
+                      "value": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list",
+                      "enabled": true
+                    },
+                    "source_photos_dir": {
+                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
+                      "enabled": true
+                    },
+                    "output_file": {
+                      "value": null,
+                      "enabled": false
+                    },
+                    "idsgn_global_vars": {
+                      "value": "wf_school_info",
+                      "enabled": true
+                    },
+                    "generation_mode": {
+                      "value": "auto",
+                      "enabled": true
+                    },
+                    "face_scale": {
+                      "value": "0.18",
+                      "enabled": false
+                    },
+                    "eye_line": {
+                      "value": "0.2",
+                      "enabled": false
+                    },
+                    "placeholder_image": {
+                      "value": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png",
+                      "enabled": true
+                    },
+                    "magic_word": {
+                      "value": "База",
+                      "enabled": true
+                    },
+                    "validate": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "log_sections": {
+                      "value": [
+                        "general",
+                        "validation",
+                        "resources",
+                        "plan",
+                        "text",
+                        "images",
+                        "thumbnails"
+                      ],
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_790d968b/Workflow2/InDesign/idsgn_spread_generator",
+                  "instance_id": "instance_e3161ae22d25",
+                  "name": "Создать виньетку",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "APP_INDD",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "idsgn_template_var": {
+                      "value": "wf_indsgn_template.auto_vignette",
+                      "enabled": true
+                    },
+                    "data_json_file": {
+                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
+                      "enabled": true
+                    },
+                    "info_list_file": {
+                      "value": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list",
+                      "enabled": true
+                    },
+                    "source_photos_dir": {
+                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
+                      "enabled": true
+                    },
+                    "output_file": {
+                      "value": null,
+                      "enabled": false
+                    },
+                    "idsgn_global_vars": {
+                      "value": "wf_school_info",
+                      "enabled": true
+                    },
+                    "generation_mode": {
+                      "value": "auto",
+                      "enabled": true
+                    },
+                    "face_scale": {
+                      "value": "0.18",
+                      "enabled": false
+                    },
+                    "eye_line": {
+                      "value": "0.2",
+                      "enabled": false
+                    },
+                    "placeholder_image": {
+                      "value": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png",
+                      "enabled": true
+                    },
+                    "magic_word": {
+                      "value": "База",
+                      "enabled": true
+                    },
+                    "validate": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "log_sections": {
+                      "value": [
+                        "general",
+                        "validation",
+                        "resources",
+                        "plan",
+                        "text",
+                        "images",
+                        "thumbnails"
+                      ],
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_790d968b/Workflow2/InDesign/idsgn_spread_generator",
+                  "instance_id": "instance_82cda087c34c",
+                  "name": "Создать разворот №1 (общее фото)",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "APP_INDD",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "idsgn_template_var": {
+                      "value": "wf_indsgn_template.auto_group",
+                      "enabled": true
+                    },
+                    "data_json_file": {
+                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
+                      "enabled": true
+                    },
+                    "info_list_file": {
+                      "value": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list",
+                      "enabled": true
+                    },
+                    "source_photos_dir": {
+                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
+                      "enabled": true
+                    },
+                    "output_file": {
+                      "value": null,
+                      "enabled": false
+                    },
+                    "idsgn_global_vars": {
+                      "value": "wf_school_info",
+                      "enabled": true
+                    },
+                    "generation_mode": {
+                      "value": "auto",
+                      "enabled": true
+                    },
+                    "face_scale": {
+                      "value": "0.18",
+                      "enabled": false
+                    },
+                    "eye_line": {
+                      "value": "0.2",
+                      "enabled": false
+                    },
+                    "placeholder_image": {
+                      "value": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png",
+                      "enabled": true
+                    },
+                    "magic_word": {
+                      "value": "База",
+                      "enabled": true
+                    },
+                    "validate": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "log_sections": {
+                      "value": [
+                        "general",
+                        "validation",
+                        "resources",
+                        "plan",
+                        "text",
+                        "images",
+                        "thumbnails"
+                      ],
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_790d968b/Workflow2/InDesign/idsgn_spread_generator",
+                  "instance_id": "instance_5b5bff800866",
+                  "name": "Создать разворот №2 (граффити)",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "APP_INDD",
+                  "icon_color": "#9B59B6",
+                  "command_line_args": {
+                    "idsgn_template_var": {
+                      "value": "wf_indsgn_template.auto_graf",
+                      "enabled": true
+                    },
+                    "data_json_file": {
+                      "value": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/matches_portrait_to_group.json",
+                      "enabled": true
+                    },
+                    "info_list_file": {
+                      "value": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list",
+                      "enabled": true
+                    },
+                    "source_photos_dir": {
+                      "value": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}",
+                      "enabled": true
+                    },
+                    "output_file": {
+                      "value": null,
+                      "enabled": false
+                    },
+                    "idsgn_global_vars": {
+                      "value": "wf_school_info",
+                      "enabled": true
+                    },
+                    "generation_mode": {
+                      "value": "auto",
+                      "enabled": true
+                    },
+                    "face_scale": {
+                      "value": "0.18",
+                      "enabled": false
+                    },
+                    "eye_line": {
+                      "value": "0.2",
+                      "enabled": false
+                    },
+                    "placeholder_image": {
+                      "value": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png",
+                      "enabled": true
+                    },
+                    "magic_word": {
+                      "value": "База",
+                      "enabled": true
+                    },
+                    "validate": {
+                      "value": false,
+                      "enabled": true
+                    },
+                    "log_sections": {
+                      "value": [
+                        "general",
+                        "validation",
+                        "resources",
+                        "plan",
+                        "text",
+                        "images",
+                        "thumbnails"
+                      ],
+                      "enabled": true
+                    }
+                  }
+                },
+                {
+                  "id": "root_790d968b/Workflow2/Tools/session_report",
+                  "instance_id": "instance_8cc9279df09a",
+                  "name": "Информационная панель: список разворотов",
+                  "description": null,
+                  "silent_mode": true,
+                  "icon_name": "REPORT",
+                  "icon_color": "#3498DB",
+                  "command_line_args": {
+                    "template": {
+                      "value": "dashboard",
+                      "enabled": true
+                    },
+                    "scope": {
+                      "value": "full",
+                      "enabled": true
+                    },
+                    "icon_size_tree": {
+                      "value": 24,
+                      "enabled": true
+                    },
+                    "icon_size_dashboard": {
+                      "value": "40",
                       "enabled": true
                     }
                   }
@@ -3665,6 +4061,37 @@
                   "icon_name": "INSTANCE_ITEM",
                   "icon_color": null,
                   "command_line_args": {}
+                },
+                {
+                  "id": "root_7617c03c/SAFETY/crypto",
+                  "instance_id": "instance_59c40aefaace",
+                  "name": "crypto",
+                  "description": null,
+                  "silent_mode": false,
+                  "icon_name": "INSTANCE_ITEM",
+                  "icon_color": null,
+                  "command_line_args": {
+                    "mode": {
+                      "value": "library",
+                      "enabled": true
+                    },
+                    "src_dir": {
+                      "value": "D:\\PySM3_Codex\\repos\\PySM\\scripts\\Workflow2\\InDesign\\pysm_idml",
+                      "enabled": true
+                    },
+                    "entry_point": {
+                      "value": null,
+                      "enabled": false
+                    },
+                    "dst_dir": {
+                      "value": "D:\\PySM3_Codex\\repos\\PySM\\scripts\\Workflow2\\InDesign\\_compiled\\pysm_idml_nuitka",
+                      "enabled": true
+                    },
+                    "hwid": {
+                      "value": null,
+                      "enabled": false
+                    }
+                  }
                 }
               ]
             }
@@ -3715,14 +4142,14 @@
       "icon_color": "#27AE60"
     },
     {
-      "instance_id": "instance_c6d1b5172e88",
-      "icon_name": "COPY_RAW",
-      "icon_color": "#27AE60"
-    },
-    {
       "instance_id": "instance_daf4aadd30cb",
       "icon_name": "APP_C1",
       "icon_color": "#E67E22"
+    },
+    {
+      "instance_id": "instance_c6d1b5172e88",
+      "icon_name": "COPY_RAW",
+      "icon_color": "#27AE60"
     },
     {
       "instance_id": "instance_4e98d09ea227",
@@ -3743,6 +4170,11 @@
       "instance_id": "instance_f30fe080d9c1",
       "icon_name": "APP_INDD",
       "icon_color": null
+    },
+    {
+      "instance_id": "instance_c73bb7a8bc66",
+      "icon_name": "COPY_PSD",
+      "icon_color": "#E67E22"
     }
   ]
 }
