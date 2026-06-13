@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 #import datetime
 from insightface.app import FaceAnalysis
+from insightface.utils.storage import ensure_available
 
 
 
@@ -29,6 +30,11 @@ from _common import (
     icon_save_warning,
     icon_save_error
 )
+
+
+class FaceAnalyzerInitError(RuntimeError):
+    """Concise user-facing error for InsightFace initialization failures."""
+
 
 class FaceAnalyzer:
     """
@@ -67,8 +73,18 @@ class FaceAnalyzer:
 
         # Проверка на необходимость скачивания
         root_path = Path(model_root)
-        if not (root_path / "models" / model_name).exists() and not (root_path / model_name).exists():
+        model_exists_locally = (root_path / "models" / model_name).exists() or (root_path / model_name).exists()
+        if not model_exists_locally:
             logger.info(f"Модель <b>Insightface</b> не найдена локально и будет загружена с GitHub.")
+            try:
+                ensure_available('models', model_name, root=model_root)
+            except Exception as e:
+                message = (
+                    f"Не удалось загрузить модель InsightFace '{model_name}'. "
+                    f"Проверьте интернет-соединение или поместите модель в папку: {root_path}. "
+                    f"Причина: {e}"
+                )
+                raise FaceAnalyzerInitError(message) from None
 
         try:
             # Блокируем вывод лишнего спама от библиотеки (C++ stdout/stderr)
@@ -85,8 +101,8 @@ class FaceAnalyzer:
             logger.info(f"Объект <b>Insightface</b> создан (провайдер: {provider_name})")
             return app
         except Exception as e:
-            logger.critical(f"Ошибка инициализации Insightface: {e}", exc_info=True)
-            raise
+            message = f"Не удалось инициализировать модель InsightFace '{model_name}'. Причина: {e}"
+            raise FaceAnalyzerInitError(message) from None
 
 
     def prepare_models(self):
@@ -227,10 +243,8 @@ class FaceAnalyzer:
                 if result:
                     face_data, face_embedding = result
                     
-                    # --- ВАЖНО: Присваиваем face_index (Immutable Index) ---
-                    # Индекс присваивается последовательно только успешно обработанным лицам.
-                    # Он соответствует индексу в списке processed_face_embeddings_list,
-                    # и соответственно, позиции в файле векторов (.npy).
+                    # face_index is local to the current image. The global embedding
+                    # row is stored separately in _Embeddings/faces_index.json.
                     face_data['face_index'] = len(processed_face_data_list)
                     
                     processed_face_data_list.append(face_data)

@@ -11,7 +11,7 @@ from .config_loader import ConfigManager
 from .coordinate_transformer import CoordinateTransformer
 from .face_data_processor_interface import FaceDataProcessorInterface
 from .attribute_analyzer import AttributeAnalyzer
-from .face_analyzer import FaceAnalyzer
+from .face_analyzer import FaceAnalyzer, FaceAnalyzerInitError
 
 __all__ = [
     "ConfigManager",
@@ -19,4 +19,5 @@ __all__ = [
     "FaceDataProcessorInterface",
     "AttributeAnalyzer",
     "FaceAnalyzer",
+    "FaceAnalyzerInitError",
 ]

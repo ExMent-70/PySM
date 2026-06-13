@@ -3,9 +3,8 @@
 import json
 import logging
 import shutil
-import struct
 from pathlib import Path
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple
 
 import numpy as np
 
@@ -42,6 +41,9 @@ class FaceStorageManager:
         self._temp_land_path = self._temp_dir / "temp_landmarks.jsonl"
         self._temp_emb_bin = self._temp_dir / "temp_embeddings.bin"
         self._temp_idx_path = self._temp_dir / "temp_index.jsonl"
+
+        if self.clear_existing:
+            self._remove_previous_outputs()
 
         # Инициализируем счетчик размером существующего .npy, чтобы индексы не пересекались при добавлении файлов
         self._total_embeddings_count = 0
@@ -223,10 +225,28 @@ class FaceStorageManager:
     def _save_json(self, path: Path, data: Any):
         try:
             # ИСПРАВЛЕНИЕ: indent=2 обеспечивает компактный размер
-            with open(path, "w", encoding="utf-8") as f:
+            tmp_path = path.with_name(f"{path.name}.tmp")
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-        except IOError as e:
+            tmp_path.replace(path)
+        except OSError as e:
             logger.error(f"{icon_error} Ошибка записи JSON {path}: {e}")
+
+    def _remove_previous_outputs(self):
+        paths_to_remove = [
+            self.output_dir / "info_faces.json",
+            self.output_dir / "info_faces_landmarks.json",
+            self.output_dir / "skipped_images.json",
+            self.embeddings_dir / "faces_index.json",
+            self.embeddings_dir / "faces_embeddings.npy",
+        ]
+
+        for path in paths_to_remove:
+            try:
+                if path.exists():
+                    path.unlink()
+            except OSError as e:
+                logger.warning(f"{icon_warning}️ Не удалось удалить старый файл результата {path.name}: {e}")
 
     def _cleanup_temp_files(self, remove_dir: bool = False):
         try:

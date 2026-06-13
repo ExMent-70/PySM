@@ -11,7 +11,7 @@ print("<i>Инициализация...</i><br>")
 
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, message="`rcond` parameter will change to the default of machine precision", module="insightface.utils.transform")
-warnings.filterwarnings("ignore", category=FutureWarning, message="Please use `SimilarityTransform.from_estimate` class constructor instead", module="insightface.utils.face_align")
+warnings.filterwarnings("ignore", category=FutureWarning, message=".*SimilarityTransform\\.from_estimate.*", module="insightface.utils.face_align")
 
 
 
@@ -24,7 +24,7 @@ import cv2
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Set
 
 try:
     current_script_path = Path(__file__).resolve()
@@ -33,7 +33,7 @@ try:
         sys.path.insert(0, str(project_root))
     
     from _common.face_storage import FaceStorageManager
-    from face_analysis.face_lib import ConfigManager, FaceAnalyzer
+    from face_analysis.face_lib import ConfigManager, FaceAnalyzer, FaceAnalyzerInitError
     from face_analysis.face_lib.result_writer import AnalysisResultWriter    
     
     from pysm_lib import pysm_context
@@ -51,13 +51,22 @@ from _common import icon_ok, icon_warning, icon_error, icon_info, icon_save, ico
 logger = logging.getLogger(__name__)
 
 
+def save_json_atomic(path: Path, data: Any, indent: int = 2) -> None:
+    tmp_path = path.with_name(f"{path.name}.tmp")
+    with open(tmp_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=indent)
+    tmp_path.replace(path)
+
+
 class SmartSyncManager:
     """Управляет точечным обновлением геометрии лиц с использованием биометрического матчинга."""
     
     def __init__(self, output_dir: Path, embeddings_path: Path):
         self.output_dir = output_dir
         self.embeddings_path = embeddings_path
+        self.index_path = self.embeddings_path.parent / "faces_index.json"
         self.global_embeddings = None
+        self.faces_index: Dict[str, List[int]] = dict()
         
         if self.embeddings_path.exists():
             try:
@@ -66,11 +75,57 @@ class SmartSyncManager:
             except Exception as e:
                 logger.error(f"Не удалось загрузить глобальные эмбеддинги для синхронизации: {e}")
 
-    def apply_updates(self, updates: List[Tuple[str, List[Dict], List[np.ndarray]]]):
+        if self.index_path.exists():
+            try:
+                with open(self.index_path, 'r', encoding='utf-8') as f:
+                    raw_index = json.load(f)
+                if isinstance(raw_index, dict):
+                    self.faces_index = {
+                        str(filename): [int(idx) for idx in indices]
+                        for filename, indices in raw_index.items()
+                        if isinstance(indices, list)
+                    }
+            except Exception as e:
+                logger.error(f"Не удалось загрузить индекс эмбеддингов для синхронизации: {e}")
+
+    def _get_global_embedding_index(self, filename: str, face: Dict, position: int) -> Optional[int]:
+        file_indices = self.faces_index.get(filename)
+        if not file_indices:
+            return None
+
+        local_idx = face.get("face_index")
+        if isinstance(local_idx, int) and 0 <= local_idx < len(file_indices):
+            return file_indices[local_idx]
+
+        if 0 <= position < len(file_indices):
+            return file_indices[position]
+
+        return None
+
+    def _load_old_embeddings(self, filename: str, old_faces: List[Dict]) -> Optional[List[np.ndarray]]:
+        if self.global_embeddings is None:
+            logger.error(f"Пропуск {filename}: файл эмбеддингов не загружен, биометрический матчинг невозможен.")
+            return None
+        if not self.faces_index:
+            logger.error(f"Пропуск {filename}: индекс эмбеддингов faces_index.json не загружен.")
+            return None
+
+        old_embs = list()
+        for position, face in enumerate(old_faces):
+            idx = self._get_global_embedding_index(filename, face, position)
+            if idx is None or idx < 0 or idx >= self.global_embeddings.shape[0]:
+                logger.error(f"Пропуск {filename}: некорректный индекс эмбеддинга для лица #{position}.")
+                return None
+            old_embs.append(self.global_embeddings[idx])
+
+        return old_embs
+
+    def apply_updates(self, updates: List[Tuple[str, List[Dict], List[np.ndarray], Optional[Tuple[int, int]]]]) -> Set[str]:
         if not updates: 
-            return
+            return set()
 
         logger.info("<br><b>Синхронизация: биометрический матчинг и обновление JSON...</b>")
+        updated_filenames: Set[str] = set()
 
         files_to_patch = dict()
         # ИСПРАВЛЕНО: Убран избыточный вызов list() для уже заполненных списков
@@ -95,7 +150,7 @@ class SmartSyncManager:
                     data_dict = data
 
                 changed = False
-                for filename, new_meta, new_embs in updates:
+                for filename, new_meta, new_embs, original_shape in updates:
                     # Быстрый поиск файла за O(1)
                     entry = data_dict.get(filename)
                     if not entry:
@@ -108,22 +163,12 @@ class SmartSyncManager:
                         faces_list = entry
 
                     if faces_list and isinstance(faces_list, list):
-                        # ИСПРАВЛЕНО: Логирование ошибки вместо "тихого отказа", если эмбеддингов нет
-                        if self.global_embeddings is None:
-                            logger.error(f"Пропуск {filename}: файл эмбеддингов не загружен, биометрический матчинг невозможен.")
-                            continue
-
                         old_faces = faces_list
                         
-                        # 1. Извлекаем старые векторы по их глобальному индексу
-                        old_embs = list()
-                        for face in old_faces:
-                            idx = face.get("face_index")
-                            if idx is not None and idx < self.global_embeddings.shape[0]:
-                                old_embs.append(self.global_embeddings[idx])
-                            else:
-                                # Если индекса нет, кладем нулевой вектор (матчинг по нему провалится)
-                                old_embs.append(np.zeros(512, dtype=np.float32))
+                        # 1. Извлекаем старые векторы по глобальным индексам из _Embeddings/faces_index.json
+                        old_embs = self._load_old_embeddings(filename, old_faces)
+                        if old_embs is None:
+                            continue
                                 
                         # 2. Жадный биометрический матчинг (Cosine Similarity)
                         matches = dict() # new_idx -> old_idx
@@ -162,16 +207,31 @@ class SmartSyncManager:
                             for key in allowed_keys:
                                 if key in new_face:
                                     old_face[key] = new_face[key]
+                                    changed = True
+                                    updated_filenames.add(filename)
                         
-                        changed = True
+                        if matches and filepath.name == "info_faces.json" and isinstance(entry, dict) and original_shape is not None:
+                            entry["original_shape"] = list(original_shape)
+                            changed = True
+                            updated_filenames.add(filename)
 
                 if changed:
-                    with open(filepath, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, ensure_ascii=False, indent=2)
+                    save_json_atomic(filepath, data, indent=2)
                     logger.info(f"{icon_save} Координаты в <i>{filepath.name}</i> успешно обновлены.")
 
             except Exception as e:
                 logger.error(f"Ошибка при обновлении {filepath.name}: {e}", exc_info=True)
+
+        return updated_filenames
+
+    def close(self):
+        mmap_obj = getattr(self.global_embeddings, "_mmap", None)
+        if mmap_obj is not None:
+            try:
+                mmap_obj.close()
+            except Exception:
+                pass
+        self.global_embeddings = None
 
 
 def get_config() -> argparse.Namespace:
@@ -307,7 +367,12 @@ def main():
     num_workers = cli_config.all_threads or (os.cpu_count() or 4)
     logger.info(f"Потоков: <b>{num_workers}</b>. Изображений для обработки: <b>{len(files_to_process)}</b> из {len(image_files)}.")
 
-    face_analyzer = FaceAnalyzer(config_manager, output_dir_override=output_dir)
+    try:
+        face_analyzer = FaceAnalyzer(config_manager, output_dir_override=output_dir)
+    except FaceAnalyzerInitError as e:
+        logger.critical(str(e))
+        sys.exit(1)
+
     # ИСПРАВЛЕНИЕ: Передаем хранилищу флаг полной очистки, если выбран режим 'create'
     is_create_mode = (cli_config.a_af_mode == 'create')
     storage_manager = FaceStorageManager(output_dir, clear_existing=is_create_mode)
@@ -321,6 +386,7 @@ def main():
     is_finalized = False
     
     updates_buffer = list()
+    sync_updated_files: Set[str] = set()
 
     try:
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
@@ -332,7 +398,7 @@ def main():
                 
                 if result_meta and result_embeddings:
                     if filename in modified_files_set:
-                        updates_buffer.append((filename, result_meta, result_embeddings))
+                        updates_buffer.append((filename, result_meta, result_embeddings, original_shape))
                     else:
                         result_writer.add_result(filename, result_meta, result_embeddings, original_shape)
                     
@@ -342,6 +408,9 @@ def main():
                     new_state[filename] = dict(mtime=st.st_mtime, size=st.st_size)
                 else:
                     skipped_files.append(filename)
+                    if cli_config.a_af_mode == 'sync' and original_shape is not None and filename not in modified_files_set:
+                        st = path.stat()
+                        new_state[filename] = dict(mtime=st.st_mtime, size=st.st_size)
                 
                 processed_count += 1
 
@@ -353,19 +422,28 @@ def main():
             if updates_buffer:
                 emb_path = storage_manager.embeddings_dir / "faces_embeddings.npy"
                 sync_manager = SmartSyncManager(output_dir, emb_path)
-                sync_manager.apply_updates(updates_buffer)
+                try:
+                    sync_updated_files = sync_manager.apply_updates(updates_buffer)
+                finally:
+                    sync_manager.close()
+                failed_sync_files = modified_files_set - sync_updated_files
+                for filename in failed_sync_files:
+                    if filename in old_state:
+                        new_state[filename] = old_state[filename]
+                    else:
+                        new_state.pop(filename, None)
+                if failed_sync_files:
+                    logger.warning(f"{icon_warning} Sync: не удалось безопасно обновить файлов: <b>{len(failed_sync_files)}</b>. Они будут повторно проверены при следующем запуске.")
 
             try:
-                with open(state_file, 'w', encoding='utf-8') as f:
-                    json.dump(new_state, f, ensure_ascii=False, indent=4)
+                save_json_atomic(state_file, new_state, indent=4)
             except Exception as e:
                 logger.error(f"Не удалось сохранить состояние файлов: {e}")
 
             if skipped_files:
                 skipped_path = output_dir / "skipped_images.json"
                 try:
-                    with open(skipped_path, "w", encoding="utf-8") as f:
-                        json.dump(skipped_files, f, ensure_ascii=False, indent=4)
+                    save_json_atomic(skipped_path, skipped_files, indent=4)
                     logger.info(f"{icon_save_warning} файл <i>skipped_images.json</i> сохранен (пропущено <b>{len(skipped_files)}</b> изображений)<br>")
                 except Exception as e:
                     pass
