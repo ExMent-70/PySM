@@ -1,30 +1,90 @@
 {
-  "description": "Обновляет систему PySM и скрипты до последней версии из GitHub репозитория.",
+  "description": "Обновляет PySM через portable Git, показывает список коммитов и измененных файлов перед применением.",
   "category": "Системные",
   "author": "System",
-  "version": "1.0",
+  "version": "2.2026.06.14",
   "command_line_args_meta": {
-    "repo_url": {
-      "type": "str",
-      "description": "URL ZIP-архива (по умолчанию main ветка)",
-      "required": true,
-      "default": "https://github.com/ExMent-70/PySM/archive/refs/heads/main.zip"
-    },
     "target_dir": {
       "type": "dir_path",
-      "description": "Папка установки (оставьте пустым для обновления текущей)",
+      "description": "Папка установки PySM. Если пусто, используется текущий корень приложения.",
       "required": false
     },
-    "token": {
-      "type": "str",
-      "description": "GitHub Token (если репозиторий приватный)",
+    "git_path": {
+      "type": "file_path",
+      "description": "Путь к git.exe. Обычно определяется автоматически из ps_env/git.",
       "required": false
+    },
+    "remote": {
+      "type": "str",
+      "description": "Имя Git remote.",
+      "required": false,
+      "default": "origin"
+    },
+    "remote_url": {
+      "type": "str",
+      "description": "URL репозитория GitHub, если remote не настроен.",
+      "required": false,
+      "default": "https://github.com/ExMent-70/PySM.git"
+    },
+    "branch": {
+      "type": "str",
+      "description": "Ветка для обновления.",
+      "required": false,
+      "default": "main"
+    },
+    "expected_remote_contains": {
+      "type": "str",
+      "description": "Ожидаемый репозиторий remote в формате host/owner/repo для проверки безопасности.",
+      "required": false,
+      "default": "github.com/ExMent-70/PySM"
+    },
+    "allow_untrusted_remote": {
+      "type": "bool",
+      "description": "Разрешить обновление из remote, который не прошел проверку expected_remote_contains.",
+      "required": false,
+      "default": false
+    },
+    "dry_run": {
+      "type": "bool",
+      "description": "Только получить данные с GitHub и показать план обновления, не менять файлы.",
+      "required": false,
+      "default": false
+    },
+    "force": {
+      "type": "bool",
+      "description": "Принудительно заменить tracked-файлы версией из remote через git reset --hard. Локальные tracked-правки будут потеряны.",
+      "required": false,
+      "default": false
+    },
+    "repair_git_state": {
+      "type": "bool",
+      "description": "Синхронизировать HEAD с remote после старого ZIP-обновления, если нет конфликтов с файлами обновления.",
+      "required": false,
+      "default": false
     },
     "no_backup": {
       "type": "bool",
-      "description": "Отключить создание бэкапа перед обновлением",
+      "description": "Не создавать ZIP-бэкап перед применением обновления.",
       "required": false,
       "default": false
+    },
+    "show_stat": {
+      "type": "bool",
+      "description": "Показать статистику git diff --stat.",
+      "required": false,
+      "default": false
+    },
+    "max_commits": {
+      "type": "int",
+      "description": "Максимум коммитов в консольном отчете.",
+      "required": false,
+      "default": 50
+    },
+    "max_files": {
+      "type": "int",
+      "description": "Максимум измененных файлов в консольном отчете.",
+      "required": false,
+      "default": 300
     }
   }
 }
