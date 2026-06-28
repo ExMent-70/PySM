@@ -1,11 +1,8 @@
 # cluster_face/_lib/strategies_analysis/portraits.py
 
 import logging
-import re
 from argparse import Namespace
-from collections import defaultdict
 from pathlib import Path
-from typing import List, Dict, Any
 import numpy as np
 from sklearn.cluster import DBSCAN
 
@@ -21,7 +18,7 @@ try:
     # Импорт контекста для вывода
     from pysm_lib.pysm_context import pysm_context
 except ImportError:
-    pass
+    pysm_context = None
 
 
 from _common import (
@@ -35,6 +32,12 @@ from _common import (
     )
 
 from ..analysis_manager import AnalysisDataManager
+from ..student_ids import (
+    build_cluster_student_map,
+    find_student_ids_file,
+    load_student_ids,
+    remove_legacy_name_fields,
+)
 from .base import AnalysisStrategy
 
 
@@ -48,18 +51,17 @@ class PortraitsStrategy(AnalysisStrategy):
 
     def run(self, config: Namespace, data_manager: AnalysisDataManager) -> None:
         self.log_header()
-        logger.info("(<i>группировка портретных фотографий (по именам и фамилиям))</i><br>")
+        logger.info("(<i>группировка портретных фотографий по student_id</i><br>")
 
         # 1. Параметры
         algorithm = getattr(config, "a_algorithm", "dbscan")
         metric = getattr(config, "a_metric", "cosine")
-        names_file_path_str = self._resolve_names_file_automatic(data_manager.data_dir)
-        
-        if not names_file_path_str:
-            logger.warning(f"️{icon_warning} Отсутствует файл с именами кластеров. Для имён кластеров будет использован шаблон: <i>Cluster_X</i>")
-            children_names = []
-        else:
-            children_names = self._load_names(Path(names_file_path_str))
+        student_ids_path = self._resolve_student_ids_file(data_manager.data_dir)
+        student_id_list = load_student_ids(student_ids_path)
+        logger.info(
+            f"{icon_ok} Загружен список идентификаторов: <b>{len(student_id_list.student_ids)}</b>, "
+            f"list_id=<b>{student_id_list.list_id}</b>"
+        )
 
         # 2. Фильтрация данных (Только портреты face_count == 1)
         logger.info("<b>Поиск портретных фотографий...</b>")
@@ -113,8 +115,27 @@ class PortraitsStrategy(AnalysisStrategy):
         logger.info(f"<br><b>Результаты группировки портретных фотографий:</b>")
         logger.info(f"{icon_ok} создано <b>{n_clusters}</b> портретных кластера(ов)")
 
-        # 4. Сопоставление имен (Хронология)
-        name_map = self._resolve_cluster_names(labels, filenames, children_names)
+        # 4. Сопоставление student_id по хронологии первой фотографии кластера
+        student_id_map = build_cluster_student_map(
+            labels, filenames, student_id_list.student_ids
+        )
+        automatic_assignment = n_clusters == len(student_id_list.student_ids)
+        if automatic_assignment:
+            logger.info(
+                f"{icon_ok} Кластеры и student_id сопоставлены: <b>{len(student_id_map)}</b>"
+            )
+        else:
+            logger.warning(
+                f"{icon_warning} Количество портретных кластеров ({n_clusters}) "
+                f"не совпадает с количеством student_id "
+                f"({len(student_id_list.student_ids)})."
+            )
+            logger.warning(
+                f"{icon_warning} Частичное назначение по порядку отключено: "
+                "портретные кластеры будут сохранены с student_id=null. "
+                "Назначьте учеников и исправьте объединение/разделение "
+                "кластеров в cluster_editor (режим face)."
+            )
 
         # 5. Применение изменений
         updates_count = 0
@@ -123,26 +144,29 @@ class PortraitsStrategy(AnalysisStrategy):
             label_int = int(label)
             
             if label_int == -1:
-                child_name = "Noise"
-                final_label = None # Или -1, зависит от конвенции. Обычно для портретов None или -1.
-                # В cluster_portraits.py было: final_label = None if label_int == -1 else label_int
-                # Давайте сохраним -1 для явности шума, или None для "не определен".
-                # Старый скрипт ставил None для Noise.
-                final_label = -1 
+                student_id = None
+                final_label = -1
             else:
-                child_name = name_map.get(label_int, f"Cluster_{label_int}")
+                student_id = student_id_map.get(label_int)
                 final_label = label_int
             
             # Обновляем JSON
             if filename in data_manager.json_data:
                 faces = data_manager.json_data[filename].get("faces", [])
                 if faces:
-                    faces[0]["cluster_label"] = final_label
-                    faces[0]["child_name"] = child_name
+                    face = faces[0]
+                    face["cluster_label"] = final_label
+                    face["student_id"] = student_id
+                    remove_legacy_name_fields(face)
                     updates_count += 1
         
         data_manager.save_json()
         logger.info(f"{icon_ok} обновлено записей в файле JSON: <b>{updates_count}</b><br>")
+        if not automatic_assignment:
+            logger.warning(
+                f"{icon_warning} Требуется ручная идентификация портретных "
+                "кластеров перед запуском режима matches.<br>"
+            )
 
 
         target_dir = getattr(config, "a_target_dir", "")
@@ -153,7 +177,7 @@ class PortraitsStrategy(AnalysisStrategy):
         # 2. Подготовка данных
         root_node = ResourceNode("Исходная<br>папка", Path(target_dir), "folder", "Исходная папка с результатами AI-анализа фотографий")
         root_node.children.append(ResourceNode("info_faces.json (таргет)", Path(target_dir) / "info_faces.json", "code", "Подробная информация о всех лицах обнаруженных на фотографиях текущей фотосессии"))
-        root_node.children.append(ResourceNode(Path(names_file_path_str).name, Path(names_file_path_str), "txt", "Список (фамилия, имя) используемый в качестве названий портретных кластеров"))
+        root_node.children.append(ResourceNode(student_ids_path.name, student_ids_path, "txt", "Список student_id текущей фотосессии в порядке съёмки"))
         
         # 3. Добавление секции
         # Можно вызывать несколько раз для разных блоков
@@ -164,77 +188,17 @@ class PortraitsStrategy(AnalysisStrategy):
                
 
 
-    def _resolve_names_file_automatic(self, target_dir: Path) -> str:
-        """
-        Автоматический поиск файла имен на основе контекста PySM.
-        Приоритет:
-        1. {target_dir}/../{photo_session}_{children_file_name} (В папке Output)
-        2. {target_dir}/../../{photo_session}_{children_file_name} (В корне сессии)
-        3. {target_dir}/../../children.txt (В корне сессии - fallback)
-        """
+    def _resolve_student_ids_file(self, target_dir: Path) -> Path:
+        """Находит обязательный TXT с student_id текущей фотосессии."""
+
         if not pysm_context:
-            logger.warning("Запуск вне контекста PySM. Поиск специфичного файла имен невозможен.")
-            # Можно добавить fallback на поиск любого .txt файла рядом, но пока оставим так
-        
-        # Получаем переменные контекста
+            raise RuntimeError(
+                "Контекст PySM недоступен: невозможно определить файл "
+                "идентификаторов текущей фотосессии."
+            )
+
         photo_session = pysm_context.get("wf_photo_session", "")
-        children_suffix = pysm_context.get("wf_children_file_name", "") 
-        
-        specific_name = f"{photo_session}_{children_suffix}"
-        if not specific_name.endswith(".txt"):
-            specific_name += ".txt"
-
-        # target_dir = .../Output/Analysis_XXX
-        output_dir = target_dir.parent          # .../Output
-        session_dir = target_dir.parent.parent  # .../Session
-
-        potential_paths = [
-            output_dir / specific_name,
-            session_dir / specific_name,
-            session_dir / "children.txt"
-        ]
-
-        for p in potential_paths:
-            if p.is_file():
-                logger.debug(f"ℹ️ Список имён и фамилий загружен из файла: <i>{p.name}</i>")
-                return str(p.resolve())
-
-        logger.warning(f"️{icon_warning} Файл с именами кластеров не найден")
-        return ""
-
-
-    def _load_names(self, path: Path) -> List[str]:
-        if not path.is_file():
-            logger.warning(f"{icon_warning} Файл имен не найден: {path}")
-            return []
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                return [line.strip() for line in f if line.strip()]
-        except Exception as e:
-            logger.error(f"{icon_error} Ошибка чтения имен: {e}")
-            return []
-
-    def _resolve_cluster_names(self, labels: np.ndarray, filenames: List[str], names: List[str]) -> Dict[int, str]:
-        """Распределяет имена по кластерам на основе времени первого фото."""
-        clusters = defaultdict(list)
-        for idx, label in enumerate(labels):
-            if label != -1:
-                clusters[int(label)].append(filenames[idx])
-
-        # Сортировка по номеру в имени файла (IMG_0001.jpg)
-        def get_sort_key(fname: str) -> int:
-            match = re.search(r'(\d+)', fname)
-            return int(match.group(1)) if match else hash(fname)
-
-        def get_start_time(cid):
-            return min(get_sort_key(f) for f in clusters[cid]) if clusters[cid] else float('inf')
-
-        sorted_cids = sorted(clusters.keys(), key=get_start_time)
-        
-        name_map = {}
-        for i, cid in enumerate(sorted_cids):
-            if i < len(names):
-                name_map[cid] = names[i]
-            else:
-                name_map[cid] = f"Unknown_{cid}"
-        return name_map
+        children_file_name = pysm_context.get("wf_children_file_name", "")
+        path = find_student_ids_file(target_dir, photo_session, children_file_name)
+        logger.info(f"{icon_info} Файл идентификаторов: <i>{path}</i>")
+        return path

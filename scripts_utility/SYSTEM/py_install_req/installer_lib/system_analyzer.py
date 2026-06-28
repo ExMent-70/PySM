@@ -3,6 +3,9 @@
 import logging
 import platform
 import re
+import json
+import os
+from pathlib import Path
 from typing import Optional, List
 
 from .models import SystemInfo, GpuInfo, CudaInfo
@@ -114,27 +117,133 @@ class SystemAnalyzer:
 
     def _get_cuda_info(self, gpu: Optional[GpuInfo]) -> Optional[CudaInfo]:
         """Определяет информацию о CUDA, включая рекомендованную версию."""
+        portable_path, portable_version = self._get_portable_cuda_info()
+
         if not gpu or gpu.vendor != "NVIDIA":
-            return CudaInfo(is_available=False)
+            return CudaInfo(
+                is_available=False,
+                portable_version=portable_version,
+                portable_path=str(portable_path) if portable_path else None,
+            )
 
         command = [self._get_command("nvidia-smi")]
         success, stdout, _ = run_command(command)
 
         if not success or not stdout:
             logging.warning("Команда nvidia-smi не вернула вывод. Считаем, что CUDA недоступна.")
-            return CudaInfo(is_available=False)
+            return CudaInfo(
+                is_available=False,
+                portable_version=portable_version,
+                portable_path=str(portable_path) if portable_path else None,
+                warnings=["nvidia-smi недоступен, поэтому CUDA wheel не выбирается автоматически."],
+            )
             
-        driver_version_match = re.search(r"CUDA Version:\s*(\d+\.\d+)", stdout)
+        driver_version_match = re.search(r"CUDA(?: UMD)? Version:\s*(\d+\.\d+)", stdout)
         driver_version = driver_version_match.group(1) if driver_version_match else None
         
         # Рекомендованная версия для установки берется из маппинга по поколению GPU.
         recommended_version = GPU_GENERATION_TO_CUDA_VERSION.get(gpu.generation, None)
+        selected_version, selected_source, warnings = self._select_cuda_version(
+            driver_version=driver_version,
+            portable_version=portable_version,
+            recommended_version=recommended_version,
+        )
         
         return CudaInfo(
             is_available=True,
             driver_version=driver_version,
-            recommended_version=recommended_version
+            recommended_version=recommended_version,
+            portable_version=portable_version,
+            portable_path=str(portable_path) if portable_path else None,
+            selected_version=selected_version,
+            selected_source=selected_source,
+            warnings=warnings,
         )
+
+    def _get_portable_cuda_info(self) -> tuple[Optional[Path], Optional[str]]:
+        """Ищет portable CUDA PySM и читает ее версию из version.json."""
+        candidates: List[Path] = []
+
+        env_path = os.environ.get("PYSM_CUDA_PATH")
+        if env_path:
+            candidates.append(Path(env_path))
+
+        repo_root = self._find_repo_root()
+        if repo_root:
+            candidates.append(repo_root.parent.parent / "ps_env" / "CUDA")
+
+        candidates.append(Path(r"D:\PySM3_Codex\ps_env\CUDA"))
+
+        for cuda_path in candidates:
+            version_file = cuda_path / "version.json"
+            if not version_file.is_file():
+                continue
+            try:
+                with open(version_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                version = data.get("cuda", {}).get("version")
+                if version:
+                    return cuda_path, self._normalize_cuda_version(version)
+            except Exception as e:
+                logging.warning(f"Не удалось прочитать portable CUDA из {version_file}: {e}")
+
+        return None, None
+
+    def _find_repo_root(self) -> Optional[Path]:
+        """Находит корень репозитория PySM относительно текущего файла."""
+        current = Path(__file__).resolve()
+        for parent in current.parents:
+            if (parent / "main.py").is_file() and (parent / "config.toml").is_file():
+                return parent
+        return None
+
+    def _select_cuda_version(
+        self,
+        driver_version: Optional[str],
+        portable_version: Optional[str],
+        recommended_version: Optional[str],
+    ) -> tuple[Optional[str], Optional[str], List[str]]:
+        """Выбирает CUDA для wheel, не превышая возможности драйвера."""
+        warnings: List[str] = []
+        driver_tuple = self._version_tuple(driver_version)
+        portable_tuple = self._version_tuple(portable_version)
+        recommended_tuple = self._version_tuple(recommended_version)
+
+        if portable_version:
+            if driver_tuple and portable_tuple and portable_tuple <= driver_tuple:
+                return portable_version, "portable", warnings
+            if not driver_tuple:
+                warnings.append(
+                    "Portable CUDA найдена, но версия CUDA драйвера не определена; "
+                    "GPU wheel не выбирается автоматически."
+                )
+            else:
+                warnings.append(
+                    f"Portable CUDA {portable_version} новее, чем поддерживает драйвер ({driver_version}); "
+                    "она не будет выбрана автоматически."
+                )
+
+        if recommended_version:
+            if driver_tuple and recommended_tuple and recommended_tuple <= driver_tuple:
+                return recommended_version, "gpu_generation", warnings
+            warnings.append(
+                f"Рекомендованная CUDA {recommended_version} не подтверждена драйвером; "
+                "будет выбран CPU wheel."
+            )
+
+        return None, None, warnings
+
+    def _normalize_cuda_version(self, version: str) -> str:
+        match = re.search(r"(\d+\.\d+)", version)
+        return match.group(1) if match else version
+
+    def _version_tuple(self, version: Optional[str]) -> Optional[tuple[int, int]]:
+        if not version:
+            return None
+        match = re.search(r"(\d+)\.(\d+)", version)
+        if not match:
+            return None
+        return int(match.group(1)), int(match.group(2))
 
     def _get_gpu_from_wmi(self) -> Optional[GpuInfo]:
         """Получает информацию о GPU через WMI и выбирает лучший."""

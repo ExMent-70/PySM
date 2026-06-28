@@ -29,6 +29,7 @@
     </rdf:Bag>
    </dc:subject>
    <photoshop:Headline></photoshop:Headline>
+   <photoshop:Category></photoshop:Category>
    <photoshop:Source></photoshop:Source>
    <photoshop:Instructions></photoshop:Instructions>
    <photoshop:TransmissionReference></photoshop:TransmissionReference>

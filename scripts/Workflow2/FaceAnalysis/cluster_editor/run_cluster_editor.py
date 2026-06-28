@@ -52,6 +52,10 @@ try:
     from _lib.editor_ui import EditorUIBuilder
     from _lib.editor_filters import GalleryFilterManager
     from _lib.editor_menus import EditorMenuManager
+    from _lib.photo_selection_filter import (
+        extract_photo_numbers,
+        load_selected_photo_numbers,
+    )
 
 except ImportError as e:
     print(f"Критическая ошибка импорта внутренних модулей: {e}", file=sys.stderr)
@@ -63,7 +67,9 @@ logger = logging.getLogger(__name__)
 
 class MainWindow(QMainWindow):
     
-    def __init__(self, working_dir: Path, reference_dir: Optional[Path], mode: str, num_workers: int, export_dir: str, win_state_var_name: str):
+    def __init__(self, working_dir: Path, reference_dir: Optional[Path], mode: str,
+                 num_workers: int, export_dir: str, win_state_var_name: str,
+                 student_list_file: Optional[Path] = None):
         super().__init__()
         self.mode = mode # Сохраняем для специфичных UI-проверок (если остались)
         self.num_workers = num_workers
@@ -84,7 +90,12 @@ class MainWindow(QMainWindow):
         self.export_end = False
 
         # 1. Инициализация Data Manager (здесь же создается Strategy)
-        self.data_manager = ClusterDataManager(self.working_dir, self.reference_dir, mode=mode)
+        self.data_manager = ClusterDataManager(
+            self.working_dir,
+            self.reference_dir,
+            mode=mode,
+            student_list_file=student_list_file,
+        )
         
         # 2. Настройка окна через стратегию
         self.setWindowTitle(self.data_manager.strategy.get_window_title(self.photo_session))
@@ -100,6 +111,7 @@ class MainWindow(QMainWindow):
 
         self.active_cluster_id: Optional[str] = None
         self.image_pixmap_cache: Dict[str, QPixmap] = {} 
+        self.selected_photo_numbers: Optional[set[str]] = None
         # ДОБАВЛЕНО: Словарь для быстрого поиска ячейки по имени файла/ключу
         self.gallery_items_map: Dict[str, QListWidgetItem] = {}        
 
@@ -293,7 +305,8 @@ class MainWindow(QMainWindow):
 
         item_data = {
             "id": cid, "name": name, "count": count, "pixmap": pixmap,
-            "is_changed": self.data_manager.is_cluster_changed(self.mode, cid)
+            "is_changed": self.data_manager.is_cluster_changed(self.mode, cid),
+            "student_id": faces[0].student_id if faces else None,
         }
         item = QListWidgetItem()
         item.setData(Qt.ItemDataRole.UserRole, item_data)
@@ -355,7 +368,10 @@ class MainWindow(QMainWindow):
         Основная логика обработки перемещения (вынесена из _handle_drop).
         """
         target_data = self._get_cluster_item_data_by_id(target_id)
-        target_name = target_data["name"] if target_data else ""
+        target_display_name = target_data["name"] if target_data else ""
+        target_name = target_display_name
+        if self.mode in {"face", "matches"} and target_data:
+            target_name = target_data.get("student_id") or ""
         
         face_selection = {}
         valid_files =[]
@@ -409,7 +425,7 @@ class MainWindow(QMainWindow):
                         faces_to_show = [c[1] for c in candidates]
                         
                         dlg = FaceSelectorDialog(full_path, faces_to_show, self, 
-                                                 f"Кто на фото - <b>{target_name}</b>?<br>(Показаны только неопознанные)")
+                                                 f"Кто на фото - <b>{target_display_name}</b>?<br>(Показаны только неопознанные)")
                         
                         if dlg.exec() == QDialog.Accepted:
                             local_idx = dlg.get_selected_index()
@@ -507,7 +523,9 @@ class MainWindow(QMainWindow):
             self._refresh_left_panel() # Перезагрузка UI (важно для Cleaning, чтобы убрать удаленное)
             return True
         else:
-            if not silent: QMessageBox.critical(self, "Ошибка", "Ошибка при сохранении.")
+            if not silent:
+                details = self.data_manager.last_error or "Не удалось сохранить данные."
+                QMessageBox.critical(self, "Ошибка сохранения", details)
             return False
 
     # --- UI Helpers ---
@@ -517,6 +535,41 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'face_details_widget'):
             self.face_details_widget.setIconSize(QSize(value, value))
             self.face_details_widget.setGridSize(QSize(value + 20, value + 60))
+
+    @Slot(bool)
+    def _on_selected_photos_toggled(self, checked: bool):
+        """Перезагружает общий выбор и обновляет текущую галерею."""
+
+        self._reload_selected_photo_numbers(checked)
+
+        if self.active_cluster_id is not None:
+            self._render_gallery(self.active_cluster_id)
+
+    def _reload_selected_photo_numbers(self, checked: bool) -> None:
+        """Обновляет данные фильтра для текущей папки анализа."""
+
+        self.selected_photo_numbers = None
+        tooltip = "Только фотографии, выбранные пользователями"
+        self.btn_filter_selected_photos.setToolTip(tooltip)
+        if checked:
+            selection_path = self.working_dir / "photo_selection.json"
+            try:
+                self.selected_photo_numbers = load_selected_photo_numbers(selection_path)
+            except ValueError as exc:
+                QMessageBox.warning(self, "Фильтр выбранных фотографий", str(exc))
+                self.btn_filter_selected_photos.blockSignals(True)
+                self.btn_filter_selected_photos.setChecked(False)
+                self.btn_filter_selected_photos.blockSignals(False)
+                return
+            if self.selected_photo_numbers is None:
+                self.btn_filter_selected_photos.setToolTip(
+                    f"{tooltip}\nФайл не найден: {selection_path}"
+                )
+            else:
+                self.btn_filter_selected_photos.setToolTip(
+                    f"{tooltip}\n"
+                    f"Загружено уникальных номеров: {len(self.selected_photo_numbers)}"
+                )
 
     @Slot(QListWidgetItem, QListWidgetItem)
     def _on_cluster_selected(self, current: QListWidgetItem, prev: QListWidgetItem):
@@ -559,7 +612,12 @@ class MainWindow(QMainWindow):
         if not cdata: return
         
         # --- 1. Читаем текущие состояния кнопок и полей фильтров ---
-        has_filters = self.filter_manager.has_active_filters()
+        has_gallery_filters = self.filter_manager.has_active_filters()
+        has_selection_filter = (
+            self.btn_filter_selected_photos.isChecked()
+            and self.selected_photo_numbers is not None
+        )
+        has_filters = has_gallery_filters or has_selection_filter
         
         # Очищаем виджеты
         self.image_list_widget.clear()
@@ -578,6 +636,11 @@ class MainWindow(QMainWindow):
         
         # --- 2. Перебираем файлы и создаем только те, что прошли фильтр ---
         for fname in filenames:
+            if has_selection_filter and not (
+                extract_photo_numbers(fname) & self.selected_photo_numbers
+            ):
+                continue
+
             record = self.data_manager.records.get(fname)
             if not record: continue
             
@@ -638,7 +701,7 @@ class MainWindow(QMainWindow):
                 user_data["face_count"] = record.face_count
                 
                 # --- 3. ЛОГИКА ФИЛЬТРАЦИИ НА ЭТАПЕ СОЗДАНИЯ ---
-                if has_filters and not self.filter_manager.passes(user_data):
+                if has_gallery_filters and not self.filter_manager.passes(user_data):
                     continue # Элемент не прошел фильтр -> пропускаем
                 
                 visible_count += 1
@@ -841,8 +904,9 @@ class MainWindow(QMainWindow):
                             txt_color = "#66ff66"
                         else:
                             color = QColor(65, 105, 225) 
-                            cname = face.extra_data.get('matched_child_name', f"ID {matched_id}")
-                            status_text = f"{cname}"
+                            status_text = self.data_manager.student_label(face.student_id)
+                            if not status_text:
+                                status_text = f"ID кластера {matched_id}"
                             txt_color = "#66ccff"
                         
                         pen = QPen(color); pen.setWidth(pen_width)
@@ -854,9 +918,9 @@ class MainWindow(QMainWindow):
                         txt = f"Лицо #{i+1}\n{status_text}"
                     else:
                         txt = f"Лицо #{i+1}"
-                        # Добавляем инфо, если есть имя
-                        if face.child_name:
-                             txt += f"\n{face.child_name}"
+                        student_label = self.data_manager.student_label(face.student_id)
+                        if student_label:
+                            txt += f"\n{student_label}"
 
                     item = QListWidgetItem()
                     item.setIcon(pixmap)
@@ -899,20 +963,18 @@ class MainWindow(QMainWindow):
         # --- ЛОГИКА ОТОБРАЖЕНИЯ ---
         display_status = "Не определено"
         display_cluster_id = "None"
-        display_name = "---"
+        display_name = self.data_manager.student_name(face.student_id) or "---"
         match_distance = None
 
         # 1. Если это Портрет (есть cluster_label)
         if face.cluster_label is not None:
             display_status = "Портрет (Cluster)"
             display_cluster_id = str(face.cluster_label)
-            display_name = face.child_name or "---"
             
         # 2. Если есть Матч (matched_portrait_cluster_label)
         elif face.extra_data.get('matched_portrait_cluster_label') is not None:
             display_status = "Сопоставление (Match)"
             display_cluster_id = str(face.extra_data.get('matched_portrait_cluster_label'))
-            display_name = face.extra_data.get('matched_child_name') or "---"
             match_distance = face.extra_data.get('match_distance')
             
         # 3. Иначе - данные не заполняются (Temp ID игнорируем)
@@ -958,7 +1020,8 @@ class MainWindow(QMainWindow):
         html += "<tr><td colspan='2'><hr></td></tr>"
         
         html += f"<tr><td><b>Cluster ID:</b></td><td>{display_cluster_id}</td></tr>"
-        html += f"<tr><td><b>Имя:</b></td><td>{display_name}</td></tr>"
+        html += f"<tr><td><b>Ученик:</b></td><td>{display_name}</td></tr>"
+        html += f"<tr><td><b>student_id:</b></td><td>{face.student_id or '---'}</td></tr>"
         
         if match_distance is not None:
              html += f"<tr><td><b>Дистанция:</b></td><td>{match_distance:.4f}</td></tr>"
@@ -1016,8 +1079,14 @@ class MainWindow(QMainWindow):
             cdata = self._get_cluster_item_data_by_id(cid)
             if not cdata: continue
             
-            # Use strategy to clean name
-            cname = self.data_manager.strategy._strip_name_prefix(cdata["name"])
+            student_id = cdata.get("student_id")
+            if self.mode in {"face", "matches"}:
+                cname = self.data_manager.student_name(student_id)
+                if not cname:
+                    logger.error(f"Экспорт кластера {cid} остановлен: отсутствует student_id.")
+                    continue
+            else:
+                cname = self.data_manager.strategy._strip_name_prefix(cdata["name"])
             
             files = self.data_manager.get_files_for_cluster({}, cid)
             for fname in files:
@@ -1031,7 +1100,7 @@ class MainWindow(QMainWindow):
                 tasks.append({
                     "source_path": self.working_images_dir / fname,
                     "output_path": self.export_dir / cname / fname,
-                    "child_name": cname,
+                    "student_name": cname,
                     "faces_bboxes": faces_bboxes
                 })
         
@@ -1172,6 +1241,12 @@ def get_config() -> argparse.Namespace:
     p = "ce_"
     parser.add_argument(f"--{p}working_dir", type=str, required=True, help="Папка с данными")
     parser.add_argument(f"--{p}reference_dir", type=str, default=None, help="Папка с эталонами (для matches)")
+    parser.add_argument(
+        f"--{p}student_list_file",
+        type=str,
+        required=True,
+        help="Файл *.list — источник ФИО",
+    )
     parser.add_argument(f"--{p}export_dir", type=str, default=None, help="Папка для экспорта фотографий с водяными знаками")
     parser.add_argument(f"--{p}win_state_var_name", type=str, default="", help="Имя переменной контекста для сохранения состояния окна")
     parser.add_argument("--all_threads", type=int, dest="all_threads", default=0, help="Количество потоков (0=авто).")
@@ -1201,11 +1276,15 @@ if __name__ == "__main__":
         r_dir = Path(r_dir_str) if r_dir_str else None
         e_dir_str = getattr(cli_config, f"{arg_prefix}export_dir")  
         win_var = getattr(cli_config, f"{arg_prefix}win_state_var_name", "")        
+        list_file_str = getattr(cli_config, f"{arg_prefix}student_list_file", None)
+        list_file = Path(list_file_str) if list_file_str else None
         if not w_dir.exists(): raise FileNotFoundError(f"Нет папки: {w_dir}")
 
         num_workers = cli_config.all_threads or (os.cpu_count() or 8)    
 
-        window = MainWindow(w_dir, r_dir, cli_config.mode, num_workers, e_dir_str, win_var)
+        window = MainWindow(
+            w_dir, r_dir, cli_config.mode, num_workers, e_dir_str, win_var, list_file
+        )
         window.show()
      
         sys.exit(app.exec())

@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.cluster import DBSCAN
 
 from ..analysis_manager import AnalysisDataManager
+from ..student_ids import remove_legacy_name_fields
 from .base import AnalysisStrategy
 
 try:
@@ -79,6 +80,7 @@ class TechnicalStrategy(AnalysisStrategy):
                 continue
 
             for i, face in enumerate(faces):
+                remove_legacy_name_fields(face)
                 status = "ok"
                 reason = "Pass"
                 
@@ -160,4 +162,4 @@ class TechnicalStrategy(AnalysisStrategy):
 
 
         # 4. Вывод
-        pysm_context.log_html(tv_builder.get_html())        
+        pysm_context.log_html(tv_builder.get_html())

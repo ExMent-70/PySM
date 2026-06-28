@@ -18,14 +18,18 @@ from pathlib import Path
 # --- Настройка путей для импорта ---
 try:
     current_script_path = Path(__file__).resolve()
-    project_root = current_script_path.parent.parent
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
+    face_analysis_root = current_script_path.parent.parent
+    repository_root = current_script_path.parents[4]
+    for import_root in (repository_root, face_analysis_root):
+        if str(import_root) not in sys.path:
+            sys.path.insert(0, str(import_root))
 except NameError:
     pass
 
 # --- Импорты ---
 
+ConfigResolver = None
+pysm_context = None
 try:
     # Импорт контекста для вывода
     from pysm_lib.pysm_context import ConfigResolver, pysm_context
@@ -101,7 +105,9 @@ def get_config() -> argparse.Namespace:
                         help="Папка с эталонами (если отличается от target)")
 
 
-    return ConfigResolver(parser).resolve_all()
+    if ConfigResolver is not None:
+        return ConfigResolver(parser).resolve_all()
+    return parser.parse_args()
 
 
 def main():
@@ -148,8 +154,9 @@ def main():
             sys.exit(1)
 
         strategy.run(config, data_manager)
-        photo_session = pysm_context.get("ws_photo_session", "SCHOOL")        
-        pysm_context.set_structured(f"var_claster_run.{photo_session}.{mode}", "yes")
+        if pysm_context is not None:
+            photo_session = pysm_context.get("ws_photo_session", "SCHOOL")
+            pysm_context.set_structured(f"var_claster_run.{photo_session}.{mode}", "yes")
         logger.debug("=== ВЫПОЛНЕНИЕ ЗАВЕРШЕНО УСПЕШНО ===")
        
     except Exception as e:

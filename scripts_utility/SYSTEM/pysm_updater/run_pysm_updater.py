@@ -17,6 +17,7 @@ Git-обновление portable-установки PySM.
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -33,6 +34,7 @@ try:
     from pysm_lib.pysm_context import ConfigResolver
     from pysm_lib.app_constants import APPLICATION_ROOT_DIR
     from pysm_lib.pysm_icons import icons
+    from pysm_lib.pysm_progress_reporter import IS_RUNNING_UNDER_PYSM, JsonProgressReporter
     from pysm_lib.pysm_report_api import ResourceNode, StandardTreeBuilder
 
     IS_MANAGED_RUN = True
@@ -41,6 +43,8 @@ except ImportError:
     pysm_context = None
     ConfigResolver = None
     icons = None
+    IS_RUNNING_UNDER_PYSM = False
+    JsonProgressReporter = None
     ResourceNode = None
     StandardTreeBuilder = None
     APPLICATION_ROOT_DIR = Path(os.getcwd()).resolve()
@@ -71,8 +75,22 @@ LOCAL_GIT_EXCLUDE_LINES = [
     "*.log",
 ]
 LOCAL_STATE_PREVIEW_LIMIT = 25
+DEFAULT_CONSOLE_PREVIEW_LIMIT = 8
 BACKUP_PROGRESS_STEP = 250
 GIT_PATH_CHUNK_SIZE = 100
+GIT_PROGRESS_RE = re.compile(
+    r"^(?:remote:\s*)?"
+    r"(?P<phase>Counting objects|Compressing objects|Receiving objects|Resolving deltas):\s+"
+    r"(?P<percent>\d{1,3})%"
+    r"(?:\s+\((?P<current>\d+)/(?P<total>\d+)\))?"
+    r"(?P<details>.*)$"
+)
+GIT_PROGRESS_PHASE_LABELS = {
+    "Counting objects": "подсчет объектов",
+    "Compressing objects": "сжатие объектов",
+    "Receiving objects": "получение объектов",
+    "Resolving deltas": "применение изменений",
+}
 
 
 class UpdaterError(RuntimeError):
@@ -184,11 +202,11 @@ def run_git_streaming(
     check: bool = True,
     progress_title: str = "Git",
 ) -> subprocess.CompletedProcess:
-    """Запустить Git с потоковым выводом прогресса в операторский лог.
+    """Запустить Git с потоковым выводом прогресса.
 
     `git fetch --progress` пишет прогресс в stderr и часто перерисовывает одну
-    строку через carriage return. Посимвольное чтение позволяет показывать в
-    PySM видимую активность при больших загрузках и не засыпать консоль шумом.
+    строку через carriage return. Посимвольное чтение позволяет показывать
+    проценты в progress-bar PySM, не засыпая консоль сотнями строк GitHub.
     """
 
     command = [str(git_path), "-C", str(target_dir), *args]
@@ -204,38 +222,84 @@ def run_git_streaming(
 
     output_parts = []
     buffer = []
-    last_line = ""
+    last_console_line = ""
     last_emit_time = 0.0
+    last_progress_phase = ""
+    last_progress_percent = -1
+    progress = None
+    if IS_RUNNING_UNDER_PYSM and JsonProgressReporter is not None:
+        progress = JsonProgressReporter(total=0, desc=f"{progress_title}: получение данных")
+
+    def progress_match(line: str) -> re.Match[str] | None:
+        if line.startswith(f"{progress_title}: "):
+            line = line[len(progress_title) + 2 :]
+        return GIT_PROGRESS_RE.match(line)
+
+    def update_progress_bar(match: re.Match[str], line: str) -> bool:
+        nonlocal last_progress_phase, last_progress_percent, progress
+        phase = match.group("phase")
+        percent = max(0, min(100, int(match.group("percent"))))
+        if phase == last_progress_phase and percent == last_progress_percent:
+            return True
+
+        label = GIT_PROGRESS_PHASE_LABELS.get(phase, phase)
+        details = match.group("details").strip()
+        detail_suffix = f" {details}" if details and phase == "Receiving objects" else ""
+        desc = f"{progress_title}: {label}{detail_suffix}"
+
+        if progress is not None:
+            if phase != last_progress_phase:
+                progress.reset(total=100)
+                progress.set_description(desc, refresh=False)
+                progress.update(percent)
+            else:
+                progress.set_description(desc, refresh=False)
+                progress.update(percent - last_progress_percent)
+        elif phase != last_progress_phase or percent == 100:
+            logger.icon_line(f"{progress_title}: {phase} {percent}%", "REFRESH")
+
+        last_progress_phase = phase
+        last_progress_percent = percent
+        return True
 
     def emit_buffer(force: bool = False):
-        nonlocal buffer, last_line, last_emit_time
+        nonlocal buffer, last_console_line, last_emit_time
         line = "".join(buffer).strip()
         buffer = []
         if not line:
             return
         output_parts.append(line)
+        logger.write_file(f"{progress_title}: {line}")
+
+        match = progress_match(line)
+        if match and update_progress_bar(match, line):
+            return
 
         now = time.monotonic()
         is_final_progress = "done" in line.lower() or "100%" in line
-        if force or is_final_progress or (line != last_line and now - last_emit_time >= 0.75):
+        if force or is_final_progress or (line != last_console_line and now - last_emit_time >= 0.75):
             logger.icon_line(f"{progress_title}: {line}", "REFRESH")
-            last_line = line
+            last_console_line = line
             last_emit_time = now
 
-    assert process.stdout is not None
-    while True:
-        char = process.stdout.read(1)
-        if char == "" and process.poll() is not None:
-            break
-        if char == "":
-            continue
-        if char in ("\r", "\n"):
-            emit_buffer(force=char == "\n")
-        else:
-            buffer.append(char)
+    try:
+        assert process.stdout is not None
+        while True:
+            char = process.stdout.read(1)
+            if char == "" and process.poll() is not None:
+                break
+            if char == "":
+                continue
+            if char in ("\r", "\n"):
+                emit_buffer(force=char == "\n")
+            else:
+                buffer.append(char)
 
-    emit_buffer(force=True)
-    return_code = process.wait()
+        emit_buffer(force=True)
+        return_code = process.wait()
+    finally:
+        if progress is not None:
+            progress.close()
     stdout = "\n".join(output_parts)
     result = subprocess.CompletedProcess(command, return_code, stdout=stdout, stderr="")
     if check and return_code != 0:
@@ -286,7 +350,12 @@ def get_config():
         action="store_true",
         help="Разрешить обновление из remote, который не прошел проверку expected_remote_contains",
     )
-    parser.add_argument("--dry_run", action="store_true", help="Только показать изменения, не обновлять файлы")
+    parser.add_argument(
+        "--dry_run",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Только показать изменения, не обновлять файлы",
+    )
     parser.add_argument("--force", action="store_true", help="Принудительно заменить tracked-файлы версией из remote")
     parser.add_argument(
         "--repair_git_state",
@@ -294,9 +363,15 @@ def get_config():
         help="Синхронизировать HEAD с remote, если нет конфликтов с файлами обновления",
     )
     parser.add_argument("--no_backup", action="store_true", help="Не создавать ZIP-бэкап перед обновлением")
-    parser.add_argument("--show_stat", action="store_true", help="Показать git diff --stat")
-    parser.add_argument("--max_commits", type=int, default=50, help="Максимум коммитов в консольном отчете")
-    parser.add_argument("--max_files", type=int, default=300, help="Максимум измененных файлов в консольном отчете")
+    parser.add_argument("--show_stat", action="store_true", help="Сохранить git diff --stat в полном логе")
+    parser.add_argument("--max_commits", type=int, default=50, help="Максимум коммитов, получаемых для отчета")
+    parser.add_argument("--max_files", type=int, default=300, help="Максимум файлов и записей в полном отчете")
+    parser.add_argument(
+        "--console_preview_limit",
+        type=int,
+        default=DEFAULT_CONSOLE_PREVIEW_LIMIT,
+        help="Максимум строк предпросмотра для длинных списков в консоли PySM",
+    )
 
     if IS_MANAGED_RUN and ConfigResolver:
         return ConfigResolver(parser).resolve_all()
@@ -360,7 +435,12 @@ def assert_git_checkout(git_path: Path, target_dir: Path):
         raise UpdaterError(f"Целевая папка не является Git checkout: {target_dir}")
 
 
-def ensure_local_git_excludes(git_path: Path, target_dir: Path, logger: UpdateLogger) -> Path:
+def ensure_local_git_excludes(
+    git_path: Path,
+    target_dir: Path,
+    logger: UpdateLogger,
+    apply_changes: bool = True,
+) -> Path:
     """Добавить локальные ignore-правила для тяжелых runtime-папок.
 
     Updater пишет в `.git/info/exclude`, а не в `.gitignore`, потому что эти
@@ -374,7 +454,6 @@ def ensure_local_git_excludes(git_path: Path, target_dir: Path, logger: UpdateLo
     if not exclude_path.is_absolute():
         exclude_path = target_dir / exclude_path
 
-    exclude_path.parent.mkdir(parents=True, exist_ok=True)
     existing_text = ""
     if exclude_path.exists():
         existing_text = exclude_path.read_text(encoding="utf-8", errors="replace")
@@ -384,6 +463,14 @@ def ensure_local_git_excludes(git_path: Path, target_dir: Path, logger: UpdateLo
     if not missing_lines:
         return exclude_path
 
+    if not apply_changes:
+        logger.icon_line(
+            f"Локальные Git-исключения требуют обновления, но dry-run не меняет .git/info/exclude: {exclude_path}",
+            "INFO",
+        )
+        return exclude_path
+
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
     with exclude_path.open("a", encoding="utf-8", newline="\n") as f:
         if existing_text and not existing_text.endswith(("\n", "\r")):
             f.write("\n")
@@ -473,7 +560,7 @@ def resolve_fetch_source(git_path: Path, target_dir: Path, remote: str, remote_u
     )
 
 
-def create_backup(target_dir: Path, logger: UpdateLogger) -> Path:
+def create_backup(target_dir: Path, logger: UpdateLogger, include_paths: list[str] | None = None) -> Path:
     """Создать ZIP-снимок перед изменением tracked-файлов.
 
     Бэкап намеренно пропускает Git-метаданные и большие runtime-директории: эти
@@ -487,6 +574,15 @@ def create_backup(target_dir: Path, logger: UpdateLogger) -> Path:
     backup_file = backup_dir / f"pysm_backup_{timestamp}.zip"
 
     files_to_backup = []
+    seen_rel_paths = set()
+
+    def add_backup_file(abs_path: Path, rel_path: Path):
+        rel_key = rel_path.as_posix()
+        if rel_key in seen_rel_paths or not abs_path.is_file():
+            return
+        seen_rel_paths.add(rel_key)
+        files_to_backup.append((abs_path, rel_path))
+
     for root, dirs, files in os.walk(target_dir):
         dirs[:] = [name for name in dirs if name not in BACKUP_EXCLUDED_DIRS]
         root_path = Path(root)
@@ -496,10 +592,23 @@ def create_backup(target_dir: Path, logger: UpdateLogger) -> Path:
                 rel_path = abs_path.relative_to(target_dir)
             except ValueError:
                 continue
-            files_to_backup.append((abs_path, rel_path))
+            add_backup_file(abs_path, rel_path)
+
+    extra_count = 0
+    for rel_text in include_paths or []:
+        rel_path = Path(rel_text)
+        if rel_path.is_absolute():
+            continue
+        abs_path = target_dir / rel_path
+        before_count = len(files_to_backup)
+        add_backup_file(abs_path, rel_path)
+        if len(files_to_backup) > before_count:
+            extra_count += 1
 
     logger.kv_line("Файл бэкапа", str(backup_file), "FILE_ARCHIVE")
     logger.kv_line("Файлов к упаковке", str(len(files_to_backup)), "LIST")
+    if extra_count:
+        logger.kv_line("Tracked-файлов из исключенных папок", str(extra_count), "INFO")
     with zipfile.ZipFile(backup_file, "w", zipfile.ZIP_DEFLATED) as zf:
         for index, (abs_path, rel_path) in enumerate(files_to_backup, start=1):
             zf.write(abs_path, rel_path)
@@ -742,6 +851,7 @@ def get_update_plan(git_path: Path, target_dir: Path, remote_ref: str, max_commi
     )
     remote_changes = get_remote_changes(git_path, target_dir, remote_ref)
     files = [entry["display"] for entry in remote_changes["entries"]]
+    file_report_limit = max(0, int(max_files))
     stat = git_output(git_path, target_dir, ["diff", "--stat", f"HEAD..{remote_ref}"], check=False)
 
     return {
@@ -752,9 +862,8 @@ def get_update_plan(git_path: Path, target_dir: Path, remote_ref: str, max_commi
         "ahead": ahead,
         "behind": behind,
         "commits": commits,
-        "changed_files": files,
+        "changed_files": files[:file_report_limit],
         "changed_files_total": len(files),
-        "changed_files_shown": files[:max_files],
         "changed_paths": sorted(remote_changes["changed_paths"]),
         "added_paths": sorted(remote_changes["added_paths"]),
         "deleted_paths": sorted(remote_changes["deleted_paths"]),
@@ -762,7 +871,65 @@ def get_update_plan(git_path: Path, target_dir: Path, remote_ref: str, max_commi
     }
 
 
-def write_update_plan(logger: UpdateLogger, plan: dict, show_stat: bool):
+def write_console_preview_list(
+    logger: UpdateLogger,
+    title: str,
+    items: list[str],
+    icon_name: str = "FILE",
+    preview_limit: int = DEFAULT_CONSOLE_PREVIEW_LIMIT,
+    total_count: int | None = None,
+):
+    """Показать короткий список в консоли, а полный список сохранить в plain-log."""
+
+    total = len(items) if total_count is None else total_count
+    display_limit = max(0, min(len(items), preview_limit))
+    plain_lines = [f"{title}: {total}"]
+    html_parts = [
+        '<div style="margin:6px 0 4px 0;">',
+        f'{icon_html(icon_name, 16)} <b>{html_escape(title)}</b>: ',
+        f'<span style="font-weight:600;">{total}</span>',
+        '</div>',
+        '<table cellspacing="0" cellpadding="0" border="0" style="margin:0 0 2px 0; border-collapse:collapse;">',
+    ]
+    if items:
+        for item in items[:display_limit]:
+            plain_lines.append(f"  - {item}")
+            html_parts.append(
+                '<tr>'
+                f'<td style="padding:1px 6px 1px 0;">{icon_html(icon_name, 14)}</td>'
+                f'<td style="padding:1px 0;"><code>{html_escape(item)}</code></td>'
+                '</tr>'
+            )
+        hidden_count = total - display_limit
+        if hidden_count > 0:
+            if total > len(items):
+                hidden_message = (
+                    f"... скрыто строк: {hidden_count}. "
+                    f"В логе сохранено записей: {len(items)} из {total}; для большего списка увеличьте max_files."
+                )
+            else:
+                hidden_message = f"... скрыто строк: {hidden_count}. Полный список в логе обновления."
+            plain_lines.append(f"  {hidden_message}")
+            html_parts.append(
+                '<tr><td></td><td style="padding:2px 0; color:#666;">'
+                f'{html_escape(hidden_message)}</td></tr>'
+            )
+    else:
+        plain_lines.append("  Нет записей.")
+        html_parts.append('<tr><td></td><td style="padding:1px 0; color:#666;">Нет записей.</td></tr>')
+    html_parts.append("</table>")
+    logger.write_html("".join(html_parts), "\n".join(plain_lines))
+
+    if len(items) > display_limit:
+        logger.write_file("")
+        logger.write_file(f"Полный список: {title} ({len(items)} из {total})")
+        for item in items:
+            logger.write_file(f"  - {item}")
+    if total > len(items):
+        logger.write_file(f"  ... не сохранено из-за max_files: {total - len(items)}")
+
+
+def write_update_plan(logger: UpdateLogger, plan: dict, show_stat: bool, console_preview_limit: int):
     logger.section("План обновления", "LIST")
     logger.kv_line("Текущий commit", plan["current_commit"], "INFO")
     logger.kv_line("Remote commit", plan["remote_commit"], "INFO")
@@ -777,30 +944,22 @@ def write_update_plan(logger: UpdateLogger, plan: dict, show_stat: bool):
     elif plan["ahead"] > 0:
         logger.icon_line("Локальная ветка уже содержит коммиты, которых нет в remote.", "WARNING")
 
-    logger.write()
-    logger.write(f"Новые коммиты ({len(plan['commits'])}):")
-    if plan["commits"]:
-        for line in plan["commits"]:
-            logger.write(f"  - {line}")
-    else:
-        logger.write("  Нет новых коммитов.")
-
-    logger.write()
-    logger.write(f"Измененные файлы ({plan['changed_files_total']}):")
-    if plan["changed_files_shown"]:
-        for line in plan["changed_files_shown"]:
-            logger.write(f"  - {line}")
-        hidden_count = plan["changed_files_total"] - len(plan["changed_files_shown"])
-        if hidden_count > 0:
-            logger.write(f"  ... скрыто файлов: {hidden_count}")
-    else:
-        logger.write("  Нет измененных файлов.")
+    write_console_preview_list(logger, "Новые коммиты", plan["commits"], "COMMIT", console_preview_limit)
+    write_console_preview_list(
+        logger,
+        "Измененные файлы",
+        plan["changed_files"],
+        "FILE",
+        console_preview_limit,
+        total_count=plan["changed_files_total"],
+    )
 
     if show_stat and plan["stat"]:
-        logger.write()
-        logger.write("Статистика diff:")
+        logger.write_file()
+        logger.write_file("Статистика diff:")
         for line in plan["stat"].splitlines():
-            logger.write(f"  {line}")
+            logger.write_file(f"  {line}")
+        logger.icon_line("Статистика diff сохранена в полном логе.", "REPORT")
 
 
 def get_status_entries(git_path: Path, target_dir: Path) -> list[dict]:
@@ -926,49 +1085,78 @@ def analyze_local_state(git_path: Path, target_dir: Path, remote_ref: str, plan:
     }
 
 
-def write_limited_list(logger: UpdateLogger, title: str, items: list[str], max_items: int, icon_name: str = "FILE"):
-    """Вывести ограниченный список одновременно в HTML-консоль и plain-log."""
+def write_limited_list(
+    logger: UpdateLogger,
+    title: str,
+    items: list[str],
+    max_items: int,
+    icon_name: str = "FILE",
+    console_preview_limit: int = DEFAULT_CONSOLE_PREVIEW_LIMIT,
+):
+    """Вывести короткий список в HTML-консоль и полный список в plain-log."""
 
-    display_limit = max(0, min(max_items, LOCAL_STATE_PREVIEW_LIMIT))
-    plain_lines = [f"{title}: {len(items)}"]
+    total = len(items)
+    report_limit = max(0, int(max_items))
+    report_items = items[:report_limit]
+    display_limit = max(0, min(len(report_items), LOCAL_STATE_PREVIEW_LIMIT, console_preview_limit))
+    plain_lines = [f"{title}: {total}"]
     html_parts = [
         '<div style="margin:6px 0 4px 0;">',
         f'{icon_html(icon_name, 16)} <b>{html_escape(title)}</b>: ',
-        f'<span style="font-weight:600;">{len(items)}</span>',
+        f'<span style="font-weight:600;">{total}</span>',
         '</div>',
         '<table cellspacing="0" cellpadding="0" border="0" style="margin:0 0 2px 0; border-collapse:collapse;">',
     ]
-    for item in items[:display_limit]:
+    for item in report_items[:display_limit]:
         plain_lines.append(f"  - {item}")
         item_status, item_path = display_to_status_and_path(item)
         html_parts.append(format_local_item_html(item, item_path, plain_status_badge(item_status), icon_name))
-    hidden_count = len(items) - min(len(items), display_limit)
+    hidden_count = total - min(total, display_limit)
     if hidden_count > 0:
-        plain_lines.append(f"  ... скрыто строк: {hidden_count}")
+        if total > len(report_items):
+            hidden_message = (
+                f"... скрыто строк: {hidden_count}. "
+                f"В логе сохранено записей: {len(report_items)} из {total}; для большего списка увеличьте max_files."
+            )
+        else:
+            hidden_message = f"... скрыто строк: {hidden_count}. Полный список в логе обновления."
+        plain_lines.append(f"  {hidden_message}")
         html_parts.append(
             '<tr><td></td><td colspan="2" style="padding:2px 0 2px 0; color:#666;">'
-            f'... скрыто строк: {hidden_count}</td></tr>'
+            f'{html_escape(hidden_message)}</td></tr>'
         )
     html_parts.append("</table>")
     logger.write_html("".join(html_parts), "\n".join(plain_lines))
 
+    if len(report_items) > display_limit:
+        logger.write_file("")
+        logger.write_file(f"Полный список: {title} ({len(report_items)} из {total})")
+        for item in report_items:
+            logger.write_file(f"  - {item}")
 
-def write_local_state(logger: UpdateLogger, state: dict, max_items: int, title: str = "Локальное состояние"):
+
+def write_local_state(
+    logger: UpdateLogger,
+    state: dict,
+    max_items: int,
+    title: str = "Локальное состояние",
+    console_preview_limit: int = DEFAULT_CONSOLE_PREVIEW_LIMIT,
+):
     """Показать классификацию локального состояния из `analyze_local_state`."""
 
     logger.section(title, "TARGET")
-    write_limited_list(logger, "Файлы уже совпадают с remote", state["already_remote"], max_items, "REFRESH")
+    write_limited_list(logger, "Файлы уже совпадают с remote", state["already_remote"], max_items, "REFRESH", console_preview_limit)
     if state["already_remote"]:
         logger.write(
             "  Диагностика этой группы: "
             f"index={state['already_remote_index_dirty']}, "
             f"worktree={state['already_remote_worktree_dirty']}"
         )
-    write_limited_list(logger, "Отсутствующие файлы из репозитория", state["missing_tracked"], max_items, "WARNING")
-    write_limited_list(logger, "Локальные изменения вне обновления", state["local_outside_update"], max_items, "FILE")
-    write_limited_list(logger, "Файлы вне Git", state["untracked_other"], max_items, "ADD")
-    write_limited_list(logger, "Локальные конфликты с обновлением", state["conflicts"], max_items, "WARNING")
-    write_limited_list(logger, "Файлы вне Git, мешающие обновлению", state["untracked_collisions"], max_items, "LOCK")
+    write_limited_list(logger, "Отсутствующие файлы из репозитория", state["missing_tracked"], max_items, "WARNING", console_preview_limit)
+    write_limited_list(logger, "Локальные изменения вне обновления", state["local_outside_update"], max_items, "FILE", console_preview_limit)
+    write_limited_list(logger, "Файлы вне Git", state["untracked_other"], max_items, "ADD", console_preview_limit)
+    write_limited_list(logger, "Локальные конфликты с обновлением", state["conflicts"], max_items, "WARNING", console_preview_limit)
+    write_limited_list(logger, "Файлы вне Git, мешающие обновлению", state["untracked_collisions"], max_items, "LOCK", console_preview_limit)
 
     if state["untracked_collisions"]:
         logger.icon_line("Есть файлы вне Git, которые мешают обновлению.", "WARNING")
@@ -1124,6 +1312,8 @@ def main():
     }
 
     try:
+        console_preview_limit = max(0, int(config.console_preview_limit))
+
         logger.section("ЗАПУСК ОБНОВЛЕНИЯ PySM", "ROCKET")
         logger.kv_line("Целевая папка", str(target_path), "FOLDER_OPEN")
         logger.kv_line("Лог обновления", str(logger.log_path), "REPORT")
@@ -1143,8 +1333,6 @@ def main():
         logger.kv_line("Git", str(git_path), "CONSOLE")
 
         assert_git_checkout(git_path, target_path)
-        local_exclude_path = ensure_local_git_excludes(git_path, target_path, logger)
-        payload["local_git_exclude"] = str(local_exclude_path)
 
         remote = config.remote or DEFAULT_REMOTE
         branch = config.branch or DEFAULT_BRANCH
@@ -1164,6 +1352,14 @@ def main():
             logger.kv_line("Remote", f"'{remote}' не настроен; используется URL {remote_url}", "REFRESH")
         assert_trusted_remote(remote_url, config.expected_remote_contains, bool(config.allow_untrusted_remote))
 
+        local_exclude_path = ensure_local_git_excludes(
+            git_path,
+            target_path,
+            logger,
+            apply_changes=not bool(config.dry_run),
+        )
+        payload["local_git_exclude"] = str(local_exclude_path)
+
         # Fetch обновляет только локальный remote-tracking ref. Рабочие файлы на
         # этом этапе не меняются, поэтому следующий plan/state отчет безопасен.
         logger.section("Получение данных с GitHub", "REFRESH")
@@ -1179,11 +1375,11 @@ def main():
 
         plan = get_update_plan(git_path, target_path, remote_ref, int(config.max_commits), int(config.max_files))
         payload["plan"] = plan
-        write_update_plan(logger, plan, bool(config.show_stat))
+        write_update_plan(logger, plan, bool(config.show_stat), console_preview_limit)
 
         local_state = analyze_local_state(git_path, target_path, remote_ref, plan)
         payload["local_state"] = local_state
-        write_local_state(logger, local_state, int(config.max_files))
+        write_local_state(logger, local_state, int(config.max_files), console_preview_limit=console_preview_limit)
 
         if config.force and config.dry_run:
             logger.write()
@@ -1195,10 +1391,11 @@ def main():
             logger.icon_line("Dry-run завершен. Файлы не изменялись.", "OK")
             return
 
-        if plan["ahead"] > 0 and not config.force:
+        if plan["ahead"] > 0:
             raise UpdaterError(
                 "Локальная ветка содержит commit, которых нет в remote. "
-                "Автоматическое обновление отменено, чтобы не потерять локальную историю."
+                "Updater не должен автоматически сбрасывать локальную историю. "
+                "Сначала сохраните, отправьте или вручную удалите локальные commit."
             )
 
         restored_missing_files = False
@@ -1208,8 +1405,24 @@ def main():
             restore_missing_tracked_files(git_path, target_path, local_state["missing_tracked_paths"], logger)
             local_state = analyze_local_state(git_path, target_path, remote_ref, plan)
             payload["local_state_after_missing_restore"] = local_state
-            write_local_state(logger, local_state, int(config.max_files), "Локальное состояние после восстановления файлов")
+            write_local_state(
+                logger,
+                local_state,
+                int(config.max_files),
+                "Локальное состояние после восстановления файлов",
+                console_preview_limit,
+            )
             restored_missing_files = True
+
+        if config.repair_git_state and not config.force and plan["behind"] > 0:
+            update_paths = set(plan["changed_paths"])
+            already_remote_paths = set(local_state["already_remote_paths"])
+            if not update_paths.issubset(already_remote_paths):
+                raise UpdaterError(
+                    "repair_git_state нельзя использовать как обычное обновление: "
+                    "часть файлов из remote еще не находится в рабочей папке. "
+                    "Сначала выполните обычное обновление без repair_git_state."
+                )
 
         if plan["behind"] == 0 and not config.force:
             # "Новых commit нет" не означает "checkout чистый". К этому моменту
@@ -1219,7 +1432,13 @@ def main():
                 repair_git_state(git_path, target_path, remote_ref, logger, local_state)
                 after_repair_state = analyze_local_state(git_path, target_path, remote_ref, plan)
                 payload["local_state_after_repair"] = after_repair_state
-                write_local_state(logger, after_repair_state, int(config.max_files), "Локальное состояние после repair")
+                write_local_state(
+                    logger,
+                    after_repair_state,
+                    int(config.max_files),
+                    "Локальное состояние после repair",
+                    console_preview_limit,
+                )
                 payload["result"] = "repaired"
                 logger.section("Итог", "OK")
                 logger.icon_line("Новых commit нет. Git-состояние синхронизировано с remote.", "OK")
@@ -1250,7 +1469,7 @@ def main():
 
         if not config.no_backup:
             logger.section("Бэкап", "FILE_ARCHIVE")
-            backup_file = create_backup(target_path, logger)
+            backup_file = create_backup(target_path, logger, plan.get("changed_paths", []))
             payload["backup_file"] = str(backup_file)
         else:
             logger.section("Бэкап", "FILE_ARCHIVE")

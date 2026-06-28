@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 class PackageType(Enum):
     """Типы пакетов, требующие разного подхода к установке."""
@@ -19,7 +19,6 @@ class GpuInfo:
     vendor: str
     generation: Optional[str] = None
     memory_mb: int = 0
-    # Добавлены вычисляемые поля для подробного отчета
     backend: str = "cpu"
     tensorrt_support: bool = False
     compute_capability: str = "N/A"
@@ -29,8 +28,12 @@ class CudaInfo:
     """Информация о CUDA."""
     is_available: bool
     driver_version: Optional[str] = None
-    # Рекомендуемая версия для установки, а не просто версия драйвера
     recommended_version: Optional[str] = None
+    portable_version: Optional[str] = None
+    portable_path: Optional[str] = None
+    selected_version: Optional[str] = None
+    selected_source: Optional[str] = None
+    warnings: List[str] = field(default_factory=list)
 
 @dataclass
 class SystemInfo:
@@ -47,9 +50,15 @@ class PackageInfo:
     package_type: PackageType
     version: Optional[str] = None
     extras: List[str] = field(default_factory=list)
+    spec: Optional[str] = None
+    source_file: Optional[str] = None
+    line_number: Optional[int] = None
+    direct_reference: bool = False
     
     def to_spec(self) -> str:
         """Преобразует информацию в полную строку для pip/uv."""
+        if self.spec:
+            return self.spec
         spec = self.name
         if self.extras:
             spec += f"[{','.join(self.extras)}]"
@@ -70,9 +79,15 @@ class InstallationPlan:
     insightface_packages: List[PackageInfo] = field(default_factory=list)
     triton_packages: List[PackageInfo] = field(default_factory=list)
 
-    # Динамически определяемые параметры
     torch_index_url: Optional[str] = None
+    torch_backend: Optional[str] = None
     onnx_package_name: Optional[str] = None
+    pip_options: List[str] = field(default_factory=list)
+    constraint_files: List[str] = field(default_factory=list)
+    package_constraints: Dict[str, PackageInfo] = field(default_factory=dict)
+    included_files: List[str] = field(default_factory=list)
+    diagnostics: List[str] = field(default_factory=list)
+    requirement_rewrites: List[str] = field(default_factory=list)
 
     def is_empty(self) -> bool:
         """Проверяет, содержит ли план хотя бы один пакет для установки."""

@@ -1,8 +1,8 @@
 {
-  "description": "Создает интерактивный HTML-отчет для визуальной проверки результатов кластеризации и сопоставления лиц. Автоматически находит все необходимые пути из контекста.",
+  "description": "Создает интерактивный HTML-отчет по кластерам и совпадениям. ФИО учеников получает из файла *.list по student_id.",
   "category": "Отчеты",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "v2.2026.01.25",
+  "version": "v2.2026.06.21",
   "command_line_args_meta": {
     "a_hr_target_dir": {
       "type": "dir_path",
@@ -11,10 +11,16 @@
       "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
     },
     "a_hr_ref_dir": {
-      "type": "file_path",
+      "type": "dir_path",
       "description": "Папка с эталонами (для matches)",
       "required": false,
       "default": ""
+    },
+    "a_hr_student_list_file": {
+      "type": "file_path",
+      "description": "Файл *.list — источник ФИО учеников",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list"
     }
   }
 }

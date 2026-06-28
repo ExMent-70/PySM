@@ -1,8 +1,8 @@
 {
-  "description": "Скрипт создает или обновляет XMP-файлы (сайдкары) для изображений\n<div style=\"{theme.tooltip_instance_args_block}\">\nЯвляется связующим звеном между этапом AI-анализа изображений и профессиональными программами для каталогизации (Adobe Lightroom, Capture One). \nСкрипт экспортирует данные полученные в процессе AI-анализа изображений (имена детей, эмоции, точные координаты лиц и глаз) в стандартные .xmp файлы-сайдкары.\n</div>",
+  "description": "Скрипт создает или обновляет XMP-файлы (сайдкары) для изображений\n<div style=\"{theme.tooltip_instance_args_block}\">\nЯвляется связующим звеном между этапом AI-анализа и программами каталогизации. ФИО получает из `*.list` по `student_id`, сохраняет реальные имена в стандартных полях, технические ID в `Iptc4xmpCore:SubjectCode`, имя сессии в IPTC Headline и имя фотосессии в IPTC Category.\n</div>",
   "category": "Метаданные",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2026.01.09",
+  "version": "v2.2026.06.22",
   "command_line_args_meta": {
     "analysis_dir": {
       "type": "str",
@@ -15,6 +15,12 @@
       "description": "Полный путь к папке с изображениями, для которых создаются XMP-файлы",
       "required": true,
       "default": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}"
+    },
+    "student_list_file": {
+      "type": "file_path",
+      "description": "Файл *.list — единственный источник фамилии и имени ученика",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list"
     },
     "all_threads": {
       "type": "int",

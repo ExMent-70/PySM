@@ -14,7 +14,7 @@ class Face:
     """
     bbox: List[float]
     cluster_label: Optional[int] = None
-    child_name: Optional[str] = None
+    student_id: Optional[str] = None
     
     # --- НОВОЕ ПОЛЕ: Неизменяемый индекс ---
     # Хранит порядковый номер лица в исходном списке (и в файле векторов).
@@ -31,7 +31,7 @@ class Face:
     
     # Исходное состояние
     original_cluster_label: Optional[int] = None
-    original_child_name: Optional[str] = None
+    original_student_id: Optional[str] = None
     original_quality_status: str = "ok"
     original_temp_label: Optional[int] = None
 
@@ -47,7 +47,7 @@ class Face:
     def is_changed(self) -> bool:
         # Проверка стандартных полей
         if (self.cluster_label != self.original_cluster_label or
-            self.child_name != self.original_child_name or
+            self.student_id != self.original_student_id or
             self.quality_status != self.original_quality_status or
             self.temp_cluster_label != self.original_temp_label):
             return True
@@ -69,7 +69,7 @@ class Face:
 
     def commit_changes(self):
         self.original_cluster_label = self.cluster_label
-        self.original_child_name = self.child_name
+        self.original_student_id = self.student_id
         self.original_quality_status = self.quality_status
         self.original_temp_label = self.temp_cluster_label
         # Фиксируем состояние матчинга
@@ -78,17 +78,21 @@ class Face:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Face":
-        known_fields = {'bbox', 'cluster_label', 'child_name', 'face_index', 
+        known_fields = {'bbox', 'cluster_label', 'student_id', 'face_index',
                         'quality_status', 'temp_cluster_label', 'temp_child_name'}
         
         kwargs = {k: data[k] for k in known_fields if k in data}
-        extra_data = {k: v for k, v in data.items() if k not in known_fields}
+        legacy_fields = {'child_name', 'matched_child_name'}
+        extra_data = {
+            k: v for k, v in data.items()
+            if k not in known_fields and k not in legacy_fields
+        }
         
         instance = cls(**kwargs)
         instance.extra_data = extra_data
         
         instance.original_cluster_label = instance.cluster_label
-        instance.original_child_name = instance.child_name
+        instance.original_student_id = instance.student_id
         instance.original_quality_status = instance.quality_status
         instance.original_temp_label = instance.temp_cluster_label
         
@@ -100,11 +104,13 @@ class Face:
 
     def to_dict(self) -> Dict[str, Any]:
         data = self.extra_data.copy()
+        data.pop('child_name', None)
+        data.pop('matched_child_name', None)
         data.update({
             'bbox': self.bbox,
             'face_index': self.face_index,
             'cluster_label': self.cluster_label,
-            'child_name': self.child_name,
+            'student_id': self.student_id,
             'quality_status': self.quality_status,
             'temp_cluster_label': self.temp_cluster_label,
             'temp_child_name': self.temp_child_name

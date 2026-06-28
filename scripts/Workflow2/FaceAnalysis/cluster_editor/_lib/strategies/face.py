@@ -46,14 +46,17 @@ class FaceModeStrategy(EditorStrategy):
                 face = record.faces[0]
                 cid = str(face.cluster_label if face.cluster_label is not None else -1)
                 
-                raw_name = face.child_name or f"Cluster {cid}"
                 if cid == "-1":
                     cname = "99-Noise"
                 elif cid != "-1":
                     prefix = self.get_name_prefix(cid)
-                    cname = prefix + self._strip_name_prefix(raw_name)
+                    label = (
+                        self.student_label(face.student_id)
+                        or f"Не назначен [Cluster {cid}]"
+                    )
+                    cname = prefix + label
                 else:
-                    cname = raw_name
+                    cname = f"Cluster {cid}"
 
                 face.effective_name = cname
                 face.filename = record.filename
@@ -79,7 +82,7 @@ class FaceModeStrategy(EditorStrategy):
         
         self.invalidate_cache()
         new_id_val = int(target_id) if target_id.lstrip('-').isdigit() else None
-        clean_name = self._strip_name_prefix(target_name) if target_name else None
+        target_student_id = target_name or None
 
         for filename in filenames:
             record = records.get(filename)
@@ -96,7 +99,7 @@ class FaceModeStrategy(EditorStrategy):
                     record.face_count = len(record.faces)
                     for f in record.faces: 
                         f.cluster_label = None
-                        f.child_name = None
+                        f.student_id = None
             else:
                 if record.image_type == 'group' or record.face_count > 1:
                     record.image_type = 'portrait'
@@ -115,22 +118,19 @@ class FaceModeStrategy(EditorStrategy):
                     
                     if target_id == "-1":
                         selected_face.cluster_label = -1
-                        selected_face.child_name = "Noise"
+                        selected_face.student_id = None
                     else:
                         selected_face.cluster_label = new_id_val
-                        if clean_name:
-                            selected_face.child_name = clean_name
+                        selected_face.student_id = target_student_id
 
     def rename_cluster(self, cluster_id: str, new_name: str, records: Dict[str, ImageRecord]) -> None:
         if cluster_id in ["group", "-1"]: return
         self.invalidate_cache()
         files = self.get_files_for_cluster(cluster_id, records)
-        clean_name = self._strip_name_prefix(new_name)
-        
         for fname in files:
             record = records[fname]
             if record.face_count == 1 and record.faces:
-                record.faces[0].child_name = clean_name
+                record.faces[0].student_id = new_name
 
     def save(self, records: Dict[str, ImageRecord], paths_config: Dict[str, Path]) -> bool:
         return True

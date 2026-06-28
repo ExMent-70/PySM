@@ -2,7 +2,7 @@
   "description": "Создает и редактирует списки учеников. Поддерживает парсинг имен, управление услугами, динамические поля (цитаты и др.) и экспорт в разные форматы.",
   "category": "Редакторы",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "v2.2026.01.11",
+  "version": "v2.2026.06.20",
   "command_line_args_meta": {
     "wf_dest_dir": {
       "type": "dir_path",
@@ -12,7 +12,7 @@
     },
     "wf_output_txt_file": {
       "type": "file_path",
-      "description": "Опциональный полный путь для файла children.txt. Если указан, имеет приоритет над wf_dest_dir.",
+      "description": "Полный путь к TXT-файлу идентификаторов учеников текущей фотосессии. Общий children.txt больше не создается.",
       "required": false,
       "default": "{wf_session_path}/{wf_session_name}/{wf_photo_session}_{wf_children_file_name}"
     },

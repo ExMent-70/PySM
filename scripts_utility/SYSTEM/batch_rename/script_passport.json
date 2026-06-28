@@ -28,6 +28,7 @@
         "%index%%ext%",
         "RAW_%index%%ext%",
         "{wf_session_name}_%index%%ext%",
+        "{wf_session_name}_%prefix%%index%%ext%",
         "{wf_session_name}_RAW_%index%%ext%",
         "%created_date%_%index%%ext%",
         "%created_date%_%created_time%_%index%%ext%",
@@ -38,7 +39,7 @@
       "type": "string",
       "description": "Префикс для токена %prefix%.",
       "required": false,
-      "default": ""
+      "default": "88"
     },
     "br_suffix": {
       "type": "string",

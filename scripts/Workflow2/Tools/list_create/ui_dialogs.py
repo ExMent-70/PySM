@@ -724,7 +724,10 @@ class AIParsingDialog(QDialog):
         
         layout.addWidget(QLabel("2. Вставьте JSON-ответ от Gemini:"))
         self.json_input_edit = QPlainTextEdit()
-        self.json_input_edit.setPlaceholderText('[{"surname": "...", "name": "...", "info": {...}}, ...]')
+        self.json_input_edit.setPlaceholderText(
+            '{"matched": [{"student_id": "A7K3-S001", "source_person": "Иванов", "info": {}}], '
+            '"unresolved": []}'
+        )
         layout.addWidget(self.json_input_edit)
         
         self.btn_apply = QPushButton("Распознать и Обновить список")
@@ -740,19 +743,11 @@ class AIParsingDialog(QDialog):
             QMessageBox.warning(self, "Внимание", "Введите текст с данными об учениках.")
             return
 
-        # 1. Формируем мини-JSON (только идентификаторы и info)
-        mini_list = []
-        for s in self.students:
-            mini_list.append({
-                "surname": s.surname,
-                "name": s.name,
-                "info": s.info
-            })
-        
+        # Справочник содержит ФИО для сопоставления и ID для безопасного ответа.
+        mini_list = io_services.build_ai_student_reference(self.students)
         json_str = json.dumps(mini_list, ensure_ascii=False, indent=2)
         
-        # 2. Получаем шаблон
-        template = io_services.get_ai_prompt_template(pathlib.Path.cwd()) # Или путь скрипта
+        template = io_services.get_ai_prompt_template(pathlib.Path(__file__).parent)
         
         # 3. Заменяем плейсхолдеры
         final_prompt = template.replace("{{STUDENT_LIST_JSON}}", json_str)
@@ -769,46 +764,35 @@ class AIParsingDialog(QDialog):
         json_text = self.json_input_edit.toPlainText().strip()
         if not json_text: return
 
-        # Очистка от markdown (```json ... ```) если нейросеть добавила их
-        import re
-        match = re.search(r'\[.*\]', json_text, re.DOTALL)
-        if match:
-            json_text = match.group(0)
-        
         try:
+            # Извлекаем JSON-объект, если AI обернул его в markdown-блок.
+            object_start = json_text.find("{")
+            object_end = json_text.rfind("}")
+            if object_start != -1 and object_end >= object_start:
+                json_text = json_text[object_start:object_end + 1]
+
             imported_data = json.loads(json_text)
-            if not isinstance(imported_data, list):
-                raise ValueError("Ожидался список объектов (list).")
-            
-            updated_count = 0
-            not_found_list = []
+            updates, unresolved = io_services.validate_ai_enrichment_response(
+                imported_data, self.students
+            )
 
-            # Создаем карту для быстрого поиска: (Фамилия_lower, Имя_lower) -> Student
-            student_map = {
-                (s.surname.strip().lower(), s.name.strip().lower()): s 
-                for s in self.students
-            }
+            students_by_id = {student.student_id: student for student in self.students}
+            for student_id, new_info in updates.items():
+                students_by_id[student_id].info.update(new_info)
 
-            for item in imported_data:
-                s_surname = item.get("surname", "").strip()
-                s_name = item.get("name", "").strip()
-                new_info = item.get("info", {})
-                
-                key = (s_surname.lower(), s_name.lower())
-                
-                if key in student_map:
-                    target_student = student_map[key]
-                    # Обновляем info (merge)
-                    if isinstance(new_info, dict):
-                        target_student.info.update(new_info)
-                        updated_count += 1
-                else:
-                    not_found_list.append(f"{s_surname} {s_name}")
-
-            msg = f"Успешно обновлено учеников: {updated_count}"
-            if not_found_list:
-                msg += f"\n\nНе найдено в списке ({len(not_found_list)}):\n" + "\n".join(not_found_list[:10])
-                if len(not_found_list) > 10: msg += "\n..."
+            msg = f"Успешно обновлено учеников: {len(updates)}"
+            if unresolved:
+                unresolved_lines = []
+                for item in unresolved[:10]:
+                    source = str(item.get("source_person", "Неизвестная запись"))
+                    reason = str(item.get("reason", "Нет однозначного совпадения"))
+                    unresolved_lines.append(f"{source}: {reason}")
+                msg += (
+                    f"\n\nНе применено неоднозначных записей ({len(unresolved)}):\n"
+                    + "\n".join(unresolved_lines)
+                )
+                if len(unresolved) > 10:
+                    msg += "\n..."
             
             QMessageBox.information(self, "Результат", msg)
             
@@ -818,4 +802,4 @@ class AIParsingDialog(QDialog):
         except json.JSONDecodeError as e:
             QMessageBox.critical(self, "Ошибка JSON", f"Некорректный формат JSON:\n{e}")
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка обработки:\n{e}")        
+            QMessageBox.critical(self, "Ошибка", f"Ошибка обработки:\n{e}")

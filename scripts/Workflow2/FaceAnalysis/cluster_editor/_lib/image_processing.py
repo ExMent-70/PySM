@@ -111,7 +111,7 @@ def apply_color_corrections(image: Image.Image, factors: Dict[str, float]) -> Im
     return image
 
 
-def create_watermark_layer(base_size: Tuple[int, int], faces_bboxes: List[List[float]], settings: Dict[str, Any], child_name: str) -> Any:
+def create_watermark_layer(base_size: Tuple[int, int], faces_bboxes: List[List[float]], settings: Dict[str, Any], student_name: str) -> Any:
     """
     Генерирует слой (PIL Image RGBA) с водяными знаками (полосы + маски лиц + текст).
     """
@@ -129,7 +129,7 @@ def create_watermark_layer(base_size: Tuple[int, int], faces_bboxes: List[List[f
     mask_fill = int(settings.get("wm_mask_fill", 20))
     pad_w_coeff = float(settings.get("wm_pad_w", 0.1))
     pad_h_coeff = float(settings.get("wm_pad_h", 0.2))
-    text_content = str(settings.get("wm_text", "ВЫБОР ФОТОГРАФИИ")) + " - " + child_name
+    text_content = str(settings.get("wm_text", "ВЫБОР ФОТОГРАФИИ")) + " - " + student_name
     text_alpha = int(settings.get("wm_text_alpha", 150))
 
     # 1. Подготовка текста (один раз)

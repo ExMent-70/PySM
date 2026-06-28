@@ -48,7 +48,7 @@
       "type": "bool",
       "description": "Только получить данные с GitHub и показать план обновления, не менять файлы.",
       "required": false,
-      "default": false
+      "default": true
     },
     "force": {
       "type": "bool",
@@ -70,21 +70,27 @@
     },
     "show_stat": {
       "type": "bool",
-      "description": "Показать статистику git diff --stat.",
+      "description": "Сохранить статистику git diff --stat в полном логе и показать уведомление в консоли.",
       "required": false,
       "default": false
     },
     "max_commits": {
       "type": "int",
-      "description": "Максимум коммитов в консольном отчете.",
+      "description": "Максимум коммитов, получаемых для отчета.",
       "required": false,
       "default": 50
     },
     "max_files": {
       "type": "int",
-      "description": "Максимум измененных файлов в консольном отчете.",
+      "description": "Максимум файлов и записей в полном отчете.",
       "required": false,
       "default": 300
+    },
+    "console_preview_limit": {
+      "type": "int",
+      "description": "Максимум строк предпросмотра для длинных списков в консоли PySM.",
+      "required": false,
+      "default": 8
     }
   }
 }

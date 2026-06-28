@@ -104,7 +104,9 @@ SVG_PATHS: Dict[str, str] = {
     "LIST": '<path d="M4 6h2v2H4zm0 5h2v2H4zm0 5h2v2H4zm4-10h12v2H8zm0 5h12v2H8zm0 5h12v2H8z"/>',
     "CAMERA": '<path d="M12 12c1.65 0 3-1.35 3-3s-1.35-3-3-3-3 1.35-3 3 1.35 3 3 3zm9-6h-3.17L16 4h-8l-1.83 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-9 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>',
     "FILE_JPG": '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7zm2 5V3.5L18.5 9H15z"/><text x="12" y="17" font-family="Arial" font-size="8" fill="#FFF" text-anchor="middle" font-weight="bold">JPG</text>',
+    "FILE_CSV": '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-7-7zm2 5V3.5L18.5 9H15z"/><text x="12" y="17" font-family="Arial" font-size="8" fill="#FFF" text-anchor="middle" font-weight="bold">CSV</text>',
     "COPY_JPG": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="17" font-family="Arial" font-size="6" fill="#FFF" text-anchor="middle" font-weight="bold">JPG</text>',
+    "COPY_CSV": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="17" font-family="Arial" font-size="6" fill="#FFF" text-anchor="middle" font-weight="bold">CSV</text>',
     "COPY_PSD": '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z"/><path d="M19 5H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z"/><text x="13.5" y="17" font-family="Arial" font-size="6" fill="#FFF" text-anchor="middle" font-weight="bold">PSD</text>',
     "SELECT_FILES": '<path d="M13 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V9l-7-7zm2 5V3.5L18.5 9H15z"/><path fill="#FFF" d="M10.9 16.1l-2.8-2.8 1.4-1.4 1.4 1.4 4.6-4.6 1.4 1.4-6 6z"/>',
     "APP_PHOTOSHOP": '<rect x="2" y="2" width="20" height="20" rx="4" ry="4"/><text x="12" y="16" font-family="Arial" font-size="11" fill="#FFF" text-anchor="middle" font-weight="bold">Ps</text>',    
@@ -205,7 +207,9 @@ THEME_KEYS = {
     "LIST": "icon_primary",
     "CAMERA": "icon_info",
     "FILE_JPG": "icon_info",
+    "FILE_CSV": "icon_success",
     "COPY_JPG": "icon_file",
+    "COPY_CSV": "icon_success",
     "COPY_PSD": "icon_info",
     "SELECT_FILES": "icon_success",
     "APP_PHOTOSHOP": "icon_info", # Используем синий цвет (как для PSD)
@@ -324,12 +328,12 @@ ICON_CATEGORIES: Dict[str, List[str]] = {
     "system":["FOLDER", "FOLDER_OPEN", "FILE", "NEW", "OPEN", "SAVE", "SLIDERS", "REFRESH", "SETTINGS", "CONSOLE", "EXIT", "CLOSE"],
     "files":[
         "FILE_PY", "FILE_CODE", "FILE_TXT", "FILE_HTML", "FILE_IMAGE", "FILE_DB", "FILE_ARCHIVE", 
-        "FILE_JPG", "FILE_PSD", "FILE_INDD", "FILE_C1", "REPORT", "TABLE", "LIST",
+        "FILE_JPG", "FILE_CSV", "FILE_PSD", "FILE_INDD", "FILE_C1", "REPORT", "TABLE", "LIST",
         "FILE_XMP", "PHOTO_PORTRAIT", "PHOTO_GROUP", "PHOTO_NATURE",
         "FILE_RAW", "FILE_MASK"  # <--- Добавлены сюда
     ],
     "actions":[
-        "PLAY", "STOP", "NEXT", "SELECT_FILES", "COPY_JPG", "COPY_PSD", "APP_PHOTOSHOP", "CAMERA", "ADD", "DELETE",
+        "PLAY", "STOP", "NEXT", "SELECT_FILES", "COPY_JPG", "COPY_CSV", "COPY_PSD", "APP_PHOTOSHOP", "CAMERA", "ADD", "DELETE",
         "APP_C1", "COPY_C1", "APP_INDD", "COPY_INDD", "APP_XMP", "COPY_XMP",
         "PHOTO_PORTRAIT_EDIT", "PHOTO_GROUP_EDIT", "PHOTO_NATURE_EDIT",
         "VAR_COPY", "VAR_SET", "VAR_REMOVE", "LOGIC_IF",

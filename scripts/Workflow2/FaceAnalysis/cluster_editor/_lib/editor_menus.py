@@ -12,7 +12,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QMenu, QMessageBox, QInputDialog, QFileDialog, QDialog
 from PySide6.QtCore import Qt, QObject, Slot
 
-from .editor_dialogs import RenameDialog
+from .editor_dialogs import RenameDialog, StudentSelectionDialog
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +29,18 @@ class EditorMenuManager(QObject):
         
         if w.mode == 'matches': return 
         if cid in ["trash", "error_matches"]: return
+        if w.mode == 'face' and cid in ["group", "-1"]: return
         
         current_name = w.data_manager.strategy._strip_name_prefix(data["name"])
         new_name = None
         
-        if w.mode == 'location':
+        if w.mode == 'face':
+            students = w.data_manager.available_students(except_cluster_id=cid)
+            dialog = StudentSelectionDialog(students, data.get("student_id", ""), w)
+            dialog.setWindowTitle("Назначить или сменить ученика")
+            if dialog.exec() == QDialog.Accepted:
+                new_name = dialog.selected_student_id()
+        elif w.mode == 'location':
             dialog = RenameDialog(w.predefined_cluster_names, current_name, w)
             if dialog.exec() == QDialog.Accepted:
                 new_name = dialog.get_selected_name()
@@ -42,8 +49,11 @@ class EditorMenuManager(QObject):
             if ok: new_name = text
             
         if new_name and new_name.strip():
-            w.data_manager.rename_cluster(dict(), cid, new_name.strip())
-            w._refresh_left_panel()
+            try:
+                w.data_manager.rename_cluster(dict(), cid, new_name.strip())
+                w._refresh_left_panel()
+            except ValueError as exc:
+                QMessageBox.warning(w, "Назначение ученика", str(exc))
 
     def show_cluster_context_menu(self, pos):
         w = self.window
@@ -64,9 +74,21 @@ class EditorMenuManager(QObject):
             if item: menu.addSeparator()
             
         elif w.mode != 'matches':
-            menu.addAction("Создать кластер").triggered.connect(self._create_cluster)
+            create_label = (
+                "Создать кластер для ученика"
+                if w.mode == 'face'
+                else "Создать кластер"
+            )
+            menu.addAction(create_label).triggered.connect(self._create_cluster)
             if item:
-                menu.addAction("Переименовать").triggered.connect(lambda: self.rename_cluster_action(item))
+                rename_label = (
+                    "Назначить/сменить ученика"
+                    if w.mode == 'face'
+                    else "Переименовать"
+                )
+                menu.addAction(rename_label).triggered.connect(
+                    lambda: self.rename_cluster_action(item)
+                )
                 if w.mode == 'face':
                     menu.addSeparator()
                     gender_menu = menu.addMenu("Принудительно установить пол")
@@ -119,6 +141,7 @@ class EditorMenuManager(QObject):
         w.photo_session = w.working_dir.name.replace("Analysis_", "")
         w.setWindowTitle(w.data_manager.strategy.get_window_title(w.photo_session))
         w.data_manager.switch_working_session(new_path)
+        w._reload_selected_photo_numbers(w.btn_filter_selected_photos.isChecked())
         w._load_and_display_data()        
 
     def _create_cluster(self):
@@ -126,7 +149,20 @@ class EditorMenuManager(QObject):
         new_name = None
         
         # --- ИЗМЕНЕНИЕ: В режиме location используем диалог с выпадающим списком ---
-        if w.mode == 'location':
+        if w.mode == 'face':
+            available_students = w.data_manager.available_students()
+            if not available_students:
+                QMessageBox.information(
+                    w,
+                    "Создание кластера",
+                    "В файле *.list нет свободных записей учеников.",
+                )
+                return
+            dialog = StudentSelectionDialog(available_students, parent=w)
+            dialog.setWindowTitle("Ученик для нового кластера")
+            if dialog.exec() == QDialog.Accepted:
+                new_name = dialog.selected_student_id()
+        elif w.mode == 'location':
             dialog = RenameDialog(w.predefined_cluster_names, "", w)
             dialog.setWindowTitle("Новый кластер локации")
             if dialog.exec() == QDialog.Accepted:
@@ -138,8 +174,11 @@ class EditorMenuManager(QObject):
             
         # Создаем кластер, если пользователь ввел/выбрал имя и не нажал Отмена
         if new_name and new_name.strip():
-            w.data_manager.create_cluster(dict(), new_name.strip())
-            w._refresh_left_panel()
+            try:
+                w.data_manager.create_cluster(dict(), new_name.strip())
+                w._refresh_left_panel()
+            except ValueError as exc:
+                QMessageBox.warning(w, "Создание кластера", str(exc))
 
     def show_gallery_context_menu(self, pos):
         w = self.window

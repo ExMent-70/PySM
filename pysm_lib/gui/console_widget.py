@@ -3,13 +3,14 @@
 import logging
 import re
 from typing import Optional, Any, Dict
-from PySide6.QtCore import Slot, QUrl
-from PySide6.QtGui import QPalette, QColor, QDesktopServices, QMouseEvent
+from PySide6.QtCore import Slot, QUrl, Qt
+from PySide6.QtGui import QPalette, QColor, QDesktopServices, QMouseEvent, QFontMetrics
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QGroupBox,
     QTextBrowser,
+    QLabel,
     QProgressBar,
 )
 from ..theme_manager import ThemeManager
@@ -57,17 +58,24 @@ class ConsoleWidget(QWidget):
         self.text_console_output.setFont(font)
         console_layout.addWidget(self.text_console_output)
         main_layout.addWidget(console_groupbox, 1)
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setMinimum(0)
         self.progress_bar.setMaximum(100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setTextVisible(False)
         self.progress_bar.setFormat(
             self.locale_manager.get("console_widget.progress_bar.default_format")
         )
         self.progress_bar.setVisible(False)
         self.progress_bar.setFixedHeight(20)
         main_layout.addWidget(self.progress_bar)
+
+        self.progress_label = QLabel(self.progress_bar)
+        self.progress_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.progress_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.progress_label.setVisible(False)
+        self.progress_label.setWordWrap(False)
 
     def apply_theme(self):
         """Применяет стили из активной темы к виджету."""
@@ -159,27 +167,63 @@ class ConsoleWidget(QWidget):
         self, instance_id: str, current: int, total: int, text_obj: Optional[Any]
     ):
         if total > 0 and current >= 0:
+            progress_text = text_obj if isinstance(text_obj, str) else ""
+            self._set_progress_label_text(
+                self._format_progress_label(progress_text, current, total)
+            )
             self.progress_bar.setVisible(True)
             self.progress_bar.setMaximum(total)
             self.progress_bar.setValue(current)
-            progress_text = text_obj if isinstance(text_obj, str) else ""
-            self.progress_bar.setFormat(
-                self.locale_manager.get(
-                    "console_widget.progress_bar.active_format", text=progress_text
-                )
-            )
+            self.progress_bar.setFormat("")
         elif current >= 0 and isinstance(text_obj, str) and text_obj:
+            self._set_progress_label_text(text_obj)
             self.progress_bar.setVisible(True)
             self.progress_bar.setRange(0, 0)
-            self.progress_bar.setFormat(
-                self.locale_manager.get(
-                    "console_widget.progress_bar.active_format", text=text_obj
-                )
-            )
+            self.progress_bar.setFormat("")
         else:
+            self._set_progress_label_text("")
             self.progress_bar.setVisible(False)
             self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(0)
             self.progress_bar.setFormat(
                 self.locale_manager.get("console_widget.progress_bar.default_format")
             )
+
+    def _set_progress_label_text(self, text: str) -> None:
+        if not text:
+            self.progress_label.clear()
+            self.progress_label.setToolTip("")
+            self.progress_label.setVisible(False)
+            return
+
+        self._sync_progress_label_geometry()
+        available_width = max(80, self.progress_label.width() - 8)
+        elided_text = QFontMetrics(self.progress_label.font()).elidedText(
+            text,
+            Qt.TextElideMode.ElideMiddle,
+            available_width,
+        )
+        self.progress_label.setText(elided_text)
+        self.progress_label.setToolTip(text)
+        self.progress_label.setVisible(True)
+        self.progress_label.raise_()
+
+    def _format_progress_label(self, text: str, current: int, total: int) -> str:
+        if total <= 0:
+            return text
+        text = self._clean_progress_text(text)
+        percent = int(round((max(0, current) / total) * 100))
+        percent = max(0, min(100, percent))
+        if text:
+            return f"{text} - {percent}%"
+        return f"{percent}%"
+
+    def _clean_progress_text(self, text: str) -> str:
+        return re.sub(r"\s+(?:из|of)\s*$", "", text.strip(), flags=re.IGNORECASE)
+
+    def _sync_progress_label_geometry(self) -> None:
+        self.progress_label.setGeometry(self.progress_bar.rect())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._sync_progress_label_geometry()

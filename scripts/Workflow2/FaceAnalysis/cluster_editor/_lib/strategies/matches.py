@@ -1,12 +1,12 @@
 # analize/cluster_editor/_lib/strategies/matches.py
 
 import logging
-import json
 from typing import Dict, List, Optional
 from pathlib import Path
 from collections import defaultdict
 
 from ..data_models import ImageRecord, Face
+from ..json_io import atomic_write_json
 from .base import EditorStrategy, natural_sort_key
 
 logger = logging.getLogger(__name__)
@@ -37,9 +37,9 @@ class MatchesModeStrategy(EditorStrategy):
                 
                 if cid in ["-1", "group"]: continue
                 
-                raw_name = face.child_name or f"Cluster {cid}"
                 prefix = self.get_name_prefix(cid)
-                cname = prefix + self._strip_name_prefix(raw_name)
+                label = self.student_label(face.student_id) or f"Cluster {cid}"
+                cname = prefix + label
                 
                 face.effective_name = cname
                 face.filename = record.filename
@@ -49,7 +49,12 @@ class MatchesModeStrategy(EditorStrategy):
     def _build_files_cache(self, records: Dict[str, ImageRecord]) -> Dict[str, List[str]]:
         cache = defaultdict(set)
         for filename, record in records.items():
-            if record.face_count > 1 or record.image_type == 'group':
+            is_group_record = (
+                record.face_count > 1
+                or record.image_type == 'group'
+                or not any(face.cluster_label is not None for face in record.faces)
+            )
+            if is_group_record:
                 if any(f.extra_data.get('matched_portrait_cluster_label') is None for f in record.faces):
                     cache["error_matches"].add(filename)
             
@@ -73,11 +78,11 @@ class MatchesModeStrategy(EditorStrategy):
                         if source_id.isdigit():
                              if str(face.extra_data.get('matched_portrait_cluster_label')) == source_id:
                                  face.extra_data['matched_portrait_cluster_label'] = None
-                                 face.extra_data['matched_child_name'] = None
+                                 face.student_id = None
             return
 
         new_id_val = int(target_id) if target_id.isdigit() else None
-        clean_name = self._strip_name_prefix(target_name) if target_name else None
+        target_student_id = target_name or None
         
         if new_id_val is None: return
 
@@ -96,7 +101,8 @@ class MatchesModeStrategy(EditorStrategy):
             if idx != -1 and idx < len(record.faces):
                 face = record.faces[idx]
                 face.extra_data['matched_portrait_cluster_label'] = new_id_val
-                face.extra_data['matched_child_name'] = clean_name
+                face.student_id = target_student_id
+                face.extra_data.pop('matched_child_name', None)
                 face.extra_data['match_distance'] = 0.0
 
     def rename_cluster(self, cluster_id: str, new_name: str, records: Dict[str, ImageRecord]) -> None:
@@ -114,12 +120,12 @@ class MatchesModeStrategy(EditorStrategy):
         clusters = self.get_clusters(records)
         sorted_ids = sorted(clusters.keys(), key=lambda x: int(x) if x.isdigit() else 9999)
         
-        total_matches_count = 0
-
         for cid in sorted_ids:
             if cid in ["-1", "group"]: continue
             files = self.get_files_for_cluster(cid, records)
-            cname = clusters[cid][0].effective_name if clusters[cid] else f"Cluster {cid}"
+            reference_student_id = clusters[cid][0].student_id if clusters[cid] else None
+            if not reference_student_id:
+                raise ValueError(f"У эталонного кластера {cid} отсутствует student_id.")
             
             group_photos_data = list()
             for fname in files:
@@ -128,31 +134,42 @@ class MatchesModeStrategy(EditorStrategy):
                 for f in rec.faces:
                     lbl = f.extra_data.get('matched_portrait_cluster_label')
                     if lbl is not None and str(lbl) == cid:
+                        if f.student_id != reference_student_id:
+                            raise ValueError(
+                                f"{fname}: student_id {f.student_id!r} не совпадает с "
+                                f"эталонным ID {reference_student_id} кластера {cid}."
+                            )
                         min_dist = f.extra_data.get('match_distance', 0.0)
                         break
                 
                 group_photos_data.append({
                     "filename": fname,
-                    "min_distance": min_dist,
+                    "min_distance": round(float(min_dist), 4),
                     "num_faces": 1
                 })
             
-            total_matches_count += len(group_photos_data)
             output_matches[cid] = {
-                "child_name": self._strip_name_prefix(cname),
+                "student_id": reference_student_id,
                 "group_photos": group_photos_data
             }
 
         unmatched_files = list()
         total_errors = 0
         for filename, record in records.items():
-            if record.face_count > 1 or record.image_type == 'group':
+            is_group_record = (
+                record.face_count > 1
+                or record.image_type == 'group'
+                or not any(face.cluster_label is not None for face in record.faces)
+            )
+            if is_group_record:
                 unmatched_faces = list()
                 for i, face in enumerate(record.faces):
                     if face.extra_data.get('matched_portrait_cluster_label') is None:
                         unmatched_faces.append({
                             "face_index": i, 
-                            "nearest_match_distance": face.extra_data.get('match_distance', 1.0)
+                            "nearest_match_distance": round(
+                                float(face.extra_data.get('match_distance', 1.0)), 4
+                            )
                         })
                 
                 if unmatched_faces:
@@ -164,15 +181,13 @@ class MatchesModeStrategy(EditorStrategy):
                     })
 
         try:
-            with open(matches_path, 'w', encoding='utf-8') as f:
-                json.dump(output_matches, f, ensure_ascii=False, indent=2)
-            with open(error_path, 'w', encoding='utf-8') as f:
-                json.dump({
-                    "description": "Manually updated via Cluster Editor",
-                    "unmatched_files": unmatched_files,
-                    "total": total_errors
-                }, f, indent=2)
-            return False 
+            atomic_write_json(matches_path, output_matches)
+            atomic_write_json(error_path, {
+                "description": "Manually updated via Cluster Editor",
+                "unmatched_files": unmatched_files,
+                "total": total_errors
+            })
+            return True
         except Exception as e:
             logger.error(f"Matches Save Error: {e}")
             return False

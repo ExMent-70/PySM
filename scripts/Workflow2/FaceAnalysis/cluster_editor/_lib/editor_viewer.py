@@ -202,7 +202,11 @@ class ImageViewer(QDialog):
                 if record:
                     for i, face in enumerate(record.faces):
                         # Собираем имя для тултипа
-                        tooltip_text = face.extra_data.get('matched_child_name') or face.child_name or face.temp_child_name or ""
+                        tooltip_text = (
+                            self.data_manager.student_label(face.student_id)
+                            or face.temp_child_name
+                            or ""
+                        )
                         
                         # СЦЕНАРИЙ 1: Клик по ОПОЗНАННОМУ лицу
                         if self.target_face_index is not None:

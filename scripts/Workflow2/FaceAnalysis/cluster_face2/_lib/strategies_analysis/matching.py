@@ -1,7 +1,6 @@
 # cluster_face/_lib/strategies_analysis/matching.py
 
 import logging
-import json
 from argparse import Namespace
 from pathlib import Path
 from typing import Dict, List, NamedTuple
@@ -9,7 +8,12 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from collections import defaultdict
 
-from ..analysis_manager import AnalysisDataManager
+from ..analysis_manager import AnalysisDataManager, write_json_atomic
+from ..student_ids import (
+    parse_student_id,
+    remove_legacy_name_fields,
+    validate_single_list,
+)
 from .base import AnalysisStrategy
 try:
     # Импорт классов API
@@ -34,7 +38,7 @@ logger = logging.getLogger(__name__)
 class ClusterProfile(NamedTuple):
     label: int
     vector: np.ndarray
-    child_name: str
+    student_id: str
 
 class MatchingStrategy(AnalysisStrategy):
     @property
@@ -90,6 +94,12 @@ class MatchingStrategy(AnalysisStrategy):
                 
                 indices = target_mgr.index_map.get(fname, [])
                 faces = info.get("faces", [])
+
+                for face in faces:
+                    face["student_id"] = None
+                    face["matched_portrait_cluster_label"] = None
+                    face.pop("match_distance", None)
+                    remove_legacy_name_fields(face)
                 
                 if len(faces) != len(indices): continue
                 
@@ -129,18 +139,18 @@ class MatchingStrategy(AnalysisStrategy):
                 dist = float(min_vals[i])
                 
                 face = target_mgr.json_data[target["filename"]]["faces"][target["face_index"]]
-                face["match_distance"] = dist
+                face["match_distance"] = round(dist, 4)
                 
                 if dist < threshold:
                     best_label = labels_order[min_indices[i]]
                     profile = centroids[best_label]
                     
                     face["matched_portrait_cluster_label"] = best_label
-                    face["matched_child_name"] = profile.child_name
+                    face["student_id"] = profile.student_id
                     matches_count += 1
                 else:
                     face["matched_portrait_cluster_label"] = None
-                    face["matched_child_name"] = "No Match"
+                    face["student_id"] = None
 
             logger.info(f"<br><b>Результаты идентификации лиц на групповых фотографиях</b>")
             logger.info(f"{icon_ok} идентифицировано: <b>{matches_count}</b>")
@@ -149,12 +159,15 @@ class MatchingStrategy(AnalysisStrategy):
             logger.info(f"{icon_warning} Групповые фотографии не найдены (идентификация лиц не требуется)")
         
         
-        # 7. Сохранение основного JSON
+        # 7. Сначала собираем и валидируем отчёты, затем пишем файлы.
+        matches_report, errors_report = self._build_reports(target_mgr, centroids)
         target_mgr.save_json()
-        
-        # 8. Генерация отчетов (matches_portrait_to_group.json и error_matches.json)
-        # Выполняется всегда, даже если targets пуст
-        self._save_reports(target_mgr, centroids)
+        write_json_atomic(
+            target_mgr.data_dir / "matches_portrait_to_group.json", matches_report
+        )
+        logger.info(f"{icon_save} файл <i>matches_portrait_to_group.json</i> сохранён")
+        write_json_atomic(target_mgr.data_dir / "error_matches.json", errors_report)
+        logger.info(f"{icon_save} файл <i>error_matches.json</i> сохранён<br>")
         
         target_dir = getattr(config, "a_target_dir", "")
         
@@ -180,7 +193,8 @@ class MatchingStrategy(AnalysisStrategy):
     def _calculate_centroids(self, mgr: AnalysisDataManager) -> Dict[int, ClusterProfile]:
         """Считает средние вектора для кластеров из референсного менеджера."""
         ref_vectors = defaultdict(list)
-        ref_names = {}
+        ref_student_ids = {}
+        student_id_to_label = {}
         
         for fname, info in mgr.json_data.items():
             if info.get("face_count") != 1: continue
@@ -194,11 +208,42 @@ class MatchingStrategy(AnalysisStrategy):
             label = face.get("cluster_label")
             
             if label is not None and label != -1 and mgr.embeddings is not None:
+                label_int = int(label)
+                student_id = str(face.get("student_id") or "").strip().upper()
+                if not student_id:
+                    raise ValueError(
+                        f"Портретный кластер {label_int} не содержит student_id "
+                        f"(файл {fname})."
+                    )
+                parse_student_id(student_id)
+
+                existing_id = ref_student_ids.get(label_int)
+                if existing_id is not None and existing_id != student_id:
+                    raise ValueError(
+                        f"Портретный кластер {label_int} содержит разные student_id: "
+                        f"{existing_id} и {student_id}."
+                    )
+                existing_label = student_id_to_label.get(student_id)
+                if existing_label is not None and existing_label != label_int:
+                    raise ValueError(
+                        f"student_id {student_id} назначен портретным кластерам "
+                        f"{existing_label} и {label_int}."
+                    )
+                ref_student_ids[label_int] = student_id
+                student_id_to_label[student_id] = label_int
+
                 idx = indices[0]
                 if idx < len(mgr.embeddings):
-                    ref_vectors[int(label)].append(mgr.embeddings[idx])
-                    if int(label) not in ref_names:
-                        ref_names[int(label)] = face.get("child_name", f"Unknown_{label}")
+                    ref_vectors[label_int].append(mgr.embeddings[idx])
+
+        list_id = validate_single_list(ref_student_ids.values())
+
+        missing_vectors = sorted(set(ref_student_ids) - set(ref_vectors))
+        if missing_vectors:
+            raise ValueError(
+                "Для портретных кластеров отсутствуют эмбеддинги: "
+                + ", ".join(map(str, missing_vectors))
+            )
 
         profiles = {}
         for label, vecs in ref_vectors.items():
@@ -208,20 +253,29 @@ class MatchingStrategy(AnalysisStrategy):
             norm = np.linalg.norm(mean)
             if norm > 1e-6: mean /= norm
             
-            profiles[label] = ClusterProfile(label, mean, ref_names[label])
+            profiles[label] = ClusterProfile(label, mean, ref_student_ids[label])
             
-        logger.info(f"️{icon_info} Количество эталонов: <b>{len(profiles)}</b>")
+        logger.info(
+            f"️{icon_info} Количество эталонов: <b>{len(profiles)}</b>, "
+            f"list_id=<b>{list_id}</b>"
+        )
         return profiles
 
-    def _save_reports(self, mgr: AnalysisDataManager, centroids: Dict[int, ClusterProfile]):
-        """Генерирует дополнительные отчеты."""
-        out_dir = mgr.data_dir
-        
+    def _build_reports(
+        self,
+        mgr: AnalysisDataManager,
+        centroids: Dict[int, ClusterProfile],
+    ) -> tuple[dict, dict]:
+        """Собирает и валидирует отчёты до начала записи файлов."""
+
         # Report 1: Matches
         # Инициализируем отчет ВСЕМИ эталонами, даже если для них нет совпадений
         matches_report = {}
         for lbl, prof in centroids.items():
-            matches_report[str(lbl)] = {"child_name": prof.child_name, "group_photos": []}
+            matches_report[str(lbl)] = {
+                "student_id": prof.student_id,
+                "group_photos": [],
+            }
             
         for fname, info in mgr.json_data.items():
             if info.get("face_count") == 1: continue
@@ -232,23 +286,36 @@ class MatchingStrategy(AnalysisStrategy):
                 lbl = face.get("matched_portrait_cluster_label")
                 dst = face.get("match_distance")
                 if lbl is not None:
-                    found_labels[str(lbl)].append(dst)
+                    lbl_int = int(lbl)
+                    profile = centroids.get(lbl_int)
+                    if profile is None:
+                        raise ValueError(
+                            f"Лицо в {fname} ссылается на неизвестный "
+                            f"портретный кластер {lbl_int}."
+                        )
+                    if face.get("student_id") != profile.student_id:
+                        raise ValueError(
+                            f"Несогласованные данные в {fname}: кластер {lbl_int} "
+                            f"соответствует {profile.student_id}, а в лице записан "
+                            f"{face.get('student_id')}."
+                        )
+                    if dst is None:
+                        raise ValueError(
+                            f"Для совпадения в {fname} отсутствует match_distance."
+                        )
+                    found_labels[str(lbl_int)].append(float(dst))
             
             for lbl_str, dists in found_labels.items():
                 if lbl_str in matches_report:
                     matches_report[lbl_str]["group_photos"].append({
                         "filename": fname,
-                        "min_distance": min(dists),
+                        "min_distance": round(min(dists), 4),
                         "num_faces": len(dists)
                     })
         
         # --- ИЗМЕНЕНИЕ: Убрана фильтрация пустых записей ---
         # Мы сохраняем matches_report как есть, чтобы видеть пустые списки для ненайденных детей.
         
-        with (out_dir / "matches_portrait_to_group.json").open("w", encoding="utf-8") as f:
-            json.dump(matches_report, f, indent=2, ensure_ascii=False)
-        logger.info(f"{icon_save} файл <i>matches_portrait_to_group.json</i> сохранён")    
-
         # Report 2: Errors
         errors_report = {"unmatched_files": []}
         total_err = 0
@@ -261,7 +328,9 @@ class MatchingStrategy(AnalysisStrategy):
                 if face.get("matched_portrait_cluster_label") is None:
                     unmatched.append({
                         "face_index": i,
-                        "nearest_match_distance": face.get("match_distance", -1.0)
+                        "nearest_match_distance": round(
+                            float(face.get("match_distance", -1.0)), 4
+                        )
                     })
             
             if unmatched:
@@ -274,6 +343,4 @@ class MatchingStrategy(AnalysisStrategy):
         
         errors_report["total"] = total_err
         
-        with (out_dir / "error_matches.json").open("w", encoding="utf-8") as f:
-            json.dump(errors_report, f, indent=2, ensure_ascii=False)
-        logger.info(f"{icon_save} файл <i>error_matches.json</i> сохранён<br>")
+        return matches_report, errors_report

@@ -6,6 +6,7 @@ from typing import Dict, List, Any, Optional
 from pathlib import Path
 
 from ..data_models import ImageRecord, Face
+from ..student_roster import StudentRoster
 
 def natural_sort_key(text: str) -> List[Any]:
     """Утилита для натуральной сортировки строк (например, 'photo-2' встанет перед 'photo-10')."""
@@ -19,6 +20,26 @@ class EditorStrategy(ABC):
     
     def __init__(self):
         self._files_cache: Optional[Dict[str, List[str]]] = None
+        self.student_roster: Optional[StudentRoster] = None
+
+    def set_student_roster(self, roster: Optional[StudentRoster]) -> None:
+        """Подключает реестр, используемый только для вычисляемых подписей."""
+        self.student_roster = roster
+        self.invalidate_cache()
+
+    def student_name(self, student_id: Optional[str]) -> str:
+        if not student_id:
+            return ""
+        if not self.student_roster:
+            return f"Неизвестный ID [{student_id}]"
+        return self.student_roster.name_for(student_id)
+
+    def student_label(self, student_id: Optional[str]) -> str:
+        if not student_id:
+            return ""
+        if not self.student_roster:
+            return f"Неизвестный ID [{student_id}]"
+        return self.student_roster.label_for(student_id)
 
     def invalidate_cache(self):
         """Сбрасывает кэш (вызывается при перемещении или переименовании данных)."""

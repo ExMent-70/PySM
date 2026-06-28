@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (
     QComboBox, QMenu, QStyle, QTabWidget, QTextBrowser, QMessageBox, QFileDialog
 )
 
-from domain import AppConfig, Student, ExtraService, CHILDREN_LIST_FILENAME
+from domain import AppConfig, Student, ExtraService, StudentIdAllocator
 from parser import SmartParser, simple_parse_text
 from ui_models import StudentTableModel, EnterKeyDelegate, StudentProxyModel
 from ui_dialogs import (
@@ -53,7 +53,11 @@ def get_raw_config() -> AppConfig:
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("-d", "--wf_dest_dir", type=str, help="Директория назначения.")
-    parser.add_argument("--wf_output_txt_file", type=str, help="Опциональный путь для сохранения children.txt.")
+    parser.add_argument(
+        "--wf_output_txt_file",
+        type=str,
+        help="Путь к файлу student_id текущей фотосессии.",
+    )
     parser.add_argument(
         "--wf_autosave_formats", type=str, nargs='+', 
         choices=["html", "txt", "csv"], default=["html", "txt"], 
@@ -83,6 +87,7 @@ class ClassListEditor(QMainWindow):
         self._is_dirty: bool = False
         self._save_children: bool = False
         self._is_loading: bool = False
+        self.id_allocator = StudentIdAllocator()
 
         self.SERVICES: Dict[str, int] = {}
         self.INFO_COLUMNS: List[str] =[]  # Список заголовков доп. информации
@@ -437,6 +442,7 @@ class ClassListEditor(QMainWindow):
         s_type = self.service_type_combo.currentText()
         cost = self.SERVICES.get(s_type, 0)
         
+        self.id_allocator.assign_missing(students)
         for s in students:
             s.service_type = s_type
             s.service_cost = cost
@@ -466,6 +472,7 @@ class ClassListEditor(QMainWindow):
     # --- Actions ---
     def _add_new_row(self) -> None:
         new_student = Student(
+            student_id=self.id_allocator.allocate(),
             surname="Ученик", name="Новый",
             color1=self.smart_parser.SURNAME_COLOR_HEX, color2=self.smart_parser.NAME_COLOR_HEX,
             color1_fg=self.surname_style.get("color", "#000000"), color2_fg=self.name_style.get("color", "#000000"),
@@ -635,8 +642,14 @@ class ClassListEditor(QMainWindow):
         if self.table_model.rowCount() == 0:
             QMessageBox.warning(self, "Пусто", "Сначала загрузите или создайте список учеников.")
             return
-            
+
         students = self.table_model.get_all_data()
+        try:
+            self.id_allocator.validate_students(students)
+        except ValueError as exc:
+            QMessageBox.critical(self, "Ошибка идентификаторов", str(exc))
+            return
+
         dialog = AIParsingDialog(students, self)
         
         # Если диалог завершился (пользователь нажал Закрыть после импорта),
@@ -700,6 +713,9 @@ class ClassListEditor(QMainWindow):
     def _load_from_file(self, path: pathlib.Path) -> None:
         try:
             metadata, students = io_services.load_session(path)
+            loaded_allocator = StudentIdAllocator(
+                metadata["list_id"], metadata["next_student_number"]
+            )
             
             self.class_name_input.setText(metadata["class_name"])
             self.service_type_combo.setCurrentText(metadata["service_type"])
@@ -721,6 +737,7 @@ class ClassListEditor(QMainWindow):
 
             self.table_model.set_info_columns(self.INFO_COLUMNS)
             self.table_model.update_data(students)
+            self.id_allocator = loaded_allocator
                        
             self.table_model.sort_and_renumber()
             self.processed_table.sortByColumn(StudentTableModel.COL_SURNAME, Qt.SortOrder.AscendingOrder)
@@ -749,7 +766,8 @@ class ClassListEditor(QMainWindow):
                 self.class_name_input.text(),
                 self.service_type_combo.currentText(),
                 self.table_model.get_all_data(),
-                self.INFO_COLUMNS # Сохраняем схему
+                self.INFO_COLUMNS, # Сохраняем схему
+                self.id_allocator,
             )
             self.statusBar().showMessage(f"Сохранено: {path.name}", 5000)
             self._is_dirty = False
@@ -814,16 +832,21 @@ class ClassListEditor(QMainWindow):
 
     def _save_for_processing(self) -> None:
         if self.table_model.rowCount() == 0: return
-        if self.config.wf_output_txt_file: 
-            output_dir = pathlib.Path(self.config.wf_output_txt_file).parent
-            filename = pathlib.Path(self.config.wf_output_txt_file).name
-        elif self.config.wf_dest_dir: 
-            output_dir = pathlib.Path(self.config.wf_dest_dir)
-            filename = CHILDREN_LIST_FILENAME
-        else: return
+        if not self.config.wf_output_txt_file:
+            QMessageBox.warning(
+                self,
+                "Файл фотосессии не сохранён",
+                "Не указан --wf_output_txt_file. Общий children.txt больше не создаётся.",
+            )
+            return
 
         try:
-            io_services.export_to_txt(output_dir, self.table_model.get_all_data(), filename)
+            output_path = pathlib.Path(self.config.wf_output_txt_file)
+            io_services.export_to_txt(
+                output_path,
+                self.table_model.get_all_data(),
+                self.id_allocator,
+            )
             self.statusBar().showMessage("Файл для обработки сохранен.", 3000)
             self._save_children = True
         except Exception as e:
@@ -889,9 +912,8 @@ class ClassListEditor(QMainWindow):
     def add_link(self) -> None:
         if IS_MANAGED_RUN and pysm_context and self.config.wf_dest_dir:
             print(" ", file=sys.stderr)
-            if self._save_children:
-                path_str = self.config.wf_output_txt_file or str(pathlib.Path(self.config.wf_dest_dir) / CHILDREN_LIST_FILENAME)
-                path = pathlib.Path(path_str)
+            if self._save_children and self.config.wf_output_txt_file:
+                path = pathlib.Path(self.config.wf_output_txt_file)
                 pysm_context.log_link(url_or_path=str(path), text=f"Открыть файл <i>{path.name}</i>")
             pysm_context.log_link(url_or_path=str(self.config.wf_dest_dir), text="Открыть папку с файлами")
             print(" ", file=sys.stderr)

@@ -1,8 +1,8 @@
 {
-  "description": "Универсальный скрипт для пакетной обработки фотографий. Извлекает номера из текста и выполняет выбранный набор операций: обновление XMP-тегов, переименование и/или копирование файлов.\n\n<b>Примеры путей при работе с RAW-файлами</b>\n<b>source_dir</b> = <i>{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}</i>\n<b>dest_dir</b> = <i>{wf_session_path}/{wf_session_name}/Selects/{wf_photo_session}</i>\n\n<b>Примеры путей при работе с JPG-файлами</b>\n<b>source_dir</b> = <i>{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG</i>\n<b>dest_dir</b> = <i>{wf_session_path}/{wf_session_name}/Output/{wf_session_name}/Альбом/Фото/{wf_photo_session}</i><hr>",
+  "description": "Интерактивный поиск и копирование фотографий по номерам. Показывает всех учеников фотографии по `student_id`, получает ФИО из `*.list`, безопасно переименовывает одиночные портреты и при необходимости синхронизирует `matches_portrait_to_group.json` по ID.\n\n<b>RAW</b>: source_dir = <i>{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}</i>\n<b>JPG</b>: source_dir = <i>{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG</i>",
   "category": "Метаданные",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.4.0",
+  "version": "v2.2026.06.21",
   "command_line_args_meta": {
     "analysis_dir": {
       "type": "dir_path",
@@ -15,6 +15,12 @@
       "description": "Путь к папке с исходными файлами для поиска.",
       "required": true,
       "default": "{wf_session_path}/{wf_session_name}/Capture/{wf_photo_session}"
+    },
+    "student_list_file": {
+      "type": "file_path",
+      "description": "Файл *.list — единственный источник фамилии и имени ученика",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list"
     },
     "dest_dir": {
       "type": "dir_path",

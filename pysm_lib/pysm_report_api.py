@@ -200,9 +200,23 @@ class DashboardBuilder(BaseReportBuilder):
         """Простой заголовок (подчеркнутый)."""
         self._render_header_html(text, link_node, mode="simple")
 
-    def add_header_boxed(self, text: str, link_node: Optional[ResourceNode] = None, extra_html: str = ""):
-        """Заголовок в рамке (как у сессии или подраздела)."""
-        self._render_header_html(text, link_node, mode="boxed", extra_html=extra_html)
+    def add_header_boxed(
+        self,
+        text: str,
+        link_node: Optional[ResourceNode] = None,
+        extra_html: str = "",
+        icon_size: int = 16,
+        vertical_padding: int = 5,
+    ):
+        """Заголовок в рамке с настраиваемыми иконкой и высотой."""
+        self._render_header_html(
+            text,
+            link_node,
+            mode="boxed",
+            extra_html=extra_html,
+            icon_size=icon_size,
+            vertical_padding=vertical_padding,
+        )
 
     def add_table_simple(self, nodes: List[ResourceNode]):
         """Таблица в одну строку. Ширина по контенту."""
@@ -268,17 +282,29 @@ class DashboardBuilder(BaseReportBuilder):
         width_attr = f'width="{width}"' if width else ''
         self.parts.append(f'<table {width_attr} style="{self.table_style} margin-top: {margin};">')
 
-    def _render_header_html(self, text, node, mode, extra_html=""):
+    def _render_header_html(
+        self,
+        text,
+        node,
+        mode,
+        extra_html="",
+        icon_size=16,
+        vertical_padding=5,
+    ):
         href = node.path.resolve().as_uri() if (node and node.path) else "#"
         icon = ""
         if node and node.path and icons:
-            icon = f'<span style="margin-right: 10px;">{icons.OPEN(size=16)}</span>&nbsp;'
+            icon = (
+                f'<span style="margin-right: 10px;">'
+                f'{icons.OPEN(size=icon_size)}</span>&nbsp;'
+            )
         
         content = f'{icon}<a href="{href}" style="text-decoration:none; color:{self.theme.text_main};">{text}</a>'
         
         if mode == "boxed":
             style = (f"border: 1px solid {self.theme.border}; border-bottom: none; "
-                     f"background-color: {self.theme.header_bg}; padding: 5px 8px; "
+                     f"background-color: {self.theme.header_bg}; "
+                     f"padding: {vertical_padding}px 8px; "
                      f"font-weight: bold; color: {self.theme.text_main}; margin-top: 12px; display: flex; align-items: center;")
             self.parts.append(f'<div style="{style}">{content} {extra_html}</div>')
         else:

@@ -2,8 +2,10 @@
 
 import json
 import logging
+import os
 import sys
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 import numpy as np
@@ -34,6 +36,26 @@ from _common import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def write_json_atomic(path: Path, data: Any) -> None:
+    """Атомарно записывает JSON через временный файл в целевой папке."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
+    )
+    os.close(fd)
+    temp_path = Path(temp_name)
+    try:
+        with temp_path.open("w", encoding="utf-8") as stream:
+            json.dump(data, stream, ensure_ascii=False, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_path, path)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
 
 class AnalysisDataManager:
     """
@@ -91,22 +113,20 @@ class AnalysisDataManager:
 
         return True
 
-    def save_json(self, backup: bool = True) -> bool:
+    def save_json(self, backup: bool = True) -> None:
         """
-        Сохраняет текущее состояние self.json_data в файл.
+        Атомарно сохраняет текущее состояние и выбрасывает ошибку при неудаче.
         """
         try:
             if backup and self.json_path.exists():
                 shutil.copy(self.json_path, self.json_path.with_suffix(".json.bak"))
 
-            with self.json_path.open("w", encoding="utf-8") as f:
-                json.dump(self.json_data, f, ensure_ascii=False, indent=2)
+            write_json_atomic(self.json_path, self.json_data)
             
             logger.info(f"<br>{icon_save} файл <i>{self.json_path.name}</i> сохранён")
-            return True
         except Exception as e:
             logger.critical(f"{icon_save_error} Ошибка сохранения JSON: {e}")
-            return False
+            raise RuntimeError(f"Не удалось сохранить {self.json_path}: {e}") from e
 
     def get_subset_embeddings(self, filter_func) -> Tuple[List[str], List[int], np.ndarray]:
         """

@@ -8,7 +8,7 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSplitter,
-    QLineEdit, QMenu, QListWidget, QSlider, QTextEdit, QProgressBar, QSpinBox
+    QLineEdit, QMenu, QListWidget, QSlider, QTextEdit, QProgressBar, QSpinBox,
 )
 from PySide6.QtCore import Qt, QSize
 
@@ -147,10 +147,12 @@ class EditorUIBuilder:
         window.btn_filter_male = QPushButton("")
         if pysm_icons: window.btn_filter_male.setIcon(pysm_icons.get_qicon("GENDER_MALE", 16))
         window.btn_filter_male.setCheckable(True)
+        window.btn_filter_male.setToolTip("Только мужчины")
         
         window.btn_filter_female = QPushButton("")
         if pysm_icons: window.btn_filter_female.setIcon(pysm_icons.get_qicon("GENDER_FEMALE", 16))
         window.btn_filter_female.setCheckable(True)
+        window.btn_filter_female.setToolTip("Только женщины")
         
         row1.addWidget(window.btn_filter_male)
         row1.addWidget(window.btn_filter_female)
@@ -160,16 +162,19 @@ class EditorUIBuilder:
         window.btn_filter_eyes = QPushButton("")
         if pysm_icons: window.btn_filter_eyes.setIcon(pysm_icons.get_qicon("EYE_CLOSED", 16))
         window.btn_filter_eyes.setCheckable(True)
+        window.btn_filter_eyes.setToolTip("Есть лицо с закрытыми глазами")
         
         window.btn_filter_mouth = QPushButton("")
         if pysm_icons: window.btn_filter_mouth.setIcon(pysm_icons.get_qicon("MOUTH_OPEN", 16))
         window.btn_filter_mouth.setCheckable(True)
+        window.btn_filter_mouth.setToolTip("Есть лицо с открытым ртом")
         
         row1.addWidget(window.btn_filter_eyes)
         row1.addWidget(window.btn_filter_mouth)
 
         window.btn_filter_beauty = QPushButton("✨ AI Оценка")
         window.btn_filter_beauty.setCheckable(True)
+        window.btn_filter_beauty.setToolTip("AI-оценка выше указанного значения")
         
         window.spin_beauty_score = QSpinBox()
         window.spin_beauty_score.setPrefix("> ")
@@ -185,10 +190,12 @@ class EditorUIBuilder:
         window.btn_filter_portrait = QPushButton("")
         if pysm_icons: window.btn_filter_portrait.setIcon(pysm_icons.get_qicon("PHOTO_PORTRAIT", 16))
         window.btn_filter_portrait.setCheckable(True)
+        window.btn_filter_portrait.setToolTip("Только портретные фотографии")
         
         window.btn_filter_group = QPushButton("")
         if pysm_icons: window.btn_filter_group.setIcon(pysm_icons.get_qicon("PHOTO_GROUP", 16))
         window.btn_filter_group.setCheckable(True)
+        window.btn_filter_group.setToolTip("Только групповые фотографии")
         
         window.spin_group_count = QSpinBox()
         window.spin_group_count.setPrefix("< ")
@@ -199,7 +206,22 @@ class EditorUIBuilder:
         
         row1.addWidget(window.btn_filter_portrait)
         row1.addWidget(window.btn_filter_group)
-        row1.addWidget(window.spin_group_count)       
+        row1.addWidget(window.spin_group_count)
+        row1.addSpacing(10)
+
+        window.btn_filter_selected_photos = QPushButton("")
+        if pysm_icons:
+            window.btn_filter_selected_photos.setIcon(
+                pysm_icons.get_qicon("SELECT_FILES", 16)
+            )
+        window.btn_filter_selected_photos.setCheckable(True)
+        window.btn_filter_selected_photos.setToolTip(
+            "Только фотографии, выбранные пользователями"
+        )
+        window.btn_filter_selected_photos.toggled.connect(
+            window._on_selected_photos_toggled
+        )
+        row1.addWidget(window.btn_filter_selected_photos)
         row1.addStretch()
         
         filter_layout.addLayout(row1)

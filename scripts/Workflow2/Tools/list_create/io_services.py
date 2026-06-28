@@ -6,12 +6,14 @@ io_services.py
 
 import csv
 import json
+import os
 import sys
 import pathlib
 import re  # Добавлен для поиска версии в файле
+import tempfile
 from typing import List, Dict, Any, Optional, Tuple
 
-from domain import Student, ExtraService, CHILDREN_LIST_FILENAME
+from domain import Student, StudentIdAllocator, validate_list_id
 
 try:
     import jinja2
@@ -33,11 +35,11 @@ DEFAULT_AI_PROMPT = """
 **Роль:** Ты — профессиональный редактор, корректор и Data Scientist.
 
 **Задача:**
-Тебе предоставлен JSON-список учеников и неструктурированный текст. 
-Твоя цель — заполнить ВСЕ поля в объекте `info` для каждого ученика, используя данные из текста.
+Тебе предоставлен справочник учеников с техническими `student_id` и неструктурированный текст пользователя.
+Нужно сопоставить упомянутых людей со справочником и извлечь дополнительные данные.
 
 **Входные данные:**
-1. JSON-структура (список учеников и поля info):
+1. Справочник текущего списка (`student_id`, ФИО и поля `info`):
 {{STUDENT_LIST_JSON}}
 
 2. Неструктурированный текст (список имен и данных, например, цитат, хобби и т.д.):
@@ -53,7 +55,9 @@ DEFAULT_AI_PROMPT = """
 2. **Сопоставление (Smart Matching):**
    - Ищи людей нестрого: "Саша" = "Александр", "Лера" = "Валерия", "Вячеслав" = "Слава".
    - Если фамилия и имя в тексте перепутаны местами — это тот же человек.
-   - Если человека из текста нет в JSON — игнорируй его.
+   - Если указана только фамилия и она уникальна в справочнике, используй соответствующий `student_id`.
+   - Если подходят несколько учеников или совпадение неуверенное, не выбирай ID: добавь запись в `unresolved`.
+   - Никогда не придумывай и не изменяй `student_id`.
 
 3. **Правила Редактуры (Типографика и Грамматика):**
    - **Регистр:** Текст должен начинаться с Заглавной буквы.
@@ -66,8 +70,81 @@ DEFAULT_AI_PROMPT = """
 
 4. **Формат вывода:**
    - Верни ТОЛЬКО валидный JSON.
-   - Не сокращай список, верни полную структуру со всеми студентами.
+   - Используй объект вида:
+     {"matched": [{"student_id": "A7K3-S001", "source_person": "Иванов", "info": {}}], "unresolved": [{"source_person": "Петров", "reason": "Несколько кандидатов", "candidates": ["A7K3-S002", "A7K3-S005"]}]}
+   - В `matched` включай только однозначные сопоставления.
+   - Сохраняй существующие значения `info`, если в тексте нет новых данных для поля.
 """
+
+
+def _atomic_write_text(path: pathlib.Path, text: str, encoding: str = "utf-8") -> None:
+    """Атомарно заменяет текстовый файл через временный файл рядом с ним."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
+    )
+    os.close(fd)
+    temp_path = pathlib.Path(temp_name)
+    try:
+        temp_path.write_text(text, encoding=encoding)
+        os.replace(temp_path, path)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+
+
+def build_ai_student_reference(students: List[Student]) -> List[Dict[str, Any]]:
+    """Формирует справочник, по которому AI разрешает ФИО в student_id."""
+
+    return [
+        {
+            "student_id": student.student_id,
+            "surname": student.surname,
+            "name": student.name,
+            "patronymic": student.patronymic,
+            "info": student.info,
+        }
+        for student in students
+    ]
+
+
+def validate_ai_enrichment_response(
+    payload: Any, students: List[Student]
+) -> Tuple[Dict[str, Dict[str, str]], List[Dict[str, Any]]]:
+    """Проверяет ответ AI и возвращает обновления, адресованные только по ID."""
+
+    if not isinstance(payload, dict):
+        raise ValueError("Ожидался JSON-объект с массивами matched и unresolved.")
+
+    matched = payload.get("matched", [])
+    unresolved = payload.get("unresolved", [])
+    if not isinstance(matched, list) or not isinstance(unresolved, list):
+        raise ValueError("Поля matched и unresolved должны быть массивами.")
+
+    students_by_id = {student.student_id: student for student in students}
+    updates: Dict[str, Dict[str, str]] = {}
+    for index, item in enumerate(matched, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"matched[{index}] должен быть JSON-объектом.")
+        student_id = str(item.get("student_id", "")).strip().upper()
+        if student_id not in students_by_id:
+            raise ValueError(
+                f"matched[{index}] содержит неизвестный student_id: {student_id or 'пусто'}."
+            )
+        if student_id in updates:
+            raise ValueError(f"student_id {student_id} повторяется в matched.")
+
+        info = item.get("info")
+        if not isinstance(info, dict):
+            raise ValueError(f"matched[{index}].info должен быть JSON-объектом.")
+        updates[student_id] = {str(key): str(value) for key, value in info.items()}
+
+    for index, item in enumerate(unresolved, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"unresolved[{index}] должен быть JSON-объектом.")
+
+    return updates, unresolved
 
 def get_ai_prompt_template(directory: pathlib.Path) -> str:
     """
@@ -276,18 +353,30 @@ def load_session(path: pathlib.Path) -> Tuple[Dict[str, Any], List[Student]]:
     with open(path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
+    list_id = validate_list_id(data.get("list_id", ""))
+    try:
+        next_student_number = int(data.get("next_student_number"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Файл списка не содержит корректный next_student_number.") from exc
+
+    allocator = StudentIdAllocator(list_id, next_student_number)
     metadata = {
         "class_name": data.get("class_name", path.stem),
         "service_type": data.get("service_type", ""),
-        "info_columns": data.get("info_columns", [])
+        "info_columns": data.get("info_columns", []),
+        "list_id": allocator.list_id,
+        "next_student_number": allocator.next_student_number,
     }
     
     students = [Student.from_dict(s) for s in data.get("students", [])]
+    allocator.validate_students(students)
     return metadata, students
 
 
-def save_session(path: pathlib.Path, class_name: str, service_type: str, 
-                 students: List[Student], info_columns: List[str]) -> None:
+def save_session(path: pathlib.Path, class_name: str, service_type: str,
+                 students: List[Student], info_columns: List[str],
+                 allocator: StudentIdAllocator) -> None:
+    allocator.validate_students(students)
     # Сериализация с гарантией наличия всех ключей info
     students_data_list = []
     for s in students:
@@ -300,21 +389,21 @@ def save_session(path: pathlib.Path, class_name: str, service_type: str,
         students_data_list.append(s_data)
 
     data = {
+        "list_id": allocator.list_id,
+        "next_student_number": allocator.next_student_number,
         "class_name": class_name,
         "service_type": service_type,
         "info_columns": info_columns,
         "students": students_data_list
     }
     
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    _atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=4))
 
 
 def export_to_csv(path: pathlib.Path, students: List[Student], info_columns: List[str] = None) -> None:
     info_columns = info_columns or []
     fieldnames = [
-        "shoot_order", "alpha_order", "surname", "name", 
+        "student_id", "shoot_order", "alpha_order", "surname", "name",
         "service_type", "service_cost", "extra_services", "total_cost"
     ] + info_columns
     
@@ -327,6 +416,7 @@ def export_to_csv(path: pathlib.Path, students: List[Student], info_columns: Lis
         extras_str = "; ".join(extras_items)
 
         row = {
+            "student_id": s.student_id,
             "shoot_order": s.shoot_order if s.shoot_order is not None else "",
             "alpha_order": s.alpha_order,
             "surname": s.surname,
@@ -346,17 +436,18 @@ def export_to_csv(path: pathlib.Path, students: List[Student], info_columns: Lis
         writer.writerows(rows_to_write)
 
 
-def export_to_txt(directory: pathlib.Path, students: List[Student], filename: str = None) -> None:
-    output_path = directory / (filename or CHILDREN_LIST_FILENAME)
+def export_to_txt(
+    output_path: pathlib.Path,
+    students: List[Student],
+    allocator: StudentIdAllocator,
+) -> None:
+    allocator.validate_students(students)
     sorted_students = sorted(
         [s for s in students if s.shoot_order is not None], 
         key=lambda s: s.shoot_order
     )
-    lines = [f"{s.surname} {s.name}".strip() for s in sorted_students]
-    
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write("\n".join(lines))
+    lines = [student.student_id for student in sorted_students]
+    _atomic_write_text(output_path, "\n".join(lines))
 
 
 def export_to_html(path: pathlib.Path, class_name: str, students: List[Student], 

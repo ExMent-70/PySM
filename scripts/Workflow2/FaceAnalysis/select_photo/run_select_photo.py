@@ -30,6 +30,15 @@ try:
     project_root = current_script_path.parent.parent
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
+    from matches_sync import atomic_write_json, sync_matches_data
+    from student_identity import (
+        StudentRoster,
+        build_rename_stem,
+        collect_photo_identity,
+        format_students_for_table,
+        load_student_roster,
+        validate_identity_contract,
+    )
 except ImportError as e:
     print(f"Критическая ошибка импорта: {e}", file=sys.stderr)
     sys.exit(1)
@@ -95,6 +104,10 @@ def get_config() -> Namespace:
         help="Папка с исходными фотографиями (откуда искать)."
     )
     parser.add_argument(
+        "--student_list_file", type=str, required=True,
+        help="Файл *.list — единственный источник фамилии и имени."
+    )
+    parser.add_argument(
         "--dest_dir", type=str, required=False, 
         help="Корневая папка для результатов (куда копировать)."
     )
@@ -158,23 +171,6 @@ def load_json(json_path: pathlib.Path, required: bool = True) -> dict:
         raise RuntimeError(f"Неизвестная ошибка чтения {json_path.name}: {e}")
 
 
-def save_json(json_path: pathlib.Path, data: dict) -> None:
-    """
-    Безопасно сохраняет словарь в файл формата JSON.
-
-    Args:
-        json_path (pathlib.Path): Путь для сохранения файла.
-        data (dict): Данные, которые необходимо сериализовать.
-    """
-    try:
-        json_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        logger.info(f"Файл успешно сохранен: {json_path.name}")
-    except Exception as e:
-        logger.error(f"Ошибка записи {json_path.name}: {e}")
-
-
 # ==============================================================================
 # 4. БЛОК: Бизнес-логика (Сервисы)
 # ==============================================================================
@@ -194,7 +190,7 @@ class DataSyncService:
         # Файл может отсутствовать при первом запуске, поэтому required=False
         self.matches_data = load_json(matches_json_path, required=False) if matches_json_path else dict()
 
-    def sync(self, search_results: list[dict], selected_numbers: set[str], config: Namespace) -> None:
+    def sync(self, search_results: list[dict], selected_numbers: set[str], config: Namespace) -> bool:
         """
         Основной метод синхронизации. Обновляет списки групповых фото для персон.
 
@@ -205,78 +201,18 @@ class DataSyncService:
         """
         if not self.matches_data or not self.matches_json_path:
             logger.warning("Файл matches.json пуст или не загружен. Синхронизация пропущена.")
-            return
+            return False
 
-        # Создаем карту: номер фото -> {имя ребенка, реальное имя файла на диске}
-        found_map = dict()
-        for item in search_results:
-            if item.get("status") == "Найден" and item.get("child_name"):
-                found_map[item["number"]] = {
-                    "child_name": item["child_name"],
-                    "filename": item.get("original_filename")
-                }
-
-        # Компилируем регулярное выражение для извлечения номеров из старых записей
-        min_d, max_d = sorted([config.min_digits, config.max_digits])
-        regex = re.compile(r"(?<!\d)(\d{%d,%d})(?!\d)" % (min_d, max_d))
-
-        for cluster_id, data in self.matches_data.items():
-            child_name = data.get("child_name")
-            if not child_name:
-                continue
-
-            current_photos = data.get("group_photos", list())
-            new_group_photos = self._sync_person_photos(
-                child_name, current_photos, selected_numbers, found_map, regex
-            )
-            self.matches_data[cluster_id]["group_photos"] = new_group_photos
-
-        save_json(self.matches_json_path, self.matches_data)
-
-    def _sync_person_photos(
-        self, 
-        child_name: str, 
-        current_photos: list[dict], 
-        selected_numbers: set[str], 
-        found_map: dict, 
-        regex: re.Pattern
-    ) -> list[dict]:
-        """
-        Очищает устаревшие фото и добавляет новые найденные для конкретного человека.
-
-        Args:
-            child_name (str): Имя персоны (ребенка).
-            current_photos (list[dict]): Текущий список фотографий в JSON.
-            selected_numbers (set[str]): Номера, подтвержденные пользователем.
-            found_map (dict): Карта реально найденных на диске файлов.
-            regex (re.Pattern): Скомпилированное регулярное выражение.
-
-        Returns:
-            list[dict]: Обновленный, отсортированный список фотографий.
-        """
-        new_group_photos = list()
-        existing_photo_numbers = set()
-
-        # 1. Очистка: оставляем только те старые фото, номера которых есть в выбранных
-        for photo_info in current_photos:
-            match = regex.search(photo_info.get("filename", ""))
-            if match and match.group(1) in selected_numbers:
-                new_group_photos.append(photo_info)
-                existing_photo_numbers.add(match.group(1))
-
-        # 2. Дополнение: добавляем свежие найденные файлы с их реальными именами
-        for number, info in found_map.items():
-            if info["child_name"] == child_name and number not in existing_photo_numbers:
-                new_photo_info = {
-                    "filename": info["filename"],
-                    "min_distance": 0.0,
-                    "num_faces": 1
-                }
-                new_group_photos.append(new_photo_info)
-
-        # Сортируем итоговый список по имени файла для консистентности JSON
-        new_group_photos.sort(key=lambda p: p.get("filename", ""))
-        return new_group_photos
+        self.matches_data = sync_matches_data(
+            self.matches_data,
+            search_results,
+            selected_numbers,
+            config.min_digits,
+            config.max_digits,
+        )
+        atomic_write_json(self.matches_json_path, self.matches_data)
+        logger.info(f"Файл успешно сохранен: {self.matches_json_path.name}")
+        return True
 
 
 # ==============================================================================
@@ -285,7 +221,12 @@ class DataSyncService:
 class TreeItem:
     """Узел древовидной структуры данных для модели отображения в QTreeView."""
     
-    def __init__(self, data: list, parent: "TreeItem" = None):
+    def __init__(
+        self,
+        data: list,
+        parent: "TreeItem" = None,
+        tooltips: dict[int, str] | None = None,
+    ):
         """
         Args:
             data (list): Данные столбцов текущего узла.
@@ -294,6 +235,7 @@ class TreeItem:
         self._data = data
         self._parent = parent
         self._children: list["TreeItem"] = list()
+        self._tooltips = tooltips or {}
 
     def child(self, row: int) -> Optional["TreeItem"]:
         """Возвращает дочерний элемент по индексу строки."""
@@ -310,6 +252,11 @@ class TreeItem:
     def data(self, column: int) -> Any:
         """Возвращает данные конкретного столбца."""
         return self._data[column] if 0 <= column < len(self._data) else None
+
+    def tooltip(self, column: int) -> str:
+        """Возвращает подсказку столбца, если она задана для узла."""
+
+        return self._tooltips.get(column, "")
 
     def parent(self) -> Optional["TreeItem"]:
         """Возвращает родительский элемент."""
@@ -333,7 +280,7 @@ class ResultTreeModel(QAbstractItemModel):
     def __init__(self, data=None, icons=None, colors=None, parent=None):
         super().__init__(parent)
         self.headers =[
-            "№", "Номер", "Имя", "Локация", "Статус", "Новое имя (основа)", "Файлы"
+            "№", "Номер", "Ученики", "Локация", "Статус", "Новое имя (основа)", "Файлы"
         ]
         self._root_item = TreeItem(self.headers)
         self.icons = icons or dict()
@@ -360,17 +307,24 @@ class ResultTreeModel(QAbstractItemModel):
             # сортировку (2 будет стоять перед 10), а не алфавитную.
             num_str = item_data.get("number", "")
             num_val = int(num_str) if num_str.isdigit() else num_str
+            students_text, students_tooltip = format_students_for_table(
+                item_data.get("student_names", [])
+            )
             
             row_data =[
                 idx, 
                 num_val,
-                item_data.get("child_name", ""),
+                students_text,
                 item_data.get("location_name", ""),
                 item_data.get("status", "Ожидает"),
                 item_data.get("new_stem", ""),
                 files_count_str,
             ]
-            parent_item = TreeItem(row_data, self._root_item)
+            parent_item = TreeItem(
+                row_data,
+                self._root_item,
+                tooltips={2: students_tooltip} if students_tooltip else None,
+            )
 
             # Если есть вложенные файлы, добавляем их как дочерние элементы строки
             if files and base_path:
@@ -398,6 +352,9 @@ class ResultTreeModel(QAbstractItemModel):
         # Роль отображения текста
         if role == Qt.DisplayRole:
             return item.data(col)
+
+        if role == Qt.ToolTipRole:
+            return item.tooltip(col) or None
 
         # Роль отображения иконок в столбце "Файлы"
         if role == Qt.DecorationRole and col == 6:
@@ -511,6 +468,7 @@ class SearchWorker(QThread):
         self, 
         source_dir: pathlib.Path, 
         metadata: dict, 
+        student_roster: StudentRoster,
         numbers: list[str], 
         exclude_dirs: list[str], 
         min_digits: int, 
@@ -519,6 +477,7 @@ class SearchWorker(QThread):
         super().__init__()
         self.source_dir = source_dir
         self.metadata = metadata
+        self.student_roster = student_roster
         self.numbers_to_find = set(numbers)
         self.exclude_dirs = set(exclude_dirs)
         self.min_digits = min_digits
@@ -535,7 +494,7 @@ class SearchWorker(QThread):
             for filename, data in self.metadata.items():
                 match = regex.search(filename)
                 if match and match.group(1) not in number_to_metadata:
-                    number_to_metadata[match.group(1)] = data
+                    number_to_metadata[match.group(1)] = (filename, data)
 
             files_map = defaultdict(list)
             
@@ -556,14 +515,14 @@ class SearchWorker(QThread):
             # Формирование итогового отчета по каждому запрошенному номеру
             results = list()
             for num in self.numbers_to_find:
-                item_data = number_to_metadata.get(num, dict())
+                metadata_filename, item_data = number_to_metadata.get(
+                    num, ("", dict())
+                )
                 found_files = files_map.get(num, list())
                 status = "Найден" if found_files else "Не найден"
 
                 faces = item_data.get("faces", list())
-                child_name = ""
-                if faces and isinstance(faces[0], dict):
-                    child_name = faces[0].get("child_name", "")
+                identity = collect_photo_identity(faces, self.student_roster)
                     
                 location_name = item_data.get("location_name", "Не определена")
                 
@@ -571,17 +530,23 @@ class SearchWorker(QThread):
                 original_filename = ""
                 
                 if found_files:
-                    new_stem = f"{child_name}-{num}" if child_name else found_files[0].stem
-                    # Сохраняем имя реально найденного файла для синхронизации JSON
-                    original_filename = found_files[0].name
+                    new_stem = build_rename_stem(
+                        identity, num, found_files[0].stem
+                    )
+                    # Для JSON используем каноническое имя из info_faces, а не
+                    # случайное расширение первого найденного RAW/JPG-файла.
+                    original_filename = metadata_filename or found_files[0].name
                 else:
-                    original_filename = f"IMG_{num}.jpg"
+                    original_filename = metadata_filename or f"IMG_{num}.jpg"
 
                 results.append({
                     "number": num, 
                     "status": status, 
                     "files": sorted(list(set(found_files))),
-                    "child_name": child_name, 
+                    "student_ids": list(identity.student_ids),
+                    "student_names": list(identity.student_names),
+                    "display_students": identity.display_students,
+                    "rename_person_name": identity.rename_person_name,
                     "location_name": location_name,
                     "base_path": self.source_dir, 
                     "new_stem": new_stem,
@@ -602,6 +567,7 @@ class ProcessWorker(QThread):
     progress_signal = Signal(str)
     progress_percent_signal = Signal(int)
     error_signal = Signal(str)
+    failed_signal = Signal(str)
 
     def __init__(
         self, 
@@ -626,7 +592,7 @@ class ProcessWorker(QThread):
                 return
 
             if not self.dest_dir:
-                self.error_signal.emit("Не указана папка назначения (--dest_dir).")
+                self.failed_signal.emit("Не указана папка назначения (--dest_dir).")
                 return
 
             items_to_process =[
@@ -634,16 +600,15 @@ class ProcessWorker(QThread):
                 if item.get("status") == "Найден"
             ]
             total = len(items_to_process)
+            copied_count = 0
+            copy_errors: list[str] = []
             
             for i, item in enumerate(items_to_process, 1):
                 files = item.get("files", list())
                 location = item.get("location_name", "unknown")
-                child_name = item.get("child_name")
-                number = item.get("number")
-                
                 # Создаем подпапку локации внутри целевой директории
                 target_location_root = self.dest_dir / str(location)
-                new_stem = f"{child_name}-{number}" if (self.do_rename and child_name) else None
+                new_stem = item.get("new_stem") if self.do_rename else None
 
                 for src_file in files:
                     try:
@@ -661,17 +626,29 @@ class ProcessWorker(QThread):
                     if not dest_file.exists():
                         try:
                             shutil.copy2(src_file, dest_file)
+                            copied_count += 1
                         except Exception as e:
-                            logger.error(f"[ОШИБКА] Не удалось скопировать {src_file.name}: {e}")
+                            copy_errors.append(
+                                f"{src_file.name}: {e}"
+                            )
                             
                 # Вычисляем и передаем процент завершения
                 percent = int((i / total) * 100) if total > 0 else 100
                 self.progress_percent_signal.emit(percent)
                 self.progress_signal.emit(f"Скопировано: группа {i} из {total}")
             
-            self.finished_signal.emit(f"Обработка завершена. Скопировано групп: {total}.")
+            if copy_errors:
+                details = "\n".join(copy_errors[:10])
+                self.failed_signal.emit(
+                    f"Не удалось скопировать файлов: {len(copy_errors)}.\n{details}"
+                )
+                return
+            self.finished_signal.emit(
+                f"Обработка завершена. Скопировано файлов: {copied_count}; "
+                f"обработано групп: {total}."
+            )
         except Exception as e:
-            self.error_signal.emit(f"Ошибка копирования: {e}")
+            self.failed_signal.emit(f"Ошибка копирования: {e}")
 
 
 # ==============================================================================
@@ -694,16 +671,25 @@ class SorterWindow(QMainWindow):
         # Инициализация слоя бизнес-логики и загрузка данных
         try:
             analysis_dir = pathlib.Path(config.analysis_dir)
+            self.student_roster = load_student_roster(
+                pathlib.Path(config.student_list_file)
+            )
             faces_json_path = analysis_dir / "info_faces.json"
             self.metadata = load_json(faces_json_path, required=True)
             
             matches_path = analysis_dir / "matches_portrait_to_group.json"
             self.sync_service = DataSyncService(matches_path)
+            validate_identity_contract(
+                self.metadata,
+                self.sync_service.matches_data,
+                self.student_roster,
+            )
             
         except Exception as e:
             QMessageBox.critical(self, "Критическая ошибка", f"Не удалось загрузить данные:\n{e}")
             self.setEnabled(False)
             self.metadata = dict()
+            self.student_roster = None
             self.sync_service = None
 
         self._load_theme_colors()
@@ -899,6 +885,7 @@ class SorterWindow(QMainWindow):
         self._search_worker = SearchWorker(
             source_dir=pathlib.Path(self.config.source_dir),
             metadata=self.metadata,
+            student_roster=self.student_roster,
             numbers=numbers,
             exclude_dirs=getattr(self.config, "exclude_dirs", list()),
             min_digits=self.config.min_digits,
@@ -976,6 +963,7 @@ class SorterWindow(QMainWindow):
             do_copy=do_copy_files
         )
         self._process_worker.finished_signal.connect(self.on_processing_finished)
+        self._process_worker.failed_signal.connect(self.on_processing_failed)
         self._process_worker.progress_signal.connect(
             lambda msg: self.statusBar().showMessage(msg)
         )
@@ -985,16 +973,39 @@ class SorterWindow(QMainWindow):
         )
         self._process_worker.start()
 
+    def on_processing_failed(self, message: str) -> None:
+        """Возвращает GUI в рабочее состояние после ошибки копирования."""
+
+        self.progress_bar.setVisible(False)
+        self.statusBar().showMessage(message)
+        self.btn_copy.setEnabled(True)
+        self.final_status = 1
+        QMessageBox.critical(self, "Ошибка копирования", message)
+
     def on_processing_finished(self, message: str) -> None:
         """Обрабатывает завершение всех операций и очищает интерфейс."""
         self.progress_bar.setVisible(False)
         self.statusBar().showMessage(message)
-        self.final_status = 0
-        
+
+        sync_completed = False
         # Синхронизация данных JSON, если включена опция
         if self.chk_sync_matches.isChecked() and self.sync_service:
             selected_numbers = set(self.numbers_line_edit.text().split())
-            self.sync_service.sync(self.search_results, selected_numbers, self.config)
+            try:
+                sync_completed = self.sync_service.sync(
+                    self.search_results, selected_numbers, self.config
+                )
+            except Exception as exc:
+                self.final_status = 1
+                QMessageBox.critical(
+                    self,
+                    "Ошибка синхронизации",
+                    f"Файлы скопированы, но matches не обновлён:\n{exc}",
+                )
+                self.btn_copy.setEnabled(True)
+                return
+
+        self.final_status = 0
 
         # Очистка интерфейса для следующей задачи
         self.markup_browser.clear()
@@ -1006,7 +1017,10 @@ class SorterWindow(QMainWindow):
         self.btn_copy.setEnabled(False)
         self.left_tabs.setCurrentIndex(0)
 
-        QMessageBox.information(self, "Успех", "Все операции успешно завершены.")
+        sync_text = " Matches синхронизирован." if sync_completed else ""
+        QMessageBox.information(
+            self, "Успех", f"Все операции успешно завершены.{sync_text}"
+        )
         
         # Логирование ссылки для платформы PySM
         if IS_MANAGED_RUN and pysm_context and getattr(self.config, "copy_files", False):

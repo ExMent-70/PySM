@@ -408,7 +408,7 @@ class EnhanceSettingsDialog(QDialog):
                 enhanced_image.size, 
                 self.faces_bboxes, 
                 self.enhancement_factors, 
-                "Имя Фамилия" # <--- Добавлен аргумент child_name
+                "Имя Фамилия"
             )
             
             if wm_layer:
@@ -494,6 +494,68 @@ class EnhanceSettingsDialog(QDialog):
         }
 
 # Остальные классы без изменений
+class StudentSelectionDialog(QDialog):
+    """Поиск и выбор записи ученика без свободного ввода личности."""
+
+    def __init__(self, students, current_student_id: str = "", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Выбор ученика")
+        self.resize(520, 480)
+        self._students = list(students)
+        self._selected_student_id: Optional[str] = None
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Поиск по фамилии, имени или student_id:"))
+        self.search = QLineEdit(self)
+        self.search.setPlaceholderText("Начните вводить фамилию, имя или ID")
+        layout.addWidget(self.search)
+
+        self.student_list = QListWidget(self)
+        layout.addWidget(self.student_list, 1)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            parent=self,
+        )
+        buttons.accepted.connect(self._accept_selection)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self.search.textChanged.connect(self._populate)
+        self.student_list.itemDoubleClicked.connect(lambda _item: self._accept_selection())
+        self._populate("")
+
+        if current_student_id:
+            for row in range(self.student_list.count()):
+                item = self.student_list.item(row)
+                if item.data(Qt.ItemDataRole.UserRole) == current_student_id:
+                    self.student_list.setCurrentItem(item)
+                    break
+
+    def _populate(self, query: str) -> None:
+        query = query.strip().casefold()
+        self.student_list.clear()
+        for student in self._students:
+            searchable = f"{student.display_name} {student.student_id}".casefold()
+            if query and query not in searchable:
+                continue
+            item = QListWidgetItem(student.display_label)
+            item.setData(Qt.ItemDataRole.UserRole, student.student_id)
+            self.student_list.addItem(item)
+        if self.student_list.count():
+            self.student_list.setCurrentRow(0)
+
+    def _accept_selection(self) -> None:
+        item = self.student_list.currentItem()
+        if not item:
+            return
+        self._selected_student_id = item.data(Qt.ItemDataRole.UserRole)
+        self.accept()
+
+    def selected_student_id(self) -> Optional[str]:
+        return self._selected_student_id
+
+
 class RenameDialog(QDialog):
     def __init__(self, predefined_names: List[str], current_name: str = "", parent=None):
         super().__init__(parent)

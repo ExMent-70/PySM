@@ -30,6 +30,9 @@
         <p><strong>Найдено кластеров (без шума):</strong> {{ summary.total_clusters }}</p>
         <p><strong>Портретов помечено как шум:</strong> {{ summary.noise_count }}</p>
         <p><strong>Кластеров с совпадениями:</strong> {{ summary.total_matches }}</p>
+        <p><strong>Идентифицировано учеников:</strong> {{ summary.identified_students }}</p>
+        <p><strong>ID списка:</strong> <code>{{ summary.list_id }}</code></p>
+        <p><strong>Не использовано записей списка:</strong> {{ summary.unused_students }}</p>
         <p><strong>Дата отчета:</strong> {{ summary.report_date }}</p>
         <p><strong>Папка с данными:</strong> <code>{{ summary.data_path }}</code></p>
         <p><strong>Папка с фото:</strong> <code>{{ summary.images_path }}</code></p>
@@ -50,15 +53,15 @@
                                 <div class="thumbnail-container">
                                     {% if cluster_data.files %}
                                     <a href="javascript:void(0);"
-                                       onclick="openModal('{{ label }}', 'portrait', 0)"
-                                       title="{{ cluster_data.child_name }}" class="thumbnail-link">
+                                       onclick='openModal({{ label | tojson }}, {{ "portrait" | tojson }}, 0)'
+                                       title="{{ cluster_data.display_name }}" class="thumbnail-link">
                                         <img data-src="{{ cluster_data.files[0].rel_path }}" alt="Кластер {{ label }}" class="thumbnail lazy">
                                     </a>
                                     {% endif %}
                                 </div>
                                 <div class="cluster-info">
-                                    <strong>{{ cluster_data.child_name }}</strong><br>
-                                    <span class="metadata">ID: {{ label }}<br>Фото: {{ cluster_data.files | length }}</span>
+                                    <strong>{{ cluster_data.display_name }}</strong><br>
+                                    <span class="metadata">Student ID: {{ cluster_data.student_id }}<br>Cluster ID: {{ cluster_data.cluster_label }}<br>Фото: {{ cluster_data.files | length }}</span>
                                 </div>
                                 <button class="toggle-button" id="portrait-{{ label }}-button" onclick="toggleRow('portrait-{{ label }}')">Развернуть</button>
                             </td>
@@ -68,7 +71,7 @@
                                     <div class="image-item">
                                         <div class="thumbnail-container">
                                             <a href="javascript:void(0);"
-                                               onclick="openModal('{{ label }}', 'portrait', {{ loop.index0 }})"
+                                               onclick='openModal({{ label | tojson }}, {{ "portrait" | tojson }}, {{ loop.index0 }})'
                                                title="{{ file.filename }}\nПол(O): {{ file.gender_onnx | default('N/A') }}, Возр(O): {{ file.age_onnx | default('N/A') }}\nЭмоция: {{ file.emotion_onnx | default('N/A') }}, Глаза: {{ file.eye_state_combined | default('N/A') }}\nПривл.: {{ file.beauty_onnx | default('N/A') }}, Det: {{ file.det_score }}"
                                                class="thumbnail-link">
                                                 <img data-src="{{ file.rel_path }}" alt="{{ file.filename }}" class="thumbnail lazy">
@@ -98,7 +101,7 @@
                   <div class="image-item">
                       <div class="thumbnail-container">
                           <a href="javascript:void(0);"
-                             onclick="openModal('-1', 'portrait', {{ loop.index0 }})"
+                             onclick='openModal({{ "-1" | tojson }}, {{ "portrait" | tojson }}, {{ loop.index0 }})'
                              title="{{ file.filename }}\nПол(O): {{ file.gender_onnx | default('N/A') }}, Возр(O): {{ file.age_onnx | default('N/A') }}\nЭмоция: {{ file.emotion_onnx | default('N/A') }}, Глаза: {{ file.eye_state_combined | default('N/A') }}\nПривл.: {{ file.beauty_onnx | default('N/A') }}, Det: {{ file.det_score }}"
                              class="thumbnail-link">
                               <img data-src="{{ file.rel_path }}" alt="{{ file.filename }}" class="thumbnail lazy">
@@ -127,15 +130,15 @@
                                 <div class="thumbnail-container">
                                     {% if portrait_clusters[label] and portrait_clusters[label].files %}
                                         <a href="javascript:void(0);"
-                                           onclick="openSingleImageModal('{{ portrait_clusters[label].files[0].rel_path }}', '{{ match.child_name }}')"
-                                           title="{{ match.child_name }}" class="thumbnail-link">
+                                           onclick='openSingleImageModal({{ portrait_clusters[label].files[0].rel_path | tojson }}, {{ match.display_name | tojson }})'
+                                           title="{{ match.display_name }}" class="thumbnail-link">
                                             <img data-src="{{ portrait_clusters[label].files[0].rel_path }}" alt="Портрет кластера {{ label }}" class="thumbnail lazy">
                                         </a>
                                     {% endif %}
                                 </div>
                                 <div class="cluster-info">
-                                    <strong>{{ match.child_name }}</strong><br>
-                                    <span class="metadata">ID: {{ label }}</span>
+                                    <strong>{{ match.display_name }}</strong><br>
+                                    <span class="metadata">Student ID: {{ match.student_id }}<br>Cluster ID: {{ match.cluster_label }}</span>
                                 </div>
                                 <button class="toggle-button" id="match-{{ label }}-button" onclick="toggleRow('match-{{ label }}')">Развернуть</button>
                             </td>
@@ -145,7 +148,7 @@
                                     <div class="image-item">
                                         <div class="thumbnail-container">
                                             <a href="javascript:void(0);"
-                                               onclick="openModal('{{ label }}', 'group', {{ loop.index0 }})"
+                                               onclick='openModal({{ label | tojson }}, {{ "group" | tojson }}, {{ loop.index0 }})'
                                                title="{{ photo.filename }}\nЛиц: {{ photo.num_faces }}, Мин.Расст: {{ '%.4f'|format(photo.confidence) if photo.confidence is not none else 'N/A' }}"
                                                class="thumbnail-link">
                                                 <img data-src="{{ photo.rel_path }}" alt="{{ photo.filename }}" class="thumbnail lazy">

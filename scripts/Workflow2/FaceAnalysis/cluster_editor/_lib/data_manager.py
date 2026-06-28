@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
 from .data_models import ImageRecord, Face
+from .json_io import atomic_write_json
+from .student_roster import StudentRecord, StudentRoster, load_student_roster
 from .strategies import get_strategy
 
 try:
@@ -18,7 +20,8 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 class ClusterDataManager:
-    def __init__(self, working_dir: Path, reference_dir: Optional[Path] = None, mode: str = "face"):
+    def __init__(self, working_dir: Path, reference_dir: Optional[Path] = None,
+                 mode: str = "face", student_list_file: Optional[Path] = None):
         self.working_dir = working_dir
         self.reference_dir = reference_dir if reference_dir else working_dir
         
@@ -27,6 +30,7 @@ class ClusterDataManager:
 
         # Основное хранилище данных: {filename: ImageRecord}
         self.records: Dict[str, ImageRecord] = dict()
+        self.last_error = ""
         
         # Список новых пустых кластеров (созданных кнопкой "Создать кластер")
         self.newly_created_clusters: List[Dict] = list()
@@ -41,6 +45,21 @@ class ClusterDataManager:
         except ValueError as e:
             logger.critical(f"Failed to initialize strategy: {e}")
             raise
+
+        self.student_roster: Optional[StudentRoster] = None
+        if student_list_file is None:
+            raise ValueError(
+                "Для всех режимов обязателен параметр ce_student_list_file."
+            )
+        self.student_roster = load_student_roster(student_list_file)
+
+        self.strategy.set_student_roster(self.student_roster)
+        logger.info(
+            "Загружен список учеников %s: list_id=%s, записей=%d",
+            self.student_roster.path,
+            self.student_roster.list_id,
+            len(self.student_roster.students),
+        )
 
     def load_data(self) -> tuple[bool, str]:
         """Загружает JSON. Векторы больше не загружаются в память при старте!"""
@@ -123,7 +142,7 @@ class ClusterDataManager:
         for new_c in self.newly_created_clusters:
             cid = new_c["id"]
             if cid not in clusters:
-                f = Face(bbox=list(), child_name=new_c["name"])
+                f = Face(bbox=list(), student_id=new_c.get("student_id"))
                 f.effective_name = new_c["name"]
                 clusters[cid] =[f]
         return clusters
@@ -143,6 +162,8 @@ class ClusterDataManager:
         )
 
     def rename_cluster(self, mode_config: Dict, cluster_id: str, new_name: str):
+        if self.strategy.mode_name == "face":
+            self._ensure_student_can_be_assigned(new_name, except_cluster_id=cluster_id)
         self.strategy.rename_cluster(cluster_id, new_name, self.records)
         for c in self.newly_created_clusters:
             if c["id"] == cluster_id:
@@ -150,7 +171,11 @@ class ClusterDataManager:
                 clean_new_name = new_name
                 if prefix and new_name.startswith(prefix):
                     clean_new_name = new_name[len(prefix):]
-                c["name"] = prefix + clean_new_name
+                if self.strategy.mode_name == "face":
+                    c["student_id"] = new_name
+                    c["name"] = prefix + self.student_label(new_name)
+                else:
+                    c["name"] = prefix + clean_new_name
 
     def create_cluster(self, mode_config: Dict, new_name: str):
         clusters = self.strategy.get_clusters(self.records)
@@ -167,10 +192,124 @@ class ClusterDataManager:
         new_id = str(max_id + 1)
         prefix = self.strategy.get_name_prefix(new_id)
         
+        if self.strategy.mode_name == "face":
+            student_id = new_name.strip()
+            self._ensure_student_can_be_assigned(student_id)
+            name = prefix + self.student_label(student_id)
+        else:
+            student_id = None
+            name = prefix + new_name.strip()
+
         self.newly_created_clusters.append({
-            "id": new_id, 
-            "name": prefix + new_name.strip()
+            "id": new_id,
+            "name": name,
+            "student_id": student_id,
         })
+
+    def student_name(self, student_id: Optional[str]) -> str:
+        return self.student_roster.name_for(student_id) if self.student_roster else ""
+
+    def student_label(self, student_id: Optional[str]) -> str:
+        return self.student_roster.label_for(student_id) if self.student_roster else ""
+
+    def assigned_portrait_student_ids(self, except_cluster_id: Optional[str] = None) -> set[str]:
+        assigned: set[str] = set()
+        for record in self.records.values():
+            if record.face_count != 1 or not record.faces:
+                continue
+            face = record.faces[0]
+            cid = str(face.cluster_label) if face.cluster_label is not None else "-1"
+            if cid == except_cluster_id or cid == "-1" or not face.student_id:
+                continue
+            assigned.add(face.student_id)
+        for cluster in self.newly_created_clusters:
+            if cluster["id"] != except_cluster_id and cluster.get("student_id"):
+                assigned.add(cluster["student_id"])
+        return assigned
+
+    def available_students(self, except_cluster_id: Optional[str] = None) -> tuple[StudentRecord, ...]:
+        if not self.student_roster:
+            return tuple()
+        return self.student_roster.available(
+            self.assigned_portrait_student_ids(except_cluster_id)
+        )
+
+    def _ensure_student_can_be_assigned(
+        self, student_id: str, except_cluster_id: Optional[str] = None
+    ) -> None:
+        if not self.student_roster or not self.student_roster.contains(student_id):
+            raise ValueError(f"student_id {student_id!r} отсутствует в открытом *.list.")
+        if student_id in self.assigned_portrait_student_ids(except_cluster_id):
+            raise ValueError(f"student_id {student_id} уже назначен другому кластеру.")
+
+    def validate_student_ids(self) -> None:
+        """Проверяет идентичность портретов и matches перед сохранением."""
+        if self.strategy.mode_name not in {"face", "matches"}:
+            return
+        if not self.student_roster:
+            raise ValueError("Реестр учеников не загружен.")
+
+        cluster_ids: Dict[int, str] = {}
+        student_clusters: Dict[str, int] = {}
+        for filename, record in self.records.items():
+            for face in record.faces:
+                if face.student_id and not self.student_roster.contains(face.student_id):
+                    raise ValueError(
+                        f"{filename}: student_id {face.student_id} отсутствует в {self.student_roster.path.name}."
+                    )
+            if record.face_count != 1 or not record.faces:
+                continue
+            face = record.faces[0]
+            if face.cluster_label is None or face.cluster_label == -1:
+                continue
+            if not face.student_id:
+                raise ValueError(
+                    f"{filename}: портретный кластер {face.cluster_label} не имеет student_id."
+                )
+            previous = cluster_ids.setdefault(face.cluster_label, face.student_id)
+            if previous != face.student_id:
+                raise ValueError(
+                    f"Кластер {face.cluster_label} содержит student_id {previous} и {face.student_id}."
+                )
+            other_cluster = student_clusters.setdefault(face.student_id, face.cluster_label)
+            if other_cluster != face.cluster_label:
+                raise ValueError(
+                    f"student_id {face.student_id} назначен кластерам {other_cluster} и {face.cluster_label}."
+                )
+
+        if self.strategy.mode_name == "matches":
+            for filename, record in self.records.items():
+                is_reference_record = (
+                    record.face_count == 1
+                    and record.faces
+                    and record.faces[0].cluster_label is not None
+                )
+                if is_reference_record:
+                    continue
+                for face in record.faces:
+                    matched_label = face.extra_data.get("matched_portrait_cluster_label")
+                    if matched_label is None:
+                        if face.student_id is not None:
+                            raise ValueError(
+                                f"{filename}: у несопоставленного лица задан student_id {face.student_id}."
+                            )
+                        continue
+                    try:
+                        matched_cluster_id = int(matched_label)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(
+                            f"{filename}: неверный matched_portrait_cluster_label {matched_label!r}."
+                        ) from exc
+                    expected_student_id = cluster_ids.get(matched_cluster_id)
+                    if expected_student_id is None:
+                        raise ValueError(
+                            f"{filename}: эталонный кластер {matched_label} не найден."
+                        )
+                    if face.student_id != expected_student_id:
+                        raise ValueError(
+                            f"{filename}: student_id {face.student_id!r} не совпадает с "
+                            f"ID {expected_student_id} эталонного кластера {matched_label}."
+                        )
 
     def delete_newly_created_cluster(self, cluster_id: str):
         self.newly_created_clusters =[c for c in self.newly_created_clusters if c['id'] != cluster_id]
@@ -203,8 +342,7 @@ class ClusterDataManager:
         try:
             if self.info_json_path.exists():
                 shutil.copy(self.info_json_path, self.info_json_path.with_suffix(".json.bak"))
-            with open(self.info_json_path, 'w', encoding='utf-8') as f:
-                json.dump(output_data, f, ensure_ascii=False, indent=2)
+            atomic_write_json(self.info_json_path, output_data)
             
             for record in self.records.values():
                 record.commit_changes()
@@ -212,6 +350,7 @@ class ClusterDataManager:
             self._has_unsaved_covers = False
             return True
         except Exception as e:
+            self.last_error = str(e)
             logger.critical(f"Standard Save error: {e}")
             return False
 
@@ -297,15 +436,16 @@ class ClusterDataManager:
                 arr = np.array(new_vectors, dtype=np.float32)
                 emb_loader.save("faces", arr, new_index_map)
         except Exception as e:
+            self.last_error = str(e)
             logger.critical(f"Cleaning: NPY Save error: {e}")
             return False
 
         # 3. Перезапись JSON
         try:
-            with open(self.info_json_path, 'w', encoding='utf-8') as f:
-                json.dump(new_json_data, f, ensure_ascii=False, indent=2)
+            atomic_write_json(self.info_json_path, new_json_data)
             self.newly_created_clusters = list()
         except Exception as e:
+            self.last_error = str(e)
             logger.critical(f"Cleaning: JSON Save error: {e}")
             return False
 
@@ -313,6 +453,13 @@ class ClusterDataManager:
         return True
 
     def save_data(self) -> bool:
+        self.last_error = ""
+        try:
+            self.validate_student_ids()
+        except ValueError as exc:
+            self.last_error = str(exc)
+            logger.error(f"Сохранение остановлено: {exc}")
+            return False
         if self.strategy.mode_name == 'cleaning':
             return self._cleaning_save()
         else:
@@ -320,7 +467,15 @@ class ClusterDataManager:
                 "json_path": self.info_json_path,
                 "embeddings_dir": self.embeddings_dir
             }
-            self.strategy.save(self.records, paths_config)
+            try:
+                strategy_saved = self.strategy.save(self.records, paths_config)
+            except Exception as exc:
+                self.last_error = str(exc)
+                logger.error(f"Сохранение режима {self.strategy.mode_name} остановлено: {exc}")
+                return False
+            if not strategy_saved:
+                self.last_error = "Стратегия режима не смогла сохранить дополнительные файлы."
+                return False
             return self._standard_json_save()
 
     # --- Legacy Wrappers & Clean APIs ---

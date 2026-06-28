@@ -23,6 +23,7 @@ try:
         sys.path.insert(0, str(project_root))
 
     from _common.xmp_editor import XmpEditor
+    from student_roster import StudentRoster, load_student_roster, normalize_student_id
 except ImportError as e:
     print(f"КРИТИЧЕСКАЯ ОШИБКА ИМПОРТА: {e}", file=sys.stderr)
     sys.exit(1)
@@ -81,6 +82,7 @@ class JsonKeys(str, Enum):
     POSE = "pose"
     CHILD_NAME = "child_name"
     MATCHED_CHILD_NAME = "matched_child_name"
+    STUDENT_ID = "student_id"
     CLUSTER_LABEL = "cluster_label"
     MATCHED_PORTRAIT_CLUSTER_LABEL = "matched_portrait_cluster_label"
     EMOTION = "emotion_faceonnx"
@@ -98,9 +100,6 @@ class JsonKeys(str, Enum):
     FACE_COUNT = "face_count"
 
 class SpecialValues(str, Enum):
-    NOISE = "Noise"
-    NO_MATCH = "No Match"
-    UNKNOWN = "Unknown"
     EYES_OPEN = "Eyes_Open"
     EYES_CLOSED = "Eyes_Closed"
     EYE_STATE_OPEN = "Open"
@@ -111,6 +110,7 @@ EXCLUDED_XMP_FIELDS = {
     JsonKeys.CLUSTER_LABEL.value, JsonKeys.MATCHED_PORTRAIT_CLUSTER_LABEL.value,
     JsonKeys.MATCH_DISTANCE.value, JsonKeys.LANDMARK_3D_68.value,
     JsonKeys.GENDER_INSIGHT.value, JsonKeys.AGE_INSIGHT.value,
+    JsonKeys.STUDENT_ID.value,
 }
 
 @dataclass(frozen=True)
@@ -141,6 +141,12 @@ def get_config() -> Namespace:
         type=str, 
         required=True, 
         help="Path to the directory containing images and where XMPs will be saved."
+    )
+    parser.add_argument(
+        "--student_list_file",
+        type=str,
+        required=True,
+        help="Path to the *.list file used as the only source of student names.",
     )
 
     parser.add_argument(
@@ -185,9 +191,11 @@ class MetadataProcessor:
     Отвечает за подготовку данных для записи в XMP.
     Преобразует JSON-структуры в списки ключевых слов и атрибутов.
     """
-    def __init__(self, template_content: Optional[str], landmark_enable: bool):
+    def __init__(self, template_content: Optional[str], landmark_enable: bool,
+                 student_roster: StudentRoster):
         self.template_content = template_content
-        self.landmark_enable = landmark_enable 
+        self.landmark_enable = landmark_enable
+        self.student_roster = student_roster
 
     def process_file(
         self,
@@ -196,7 +204,8 @@ class MetadataProcessor:
         file_data: Dict[str, Any],
         landmarks_data: Dict[str, Any],
         photo_type: PhotoType,
-        session_name: Optional[str]
+        session_name: Optional[str],
+        photo_session: Optional[str] = None,
     ) -> bool:
         """
         Основной метод обработки одного файла.
@@ -208,13 +217,22 @@ class MetadataProcessor:
         editor = XmpEditor(xmp_path, self.template_content)
 
         # 1. Заполнение базовых полей
-        self._set_base_metadata(editor, image_filename, merged_file_data, photo_type, session_name)
+        self._set_base_metadata(
+            editor,
+            image_filename,
+            merged_file_data,
+            photo_type,
+            session_name,
+            photo_session,
+        )
 
         # 2. Обработка лиц (генерация ключевых слов и SubjectCode)
         faces = merged_file_data.get(JsonKeys.FACES.value, list())
         is_portrait = (photo_type == PhotoType.PORTRAIT)
         
-        face_keywords, subject_codes, persons = self._extract_face_info(faces, photo_type, is_portrait)
+        face_keywords, subject_codes, persons = self._extract_face_info(
+            faces, photo_type, is_portrait
+        )
 
         # Добавление глобальных данных изображения в SubjectCode
         if original_shape := merged_file_data.get(JsonKeys.ORIGINAL_SHAPE.value):
@@ -234,13 +252,11 @@ class MetadataProcessor:
         editor.update_bag("dc", "subject", list(all_keywords), sort=True)
         editor.update_bag("lightroom", "hierarchicalSubject", list(all_keywords), sort=True)
         editor.update_bag("Iptc4xmpCore", "SubjectCode", subject_codes, sort=False)
-        
-        if is_portrait and persons:
-            valid_persons = list(p for p in persons if not p.startswith("Кластер_"))
-            if not valid_persons: 
-                valid_persons = persons
-            if valid_persons:
-                editor.set_simple_field("photoshop", "TransmissionReference", ", ".join(valid_persons))
+
+        transmission_reference = ", ".join(persons) if is_portrait else ""
+        editor.set_simple_field(
+            "photoshop", "TransmissionReference", transmission_reference
+        )
 
         return editor.save()
 
@@ -267,12 +283,14 @@ class MetadataProcessor:
         image_filename: str,
         file_data: Dict[str, Any],
         photo_type: PhotoType,
-        session_name: Optional[str]
+        session_name: Optional[str],
+        photo_session: Optional[str],
     ) -> None:
         """Устанавливает базовые глобальные метаданные для всего изображения."""
         editor.set_simple_field("photoshop", "Source", "1")
         editor.set_simple_field("photoshop", "Credit", "1")
         editor.set_simple_field("photoshop", "Headline", session_name)
+        editor.set_simple_field("photoshop", "Category", photo_session)
         editor.set_simple_field("GettyImagesGIFT", "OriginalFilename", image_filename)
         editor.set_simple_field("Iptc4xmpCore", "IntellectualGenre", photo_type.value)
 
@@ -299,23 +317,16 @@ class MetadataProcessor:
             keywords.add(f"{PYSM_PREFIX}LOCATION_{location_name.strip()}")
         return keywords
 
-    def _identify_person(self, face: Dict[str, Any]) -> str:
-        """
-        Извлекает идентификатор персоны из данных лица.
-        Возвращает имя, строку с номером кластера или пустую строку, если лицо не распознано.
-        """
-        ignore_names = {SpecialValues.NOISE.value, SpecialValues.NO_MATCH.value, SpecialValues.UNKNOWN.value}
-        name = face.get(JsonKeys.CHILD_NAME.value) or face.get(JsonKeys.MATCHED_CHILD_NAME.value)
-        cluster = face.get(JsonKeys.CLUSTER_LABEL.value) or face.get(JsonKeys.MATCHED_PORTRAIT_CLUSTER_LABEL.value)
-        
-        if name and name not in ignore_names and not name.startswith(SpecialValues.UNKNOWN.value):
-            return str(name)
-        if cluster is not None:
-            try:
-                return f"Кластер_{int(cluster):02d}"
-            except (ValueError, TypeError):
-                pass
-        return ""
+    def _identify_person(self, face: Dict[str, Any]) -> Tuple[Optional[str], str]:
+        """Возвращает проверенный ``student_id`` и ФИО из единого реестра."""
+
+        raw_student_id = face.get(JsonKeys.STUDENT_ID.value)
+        if raw_student_id is None or not str(raw_student_id).strip():
+            return None, ""
+        student_id = normalize_student_id(
+            raw_student_id, self.student_roster.list_id
+        )
+        return student_id, self.student_roster.name_for(student_id)
 
     def _extract_portrait_keywords(self, face_attributes: Dict[str, Any]) -> Set[str]:
         """
@@ -380,7 +391,7 @@ class MetadataProcessor:
     ) -> Tuple[Set[str], List[str], List[str]]:
         """
         Главный оркестратор сбора данных о лицах.
-        Возвращает кортеж: (Множество ключевых слов, Список SubjectCodes, Список найденных персон).
+        Возвращает ключевые слова, SubjectCode и найденные ФИО.
         """
         keywords = set()
         subject_codes_final = list()
@@ -390,7 +401,7 @@ class MetadataProcessor:
             if not isinstance(face, dict): 
                 continue
 
-            person_identifier = self._identify_person(face)
+            student_id, person_identifier = self._identify_person(face)
             
             # Базовый словарь атрибутов для формирования XMP-тегов
             face_attributes = {'genre': photo_type.value}
@@ -410,6 +421,8 @@ class MetadataProcessor:
 
             # Формируем и добавляем SubjectCodes
             face_codes = self._generate_subject_codes(face_attributes, face_idx)
+            if student_id:
+                face_codes.append(f"F{face_idx}:{student_id}")
             subject_codes_final.extend(face_codes)
 
         return keywords, subject_codes_final, persons_found
@@ -467,6 +480,63 @@ def extract_digits(filename: str) -> str:
     return match.group(0) if match else ""
 
 
+def _has_non_noise_identity_cluster(face: Dict[str, Any]) -> bool:
+    """Проверяет, должно ли лицо уже иметь student_id."""
+
+    for key in (
+        JsonKeys.CLUSTER_LABEL.value,
+        JsonKeys.MATCHED_PORTRAIT_CLUSTER_LABEL.value,
+    ):
+        value = face.get(key)
+        if value is None:
+            continue
+        try:
+            if int(value) >= 0:
+                return True
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Поле {key} содержит неверное значение {value!r}.") from exc
+    return False
+
+
+def validate_xmp_tasks(tasks: List[Tuple[pathlib.Path, str, Dict[str, Any], str]],
+                       student_roster: StudentRoster) -> None:
+    """Проверяет идентичность всех задач до создания первого XMP."""
+
+    for _xmp_path, json_key, file_data, _image_filename in tasks:
+        faces = file_data.get(JsonKeys.FACES.value, list())
+        if not isinstance(faces, list):
+            raise ValueError(f"{json_key}: поле faces должно быть массивом.")
+        for face_index, face in enumerate(faces):
+            if not isinstance(face, dict):
+                raise ValueError(
+                    f"{json_key}: faces[{face_index}] должно быть JSON-объектом."
+                )
+            raw_student_id = face.get(JsonKeys.STUDENT_ID.value)
+            if raw_student_id is not None and str(raw_student_id).strip():
+                try:
+                    student_id = normalize_student_id(
+                        raw_student_id, student_roster.list_id
+                    )
+                    student_roster.name_for(student_id)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"{json_key}, лицо {face_index}: {exc}"
+                    ) from exc
+            else:
+                try:
+                    requires_identity = _has_non_noise_identity_cluster(face)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"{json_key}, лицо {face_index}: {exc}"
+                    ) from exc
+                if requires_identity:
+                    raise ValueError(
+                        f"{json_key}, лицо {face_index}: идентифицированный "
+                        "портретный/matched-кластер не содержит student_id. "
+                        "Исправьте данные в cluster_editor."
+                    )
+
+
 def run_xmp_creation(
     faces_data: Dict[str, Any],
     landmarks_data_full: Dict[str, Any],
@@ -476,12 +546,16 @@ def run_xmp_creation(
     template_content: Optional[str],
     landmark_enable: bool,
     scan_folder_mode: bool,
-    xmp_subfolder: bool
+    xmp_subfolder: bool,
+    student_roster: StudentRoster,
+    photo_session: Optional[str] = None,
 ):
     logger.debug(f"ℹ️ Целевая папка (корневая): {image_folder_path}")
     logger.info(f"ℹ️ Сохранение Landmark 2D: {'✅' if landmark_enable else '❌'}")
     
-    processor = MetadataProcessor(template_content, landmark_enable)
+    processor = MetadataProcessor(
+        template_content, landmark_enable, student_roster
+    )
     tasks = list()  # Список кортежей: (путь_к_XMP, оригинальный_ключ_JSON, данные_файла, имя_изображения_для_метаданных)
 
     if scan_folder_mode:
@@ -524,6 +598,12 @@ def run_xmp_creation(
         logger.info("Нет файлов для обработки.")
         return
 
+    validate_xmp_tasks(tasks, student_roster)
+    logger.info(
+        f"ℹ️ Проверены student_id для <b>{len(tasks)}</b> задач; "
+        f"list_id=<b>{student_roster.list_id}</b>."
+    )
+
     logger.info(f"ℹ️ Сформировано задач: <b>{len(tasks)}</b>. Обработка в <b>{max_workers}</b> потоках...")
     
     errors = 0
@@ -542,7 +622,8 @@ def run_xmp_creation(
                 file_data,
                 file_landmarks,
                 photo_type,
-                session_name
+                session_name,
+                photo_session,
             )
             futures[future] = real_image_filename
 
@@ -571,12 +652,25 @@ def main():
     template_content = load_template_content(current_script_path)
     
     session_name = pysm_context.get("wf_session_name")
+    photo_session = pysm_context.get("wf_photo_session")
     
     analysis_path = pathlib.Path(config.analysis_dir)
     image_folder = pathlib.Path(config.image_dir)
+    student_list_path = pathlib.Path(config.student_list_file)
 
     if not analysis_path.exists():
         logger.error(f"❌ Папка анализа не найдена: {analysis_path}")
+        sys.exit(1)
+
+    try:
+        student_roster = load_student_roster(student_list_path)
+        logger.info(
+            f"ℹ️ Загружен список учеников: <i>{student_roster.path}</i>, "
+            f"list_id=<b>{student_roster.list_id}</b>, "
+            f"записей=<b>{len(student_roster.students)}</b>."
+        )
+    except Exception as exc:
+        logger.critical(f"❌ Ошибка списка учеников: {exc}")
         sys.exit(1)
     
     # В классическом режиме (генерация в папку) создаем ее, если нет
@@ -623,17 +717,23 @@ def main():
         logger.debug("⚠️ Загрузка ландмарков пропущена (настройка отключена).")
 
     # Запуск
-    run_xmp_creation(
-        faces_data=faces_data,
-        landmarks_data_full=landmarks_data,
-        image_folder_path=image_folder,
-        session_name=session_name,
-        max_workers=config.all_threads,
-        template_content=template_content,
-        landmark_enable=config.landmark_enable,
-        scan_folder_mode=config.scan_folder_mode,
-        xmp_subfolder=config.xmp_subfolder
-    )
+    try:
+        run_xmp_creation(
+            faces_data=faces_data,
+            landmarks_data_full=landmarks_data,
+            image_folder_path=image_folder,
+            session_name=session_name,
+            max_workers=config.all_threads or (os.cpu_count() or 4),
+            template_content=template_content,
+            landmark_enable=config.landmark_enable,
+            scan_folder_mode=config.scan_folder_mode,
+            xmp_subfolder=config.xmp_subfolder,
+            student_roster=student_roster,
+            photo_session=photo_session,
+        )
+    except ValueError as exc:
+        logger.critical(f"❌ Создание XMP остановлено до записи файлов: {exc}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

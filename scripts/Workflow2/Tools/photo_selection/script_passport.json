@@ -1,0 +1,64 @@
+{
+  "description": "Единый скрипт отбора фотографий: импортирует номера выбранных фотографий, сохраняет photo_selection.json, проверяет назначения по AI-анализу, копирует выбранные файлы и создаёт photo_assignments.json для верстки альбома.",
+  "category": "Редакторы",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2.2026.06.22",
+  "command_line_args_meta": {
+    "student_list_file": {
+      "type": "file_path",
+      "description": "Список класса/группу содержащий имена и фамилий *.list.",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list"
+    },
+    "analysis_dir": {
+      "type": "dir_path",
+      "description": "Папка результатов AI-анализа с info_faces.json, photo_selection.json и photo_assignments.json.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
+    },
+    "source_dir": {
+      "type": "dir_path",
+      "description": "Исходная папка с изображениями для поиска и копирования выбранных номеров.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG"
+    },
+    "dest_dir": {
+      "type": "dir_path",
+      "description": "Целевая папка, куда копируются выбранные файлы и где генератор альбома ожидает готовые JPG/JPEG/PSD.",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}"
+    },
+    "session_name": {
+      "type": "str",
+      "description": "Уникальный идентификатор класса/группы",
+      "required": true,
+      "default": "{wf_session_name}"
+    },
+    "photo_session": {
+      "type": "str",
+      "description": "Название текущей фотосессии.",
+      "required": true,
+      "default": "{wf_photo_session}"
+    },
+    "exclude_dirs": {
+      "type": "list",
+      "description": "Имена подпапок, исключаемых при поиске, копировании и выводе файлов.",
+      "required": false,
+      "default": [
+        "Masks"
+      ]
+    },
+    "title": {
+      "type": "str",
+      "description": "Заголовок главного окна.",
+      "required": false,
+      "default": "Выбор фотографий"
+    },
+    "message": {
+      "type": "string_multiline",
+      "description": "HTML-инструкция, выводимая первым блоком правой информационной панели.",
+      "required": false,
+      "default": ""
+    }
+  }
+}

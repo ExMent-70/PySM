@@ -51,7 +51,7 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
 
     source_path = task_data["source_path"]
     output_path = task_data["output_path"]
-    child_name = task_data["child_name"]
+    student_name = task_data["student_name"]
     raw_faces_bboxes = task_data.get("faces_bboxes", list())
     
     factors = task_data.get("factors", dict())
@@ -99,7 +99,9 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
                     scaled_bboxes = raw_faces_bboxes
 
                 # Генерируем слой (Общая функция)
-                watermark_layer = create_watermark_layer((target_w, target_h), scaled_bboxes, factors, child_name)
+                watermark_layer = create_watermark_layer(
+                    (target_w, target_h), scaled_bboxes, factors, student_name
+                )
                 
                 if watermark_layer:
                     final_image = Image.alpha_composite(final_image, watermark_layer)
@@ -116,7 +118,7 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
                 # Подгон размера шрифта имени
                 if hasattr(font_main, 'getbbox'): 
                     while font_size > 10:
-                        bbox = draw_main.textbbox((0, 0), child_name, font=font_main)
+                        bbox = draw_main.textbbox((0, 0), student_name, font=font_main)
                         if (bbox[2] - bbox[0]) < target_w * 0.9: 
                             break
                         font_size -= 2
@@ -125,14 +127,14 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
 
                 # Позиционирование
                 try:
-                    name_bbox = draw_main.textbbox((0, 0), child_name, font=font_main)
+                    name_bbox = draw_main.textbbox((0, 0), student_name, font=font_main)
                     name_w = name_bbox[2] - name_bbox[0]
                     name_h = name_bbox[3] - name_bbox[1]
                     
                     num_bbox = draw_main.textbbox((0, 0), file_number, font=font_main)
                     num_w = num_bbox[2] - num_bbox[0]
                 except AttributeError:
-                    name_w, name_h = draw_main.textsize(child_name, font=font_main)
+                    name_w, name_h = draw_main.textsize(student_name, font=font_main)
                     num_w, num_h = draw_main.textsize(file_number, font=font_main)
 
                 anchor_y = int(target_h * TEXT_VERTICAL_ANCHOR_PCT)
@@ -141,7 +143,10 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
                 name_pos = ((target_w - name_w) / 2, text_top_y)
                 num_pos = ((target_w - num_w) / 2, text_top_y + name_h + TEXT_LINE_SPACING)
 
-                draw_main.text(name_pos, child_name, font=font_main, fill="white", stroke_width=3, stroke_fill="black")
+                draw_main.text(
+                    name_pos, student_name, font=font_main, fill="white",
+                    stroke_width=3, stroke_fill="black"
+                )
                 draw_main.text(num_pos, file_number, font=font_main, fill="white", stroke_width=3, stroke_fill="black")
             
             # 4. СОХРАНЕНИЕ
