@@ -87,6 +87,8 @@ class RequirementsParser:
         else:
             packages = self._parse_requirements_txt(requirements_path)
 
+        self._validate_insightface_requirements(packages)
+
         logging.info(f"Найдено <b>{len(packages)}</b> пакета(ов).<br>")
         if self._included_files:
             logging.info(f"Подключено requirements-файлов: <b>{len(self._included_files)}</b>")
@@ -96,6 +98,87 @@ class RequirementsParser:
             logging.warning(diagnostic)
 
         return self._create_plan(packages)
+
+    def _validate_insightface_requirements(self, packages: List[PackageInfo]) -> None:
+        """Require unambiguous exact InsightFace and NumPy pins.
+
+        InsightFace is installed separately with ``--no-deps``. Therefore its
+        own version and the NumPy compatibility version must come directly from
+        the parsed project requirements before the installer can change the
+        target environment.
+        """
+        insightface_packages = self._packages_named(packages, "insightface")
+        if not insightface_packages:
+            return
+
+        if len(insightface_packages) != 1:
+            raise ValueError(
+                "Для InsightFace найдено несколько требований. Оставьте ровно одну строку "
+                "вида insightface==<версия>."
+            )
+
+        numpy_packages = self._packages_named(packages, "numpy")
+        if not numpy_packages:
+            raise ValueError(
+                "В requirements присутствует InsightFace, но отсутствует NumPy. "
+                "Добавьте точное требование numpy==<версия>."
+            )
+        if len(numpy_packages) != 1:
+            raise ValueError(
+                "Для NumPy найдено несколько требований. Оставьте ровно одну строку "
+                "вида numpy==<версия>."
+            )
+
+        self._require_exact_pin(insightface_packages[0], "InsightFace")
+        self._require_exact_pin(numpy_packages[0], "NumPy")
+
+    def _packages_named(self, packages: List[PackageInfo], name: str) -> List[PackageInfo]:
+        normalized_name = name.lower().replace("_", "-")
+        return [
+            package
+            for package in packages
+            if package.name.lower().replace("_", "-") == normalized_name
+        ]
+
+    def _require_exact_pin(self, package: PackageInfo, display_name: str) -> str:
+        location = package.source_file or "requirements"
+        if package.line_number:
+            location = f"{location}:{package.line_number}"
+
+        if package.direct_reference:
+            raise ValueError(
+                f"{location}: {display_name} должен быть задан точной версией через ==; "
+                "URL, wheel и другие прямые ссылки не допускаются."
+            )
+        if package.extras:
+            raise ValueError(
+                f"{location}: extras для {display_name} не поддерживаются в специальной "
+                f"схеме установки. Используйте {package.name}==<версия>."
+            )
+        if not Requirement:
+            raise ImportError(
+                "Для проверки точных версий InsightFace и NumPy требуется библиотека packaging."
+            )
+
+        try:
+            requirement = Requirement(package.to_spec())
+        except Exception as error:
+            raise ValueError(
+                f"{location}: не удалось разобрать требование {display_name}: {error}"
+            ) from None
+
+        specifiers = list(requirement.specifier)
+        if (
+            len(specifiers) != 1
+            or specifiers[0].operator != "=="
+            or not specifiers[0].version
+            or "*" in specifiers[0].version
+        ):
+            raise ValueError(
+                f"{location}: {display_name} должен быть закреплён одной точной версией "
+                f"через ==; получено: {package.to_spec()}"
+            )
+        return specifiers[0].version
 
     def _parse_requirements_txt(self, file_path: Path) -> List[PackageInfo]:
         packages: List[PackageInfo] = []
@@ -544,8 +627,8 @@ class RequirementsParser:
 
         Категории нужны потому, что GPU-зависимости устанавливаются не теми же
         правилами, что обычные пакеты: Torch получает CUDA index/backend, ONNX
-        может быть переписан в `onnxruntime-gpu`, а Insightface использует
-        ABI-зависимый wheel.
+        может быть переписан в `onnxruntime-gpu`, а InsightFace устанавливается
+        отдельно по точной версии из requirements.
         """
         plan = InstallationPlan()
         for pkg in packages:

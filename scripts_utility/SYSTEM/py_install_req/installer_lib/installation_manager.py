@@ -3,10 +3,11 @@
 import logging
 import json
 import re
+import tempfile
 from pathlib import Path
 from typing import List, Dict
 
-from .models import InstallationPlan, SystemInfo, PackageInfo
+from .models import InstallationPlan, SystemInfo, PackageInfo, PackageType
 from .utils import run_command, run_command_streaming
 
 try:
@@ -46,6 +47,7 @@ class InstallationManager:
         self.plan_only = plan_only
         self.failures: List[str] = []
         self.category_results: Dict[str, Dict[str, str]] = {}
+        self._numpy_constraint_path: Path | None = None
         self.use_log_icons = True
         self.use_uv = self._check_uv_available() if plan_only else self._check_and_install_uv()
         self.installed_packages = self._get_installed_packages()
@@ -57,28 +59,33 @@ class InstallationManager:
             logging.info("План установки пуст. Установка не требуется.")
             return
 
-        logging.info("\nСравнение с установленными пакетами и выполнение плана")
-        self._install_regular_packages()
-        self._install_torch_packages()
-        self._install_onnx_packages()
-        self._install_triton_packages()
-        self._install_insightface_packages()
-        self._log_plan_notes()
-        self._log_category_summary()
+        self._create_numpy_constraint()
+        try:
+            logging.info("\nСравнение с установленными пакетами и выполнение плана")
+            self._install_regular_packages()
+            self._install_torch_packages()
+            self._install_onnx_packages()
+            self._repair_onnx_runtime_collision()
+            self._install_triton_packages()
+            self._install_insightface_packages()
+            self._log_plan_notes()
+            self._log_category_summary()
 
-        if self.failures:
-            if self.plan_only:
+            if self.failures:
+                if self.plan_only:
+                    details = "\n".join(f"  - {item}" for item in self.failures)
+                    logging.error(f"\nРежим плана: обнаружены блокирующие проблемы:\n{details}\n")
+                    return
                 details = "\n".join(f"  - {item}" for item in self.failures)
-                logging.error(f"\nРежим плана: обнаружены блокирующие проблемы:\n{details}\n")
+                raise RuntimeError(f"Не удалось установить все категории пакетов:\n{details}")
+
+            if self.plan_only:
+                logging.info("\nРежим плана: установка пакетов не выполнялась.\n")
                 return
-            details = "\n".join(f"  - {item}" for item in self.failures)
-            raise RuntimeError(f"Не удалось установить все категории пакетов:\n{details}")
 
-        if self.plan_only:
-            logging.info("\nРежим плана: установка пакетов не выполнялась.\n")
-            return
-
-        logging.info("\nУстановка пакетов успешно завершена\n")
+            logging.info("\nУстановка пакетов успешно завершена\n")
+        finally:
+            self._remove_numpy_constraint()
 
     def _set_category_result(self, category_name: str, status: str, details: str = "") -> None:
         self.category_results[category_name] = {"status": status, "details": details}
@@ -421,6 +428,64 @@ class InstallationManager:
         if spec.startswith("-e "):
             return ["-e", spec[3:].strip()]
         return [spec]
+
+    def _find_plan_package(self, package_name: str) -> PackageInfo | None:
+        normalized_name = package_name.lower().replace("_", "-")
+        package_groups = (
+            self.plan.regular_packages,
+            self.plan.torch_packages,
+            self.plan.onnx_packages,
+            self.plan.insightface_packages,
+            self.plan.triton_packages,
+        )
+        for group in package_groups:
+            for package in group:
+                if package.name.lower().replace("_", "-") == normalized_name:
+                    return package
+        return None
+
+    def _required_exact_version(self, package_name: str) -> str:
+        package = self._find_plan_package(package_name)
+        version = self._get_exact_pinned_version(package) if package else ""
+        if not version:
+            raise RuntimeError(
+                f"Для специальной установки требуется точная версия {package_name} "
+                "из requirements.txt."
+            )
+        return version
+
+    def _create_numpy_constraint(self) -> None:
+        """Create a short-lived NumPy pin for special resolver commands."""
+        if not self.plan.insightface_packages:
+            return
+
+        numpy_version = self._required_exact_version("numpy")
+        constraint_spec = f"numpy=={numpy_version}"
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix="pysm_numpy_",
+            suffix=".txt",
+            delete=False,
+        ) as constraint_file:
+            constraint_file.write(f"{constraint_spec}\n")
+            self._numpy_constraint_path = Path(constraint_file.name)
+        logging.info(f"Динамический constraint для специальных команд: <b>{constraint_spec}</b>")
+
+    def _remove_numpy_constraint(self) -> None:
+        constraint_path = getattr(self, "_numpy_constraint_path", None)
+        if not constraint_path:
+            return
+        try:
+            constraint_path.unlink(missing_ok=True)
+        finally:
+            self._numpy_constraint_path = None
+
+    def _with_numpy_constraint(self, cmd: List[str]) -> List[str]:
+        constraint_path = getattr(self, "_numpy_constraint_path", None)
+        if constraint_path:
+            cmd.extend(["--constraint", str(constraint_path)])
+        return cmd
         
     def _install_torch_packages(self):
         if not self.plan.torch_packages:
@@ -434,7 +499,7 @@ class InstallationManager:
         if not self._validate_torch_direct_references(packages_to_install):
             self._set_category_result("Torch", "FAIL", "блокирующий конфликт wheel/URL")
             return
-        cmd = self._build_base_command()
+        cmd = self._with_numpy_constraint(self._build_base_command())
         cmd.append("--upgrade") # Torch лучше всегда обновлять до нужной версии
         if self._torch_family_needs_cuda_reinstall(packages_to_install):
             cmd = self._add_reinstall_options(cmd, packages_to_install)
@@ -457,7 +522,7 @@ class InstallationManager:
             self._set_category_result("ONNX", "SKIP", "уже соответствует")
             return
         logging.info("\n<b><i>Установка пакетов ONNX...</i></b>")
-        cmd = self._build_base_command()
+        cmd = self._with_numpy_constraint(self._build_base_command())
         cmd.append("--upgrade")
         if self.system_info.gpu and self.system_info.gpu.generation == "blackwell":
             cmd.append("--pre")
@@ -467,6 +532,109 @@ class InstallationManager:
                 self._set_category_result("ONNX", "OK", "установлено/обновлено, provider проверен")
             else:
                 self._set_category_result("ONNX", "FAIL", "ошибка проверки provider")
+
+    def _repair_onnx_runtime_collision(self) -> None:
+        """Remove CPU ONNX Runtime and restore the GPU distribution files."""
+        if not self.plan.insightface_packages:
+            return
+
+        if self.plan_only:
+            cpu_runtime_version = self.installed_packages.get("onnxruntime")
+        else:
+            distribution_info = self._get_onnx_distribution_info()
+            if distribution_info.get("error"):
+                self.failures.append("ONNX Runtime distribution inspection")
+                self._set_category_result("ONNX", "FAIL", "не удалось проверить CPU/GPU-дистрибутивы")
+                logging.error(
+                    "ОШИБКА: не удалось проверить установленные дистрибутивы "
+                    f"onnxruntime и onnxruntime-gpu: {distribution_info['error']}"
+                )
+                return
+            cpu_runtime_version = distribution_info.get("cpu_runtime_version")
+        if not cpu_runtime_version:
+            return
+
+        if self.plan.onnx_package_name != "onnxruntime-gpu":
+            message = (
+                "InsightFace требует GPU-схему ONNX Runtime, но системный resolver "
+                f"выбрал {self.plan.onnx_package_name or 'неизвестный пакет'}."
+            )
+            self.failures.append("InsightFace ONNX Runtime GPU selection")
+            self._set_category_result("ONNX", "FAIL", "не выбран onnxruntime-gpu")
+            logging.error(f"ОШИБКА: {message}")
+            return
+
+        logging.warning(
+            f"Обнаружен CPU-пакет onnxruntime {cpu_runtime_version}. Он будет удалён, "
+            "после чего onnxruntime-gpu будет переустановлен для восстановления общих файлов."
+        )
+        uninstall_cmd = [
+            str(self.python_executable),
+            "-m",
+            "pip",
+            "uninstall",
+            "--yes",
+            "onnxruntime",
+        ]
+        if not self._run_install_command(uninstall_cmd, "ONNX"):
+            return
+
+        gpu_packages = [
+            package
+            for package in self._normalize_onnx_packages(self.plan.onnx_packages)
+            if package.name.lower().replace("_", "-") == "onnxruntime-gpu"
+        ]
+        if not gpu_packages:
+            gpu_packages = [
+                PackageInfo(
+                    name="onnxruntime-gpu",
+                    original_line="onnxruntime-gpu",
+                    package_type=PackageType.ONNXRUNTIME,
+                    spec="onnxruntime-gpu",
+                )
+            ]
+
+        reinstall_cmd = self._with_numpy_constraint(self._build_base_command())
+        reinstall_cmd.append("--upgrade")
+        reinstall_cmd = self._add_reinstall_options(reinstall_cmd, gpu_packages)
+        if self.system_info.gpu and self.system_info.gpu.generation == "blackwell":
+            reinstall_cmd.append("--pre")
+        reinstall_cmd.extend(self._get_onnx_specs(gpu_packages))
+
+        if not self._run_install_command(reinstall_cmd, "ONNX"):
+            return
+        if self.plan_only:
+            return
+
+        self.installed_packages.pop("onnxruntime", None)
+        if self._verify_onnx_runtime_installation():
+            self._set_category_result("ONNX", "OK", "CPU-пакет удалён, GPU runtime восстановлен")
+        else:
+            self._set_category_result("ONNX", "FAIL", "не удалось восстановить GPU provider")
+
+    def _get_onnx_distribution_info(self) -> Dict[str, object]:
+        cmd = [
+            str(self.python_executable),
+            "-c",
+            (
+                "import json\n"
+                "from importlib import metadata\n"
+                "def dist_version(name):\n"
+                " try: return metadata.version(name)\n"
+                " except metadata.PackageNotFoundError: return None\n"
+                "print(json.dumps({"
+                "'gpu_runtime_version': dist_version('onnxruntime-gpu'), "
+                "'cpu_runtime_version': dist_version('onnxruntime')"
+                "}))\n"
+            ),
+        ]
+        success, stdout, stderr = run_command(cmd)
+        if not success:
+            return {"error": stderr}
+        try:
+            return json.loads(stdout)
+        except json.JSONDecodeError:
+            return {"error": stdout}
 
     def _install_triton_packages(self):
         if not self.plan.triton_packages:
@@ -487,10 +655,12 @@ class InstallationManager:
             self._set_category_result("Insightface", "SKIP", "нет требований")
             return
         packages_to_install = self._filter_packages_to_install(self.plan.insightface_packages)
+        if self.plan_only and not packages_to_install:
+            # План всегда показывает специальную команду InsightFace, даже если
+            # текущая среда уже соответствует точной версии requirements.
+            packages_to_install = list(self.plan.insightface_packages)
         if not packages_to_install:
-            if self.plan_only:
-                self._set_category_result("Insightface", "SKIP", "уже соответствует")
-            elif self._verify_insightface_gpu_installation():
+            if self._verify_insightface_gpu_installation():
                 self._set_category_result("Insightface", "SKIP", "уже соответствует, GPU проверен")
             else:
                 self._set_category_result("Insightface", "FAIL", "ошибка проверки GPU-среды")
@@ -524,6 +694,24 @@ class InstallationManager:
             logging.error(f"ОШИБКА: InsightFace не импортируется: {info.get('error', 'неизвестная ошибка')}")
             return False
 
+        expected_insightface_version = self._required_exact_version("insightface")
+        expected_numpy_version = self._required_exact_version("numpy")
+        if str(info.get("insightface_version") or "") != expected_insightface_version:
+            self.failures.append("InsightFace version verification")
+            logging.error(
+                "ОШИБКА: установлена версия InsightFace "
+                f"<b>{info.get('insightface_version') or 'неизвестно'}</b>, "
+                f"а requirements требует <b>{expected_insightface_version}</b>."
+            )
+            return False
+        if str(info.get("numpy_version") or "") != expected_numpy_version:
+            self.failures.append("NumPy version verification")
+            logging.error(
+                f"ОШИБКА: установлена версия NumPy <b>{info.get('numpy_version') or 'неизвестно'}</b>, "
+                f"а requirements требует <b>{expected_numpy_version}</b>."
+            )
+            return False
+
         gpu_providers = {"CUDAExecutionProvider", "TensorrtExecutionProvider"}
         providers = set(info.get("providers") or [])
         if not info.get("gpu_runtime_version"):
@@ -547,6 +735,7 @@ class InstallationManager:
 
         logging.info(
             f"{self._status_prefix('DIRECT')} InsightFace <b>{info.get('insightface_version')}</b>, "
+            f"NumPy <b>{info.get('numpy_version')}</b>, "
             f"onnxruntime-gpu <b>{info.get('gpu_runtime_version')}</b>, "
             f"providers: <b>{sorted(providers)}</b>"
         )
@@ -561,13 +750,15 @@ class InstallationManager:
                 "from importlib import metadata\n"
                 "try:\n"
                 " import insightface\n"
+                " import numpy\n"
                 " import onnxruntime as ort\n"
                 " def dist_version(name):\n"
                 "  try: return metadata.version(name)\n"
                 "  except metadata.PackageNotFoundError: return None\n"
                 " print(json.dumps({"
                 "'installed': True, "
-                "'insightface_version': getattr(insightface, '__version__', None), "
+                "'insightface_version': dist_version('insightface'), "
+                "'numpy_version': dist_version('numpy'), "
                 "'gpu_runtime_version': dist_version('onnxruntime-gpu'), "
                 "'cpu_runtime_version': dist_version('onnxruntime'), "
                 "'providers': ort.get_available_providers()"

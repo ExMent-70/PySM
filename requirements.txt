@@ -4,13 +4,13 @@ cssutils
 einops
 hdbscan
 huggingface_hub[hf_xet]
-insightface
+insightface==1.0.1
 ipymarkup
 ijson
 lxml
 Jinja2
 natasha
-numpy
+numpy==2.4.6
 nvidia-ml-py
 onnx
 onnxruntime-gpu
