@@ -10,6 +10,7 @@ from pathlib import Path
 import sys
 
 from .assignment_core import normalize_exclude_dirs
+from .ai_import import create_ai_import_request
 from .constants import (
     PHOTO_NUMBER_DIGITS, WINDOW_STATE_VAR, ITEM_NUMBER_ROLE, ITEM_PATHS_ROLE,
     ITEM_STUDENT_ROLE,
@@ -17,34 +18,44 @@ from .constants import (
 from .csv_import import (
     import_personal_file, import_table, read_csv_table, read_personal_numbers,
 )
-from .domain import ImportEntry
+from .domain import ImportEntry, coalesce_import_entries
+from .image_pipeline import PhotoSelectionImagePipeline
 from .models import PhotoSelectionSessionState
 from .number_parser import parse_manual_numbers
 from .roster import load_roster
 from .storage import load_document, save_document
-from .ui_widgets import AnswerCheckBox, AiDialog, CsvMappingDialog, ImagePreviewLabel, SelectedNumbersDialog
-from .workers import BuildRequest, Operation, OperationOutcome, PhotoSelectionOperationWorker
+from .ui_widgets import AnswerCheckBox, CsvMappingDialog, ImagePreviewLabel, SelectedNumbersDialog
+from .workers import (
+    BuildRequest,
+    Operation,
+    OperationOutcome,
+    PhotoSelectionOperationWorker,
+    file_signature,
+)
 from .assignment_views import AssignmentViewsMixin
 from .export_service import ExportMixin
 from .preview_service import PreviewMixin
 from .report_builder import ReportMixin
 
+from pysm_lib.gui.ai import edit_ai_json_response
+
 try:
     from pysm_lib import pysm_context, theme_api
-    from pysm_lib.pysm_context import ConfigResolver
-    from pysm_lib.pysm_icons import icons as pysm_icons
-    from pysm_lib.pysm_report_api import DashboardBuilder, ResourceNode
-    from pysm_lib.window_state_manager import WindowStateManager
-    IS_MANAGED_RUN = True
 except ImportError:
-    ConfigResolver = None
     pysm_context = None
-    pysm_icons = None
     theme_api = None
-    DashboardBuilder = None
-    ResourceNode = None
+
+try:
+    from pysm_lib.pysm_icons import icons as pysm_icons
+except ImportError:
+    pysm_icons = None
+
+try:
+    from pysm_lib.window_state_manager import WindowStateManager
+except ImportError:
     WindowStateManager = None
-    IS_MANAGED_RUN = False
+
+IS_MANAGED_RUN = pysm_context is not None
 
 from PySide6.QtCore import QProcess, QSize, Qt, QTimer, QUrl, QUrlQuery
 from PySide6.QtGui import QDesktopServices
@@ -57,6 +68,8 @@ from PySide6.QtWidgets import (
 
 
 logger = logging.getLogger(__name__)
+
+
 class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, ExportMixin, QMainWindow):
     HEADERS = ("student_id", "Фамилия Имя", "Выбранные номера", "Количество", "Ответ", "Источник")
 
@@ -72,9 +85,18 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
         self._saved_state = copy.deepcopy(self.document.to_dict())
         self.state = PhotoSelectionSessionState()
         self._worker: PhotoSelectionOperationWorker | None = None
+        self._refresh_pending = False
         self._base_report_html = ""
         self._preview_by_stem: dict[str, Path] = {}
         self._final_log_emitted = False
+        self._image_pipeline = PhotoSelectionImagePipeline(
+            Path(config.analysis_dir),
+            parent=self,
+        )
+        self._close_after_image_shutdown = False
+        self._image_pipeline.shutdownFinished.connect(
+            self._finish_deferred_close
+        )
         self.user_message_html = str(getattr(config, "message", "") or "").strip()
         self.setWindowTitle(
             str(getattr(config, "title", "") or f"Выбор фотографий — {config.photo_session}")
@@ -130,7 +152,7 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
             "Выберите ученика для просмотра подробной информации."
         )
         self.import_result.setMinimumWidth(320)
-        self.preview = ImagePreviewLabel()
+        self.preview = ImagePreviewLabel(self._image_pipeline.loader)
         self.right_splitter = QSplitter(Qt.Orientation.Vertical)
         self.right_splitter.addWidget(self.import_result)
         self.right_splitter.addWidget(self.preview)
@@ -180,9 +202,6 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
             assignment_buttons.addWidget(button)
         assignment_buttons.addStretch()
         layout.addWidget(self.assignment_buttons)
-        self._operation_buttons = tuple(
-            self.assignment_buttons.findChildren(QPushButton)
-        )
         self.assignment_buttons.hide()
         self._refresh_table()
         self._restore_window_state()
@@ -544,11 +563,17 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
 
     def _apply_entries(self, entries: list[ImportEntry], source: str, unresolved=None):
         unresolved = unresolved or []
-        if not entries and not unresolved:
-            self._show_import_result(
-                entries, unresolved, source=source, status="Подходящих записей не найдено"
+        entries = coalesce_import_entries(entries)
+        if not entries:
+            status = (
+                "Все записи требуют ручной проверки"
+                if unresolved
+                else "Подходящих записей не найдено"
             )
-            QMessageBox.information(self, "Импорт", "Подходящих записей не найдено.")
+            self._show_import_result(
+                entries, unresolved, source=source, status=status
+            )
+            QMessageBox.information(self, "Импорт", status + ".")
             return
         preview_lines = []
         for entry in entries[:12]:
@@ -611,14 +636,18 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
             dest_dir=Path(self.config.dest_dir),
             exclude_dirs=tuple(self._exclude_dirs()),
             assignment_path=self.assignment_path,
+            selection_signature=file_signature(self.selection_path),
         )
 
     def _set_busy(self, busy: bool) -> None:
-        for button in getattr(self, "_operation_buttons", ()):
-            button.setEnabled(not busy)
+        self.view_tabs.setEnabled(not busy)
+        self.import_buttons.setEnabled(not busy)
+        self.assignment_buttons.setEnabled(not busy)
 
     def _start_operation(self, operation: Operation) -> None:
         if self._worker is not None and self._worker.isRunning():
+            if operation == "refresh":
+                self._refresh_pending = True
             return
         self._set_busy(True)
         worker = PhotoSelectionOperationWorker(
@@ -649,11 +678,26 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
         QMessageBox.critical(self, "Обработка фотографий", message)
 
     def _operation_completed(self, outcome: OperationOutcome) -> None:
+        if outcome.selection_signature != file_signature(self.selection_path):
+            self.state.assignments_dirty = True
+            self._refresh_pending = True
+            self.report.setHtml(
+                self._message_header_html()
+                + "<h3>Выбор изменён</h3>"
+                + "<p>Устаревший результат фоновой операции отброшен. "
+                + "После завершения будет выполнен новый пересчёт.</p>"
+            )
+            return
         self.state.build_result = outcome.result
+        self._preview_by_stem = dict(outcome.preview_by_stem or {})
         if outcome.copy_summary is not None:
             self.state.copy_summary = outcome.copy_summary
         if outcome.assignment_saved:
             self.state.assignments_dirty = False
+        elif outcome.operation == "refresh":
+            self.state.assignments_dirty = not self._assignment_file_matches_result(
+                outcome.result
+            )
         elif outcome.operation in {"copy", "copy_and_build"}:
             self.state.assignments_dirty = True
         self._render_assignment_views()
@@ -681,6 +725,9 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
         self._set_busy(False)
         if worker is not None:
             worker.deleteLater()
+        if self._refresh_pending:
+            self._refresh_pending = False
+            QTimer.singleShot(0, self.refresh_async)
 
     def refresh_async(self) -> None:
         self._start_operation("refresh")
@@ -832,16 +879,19 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
             QMessageBox.critical(self, "Ошибка CSV", str(exc))
 
     def import_ai(self):
-        dialog = AiDialog(self.roster, self.config, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            self._apply_entries(dialog.entries, "ai_json", dialog.unresolved)
+        result = edit_ai_json_response(create_ai_import_request(self.roster), self)
+        if result.accepted:
+            entries, unresolved = result.value
+            self._apply_entries(entries, "ai_json", unresolved)
 
     def _save_document(self, *, show_message: bool) -> bool:
         try:
+            payload = self.document.to_dict()
+            selection_changed = payload != self._saved_state
             save_document(self.selection_path, self.document)
-            self._saved_state = copy.deepcopy(self.document.to_dict())
-            self.state.selection_dirty = False
-            self.state.assignments_dirty = True
+            self._saved_state = copy.deepcopy(payload)
+            if selection_changed:
+                self.state.assignments_dirty = True
             if show_message:
                 QMessageBox.information(self, "Сохранено", str(self.selection_path))
             return True
@@ -854,8 +904,10 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
 
     def _selection_changed(self) -> None:
         """Persist changed selections and refresh assignment views."""
-        self.state.selection_dirty = True
         self.state.assignments_dirty = True
+        self.state.copy_summary = None
+        if self._worker is not None and self._worker.isRunning():
+            self._refresh_pending = True
         if self._save_document(show_message=False) and self._can_refresh_assignments():
             self.refresh_async()
 
@@ -868,6 +920,12 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
         )
 
     def closeEvent(self, event):
+        if self._close_after_image_shutdown:
+            if self._image_pipeline.is_closed:
+                event.accept()
+            else:
+                event.ignore()
+            return
         if self._worker is not None and self._worker.isRunning():
             QMessageBox.information(
                 self,
@@ -889,9 +947,7 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
                 if answer != QMessageBox.StandardButton.Yes:
                     event.ignore()
                     return
-            self._emit_final_log_once()
-            self._save_window_state()
-            event.accept()
+            self._accept_close(event)
             return
         answer = QMessageBox.question(
             self,
@@ -903,17 +959,29 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
         )
         if answer == QMessageBox.StandardButton.Save:
             if self._save_document(show_message=False):
-                self._emit_final_log_once()
-                self._save_window_state()
-                event.accept()
+                self._accept_close(event)
             else:
                 event.ignore()
         elif answer == QMessageBox.StandardButton.Discard:
-            self._emit_final_log_once()
-            self._save_window_state()
-            event.accept()
+            self._accept_close(event)
         else:
             event.ignore()
+
+    def _accept_close(self, event) -> None:
+        """Finalize UI state and close after image workers have retired."""
+
+        self._emit_final_log_once()
+        self._save_window_state()
+        self.preview.cancel_requests()
+        if self._image_pipeline.shutdown():
+            event.accept()
+            return
+        self._close_after_image_shutdown = True
+        event.ignore()
+
+    def _finish_deferred_close(self) -> None:
+        if self._close_after_image_shutdown:
+            self.close()
 
 
 def run_application(config: argparse.Namespace) -> int:

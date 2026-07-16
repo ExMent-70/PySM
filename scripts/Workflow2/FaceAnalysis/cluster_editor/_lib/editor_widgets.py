@@ -1,14 +1,18 @@
-# analize/cluster_editor/_lib/editor_widgets.py
 """
 Модуль, содержащий кастомные подклассы стандартных виджетов Qt,
 такие как списки с поддержкой Drag & Drop.
 """
 import logging
-from PySide6.QtWidgets import QListWidget, QListWidgetItem, QAbstractItemView
+from PySide6.QtWidgets import QListWidget, QAbstractItemView
 from PySide6.QtGui import QDropEvent, QDrag, QPainter, QColor, QPixmap
 from PySide6.QtCore import Qt, Signal, QMimeData, QPoint, QSize
 
-from .editor_delegates import THUMBNAIL_SIZE, FACE_SIZE, FACE_SIZE_PORTRAIT
+from .editor_delegates import (
+    FACE_SIZE,
+    FACE_SIZE_PORTRAIT,
+    THUMBNAIL_SIZE,
+    FaceItemDelegate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +50,6 @@ class ClusterDropListWidget(QListWidget):
             if self.drop_target_item:
                 self.viewport().update(self.visualItemRect(self.drop_target_item))
         
-        # --- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ---
         # Явно сообщаем Qt, можно ли выполнить сброс в *данной конкретной точке*.
         # Это изменит курсор и позволит сработать dropEvent.
         if current_item:
@@ -107,7 +110,7 @@ class ImageDragListWidget(QListWidget):
 
         mime_data = QMimeData()
         
-        # --- ИСПРАВЛЕНИЕ: Передаем face_index вместе с именем файла ---
+        # Cleaning передаёт индекс лица вместе с именем файла.
         filenames =[]
         for item in items:
             user_data = item.data(Qt.ItemDataRole.UserRole)
@@ -166,9 +169,18 @@ class FaceDetailsWidget(QListWidget):
         self.mode = mode
         
         self.setViewMode(QListWidget.ViewMode.IconMode)
+        self.setItemDelegate(FaceItemDelegate(self))
+        self.setUniformItemSizes(True)
         self.setResizeMode(QListWidget.ResizeMode.Adjust) 
         self.setMovement(QListWidget.Movement.Static)
         self.setSpacing(10)
+        # QAbstractScrollArea receives pointer events through its viewport.
+        # Explicit tracking keeps ``QListWidget::item:hover`` current while the
+        # cursor moves between faces without a pressed mouse button.
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         
         # Настройка размеров в зависимости от режима
         if self.mode == 'face':

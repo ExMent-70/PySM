@@ -6,6 +6,7 @@ import json
 import time
 import shlex
 import os
+import uuid
 from typing import List, Dict, Optional, Callable
 from datetime import datetime
 
@@ -17,6 +18,14 @@ from .locale_manager import LocaleManager
 from .app_constants import APPLICATION_ROOT_DIR
 from .config_manager import ConfigManager
 from .theme_manager import ThemeManager
+from .context_shared_memory import (
+    HEADER_SIZE,
+    SharedMemoryContextError,
+    SharedMemoryContextStore,
+    calculate_segment_size,
+    encoded_payload_size,
+)
+from .context_store import FileContextStore
 
 from .app_enums import SetRunMode, ScriptRunStatus, AppState
 
@@ -24,6 +33,9 @@ logger = logging.getLogger(f"PyScriptManager.{__name__}")
 
 # Максимальная глубина вложенности вызовов (защита от бесконечных циклов A -> B -> A)
 MAX_STACK_DEPTH = 20
+CONTEXT_SHM_RESIZE_USAGE_THRESHOLD = 0.80
+DYNAMIC_MACRO_FALLBACK_NAME = "Динамический макрос"
+
 
 class SetRunnerOrchestrator(QObject):
     log_message = Signal(str, str)
@@ -72,12 +84,20 @@ class SetRunnerOrchestrator(QObject):
         
         # Хранит целевой ID, если скрипт запросил прыжок
         self._pending_jump_target: Optional[str] = None
+        self._pending_jump_source_instance_id: Optional[str] = None
+        self._dynamic_macro_counter: int = 0
 
         self.active_runners: Dict[str, ScriptRunner] = {}
         self.run_had_errors: bool = False
         self.start_time: float = 0
         self.script_start_time: float = 0
         self._stop_requested: bool = False
+        self._context_store = None
+        self._context_backend: str = "file"
+        self._context_shm_name: Optional[str] = None
+        self._context_segment_size: int = 0
+        self._context_snapshot_cache: dict = {}
+        self._context_resize_warning_logged: bool = False
 
     def _atomic_write_json(self, target_path: pathlib.Path, data_to_dump: dict) -> None:
         """Write JSON atomically so context reloads never observe a truncated file."""
@@ -134,14 +154,252 @@ class SetRunnerOrchestrator(QObject):
             logger.error(f"Не удалось подготовить файл контекста: {e}", exc_info=True)
             raise
 
+    def _build_runtime_context_data(self) -> dict:
+        context_data = {}
+        if self.get_set_manager_func:
+            sm = self.get_set_manager_func()
+            if sm:
+                for k, v in sm.current_collection_model.context_data.items():
+                    context_data[k] = v.model_dump(mode="json")
+
+        active_theme_name = self.theme_manager.get_active_theme_name()
+        current_log_level = logging.getLevelName(logger.getEffectiveLevel())
+        context_data["pysm_active_theme_name"] = {
+            "type": "string",
+            "value": active_theme_name,
+            "description": "System: Name of the active PyScriptManager theme.",
+            "read_only": True,
+        }
+        context_data["sys_log_level"] = {
+            "type": "string",
+            "value": current_log_level,
+            "read_only": True,
+        }
+        context_data["pysm_sys_info"] = {
+            "type": "json",
+            "value": {
+                "app_root_dir": str(APPLICATION_ROOT_DIR),
+                "collection_file_path": str(self.config_manager.last_used_sets_collection_file),
+                "active_theme_name": active_theme_name,
+                "log_level": current_log_level,
+                "python_interpreter": str(self.config_manager.python_interpreter),
+            },
+            "description": "System: Information about the execution environment.",
+            "read_only": True,
+        }
+        return context_data
+
+    def _prepare_context_runtime_store(self):
+        context_config = self.config_manager.config.runtime_context
+        self._context_backend = context_config.backend
+        context_data = self._build_runtime_context_data()
+
+        if context_config.backend == "file":
+            self._prepare_context_file()
+            self._context_store = FileContextStore(self.context_file_path)
+            self._context_segment_size = 0
+            self._context_snapshot_cache = context_data
+            return
+
+        if self._context_store is None:
+            self._context_shm_name = f"pysm_context_{os.getpid()}_{uuid.uuid4().hex}"
+            size = calculate_segment_size(
+                context_data,
+                context_config.shared_memory_min_size_mb,
+                context_config.shared_memory_max_size_mb,
+            )
+            self._context_store = SharedMemoryContextStore.create(
+                self._context_shm_name,
+                size,
+                context_data,
+            )
+            self._context_segment_size = size
+        else:
+            self._save_snapshot_to_runtime_store(context_data)
+        self._context_snapshot_cache = context_data
+
+    def _max_context_segment_size(self) -> int:
+        context_config = self.config_manager.config.runtime_context
+        min_size = max(1, int(context_config.shared_memory_min_size_mb)) * 1024 * 1024
+        max_size = max(1, int(context_config.shared_memory_max_size_mb)) * 1024 * 1024
+        return max(min_size, max_size)
+
+    def _calculate_resized_segment_size(self, payload_size: int) -> int:
+        current_size = max(self._context_segment_size, HEADER_SIZE + payload_size)
+        max_size = self._max_context_segment_size()
+        required_size = HEADER_SIZE + payload_size
+        if required_size > max_size:
+            raise SharedMemoryContextError(
+                f"Context payload requires {required_size} bytes, max shared memory is {max_size} bytes."
+            )
+        return min(max_size, max(current_size * 2, required_size * 2))
+
+    def _save_snapshot_to_runtime_store(self, snapshot: dict) -> None:
+        if not self._context_store:
+            return
+        payload_size = encoded_payload_size(snapshot)
+        if self.uses_runtime_context and payload_size > self._context_store.capacity:
+            self._resize_runtime_context_store(snapshot, "write requires larger segment")
+            return
+        self._context_store.save(snapshot)
+
+    def _resize_runtime_context_store(self, snapshot: dict, reason: str) -> bool:
+        if not self.uses_runtime_context or not self._context_store:
+            return False
+
+        payload_size = encoded_payload_size(snapshot)
+        new_size = self._calculate_resized_segment_size(payload_size)
+        if new_size <= self._context_segment_size:
+            return False
+
+        old_store = self._context_store
+        old_name = self._context_shm_name
+        old_size = self._context_segment_size
+        new_name = f"pysm_context_{os.getpid()}_{uuid.uuid4().hex}"
+        new_store = SharedMemoryContextStore.create(new_name, new_size, snapshot)
+
+        self._context_store = new_store
+        self._context_shm_name = new_name
+        self._context_segment_size = new_size
+        self._context_snapshot_cache = snapshot
+        self._context_resize_warning_logged = False
+
+        try:
+            old_store.unlink()
+            old_store.close()
+        except Exception as e:
+            logger.warning(f"Failed to release old runtime context store {old_name}: {e}")
+
+        self.log_message.emit(
+            "set_info",
+            (
+                "<b>Shared memory resized:</b> "
+                f"{self._format_context_size(old_size)} -> {self._format_context_size(new_size)} "
+                f"(payload {self._format_context_size(payload_size)}, reason: {reason})"
+            ),
+        )
+        return True
+
+    def _maybe_resize_runtime_context_store(self) -> bool:
+        if not self.uses_runtime_context or not self._context_store:
+            return False
+
+        snapshot = self._context_snapshot_cache or self._context_store.load()
+        payload_size = encoded_payload_size(snapshot)
+        capacity = max(1, self._context_store.capacity)
+        usage_ratio = payload_size / capacity
+        if usage_ratio < CONTEXT_SHM_RESIZE_USAGE_THRESHOLD:
+            return False
+
+        if self._context_segment_size >= self._max_context_segment_size():
+            if not self._context_resize_warning_logged:
+                self._context_resize_warning_logged = True
+                self.log_message.emit(
+                    "script_error_block",
+                    (
+                        "<b>Shared memory context is near capacity:</b> "
+                        f"{usage_ratio:.0%} used, segment "
+                        f"{self._format_context_size(self._context_segment_size)}. "
+                        "Increase shared_memory_max_size_mb if context keeps growing."
+                    ),
+                )
+            return False
+
+        return self._resize_runtime_context_store(
+            snapshot,
+            f"usage {usage_ratio:.0%} exceeded {CONTEXT_SHM_RESIZE_USAGE_THRESHOLD:.0%}",
+        )
+
+    def _sync_context_from_runtime_store(self) -> bool:
+        if not self._context_store:
+            return False
+        try:
+            snapshot = self._context_store.load()
+        except Exception as e:
+            logger.error(f"Failed to read runtime context store: {e}", exc_info=True)
+            return False
+        self._context_snapshot_cache = snapshot
+        if self.get_set_manager_func:
+            sm = self.get_set_manager_func()
+            if sm:
+                return bool(sm.replace_context_from_raw_snapshot(snapshot))
+        return True
+
+    def _checkpoint_context_to_file(self) -> bool:
+        if self.config_manager.config.runtime_context.checkpoint_policy == "on_save_exit":
+            return True
+        saved = self._save_context_checkpoint()
+        self._log_context_checkpoint_result(saved, "after script")
+        return saved
+
+    def _should_write_context_file_on_finalize(self) -> bool:
+        return (
+            self.config_manager.config.runtime_context.checkpoint_policy
+            != "on_save_exit"
+        )
+
+    def _save_context_checkpoint(self) -> bool:
+        self._sync_context_from_runtime_store()
+        if self.get_set_manager_func:
+            sm = self.get_set_manager_func()
+            if sm:
+                return bool(sm.save_current_context_to_file(self.context_file_path))
+        return False
+
+    def _format_context_size(self, size_bytes: int) -> str:
+        if size_bytes <= 0:
+            return "n/a"
+        size_mb = size_bytes / (1024 * 1024)
+        return f"{size_mb:.1f} MB"
+
+    def _log_context_checkpoint_skipped(self, reason: str) -> None:
+        self.log_message.emit(
+            "runner_info",
+            f"<b>Context checkpoint:</b> skipped ({reason})",
+        )
+
+    def _log_context_checkpoint_result(self, saved: bool, reason: str) -> None:
+        status = "written" if saved else "failed"
+        self.log_message.emit(
+            "runner_info",
+            f"<b>Context checkpoint:</b> {status} ({reason})",
+        )
+
+    @property
+    def uses_runtime_context(self) -> bool:
+        return self._context_backend == "shared_memory"
+
+    def sync_runtime_context_for_save(self) -> bool:
+        return self._sync_context_from_runtime_store()
+
+    def refresh_runtime_context_from_set_manager(self) -> bool:
+        if not self._context_store:
+            return False
+        try:
+            context_data = self._build_runtime_context_data()
+            self._save_snapshot_to_runtime_store(context_data)
+            self._context_snapshot_cache = context_data
+            return True
+        except Exception as e:
+            logger.error(f"Failed to refresh runtime context store: {e}", exc_info=True)
+            return False
+
     @Slot()
     def start(self):
         self.clear_console.emit()
         
         try:
-            self._prepare_context_file()
-        except Exception:
-            self.log_message.emit("script_error_block", "КРИТИЧЕСКАЯ ОШИБКА: Не удалось создать файл контекста.")
+            self._prepare_context_runtime_store()
+        except Exception as e:
+            self.log_message.emit(
+                "script_error_block",
+                (
+                    "<b>КРИТИЧЕСКАЯ ОШИБКА:</b> Не удалось создать runtime context store.<br>"
+                    f"Backend: {self.config_manager.config.runtime_context.backend}<br>"
+                    f"Checkpoint file: {self.context_file_path}<br>"
+                    f"Причина: {e}"
+                ),
+            )
             self._finalize_run(was_stopped=True)
             return
 
@@ -178,6 +436,8 @@ class SetRunnerOrchestrator(QObject):
         
         self.run_had_errors = False
         self._pending_jump_target = None
+        self._pending_jump_source_instance_id = None
+        self._dynamic_macro_counter = 0
         self.run_started.emit(self.set_node.name)
         
         self._process_next_script()
@@ -198,10 +458,63 @@ class SetRunnerOrchestrator(QObject):
         """Коллбэк, вызываемый ScriptRunner при перехвате команды PYSM_ROUTING_CMD."""
         logger.info(f"Получена команда маршрутизации: {instance_id} -> {target_id}")
         self._pending_jump_target = target_id
+        self._pending_jump_source_instance_id = instance_id
+
+    def _find_routing_source_entry(
+        self,
+        instance_id: Optional[str],
+    ) -> Optional[ScriptSetEntryModel]:
+        """Находит экземпляр, который запросил изменение очереди выполнения."""
+        if not instance_id:
+            return None
+
+        for frame in reversed(self.call_stack):
+            entry = next(
+                (
+                    candidate
+                    for candidate in frame.get("queue", [])
+                    if candidate.instance_id == instance_id
+                ),
+                None,
+            )
+            if entry:
+                return entry
+
+        if self.get_set_manager_func:
+            set_manager = self.get_set_manager_func()
+            if set_manager:
+                result = set_manager.find_entry_and_parent_set(instance_id)
+                if result:
+                    entry, _parent_set = result
+                    return entry
+
+        return None
+
+    def _next_dynamic_macro_name(self, source_instance_id: Optional[str]) -> str:
+        """Возвращает имя инициатора GOSUB или нумерованный fallback."""
+        self._dynamic_macro_counter = getattr(self, "_dynamic_macro_counter", 0) + 1
+        source_entry = self._find_routing_source_entry(source_instance_id)
+
+        if source_entry:
+            instance_name = (source_entry.name or "").strip()
+            if instance_name:
+                return instance_name
+
+            script_info = self.get_script_info_by_id(source_entry.id)
+            base_script_name = (
+                str(script_info.name).strip()
+                if script_info and script_info.name
+                else ""
+            )
+            if base_script_name:
+                return base_script_name
+
+        return f"{DYNAMIC_MACRO_FALLBACK_NAME} {self._dynamic_macro_counter}"
 
     # Добавляем новый метод-перехватчик
     def _handle_context_update(self, instance_id: str, update_data: dict):
         """Пробрасывает данные обновления контекста в AppController."""
+        self._sync_context_from_runtime_store()
         self.context_ipc_update_received.emit(update_data)
 
     def _determine_next_script(self) -> Optional[Dict]:
@@ -216,7 +529,13 @@ class SetRunnerOrchestrator(QObject):
         # Теперь переходы работают всегда и везде.
         if self._pending_jump_target:
             target_ids_raw = self._pending_jump_target
-            self._pending_jump_target = None 
+            source_instance_id = getattr(
+                self,
+                "_pending_jump_source_instance_id",
+                None,
+            )
+            self._pending_jump_target = None
+            self._pending_jump_source_instance_id = None
             
             # Парсим все запрошенные ID (через запятую)
             target_ids =[t.strip() for t in target_ids_raw.split(",") if t.strip()]
@@ -282,13 +601,19 @@ class SetRunnerOrchestrator(QObject):
                         self.run_had_errors = True
                         return None
 
-                    names =[e.name or self.get_script_info_by_id(e.id).name for e in new_queue]
+                    names = [
+                        entry.name or self.get_script_info_by_id(entry.id).name
+                        for entry in new_queue
+                    ]
+                    dynamic_macro_name = self._next_dynamic_macro_name(
+                        source_instance_id
+                    )
                     
                     # --- НАЧАЛО ИЗМЕНЕНИЙ ---
                     # Формируем читаемый многострочный нумерованный список
-                    macro_msg_lines =[
-                        "↪ Динамический макрос (GOSUB).",
-                        "В очередь выполнения добавлены следующие скрипты:"
+                    macro_msg_lines = [
+                        f"↪ {dynamic_macro_name} (GOSUB).",
+                        "В очередь выполнения добавлены следующие скрипты:",
                     ]
                     for i, name in enumerate(names, 1):
                         macro_msg_lines.append(f"{i}. {name}")
@@ -297,9 +622,15 @@ class SetRunnerOrchestrator(QObject):
                     # --- КОНЕЦ ИЗМЕНЕНИЙ ---
                     
                     for entry in new_queue:
-                        self.instance_status_changed.emit(entry.instance_id, ScriptRunStatus.PENDING)
+                        self.instance_status_changed.emit(
+                            entry.instance_id,
+                            ScriptRunStatus.PENDING,
+                        )
                         
-                    virtual_set = ScriptSetNodeModel(name="Динамический Макрос", script_entries=new_queue)
+                    virtual_set = ScriptSetNodeModel(
+                        name=dynamic_macro_name,
+                        script_entries=new_queue,
+                    )
                     new_frame = {
                         "set_node": virtual_set,
                         "queue": new_queue,
@@ -380,9 +711,17 @@ class SetRunnerOrchestrator(QObject):
         # --- СИНХРОНИЗАЦИЯ ПЕРЕД КАЖДЫМ СКРИПТОМ ---
         # Обновляем файл на диске из памяти, чтобы новый Python процесс получил свежие данные
         try:
-            self._prepare_context_file()
-        except Exception:
-            self.log_message.emit("script_error_block", "КРИТИЧЕСКАЯ ОШИБКА: Не удалось обновить файл контекста перед запуском.")
+            self._prepare_context_runtime_store()
+        except Exception as e:
+            self.log_message.emit(
+                "script_error_block",
+                (
+                    "<b>КРИТИЧЕСКАЯ ОШИБКА:</b> Не удалось обновить runtime context store перед запуском скрипта.<br>"
+                    f"Backend: {self.config_manager.config.runtime_context.backend}<br>"
+                    f"Checkpoint file: {self.context_file_path}<br>"
+                    f"Причина: {e}"
+                ),
+            )
             self._finalize_run(was_stopped=True)
             return
 
@@ -402,6 +741,8 @@ class SetRunnerOrchestrator(QObject):
             on_context_update=self._handle_context_update,
             custom_command_args_dict=args_for_run,
             context_file_path=str(self.context_file_path),
+            context_shm_name=self._context_shm_name if self.uses_runtime_context else None,
+            context_mode=self._context_backend,
             app_root_dir=APPLICATION_ROOT_DIR,
         )
         
@@ -510,6 +851,10 @@ class SetRunnerOrchestrator(QObject):
         if instance_id in self.active_runners:
             del self.active_runners[instance_id]
 
+        self._sync_context_from_runtime_store()
+        self._checkpoint_context_to_file()
+        self._maybe_resize_runtime_context_store()
+
         # --- НАЧАЛО ИЗМЕНЕНИЙ ---
         # Испускаем сигнал, чтобы обновить контекст в UI после КАЖДОГО шага
         self.context_reloaded.emit()
@@ -524,8 +869,18 @@ class SetRunnerOrchestrator(QObject):
             self._process_next_script()
 
     def _finalize_run(self, was_stopped: bool):
+        self._sync_context_from_runtime_store()
+        should_write_context_file = self._should_write_context_file_on_finalize()
+        if should_write_context_file:
+            self._log_context_checkpoint_result(
+                self._save_context_checkpoint(),
+                "run finished",
+            )
+        else:
+            self._log_context_checkpoint_skipped("run finished; waiting for collection Save")
+
         # Удаляем устаревшие поля, если они вдруг есть
-        if self.context_file_path.is_file():
+        if should_write_context_file and self.context_file_path.is_file():
             try:
                 with open(self.context_file_path, "r", encoding="utf-8") as f:
                     context_data = json.load(f)
@@ -587,6 +942,16 @@ class SetRunnerOrchestrator(QObject):
         
         # Очищаем стек вызовов
         self.call_stack.clear()
+        if self._context_store:
+            try:
+                self._context_store.unlink()
+                self._context_store.close()
+            except Exception as e:
+                logger.warning(f"Failed to close runtime context store: {e}")
+            finally:
+                self._context_store = None
+                self._context_shm_name = None
+                self._context_segment_size = 0
 
     def _log_set_start_info(self, queue_len: int):
         mode_map = {
@@ -615,6 +980,24 @@ class SetRunnerOrchestrator(QObject):
             self.log_message.emit(
                 "set_info",
                 f"{self.locale_manager.get('app_controller.console_set_context_file_label')} {self.context_file_path}",
+            )
+        context_policy = self.config_manager.config.runtime_context.checkpoint_policy
+        self.log_message.emit(
+            "set_info",
+            f"<b>Context backend:</b> {self._context_backend}",
+        )
+        self.log_message.emit(
+            "set_info",
+            f"<b>Context checkpoint policy:</b> {context_policy}",
+        )
+        if self.uses_runtime_context:
+            self.log_message.emit(
+                "set_info",
+                f"<b>Shared memory segment:</b> {self._format_context_size(self._context_segment_size)}",
+            )
+            self.log_message.emit(
+                "set_info",
+                f"<b>Shared memory name:</b> {self._context_shm_name}",
             )
         self.log_message.emit("EMPTY_LINE", "")
 

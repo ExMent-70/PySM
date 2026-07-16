@@ -1,4 +1,3 @@
-# analize/cluster_editor/_lib/editor_filters.py
 # -*- coding: utf-8 -*-
 
 """

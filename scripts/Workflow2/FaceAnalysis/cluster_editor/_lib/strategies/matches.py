@@ -1,4 +1,3 @@
-# analize/cluster_editor/_lib/strategies/matches.py
 
 import logging
 from typing import Dict, List, Optional
@@ -6,7 +5,6 @@ from pathlib import Path
 from collections import defaultdict
 
 from ..data_models import ImageRecord, Face
-from ..json_io import atomic_write_json
 from .base import EditorStrategy, natural_sort_key
 
 logger = logging.getLogger(__name__)
@@ -23,7 +21,7 @@ class MatchesModeStrategy(EditorStrategy):
         if cluster_id.isdigit(): return f"{int(cluster_id):02d}-"
         return ""
 
-    def _strip_name_prefix(self, name: str) -> str:
+    def normalize_cluster_name(self, name: str) -> str:
         if name and '-' in name and name.split('-', 1)[0].isdigit(): 
             return name.split('-', 1)[1].strip()
         return name
@@ -108,9 +106,14 @@ class MatchesModeStrategy(EditorStrategy):
     def rename_cluster(self, cluster_id: str, new_name: str, records: Dict[str, ImageRecord]) -> None:
         self.invalidate_cache()
 
-    def save(self, records: Dict[str, ImageRecord], paths_config: Dict[str, Path]) -> bool:
+    def build_save_outputs(
+        self,
+        records: Dict[str, ImageRecord],
+        paths_config: Dict[str, Path],
+    ) -> Dict[Path, object]:
         json_path = paths_config.get("json_path")
-        if not json_path: return False
+        if not json_path:
+            raise ValueError("Не задан путь основного JSON-файла.")
         
         work_dir = json_path.parent
         matches_path = work_dir / "matches_portrait_to_group.json"
@@ -180,14 +183,11 @@ class MatchesModeStrategy(EditorStrategy):
                         "faces": unmatched_faces
                     })
 
-        try:
-            atomic_write_json(matches_path, output_matches)
-            atomic_write_json(error_path, {
+        return {
+            matches_path: output_matches,
+            error_path: {
                 "description": "Manually updated via Cluster Editor",
                 "unmatched_files": unmatched_files,
                 "total": total_errors
-            })
-            return True
-        except Exception as e:
-            logger.error(f"Matches Save Error: {e}")
-            return False
+            },
+        }

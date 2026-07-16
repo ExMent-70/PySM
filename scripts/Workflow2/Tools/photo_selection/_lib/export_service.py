@@ -2,13 +2,59 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import csv
 from html import escape
+import os
 from pathlib import Path
+import tempfile
+from typing import Iterator, TextIO
 
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-from .assignment_core import LAYOUT_READY_SUFFIXES, is_excluded_relative_path
+from .assignment_core import (
+    LAYOUT_READY_SUFFIXES,
+    index_records_by_student_location,
+    is_excluded_relative_path,
+)
+
+
+@contextmanager
+def _atomic_text_writer(
+    path: Path,
+    *,
+    encoding: str,
+    newline: str | None = None,
+) -> Iterator[TextIO]:
+    """Publish an exported text file only after a complete durable write."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temp_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    temp_path = Path(temp_name)
+    try:
+        try:
+            stream = os.fdopen(
+                descriptor,
+                "w",
+                encoding=encoding,
+                newline=newline,
+            )
+        except Exception:
+            os.close(descriptor)
+            raise
+        with stream:
+            yield stream
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_path, path)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+
 
 class ExportMixin:
     def _layout_file_matrix(
@@ -21,33 +67,35 @@ class ExportMixin:
         destination = Path(self.config.dest_dir).resolve()
         csv_directory = destination
         exclude_dirs = tuple(self._exclude_dirs())
+        record_index = index_records_by_student_location(result)
+        layout_paths_by_number: dict[str, list[str]] = {}
+        for record in result.records.values():
+            layout_paths: set[str] = set()
+            for path in record.destination_files:
+                if (
+                    path.suffix.casefold() not in LAYOUT_READY_SUFFIXES
+                    or not path.is_file()
+                ):
+                    continue
+                try:
+                    resolved = path.resolve()
+                    resolved.relative_to(destination)
+                    relative = resolved.relative_to(csv_directory)
+                except ValueError:
+                    continue
+                if not is_excluded_relative_path(relative, exclude_dirs):
+                    layout_paths.add(str(relative))
+            layout_paths_by_number[record.number] = sorted(
+                layout_paths,
+                key=str.casefold,
+            )
         students = []
         for student in sorted(self.roster.students, key=lambda item: item.display_name.casefold()):
             files_by_location: dict[str, list[str]] = {}
             for location in locations:
                 values: set[str] = set()
-                for record in result.records.values():
-                    if (
-                        record.location != location
-                        or student.student_id not in record.assigned_student_ids
-                    ):
-                        continue
-                    layout_paths: set[str] = set()
-                    for path in record.destination_files:
-                        if (
-                            path.suffix.casefold() not in LAYOUT_READY_SUFFIXES
-                            or not path.is_file()
-                        ):
-                            continue
-                        try:
-                            resolved = path.resolve()
-                            resolved.relative_to(destination)
-                            relative = resolved.relative_to(csv_directory)
-                        except ValueError:
-                            continue
-                        if is_excluded_relative_path(relative, exclude_dirs):
-                            continue
-                        layout_paths.add(str(relative))
+                for record in record_index.get((student.student_id, location), []):
+                    layout_paths = layout_paths_by_number[record.number]
                     if layout_paths:
                         values.update(layout_paths)
                     else:
@@ -102,8 +150,8 @@ class ExportMixin:
         if not output_path.suffix:
             output_path = output_path.with_suffix(".html")
         try:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(self._student_location_html(), encoding="utf-8")
+            with _atomic_text_writer(output_path, encoding="utf-8") as stream:
+                stream.write(self._student_location_html())
         except OSError as exc:
             QMessageBox.critical(self, "Сохранение HTML", f"Не удалось сохранить файл:\n{exc}")
             return
@@ -125,8 +173,11 @@ class ExportMixin:
             output_path = output_path.with_suffix(".csv")
         locations, students = self._layout_file_matrix()
         try:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            with output_path.open("w", encoding="utf-8-sig", newline="") as stream:
+            with _atomic_text_writer(
+                output_path,
+                encoding="utf-8-sig",
+                newline="",
+            ) as stream:
                 writer = csv.writer(stream, delimiter=";")
                 writer.writerow(["ФИО", *locations])
                 for full_name, files_by_location in students:

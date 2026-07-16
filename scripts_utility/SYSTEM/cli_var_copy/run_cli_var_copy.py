@@ -11,16 +11,24 @@ run_cli_copy_value.py
 import argparse
 import logging
 import sys
-from typing import Optional, Dict, Any
 
 # Попытка импорта зависимостей PySM
 try:
     from pysm_lib import pysm_context
+    from pysm_lib.context_variable_ops import (
+        copy_context_value,
+        format_error,
+        format_success,
+    )
     from pysm_lib.pysm_context import ConfigResolver
     IS_MANAGED_RUN = True
 except ImportError:
     pysm_context = None
     ConfigResolver = None
+    def format_error(message: str) -> str:
+        return f"❌ ОШИБКА: {message}"
+    def format_success(var_name: str, value) -> str:
+        return f"✅ <b>{var_name}</b> = <i>{value}</i>"
     IS_MANAGED_RUN = False
 
 # Настройка логирования
@@ -39,14 +47,14 @@ def get_config() -> argparse.Namespace:
         "--copy_source_var", 
         type=str, 
         required=True,
-        help="Имя исходной переменной."
+        help="Имя исходной переменной. Поддерживается точечная нотация, например project.name."
     )
     
     parser.add_argument(
         "--copy_target_var", 
         type=str, 
         required=True,
-        help="Имя целевой переменной."
+        help="Имя целевой переменной. Поддерживается точечная нотация, например project.backup_name."
     )
     
     # --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
@@ -87,32 +95,27 @@ def main() -> None:
     logger.info(f"Запуск копирования: '{source_key}' -> '{target_key}'")
 
     # 3. Получение данных
-    source_data: Optional[Dict[str, Any]] = pysm_context.get_variable(source_key)
+    try:
+        source = copy_context_value(pysm_context, source_key, target_key)
+    except Exception as e:
+        logger.critical(format_error(f"Ошибка записи: {e}"))
+        sys.exit(1)
 
-    if source_data is None:
+    if not source.exists:
         msg = f"Исходная переменная '{source_key}' отсутствует в контексте."
         if fail_if_missing:
-            logger.error(f"КРИТИЧЕСКАЯ ОШИБКА: {msg}")
+            logger.error(format_error(msg))
             sys.exit(1)
         else:
             logger.warning(f"ПРЕДУПРЕЖДЕНИЕ: {msg} Пропуск операции.")
             sys.exit(0)
 
     # 4. Копирование
-    value = source_data.get("value")
-    var_type = source_data.get("type")
-    
-    val_str = str(value)
+    val_str = str(source.value)
     val_preview = (val_str[:47] + "...") if len(val_str) > 50 else val_str
     
-    logger.info(f"Найдено значение: {val_preview} (Тип: {var_type})")
-
-    try:
-        pysm_context.set(target_key, value, var_type=var_type)
-        logger.info(f"УСПЕХ: Значение скопировано в '{target_key}'.")
-    except Exception as e:
-        logger.critical(f"ОШИБКА ЗАПИСИ: {e}")
-        sys.exit(1)
+    logger.info(f"Найдено значение: {val_preview} (Тип: {source.var_type})")
+    logger.info(format_success(target_key, source.value))
 
     sys.exit(0)
 

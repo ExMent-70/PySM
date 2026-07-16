@@ -1,4 +1,3 @@
-# analize/cluster_editor/_lib/editor_ui.py
 # -*- coding: utf-8 -*-
 
 """
@@ -10,7 +9,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSplitter,
     QLineEdit, QMenu, QListWidget, QSlider, QTextEdit, QProgressBar, QSpinBox,
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt
 
 from .editor_widgets import ImageDragListWidget, ClusterDropListWidget, FaceDetailsWidget
 from .editor_delegates import FACE_MIN, FACE_MAX, FACE_SIZE, FACE_SIZE_PORTRAIT
@@ -63,7 +62,10 @@ class EditorUIBuilder:
         if window.mode == 'matches': left_label_text = "Эталоны (Портреты)"
         elif window.mode == 'cleaning': left_label_text = "Технические группы"
         
-        left_layout.addWidget(QLabel(f"{window.photo_session}: {left_label_text}"))
+        window.cluster_list_title = QLabel(
+            f"{window.photo_session}: {left_label_text}"
+        )
+        left_layout.addWidget(window.cluster_list_title)
         
         window.search_bar = QLineEdit()
         window.search_bar.setPlaceholderText("Поиск...")

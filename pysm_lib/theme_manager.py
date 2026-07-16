@@ -48,6 +48,7 @@ def get_default_dynamic_styles() -> Dict[str, str]:
         "tooltip_arg_value": "color: #0077b6;",
         "delegate_hover_border": "color: #0078d7;",
         "delegate_changed_indicator": "color: #f0ad4e;",
+        "delegate_face_hover": "color: #f0ad4e;",
         "delegate_preview_background": "color: #e8e8e8;",
         "delegate_secondary_text": "color: #555555;",
         "markup_number": "background-color: #27ae60; border-color: #bbdefb; color: #ffffff;",

@@ -45,18 +45,23 @@ IS_MANAGED_RUN = False
 
 try:
     current_script_path = Path(__file__).resolve()
-    project_root = current_script_path.parent.parent
+    project_root = current_script_path.parents[3]
+    system_scripts_dir = current_script_path.parents[1]
 
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
+    for path in (project_root, system_scripts_dir):
+        if str(path) not in sys.path:
+            sys.path.insert(0, str(path))
 
     from pysm_lib import pysm_context
+    from pysm_lib.context_variable_ops import context_value_exists, remove_context_value
     from pysm_lib.pysm_context import ConfigResolver
 
     IS_MANAGED_RUN = True
 
 except ImportError as e:
     pysm_context = None
+    context_value_exists = None
+    remove_context_value = None
     ConfigResolver = None
 
     print(f"Критическая ошибка импорта: {e}", file=sys.stderr)
@@ -315,61 +320,6 @@ def is_empty_value(value: Any) -> bool:
 
     return False
 
-
-# ==============================================================================
-# 6. Проверка существования значения в контексте
-# ==============================================================================
-
-def context_value_exists(context: Any, key_path: str) -> bool:
-    """
-    Проверяет существование переменной или вложенного значения в контексте.
-
-    Если в pysm_context доступен метод exists(), используется он.
-    Если метод отсутствует, применяется локальный fallback.
-
-    Fallback поддерживает:
-        - верхнеуровневые переменные;
-        - dot-notation по dict;
-        - числовые индексы списков.
-    """
-    if hasattr(context, "exists"):
-        return bool(context.exists(key_path))
-
-    keys = key_path.split(".")
-    base_key = keys[0]
-
-    variable_data = context.get_variable(base_key)
-
-    if not variable_data or not isinstance(variable_data, dict):
-        return False
-
-    if len(keys) == 1:
-        return True
-
-    current_value = variable_data.get("value")
-
-    for path_part in keys[1:]:
-        if isinstance(current_value, dict):
-            if path_part not in current_value:
-                return False
-            current_value = current_value[path_part]
-            continue
-
-        if isinstance(current_value, list):
-            if not path_part.isdigit():
-                return False
-
-            index = int(path_part)
-
-            if index < 0 or index >= len(current_value):
-                return False
-
-            current_value = current_value[index]
-            continue
-
-        return False
-
-    return True
 
 
 # ==============================================================================
@@ -742,7 +692,7 @@ def main() -> None:
             "параметр if-comparison-value.",
             config.if_operator,
         )
-        sys.exit(1)    
+        sys.exit(1)
 
     try:
         variable_name = ensure_required_text(
@@ -790,7 +740,7 @@ def main() -> None:
                 icon_delete,
                 escape(variable_name),
             )
-            pysm_context.remove(variable_name)
+            remove_context_value(pysm_context, variable_name)
         else:
             logger.warning(
                 "%s Очистка переменной пропущена: имя переменной пустое.",
@@ -800,10 +750,9 @@ def main() -> None:
     if target_id:
         try:
             pysm_context.set_next_script(target_id)
-            logger.debug(
-                "%s Запрошен переход к скрипту с ID: <i>%s</i>",
+            logger.info(
+                "\n%s Порядок выполнения скриптов изменён",
                 icon_play,
-                escape(target_id),
             )
         except Exception as e:
             logger.error(
@@ -828,4 +777,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

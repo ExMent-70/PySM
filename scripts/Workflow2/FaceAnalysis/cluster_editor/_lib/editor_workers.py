@@ -1,16 +1,14 @@
-# analize/cluster_editor/_lib/editor_workers.py
 
 import logging
 import os
 import concurrent.futures
 import re
+import tempfile
 import traceback
-import sys
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Any
 
-from PySide6.QtCore import QObject, Signal, Qt
-from PySide6.QtGui import QImage
+from PySide6.QtCore import QObject, Signal
 
 # Импорт общей логики
 try:
@@ -21,29 +19,30 @@ except ImportError:
     apply_color_corrections, create_watermark_layer = None, None
 
 from _common import (
-    icon_ok, 
-    icon_warning, 
-    icon_error, 
     icon_info,
-    icon_save,
-    icon_save_warning,
-    icon_save_error
 )
-
-IS_MANAGED_RUN = False
-try:
-    from pysm_lib import pysm_context
-    IS_MANAGED_RUN = True
-except ImportError as e:
-    print(f"Ошибка импорта: {e}", file=sys.stderr)
-
-
-from .editor_delegates import THUMBNAIL_SIZE
 
 logger = logging.getLogger(__name__)
 
 TEXT_VERTICAL_ANCHOR_PCT = 0.85 
 TEXT_LINE_SPACING = 15 
+
+
+class DataLoadWorker(QObject):
+    """Load and parse one data manager outside the GUI thread."""
+
+    finished = Signal(bool, str)
+
+    def __init__(self, data_manager) -> None:
+        super().__init__()
+        self.data_manager = data_manager
+
+    def run(self) -> None:
+        try:
+            success, message = self.data_manager.load_data()
+        except Exception as exc:
+            success, message = False, str(exc)
+        self.finished.emit(success, message)
 
 def run_export_task(task_data: Dict[str, Any]) -> str:
     """Функция обработки (выполняется в отдельном процессе)."""
@@ -123,7 +122,8 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
                             break
                         font_size -= 2
                         try: font_main = ImageFont.truetype("arialbd.ttf", font_size)
-                        except: pass
+                        except OSError:
+                            pass
 
                 # Позиционирование
                 try:
@@ -149,126 +149,27 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
                 )
                 draw_main.text(num_pos, file_number, font=font_main, fill="white", stroke_width=3, stroke_fill="black")
             
-            # 4. СОХРАНЕНИЕ
-            final_image.convert("RGB").save(output_path_obj, "JPEG", quality=quality, dpi=target_dpi)
+            descriptor, temporary_name = tempfile.mkstemp(
+                dir=output_path_obj.parent,
+                prefix=f".{output_path_obj.name}.",
+                suffix=".tmp",
+            )
+            os.close(descriptor)
+            temporary_path = Path(temporary_name)
+            try:
+                final_image.convert("RGB").save(
+                    temporary_path,
+                    "JPEG",
+                    quality=quality,
+                    dpi=target_dpi,
+                )
+                os.replace(temporary_path, output_path_obj)
+            finally:
+                temporary_path.unlink(missing_ok=True)
             return "OK"
 
     except Exception as e:
         return f"Error processing {Path(source_path).name}: {traceback.format_exc()}"
-
-
-class ChunkedImageLoader(QObject):
-    chunk_ready = Signal(list) 
-    progress_updated = Signal(int)
-    finished = Signal()
-
-    def __init__(self, tasks: List[Dict], pixmap_cache: Dict, num_threads: int):
-        super().__init__()
-        self.tasks = tasks
-        self.pixmap_cache = pixmap_cache
-        self.num_threads = min(num_threads, (os.cpu_count() or 4) * 2)
-
-        self._is_interruption_requested = False
-        self._executor = None
-
-    def requestInterruption(self):
-        self._is_interruption_requested = True
-        # Немедленная отмена всех задач в очереди (решает проблему лагов UI при быстром переключении)
-        if self._executor:
-            self._executor.shutdown(wait=False, cancel_futures=True)
-
-    def _load_single_image(self, task: Dict) -> Optional[Tuple[str, QImage]]:
-        if self._is_interruption_requested: return None
-        full_path = task.get("full_path")
-        cache_key = task.get("cache_key", task["filename"])
-        bbox = task.get("bbox")
-        draw_rect = task.get("draw_face_rect", False)
-        
-        if not full_path or not full_path.exists(): return None
-        
-        try:
-            if bbox and Image:
-                with Image.open(str(full_path)) as pil_img:
-                    img_w, img_h = pil_img.size
-                    x1, y1, x2, y2 = map(int, bbox)
-                    if x1 > x2: x1, x2 = x2, x1
-                    if y1 > y2: y1, y2 = y2, y1
-                    face_w = x2 - x1; face_h = y2 - y1
-                    pad = int(max(face_w, face_h) * 0.5)
-                    cx1 = max(0, x1 - pad); cy1 = max(0, y1 - pad)
-                    cx2 = min(img_w, x2 + pad); cy2 = min(img_h, y2 + pad)
-                    if cx2 > cx1 and cy2 > cy1:
-                        crop = pil_img.crop((cx1, cy1, cx2, cy2))
-                        if draw_rect:
-                            if crop.mode != "RGBA": crop = crop.convert("RGBA")
-                            draw = ImageDraw.Draw(crop)
-                            rx1 = x1 - cx1; ry1 = y1 - cy1
-                            rx2 = rx1 + face_w; ry2 = ry1 + face_h
-                            for w in range(3):
-                                draw.rectangle([rx1-w, ry1-w, rx2+w, ry2+w], outline=(255, 165, 0, 255))
-                        if crop.mode != "RGBA": crop = crop.convert("RGBA")
-                        data = crop.tobytes("raw", "RGBA")
-                        qim = QImage(data, crop.width, crop.height, QImage.Format.Format_RGBA8888).copy()
-                        thumb = qim.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                        return (cache_key, thumb)
-            image = QImage()
-            if not image.load(str(full_path)): return None
-            thumb = image.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            return (cache_key, thumb)
-        except Exception as e:
-            logger.error(f"Error loading {full_path}: {e}")
-            return None
-
-    def run(self):
-        if self._is_interruption_requested:
-            self.finished.emit()
-            return
-
-        processed_count = 0
-        current_batch_size = 5 
-        max_batch_size = 20
-        batch_buffer = list()
-        
-        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.num_threads)
-        
-        try:
-            future_to_task = dict()
-            # Безопасное добавление задач (с защитой от мгновенного shutdown)
-            for task in self.tasks:
-                if self._is_interruption_requested:
-                    break
-                try:
-                    future = self._executor.submit(self._load_single_image, task)
-                    future_to_task[future] = task
-                except RuntimeError:
-                    # Пул потоков был принудительно остановлен извне
-                    break
-            
-            for future in concurrent.futures.as_completed(future_to_task):
-                if self._is_interruption_requested: break
-                try:
-                    result = future.result()
-                    if result: batch_buffer.append(result)
-                except Exception: pass
-                
-                processed_count += 1
-                
-                if len(batch_buffer) >= current_batch_size:
-                    self.chunk_ready.emit(batch_buffer)
-                    batch_buffer = list()
-                    self.progress_updated.emit(processed_count)
-                    if current_batch_size < max_batch_size: current_batch_size += 5
-                    
-            if batch_buffer and not self._is_interruption_requested:
-                self.chunk_ready.emit(batch_buffer)
-                self.progress_updated.emit(processed_count)
-                
-        finally:
-            if self._executor:
-                self._executor.shutdown(wait=False, cancel_futures=True)
-                self._executor = None
-
-        self.finished.emit()
 
 
 class ExportWorker(QObject):
@@ -291,57 +192,86 @@ class ExportWorker(QObject):
         
         self._is_interruption_requested = False
         self._executor = None
+        self._futures = []
 
-    def requestInterruption(self):
-        """Безопасная отмена экспорта и уничтожение процессов."""
+    def request_interruption(self) -> None:
+        """Cancel queued jobs; running processes finish before ``finished``."""
         self._is_interruption_requested = True
-        if self._executor:
-            self._executor.shutdown(wait=False, cancel_futures=True)
+        for future in list(self._futures):
+            future.cancel()
 
     def run(self):
         total = len(self.tasks)
         processed_count = 0
-        watermarks_text = ""
-        
-        if self.common_settings["apply_watermarks"]:
-            watermarks_text = " с водяными знаками"
-            
-        logger.info(f"\n{icon_info} Экспорт <b>{total}</b> файла(ов){watermarks_text}...")
-        
-        prepared_tasks = list()
-        for task in self.tasks:
-            full_task = task.copy()
-            full_task.update(self.common_settings)
-            full_task["source_path"] = str(full_task["source_path"])
-            full_task["output_path"] = str(full_task["output_path"])
-            prepared_tasks.append(full_task)
-            
-        errors = list()
-        self._executor = concurrent.futures.ProcessPoolExecutor(max_workers=self.num_processes)
-        
+        errors = []
         try:
-            futures =[self._executor.submit(run_export_task, task_data) for task_data in prepared_tasks]
-            
-            for future in concurrent.futures.as_completed(futures):
-                if self._is_interruption_requested: break
+            if self._is_interruption_requested:
+                return
+
+            watermarks_text = (
+                " с водяными знаками"
+                if self.common_settings["apply_watermarks"]
+                else ""
+            )
+            logger.info(
+                f"\n{icon_info} Экспорт <b>{total}</b> файла(ов)"
+                f"{watermarks_text}..."
+            )
+
+            prepared_tasks = []
+            for task in self.tasks:
+                full_task = {**task, **self.common_settings}
+                full_task["source_path"] = str(full_task["source_path"])
+                full_task["output_path"] = str(full_task["output_path"])
+                prepared_tasks.append(full_task)
+
+            self._executor = concurrent.futures.ProcessPoolExecutor(
+                max_workers=self.num_processes
+            )
+            self._futures = [
+                self._executor.submit(run_export_task, task_data)
+                for task_data in prepared_tasks
+            ]
+
+            for future in concurrent.futures.as_completed(self._futures):
+                if self._is_interruption_requested:
+                    break
                 try:
                     res = future.result()
-                    if res != "OK": errors.append(res)
-                except Exception as e: 
-                    errors.append(str(e))
-                    
+                    if res != "OK":
+                        errors.append(res)
+                except Exception as exc:
+                    errors.append(str(exc))
+
                 processed_count += 1
                 self.progress_updated.emit(processed_count)
-                
-        finally:
-            if self._executor:
-                self._executor.shutdown(wait=False, cancel_futures=True)
-                self._executor = None
 
-        if self._is_interruption_requested:
-            self.finished.emit(f"Экспорт прерван. Обработано {processed_count} из {total} файлов.")
-        else:
+        except Exception as exc:
+            errors.append(f"Ошибка инфраструктуры экспорта: {exc}")
+            logger.exception("Экспорт аварийно остановлен")
+        finally:
+            try:
+                if self._executor is not None:
+                    self._executor.shutdown(wait=True, cancel_futures=True)
+            except Exception as exc:
+                errors.append(f"Ошибка завершения пула экспорта: {exc}")
+                logger.exception("Не удалось корректно завершить пул экспорта")
+            self._executor = None
+            self._futures = []
+
             if errors:
                 logger.error(f"Errors during export ({len(errors)}):")
-                for e in errors[:5]: logger.error(e)
-            self.finished.emit(f"Экспорт завершен. Обработано {total} файлов. Ошибок: {len(errors)}.")
+                for error in errors[:5]:
+                    logger.error(error)
+
+            if self._is_interruption_requested:
+                message = (
+                    f"Экспорт прерван. Обработано {processed_count} "
+                    f"из {total} файлов."
+                )
+            else:
+                message = (
+                    f"Экспорт завершен. Обработано {processed_count} "
+                    f"из {total} файлов. Ошибок: {len(errors)}."
+                )
+            self.finished.emit(message)

@@ -10,12 +10,22 @@ import pathlib  # Добавляем импорт pathlib, если его не 
 IS_MANAGED_RUN = False
 try:
     from pysm_lib import pysm_context
+    from pysm_lib.context_variable_ops import (
+        format_error,
+        format_success,
+        read_context_value,
+        write_context_value,
+    )
     from pysm_lib.pysm_context import ConfigResolver
     IS_MANAGED_RUN = True
 except ImportError:
     # Создаем заглушки для автономного запуска
     pysm_context = None
     ConfigResolver = None
+    def format_error(message: str) -> str:
+        return f"❌ ОШИБКА: {message}"
+    def format_success(var_name: str, value) -> str:
+        return f"✅ <b>{var_name}</b> = <i>{value}</i>"
 
 # Импортируем PySide6 с проверкой на его наличие
 try:
@@ -43,7 +53,7 @@ def get_config():
     parser.add_argument(
         "--dlg_open_var", 
         type=str,
-        help="Имя переменной, в которую будет сохранен выбранный путь.",
+        help="Имя переменной, в которую будет сохранен выбранный путь. Поддерживается точечная нотация, например project.output_path.",
         default="dlg_open_user_var"
     )
     parser.add_argument(
@@ -82,25 +92,27 @@ def get_config():
 # ==============================================================================
 def main():
     """Основная функция-оркестратор."""
-    if not IS_MANAGED_RUN or not pysm_context:
-        logger.critical("❌ Этот скрипт может быть запущен только в среде PySM")
-        sys.exit(1)
-  
     config = get_config()
+
+    if not IS_MANAGED_RUN or not pysm_context:
+        logger.critical(format_error("Этот скрипт может быть запущен только в среде PySM"))
+        sys.exit(1)
     
     # Теперь эта строка не должна вызывать ошибку
     q_app = QApplication.instance() or QApplication(sys.argv)
     
     # Логика определения начальной директории
     initial_dir = ""
-    existing_path_str = pysm_context.get(config.dlg_open_var)
+    existing_path = read_context_value(pysm_context, config.dlg_open_var)
+    existing_path_str = existing_path.value if existing_path.exists else None
     if existing_path_str and os.path.exists(existing_path_str):
         if os.path.isfile(existing_path_str):
             initial_dir = os.path.dirname(existing_path_str)
         else:
             initial_dir = existing_path_str
     else:
-        collection_dir = pysm_context.get_structured("pysm_info.collection_dir")
+        collection_dir_value = read_context_value(pysm_context, "pysm_info.collection_dir")
+        collection_dir = collection_dir_value.value if collection_dir_value.exists else None
         if collection_dir and os.path.isdir(collection_dir):
             initial_dir = collection_dir
 
@@ -124,19 +136,19 @@ def main():
         )
 
     if not selected_path:
-        logger.critical("❌ Операция отменена пользователем<br>")
+        logger.critical(format_error("Операция отменена пользователем<br>"))
         sys.exit(1)
     
     # Логика сохранения результата в контекст
     path_type = "dir_path" if config.dlg_open_type == 'directory' else 'file_path'        
     try:
-        pysm_context.set(
-            key=config.dlg_open_var,
-            value=selected_path,
-            var_type=path_type
+        write_context_value(
+            pysm_context,
+            config.dlg_open_var,
+            selected_path,
+            var_type=path_type,
         )
-        s = f"<b>{config.dlg_open_var}</b> = <i>{selected_path}</i><br>"
-        logger.info(f"✅ {s}")
+        logger.info(format_success(config.dlg_open_var, selected_path))
         #s = f"<b>{config.dlg_open_var}</b> = <i>{selected_path} (тип: {path_type})</i><br>"
         #print(f"<b>{config.dlg_open_var}</b> = <i>{selected_path} (тип: {path_type})</i><br>")
         
@@ -151,7 +163,7 @@ def main():
         logger.info(" ")
         """
     except Exception as e:
-        logger.critical("❌ \nКритическая ошибка при записи в контекст: {e}", file=sys.stderr)
+        logger.critical(format_error(f"Критическая ошибка при записи в контекст: {e}"))
         sys.exit(1)
 
 

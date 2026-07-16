@@ -7,6 +7,7 @@ collection_info = "color: #c9d1d9; background-color: #161b22; padding: 5px; bord
 # Почти черный фон консоли
 console_background = "background-color: #0d1117;"
 delegate_changed_indicator = "color: #d29922;"
+delegate_face_hover = "color: #d29922;"
 delegate_hover_border = "color: #58a6ff;"
 delegate_preview_background = "color: #161b22;"
 delegate_secondary_text = "color: #8b949e;"

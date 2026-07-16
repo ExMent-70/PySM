@@ -8,7 +8,6 @@ from typing import List, Dict
 
 from .models import InstallationPlan, SystemInfo, PackageInfo
 from .utils import run_command, run_command_streaming
-from .config import INSIGHTFACE_WINDOWS_WHEEL_URLS
 
 try:
     from pysm_lib.pysm_icons import icons as pysm_icons
@@ -489,40 +488,101 @@ class InstallationManager:
             return
         packages_to_install = self._filter_packages_to_install(self.plan.insightface_packages)
         if not packages_to_install:
-            self._set_category_result("Insightface", "SKIP", "уже соответствует")
+            if self.plan_only:
+                self._set_category_result("Insightface", "SKIP", "уже соответствует")
+            elif self._verify_insightface_gpu_installation():
+                self._set_category_result("Insightface", "SKIP", "уже соответствует, GPU проверен")
+            else:
+                self._set_category_result("Insightface", "FAIL", "ошибка проверки GPU-среды")
             return
         logging.info("\n<b><i>Установка пакетов Insightface...</i></b>")
         cmd = self._build_base_command()
-        cmd.append("--upgrade")
-        logging.info("Insightface требует <b>numpy==1.26.4</b>; эта версия будет установлена принудительно.")
-        cmd.extend([self._get_insightface_spec(), "numpy==1.26.4"])
-        self._run_install_command(cmd, "Insightface")
-
-    def _get_insightface_spec(self) -> str:
-        tag = self._get_python_abi_tag()
-        wheel_url = INSIGHTFACE_WINDOWS_WHEEL_URLS.get(tag)
-        if wheel_url:
-            logging.info(f"Выбран wheel insightface для Python ABI <b>{tag}</b>.")
-            return wheel_url
-
-        logging.warning(
-            f"Готовый wheel insightface для Python ABI {tag or 'unknown'} не настроен. "
-            "Будет использована обычная установка insightface==0.7.3; "
-            "она может потребовать Microsoft C++ Build Tools."
+        cmd.extend(["--upgrade", "--no-deps"])
+        logging.info(
+            "InsightFace устанавливается без автоматических зависимостей: "
+            "ONNX Runtime управляется отдельно, чтобы CPU-пакет onnxruntime "
+            "не заменил onnxruntime-gpu."
         )
-        return "insightface==0.7.3"
+        for package in packages_to_install:
+            cmd.extend(self._package_install_args(package))
 
-    def _get_python_abi_tag(self) -> str:
+        if self._run_install_command(cmd, "Insightface") and not self.plan_only:
+            if self._verify_insightface_gpu_installation():
+                self._set_category_result(
+                    "Insightface",
+                    "OK",
+                    "установлено/обновлено, onnxruntime-gpu и GPU provider проверены",
+                )
+            else:
+                self._set_category_result("Insightface", "FAIL", "ошибка проверки GPU-среды")
+
+    def _verify_insightface_gpu_installation(self) -> bool:
+        """Verify that InsightFace is backed by one unambiguous GPU runtime."""
+        info = self._get_installed_insightface_info()
+        if not info.get("installed"):
+            self.failures.append("InsightFace import verification")
+            logging.error(f"ОШИБКА: InsightFace не импортируется: {info.get('error', 'неизвестная ошибка')}")
+            return False
+
+        gpu_providers = {"CUDAExecutionProvider", "TensorrtExecutionProvider"}
+        providers = set(info.get("providers") or [])
+        if not info.get("gpu_runtime_version"):
+            self.failures.append("onnxruntime-gpu distribution verification")
+            logging.error("ОШИБКА: в целевом Python не установлен пакет onnxruntime-gpu.")
+            return False
+        if info.get("cpu_runtime_version"):
+            self.failures.append("ONNX Runtime CPU/GPU package collision")
+            logging.error(
+                "ОШИБКА: одновременно установлены onnxruntime и onnxruntime-gpu. "
+                "Удалите CPU-пакет onnxruntime и повторите установку."
+            )
+            return False
+        if not providers.intersection(gpu_providers):
+            self.failures.append("InsightFace GPU provider verification")
+            logging.error(
+                "ОШИБКА: ONNX Runtime не предоставляет CUDA/TensorRT provider. "
+                f"Доступные providers: {sorted(providers)}."
+            )
+            return False
+
+        logging.info(
+            f"{self._status_prefix('DIRECT')} InsightFace <b>{info.get('insightface_version')}</b>, "
+            f"onnxruntime-gpu <b>{info.get('gpu_runtime_version')}</b>, "
+            f"providers: <b>{sorted(providers)}</b>"
+        )
+        return True
+
+    def _get_installed_insightface_info(self) -> Dict[str, object]:
         cmd = [
             str(self.python_executable),
             "-c",
-            "import sys; print(f'cp{sys.version_info.major}{sys.version_info.minor}')",
+            (
+                "import json\n"
+                "from importlib import metadata\n"
+                "try:\n"
+                " import insightface\n"
+                " import onnxruntime as ort\n"
+                " def dist_version(name):\n"
+                "  try: return metadata.version(name)\n"
+                "  except metadata.PackageNotFoundError: return None\n"
+                " print(json.dumps({"
+                "'installed': True, "
+                "'insightface_version': getattr(insightface, '__version__', None), "
+                "'gpu_runtime_version': dist_version('onnxruntime-gpu'), "
+                "'cpu_runtime_version': dist_version('onnxruntime'), "
+                "'providers': ort.get_available_providers()"
+                "}))\n"
+                "except Exception as e:\n"
+                " print(json.dumps({'installed': False, 'error': str(e)}))\n"
+            ),
         ]
         success, stdout, stderr = run_command(cmd)
         if not success:
-            logging.warning(f"Не удалось определить ABI целевого Python: {stderr}")
-            return ""
-        return stdout.strip()
+            return {"installed": False, "error": stderr}
+        try:
+            return json.loads(stdout)
+        except json.JSONDecodeError:
+            return {"installed": False, "error": stdout}
 
     def _get_installed_torch_info(self) -> Dict[str, object]:
         cmd = [

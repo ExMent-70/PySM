@@ -1,8 +1,6 @@
-# analize/cluster_editor/_lib/strategies/face.py
 
 import logging
 from typing import Dict, List, Optional
-from pathlib import Path
 from collections import defaultdict
 
 from ..data_models import ImageRecord, Face
@@ -23,7 +21,7 @@ class FaceModeStrategy(EditorStrategy):
             return f"{int(cluster_id):02d}-"
         return ""
 
-    def _strip_name_prefix(self, name: str) -> str:
+    def normalize_cluster_name(self, name: str) -> str:
         if name and '-' in name:
             parts = name.split('-', 1)
             if parts[0].isdigit():
@@ -131,6 +129,3 @@ class FaceModeStrategy(EditorStrategy):
             record = records[fname]
             if record.face_count == 1 and record.faces:
                 record.faces[0].student_id = new_name
-
-    def save(self, records: Dict[str, ImageRecord], paths_config: Dict[str, Path]) -> bool:
-        return True

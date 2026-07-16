@@ -114,7 +114,7 @@ class ONNXModelManager:
             if has_files:
                 return "(Папка кеша содержит файлы)" 
             else:
-                return "{icon_warning} <b>Кеш не найден. Компиляция моделей займёт некоторое время...</b>"
+                return f"{icon_warning} <b>Кеш не найден. Компиляция моделей займёт некоторое время...</b>"
         except Exception:
             return ""
 

@@ -10,8 +10,9 @@ ijson
 lxml
 Jinja2
 natasha
-numpy==1.26.4
+numpy
 nvidia-ml-py
+onnx
 onnxruntime-gpu
 opencv-python
 packaging
@@ -26,11 +27,13 @@ PySide6
 pycryptodome
 rawpy
 regex
+requests
 safetensors
+scikit-image
 scikit-learn
 scipy
 toml
-torch==2.10.0
+torch
 tqdm
 transformers==4.55.4
 transparent-background[gui]

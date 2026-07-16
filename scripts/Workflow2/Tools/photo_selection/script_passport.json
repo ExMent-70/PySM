@@ -2,7 +2,7 @@
   "description": "Единый скрипт отбора фотографий: импортирует номера выбранных фотографий, сохраняет photo_selection.json, проверяет назначения по AI-анализу, копирует выбранные файлы и создаёт photo_assignments.json для верстки альбома.",
   "category": "Редакторы",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.06.22",
+  "version": "2.2026.07.11",
   "command_line_args_meta": {
     "student_list_file": {
       "type": "file_path",

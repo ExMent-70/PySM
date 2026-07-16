@@ -79,3 +79,23 @@ class ImportEntry:
     selected_numbers: tuple[str, ...]
     source_person: str = ""
     responded: bool = True
+
+
+def coalesce_import_entries(entries: Iterable[ImportEntry]) -> list[ImportEntry]:
+    """Merge repeated student rows without losing earlier photo numbers."""
+
+    merged: dict[str, ImportEntry] = {}
+    for entry in entries:
+        previous = merged.get(entry.student_id)
+        numbers = unique_numbers(
+            (*previous.selected_numbers, *entry.selected_numbers)
+            if previous is not None
+            else entry.selected_numbers
+        )
+        merged[entry.student_id] = ImportEntry(
+            entry.student_id,
+            tuple(numbers),
+            entry.source_person or (previous.source_person if previous else ""),
+            entry.responded,
+        )
+    return list(merged.values())

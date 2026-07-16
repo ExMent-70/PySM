@@ -52,6 +52,8 @@ class ScriptRunner(QObject):
         on_context_update: Optional[Callable[[str, dict], None]] = None,
         custom_command_args_dict: Optional[Dict[str, Any]] = None,
         context_file_path: Optional[str] = None,
+        context_shm_name: Optional[str] = None,
+        context_mode: str = "file",
         app_root_dir: Optional[pathlib.Path] = None,
         global_python_paths: Optional[List[str]] = None,
         global_env_vars: Optional[Dict[str, str]] = None,
@@ -62,6 +64,8 @@ class ScriptRunner(QObject):
         self.python_interpreter: str = python_interpreter
         self.additional_env_paths: List[str] = additional_env_paths or[]
         self.context_file_path = context_file_path
+        self.context_shm_name = context_shm_name
+        self.context_mode = context_mode
         self.app_root_dir = app_root_dir
         self.global_python_paths = global_python_paths or[]
         self.global_env_vars = global_env_vars or {}
@@ -100,6 +104,11 @@ class ScriptRunner(QObject):
                 env.insert(key, val)
                 
         env.insert("PY_SCRIPT_MANAGER_ACTIVE", "1")
+        env.insert("PYSM_CONTEXT_MODE", self.context_mode)
+        if self.context_file_path:
+            env.insert("PYSM_CONTEXT_FILE", self.context_file_path)
+        if self.context_shm_name:
+            env.insert("PYSM_CONTEXT_SHM_NAME", self.context_shm_name)
         logger.debug(locale_manager.get("script_runner.log_debug.pysm_active_set"))
         
         new_path_parts: List[str] =[]
@@ -197,6 +206,9 @@ class ScriptRunner(QObject):
             "pysm_lib.context_loader",
         ]
         command.append(run_file_path_str)
+        if self.context_shm_name:
+            command.extend(["--pysm-context-shm-name", self.context_shm_name])
+            command.extend(["--pysm-context-mode", self.context_mode])
         if self.context_file_path:
             command.extend(["--pysm-context-file", self.context_file_path])
             

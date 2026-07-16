@@ -24,12 +24,17 @@ from decimal import Decimal, InvalidOperation
 
 try:
     from pysm_lib import pysm_context
+    from pysm_lib.context_variable_ops import format_error, format_success, read_context_value, write_context_value
     from pysm_lib.pysm_context import ConfigResolver
 
     IS_MANAGED_RUN = True
 except ImportError:
     pysm_context = None
     ConfigResolver = None
+    def format_error(message: str) -> str:
+        return f"❌ ОШИБКА: {message}"
+    def format_success(var_name: str, value) -> str:
+        return f"✅ <b>{var_name}</b> = <i>{value}</i>"
     IS_MANAGED_RUN = False
 
 
@@ -64,7 +69,8 @@ class ContextHandler:
         if IS_MANAGED_RUN and pysm_context:
 
             try:
-                value = pysm_context.get(self.var_name)
+                result = read_context_value(pysm_context, self.var_name)
+                value = result.value if result.exists else None
 
                 if value is None:
 
@@ -102,8 +108,8 @@ class ContextHandler:
 
         if IS_MANAGED_RUN and pysm_context:
             try:
-                pysm_context.set(self.var_name, value)
-                logger.info(f"✅ <b>{self.var_name}</b> = <i>{value}</i>\n")
+                write_context_value(pysm_context, self.var_name, value)
+                logger.info(format_success(self.var_name, value) + "\n")
 
             except Exception as e:
                 logger.critical(
@@ -238,7 +244,7 @@ def get_config() -> Namespace:
         "--inc_var_name",
         type=str,
         required=True,
-        help="Имя переменной контекста.",
+        help="Имя переменной контекста. Поддерживается точечная нотация, например project.counter.",
     )
 
     parser.add_argument(
@@ -308,7 +314,7 @@ def main():
         new_value = processor.process()
 
     except Exception as e:
-        logger.error(f"ОШИБКА: {e}")
+        logger.error(format_error(str(e)))
         sys.exit(1)
 
     context_handler.save_value(new_value)

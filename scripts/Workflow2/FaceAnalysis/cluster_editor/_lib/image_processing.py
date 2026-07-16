@@ -1,4 +1,3 @@
-# analize/cluster_editor/_lib/image_processing.py
 # -*- coding: utf-8 -*-
 
 """
@@ -131,6 +130,7 @@ def create_watermark_layer(base_size: Tuple[int, int], faces_bboxes: List[List[f
     pad_h_coeff = float(settings.get("wm_pad_h", 0.2))
     text_content = str(settings.get("wm_text", "ВЫБОР ФОТОГРАФИИ")) + " - " + student_name
     text_alpha = int(settings.get("wm_text_alpha", 150))
+    random_source = random.Random(int(settings.get("wm_seed", 0)))
 
     # 1. Подготовка текста (один раз)
     rotated_txt_img = None
@@ -139,8 +139,10 @@ def create_watermark_layer(base_size: Tuple[int, int], faces_bboxes: List[List[f
         try:
             font = ImageFont.truetype("arial.ttf", font_size)
         except IOError:
-            try: font = ImageFont.load_default()
-            except: font = None
+            try:
+                font = ImageFont.load_default()
+            except OSError:
+                font = None
         
         if font:
             dummy_draw = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
@@ -156,19 +158,15 @@ def create_watermark_layer(base_size: Tuple[int, int], faces_bboxes: List[List[f
             rotated_txt_img = txt_img.rotate(90, expand=True)
             rw, rh = rotated_txt_img.size
 
-    # 2. Рисование полос
+    # 2. Рисование полос. Локальный seed делает превью и экспорт воспроизводимыми.
     current_x = 0
-    # Используем фиксированный seed для воспроизводимости в превью и экспорте?
-    # Пока оставим random, но в идеале передавать seed. 
-    # В данном случае random вызывается локально, так что полосы будут немного разными каждый раз, но это не критично.
-    
     while current_x < width:
-        stripe_width = random.randint(int(base_period * 0.6), int(base_period * 0.9))
-        gap_width = random.randint(int(base_period * 0.2), int(base_period * 0.4))
+        stripe_width = random_source.randint(int(base_period * 0.6), int(base_period * 0.9))
+        gap_width = random_source.randint(int(base_period * 0.2), int(base_period * 0.4))
         
-        r = random.randint(200, 255)
-        g = random.randint(200, 255)
-        b = random.randint(200, 255)
+        r = random_source.randint(200, 255)
+        g = random_source.randint(200, 255)
+        b = random_source.randint(200, 255)
         
         draw.rectangle([current_x, 0, current_x + stripe_width, height], fill=(r, g, b, stripe_alpha))
         
@@ -178,7 +176,7 @@ def create_watermark_layer(base_size: Tuple[int, int], faces_bboxes: List[List[f
             paste_x = int(center_x - (rw / 2))
             
             if height > rh + 20:
-                paste_y = random.randint(10, height - rh - 10)
+                paste_y = random_source.randint(10, height - rh - 10)
             else:
                 paste_y = 0
             

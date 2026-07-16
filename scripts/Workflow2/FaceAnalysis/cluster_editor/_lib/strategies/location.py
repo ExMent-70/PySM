@@ -1,8 +1,6 @@
-# analize/cluster_editor/_lib/strategies/location.py
 
 import logging
 from typing import Dict, List, Optional
-from pathlib import Path
 from collections import defaultdict
 
 from ..data_models import ImageRecord, Face
@@ -59,6 +57,3 @@ class LocationModeStrategy(EditorStrategy):
         files = self.get_files_for_cluster(cluster_id, records)
         for fname in files:
             records[fname].location_name = new_name
-
-    def save(self, records: Dict[str, ImageRecord], paths_config: Dict[str, Path]) -> bool:
-        return True

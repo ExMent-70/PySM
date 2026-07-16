@@ -23,11 +23,21 @@ from typing import Optional, Dict, Any
 
 try:
     from pysm_lib import pysm_context
+    from pysm_lib.context_variable_ops import (
+        context_value_exists,
+        format_error,
+        remove_context_value,
+        success_icon,
+    )
     from pysm_lib.pysm_context import ConfigResolver
     IS_MANAGED_RUN = True
 except ImportError:
     pysm_context = None
     ConfigResolver = None
+    def format_error(message: str) -> str:
+        return f"❌ ОШИБКА: {message}"
+    def success_icon() -> str:
+        return "✅"
     IS_MANAGED_RUN = False
 
 # Настройка логирования
@@ -53,7 +63,7 @@ def get_config() -> argparse.Namespace:
         "--remove_var_name", 
         type=str, 
         required=True,
-        help="Имя переменной или 'all' для полной очистки."
+        help="Имя переменной, dotted-путь или 'all' для полной очистки."
     )
     
     # Флаг строгого режима
@@ -94,7 +104,7 @@ def main() -> None:
     fail_if_missing: bool = str_to_bool(config.remove_fail_if_missing)
 
     if not var_name_input:
-        logger.error("ОШИБКА: Имя переменной не может быть пустым.")
+        logger.error(format_error("Имя переменной не может быть пустым."))
         sys.exit(1)
 
     # --- СЦЕНАРИЙ 1: Полная очистка (ключевое слово 'all') ---
@@ -102,23 +112,23 @@ def main() -> None:
         logger.warning("Получена команда 'all'. ЗАПУЩЕН РЕЖИМ ПОЛНОЙ ОЧИСТКИ КОНТЕКСТА.")
         try:
             # Вызов remove() без аргументов удаляет всё
-            pysm_context.remove()
-            logger.info("УСПЕХ: Все пользовательские переменные удалены.")
+            remove_context_value(pysm_context)
+            logger.info(f"{success_icon()} Все пользовательские переменные удалены.")
             sys.exit(0)
         except Exception as e:
-            logger.critical(f"ОШИБКА ПРИ ОЧИСТКЕ: {e}")
+            logger.critical(format_error(f"Ошибка при очистке: {e}"))
             sys.exit(1)
 
     # --- СЦЕНАРИЙ 2: Удаление конкретной переменной ---
     logger.info(f"Запрос на удаление конкретной переменной: '{var_name_input}'")
 
     # Проверка существования
-    existing_data: Optional[Dict[str, Any]] = pysm_context.get_variable(var_name_input)
+    variable_exists = context_value_exists(pysm_context, var_name_input)
 
-    if existing_data is None:
+    if not variable_exists:
         msg = f"Переменная '{var_name_input}' не найдена в контексте."
         if fail_if_missing:
-            logger.error(f"КРИТИЧЕСКАЯ ОШИБКА: {msg}")
+            logger.error(format_error(msg))
             sys.exit(1)
         else:
             logger.warning(f"ПРЕДУПРЕЖДЕНИЕ: {msg} Удалять нечего.")
@@ -126,21 +136,23 @@ def main() -> None:
 
     # Удаление
     try:
-        # Дополнительная защита
-        if existing_data.get("read_only", False):
-            logger.error(f"ОШИБКА: Переменная '{var_name_input}' защищена от удаления (read_only).")
+        # Дополнительная защита для обычных переменных и базовых JSON-объектов.
+        base_var_name = var_name_input.split(".", 1)[0]
+        existing_data: Optional[Dict[str, Any]] = pysm_context.get_variable(base_var_name)
+        if existing_data and existing_data.get("read_only", False):
+            logger.error(format_error(f"Переменная '{var_name_input}' защищена от удаления (read_only)."))
             sys.exit(1)
 
-        pysm_context.remove(var_name_input)
+        remove_context_value(pysm_context, var_name_input)
         
         # Верификация
-        if pysm_context.get_variable(var_name_input) is None:
-            logger.info(f"УСПЕХ: Переменная '{var_name_input}' удалена.")
+        if not context_value_exists(pysm_context, var_name_input):
+            logger.info(f"{success_icon()} Переменная '{var_name_input}' удалена.")
         else:
             raise RuntimeError("Метод remove отработал, но переменная осталась.")
             
     except Exception as e:
-        logger.critical(f"ОШИБКА УДАЛЕНИЯ: {e}")
+        logger.critical(format_error(f"Ошибка удаления: {e}"))
         sys.exit(1)
 
     sys.exit(0)

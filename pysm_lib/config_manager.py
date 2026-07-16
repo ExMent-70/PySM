@@ -47,6 +47,9 @@ class UIConfig(BaseModel):
     last_used_sets_collection_file: str = Field(default="")
 
 ValidLogLevels = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+RuntimeContextBackend = Literal["shared_memory", "file"]
+RuntimeContextOverflowPolicy = Literal["fail_current_write"]
+RuntimeContextCheckpointPolicy = Literal["after_each_script", "on_save_exit"]
 
 class LoggingConfig(BaseModel):
     log_level: ValidLogLevels = Field(default="INFO")
@@ -65,11 +68,40 @@ class GeneralConfig(BaseModel):
     # Оно хранит имя папки активной темы.
     active_theme_name: str = Field(default="default")
 
+
+class RuntimeContextConfig(BaseModel):
+    backend: RuntimeContextBackend = Field(default="shared_memory")
+    shared_memory_min_size_mb: int = Field(default=16, ge=1)
+    shared_memory_max_size_mb: int = Field(default=128, ge=1)
+    shared_memory_overflow_policy: RuntimeContextOverflowPolicy = Field(
+        default="fail_current_write"
+    )
+    checkpoint_policy: RuntimeContextCheckpointPolicy = Field(
+        default="after_each_script"
+    )
+
+    @field_validator("checkpoint_policy", mode="before")
+    @classmethod
+    def migrate_checkpoint_policy(cls, value: str) -> str:
+        if value == "on_exit":
+            return "on_save_exit"
+        return value
+
+    @field_validator("shared_memory_max_size_mb")
+    @classmethod
+    def check_max_size(cls, value: int, info) -> int:
+        min_value = info.data.get("shared_memory_min_size_mb", 1)
+        if value < min_value:
+            raise ValueError("shared_memory_max_size_mb must be >= shared_memory_min_size_mb")
+        return value
+
+
 class AppConfigModel(BaseModel):
     paths: PathsConfig = Field(default_factory=PathsConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     general: GeneralConfig = Field(default_factory=GeneralConfig)
+    runtime_context: RuntimeContextConfig = Field(default_factory=RuntimeContextConfig)
     environment_variables: Dict[str, str] = Field(default_factory=dict)
     
     # --- ИЗМЕНЕНИЕ ---
@@ -137,12 +169,49 @@ class ConfigManager:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
             config_dict = config_copy_for_save.model_dump(mode="python")
 
+            config_text = self._format_config_toml(config_dict)
             with open(self.config_path, "w", encoding="utf-8") as f:
-                toml.dump(config_dict, f)
+                f.write(config_text)
             return True
         except Exception as e:
             logger.error(f"Не удалось сохранить конфигурацию в '{self.config_path}': {e}", exc_info=True)
             return False
+
+    def _format_config_toml(self, config_dict: Dict[str, Any]) -> str:
+        config_text = toml.dumps(config_dict)
+        if "[runtime_context]\n" in config_text:
+            config_text = config_text.replace(
+                "[runtime_context]\n",
+                "[runtime_context]\n"
+                "# Runtime context backend.\n"
+                "# Possible values:\n"
+                '# - "shared_memory": default runtime exchange through Python SharedMemory.\n'
+                '# - "file": diagnostic fallback through .context.json.\n',
+                1,
+            )
+        config_text = config_text.replace(
+            "shared_memory_overflow_policy = \"fail_current_write\"\n",
+            "\n"
+            "# SharedMemory overflow behavior.\n"
+            "# Possible values:\n"
+            '# - "fail_current_write": reject the write when payload does not fit the segment.\n'
+            "shared_memory_overflow_policy = \"fail_current_write\"\n",
+            1,
+        )
+        checkpoint_comment = (
+            "\n"
+            "# When PySM writes live runtime context back to .context.json.\n"
+            "# Possible values:\n"
+            '# - "after_each_script": checkpoint after every completed script.\n'
+            '# - "on_save_exit": checkpoint only when the collection is saved or PySM closes with Save.\n'
+        )
+        for value in ("after_each_script", "on_save_exit"):
+            config_text = config_text.replace(
+                f"checkpoint_policy = \"{value}\"\n",
+                f"{checkpoint_comment}checkpoint_policy = \"{value}\"\n",
+                1,
+            )
+        return config_text
 
     def save_config(self) -> bool:
         return self._save_to_file(self.config)

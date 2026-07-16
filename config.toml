@@ -1,11 +1,10 @@
 [paths]
-python_interpreter = "../../envs/pysm/python.exe"
+python_interpreter = "../../envs/pysm/Scripts/python.exe"
 additional_env_paths = []
 python_paths = []
 
 [ui]
-last_used_script_set = "setnode_e1ff3c2be2ae"
-last_used_sets_collection_file = "script_collections/Рабочий процесс. Сезон 2026.pysmc"
+last_used_script_set = ""
 
 [logging]
 log_level = "INFO"

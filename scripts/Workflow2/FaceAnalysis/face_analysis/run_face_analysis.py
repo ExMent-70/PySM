@@ -246,7 +246,13 @@ def get_config() -> argparse.Namespace:
     
     # --- Перенесенные параметры из конфига ---
     parser.add_argument("--a_af_model_name", type=str, dest="a_af_model_name", default="buffalo_l")
-    parser.add_argument("--a_af_det_size", type=int, dest="a_af_det_size", default=1280)
+    parser.add_argument(
+        "--a_af_det_size",
+        type=int,
+        dest="a_af_det_size",
+        default=1280,
+        help="Размер рабочей копии исходного кадра; вход SCRFD фиксирован на 640x640.",
+    )
     parser.add_argument("--a_af_det_thresh", type=float, dest="a_af_det_thresh", default=0.5)
     parser.add_argument(
         "--a_af_tasks", 

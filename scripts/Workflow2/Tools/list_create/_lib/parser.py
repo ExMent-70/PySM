@@ -15,7 +15,10 @@ import re
 from typing import List, Dict, Any, Tuple, Optional
 
 # Импорт моделей данных
-from domain import Student
+from .domain import Student
+
+
+RESOURCE_DIR = pathlib.Path(__file__).parent / "resources"
 
 
 
@@ -101,7 +104,7 @@ class SmartParser:
 
     def _load_normalization_dict(self):
         """Загружает словарь нормализации имен (Саша -> Александр)."""
-        dict_path = pathlib.Path(__file__).parent / "_names_normalization.json"
+        dict_path = RESOURCE_DIR / "_names_normalization.json"
         default_dict = {"Саша": "Александр", "Аня": "Анна", "Настя": "Анастасия"}
         
         if dict_path.exists():
@@ -112,6 +115,7 @@ class SmartParser:
                 self.normalization_dict = default_dict
         else:
             try:
+                dict_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(dict_path, 'w', encoding='utf-8') as f:
                     json.dump(default_dict, f, ensure_ascii=False, indent=4)
                 self.normalization_dict = default_dict

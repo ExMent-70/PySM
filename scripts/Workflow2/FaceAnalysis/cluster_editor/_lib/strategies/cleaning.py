@@ -1,8 +1,6 @@
-# analize/cluster_editor/_lib/strategies/cleaning.py
 
 import logging
 from typing import Dict, List, Optional, Any
-from pathlib import Path
 from collections import defaultdict
 
 from ..data_models import ImageRecord, Face
@@ -26,7 +24,7 @@ class CleaningModeStrategy(EditorStrategy):
             return f"Temp {cluster_id} - "
         return ""
 
-    def _strip_name_prefix(self, name: str) -> str:
+    def normalize_cluster_name(self, name: str) -> str:
         if name and name.startswith("Temp ") and " - " in name:
             return name.split(" - ", 1)[1]
         return name
@@ -78,7 +76,7 @@ class CleaningModeStrategy(EditorStrategy):
         
         self.invalidate_cache()
         new_id_val = int(target_id) if target_id.lstrip('-').isdigit() else None
-        clean_name = self._strip_name_prefix(target_name) if target_name else None
+        clean_name = self.normalize_cluster_name(target_name) if target_name else None
 
         for filename in filenames:
             record = records.get(filename)
@@ -109,14 +107,10 @@ class CleaningModeStrategy(EditorStrategy):
         if cluster_id in ["trash", "-1"]: return
         self.invalidate_cache()
         files = self.get_files_for_cluster(cluster_id, records)
-        clean_name = self._strip_name_prefix(new_name)
+        clean_name = self.normalize_cluster_name(new_name)
         
         for fname in files:
             record = records[fname]
             for face in record.faces:
                 if str(face.temp_cluster_label) == cluster_id and not face.is_trash:
                     face.temp_child_name = clean_name
-
-    def save(self, records: Dict[str, ImageRecord], paths_config: Dict[str, Path]) -> bool:
-        # Вся логика сохранения перенесена в DataManager, чтобы не нарушать архитектуру
-        return True

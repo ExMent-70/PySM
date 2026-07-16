@@ -1,14 +1,14 @@
-# analize/cluster_editor/_lib/data_manager.py
 
 import logging
 import json
+import os
 import shutil
 import numpy as np
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 
 from .data_models import ImageRecord, Face
-from .json_io import atomic_write_json
+from .json_io import atomic_write_bundle, json_writer
 from .student_roster import StudentRecord, StudentRoster, load_student_roster
 from .strategies import get_strategy
 
@@ -66,42 +66,37 @@ class ClusterDataManager:
         self.strategy.invalidate_cache()
         if not self.info_json_path.exists():
             return False, f"Файл не найден: {self.info_json_path}"
-        
-        self.records.clear()
-        self.manual_covers.clear()
-        self._has_unsaved_covers = False
 
+        parsed_records: Dict[str, ImageRecord] = {}
         try:
             with open(self.info_json_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                for filename, file_data in data.items():
-                    record = ImageRecord.from_dict(filename, file_data)
-                    
-                    if record.face_count == 1: 
-                        record.image_type = 'portrait'
-                    else: 
-                        record.image_type = 'group'
-                    
-                    record.original_image_type = record.image_type
-                    
-                    all_faces = record.faces + record.removed_faces
-                    for i, face in enumerate(all_faces):
-                        target_idx = i
-                        if face.face_index is not None:
-                            target_idx = face.face_index
-                        
-                        if record.face_count == 1 and len(all_faces) == 1:
-                             face.embedding_key = filename
-                        else:
-                             face.embedding_key = f"{filename}::{target_idx}"
-                        
-                        face.commit_changes()
-                        
-                    record.commit_changes()
-                    self.records[filename] = record
+            if not isinstance(data, dict):
+                raise ValueError("Корень info_faces.json должен быть JSON-объектом.")
+
+            for filename, file_data in data.items():
+                record = ImageRecord.from_dict(filename, file_data)
+                record.image_type = 'portrait' if record.face_count == 1 else 'group'
+                record.original_image_type = record.image_type
+
+                all_faces = record.faces + record.removed_faces
+                for i, face in enumerate(all_faces):
+                    target_idx = face.face_index if face.face_index is not None else i
+                    if record.face_count == 1 and len(all_faces) == 1:
+                        face.embedding_key = filename
+                    else:
+                        face.embedding_key = f"{filename}::{target_idx}"
+                    face.commit_changes()
+
+                record.commit_changes()
+                parsed_records[filename] = record
         except Exception as e:
             return False, f"JSON load error: {e}"
-        
+
+        self.records = parsed_records
+        self.manual_covers.clear()
+        self._has_unsaved_covers = False
+
         if self.strategy.mode_name == 'matches' and self.reference_dir != self.working_dir:
             self._load_reference_clusters()
 
@@ -331,23 +326,30 @@ class ClusterDataManager:
 
     # --- Saving Logic ---
 
-    def _standard_json_save(self) -> bool:
+    def _standard_json_save(
+        self,
+        additional_outputs: Optional[Dict[Path, Any]] = None,
+    ) -> bool:
         output_data = dict()
         for filename, record in self.records.items():
             if any(f.extra_data.get('is_reference') for f in record.faces):
                 continue
-                
-            record.face_count = len(record.faces)
             output_data[filename] = record.to_dict()
         try:
             if self.info_json_path.exists():
-                shutil.copy(self.info_json_path, self.info_json_path.with_suffix(".json.bak"))
-            atomic_write_json(self.info_json_path, output_data)
-            
+                shutil.copy2(
+                    self.info_json_path,
+                    self.info_json_path.with_suffix(".json.bak"),
+                )
+            writers = {self.info_json_path: json_writer(output_data)}
+            for path, payload in (additional_outputs or {}).items():
+                writers[Path(path)] = json_writer(payload)
+            atomic_write_bundle(writers)
+
             for record in self.records.values():
+                record.face_count = len(record.faces)
                 record.commit_changes()
             self.newly_created_clusters = list()
-            self._has_unsaved_covers = False
             return True
         except Exception as e:
             self.last_error = str(e)
@@ -359,7 +361,8 @@ class ClusterDataManager:
         logger.info("DataManager: Starting destructive save for cleaning...")
         
         if not EmbeddingLoader:
-            logger.error("EmbeddingLoader unavailable")
+            self.last_error = "EmbeddingLoader недоступен."
+            logger.error(self.last_error)
             return False
 
         # 1. Загружаем вектора "на лету"
@@ -367,89 +370,146 @@ class ClusterDataManager:
             emb_loader = EmbeddingLoader(self.embeddings_dir)
             vecs, idx_map = emb_loader.load("faces")
         except Exception as e:
+            self.last_error = str(e)
             logger.error(f"Error loading embeddings for cleaning: {e}")
             return False
 
         # Строим быстрый словарь векторов для поиска
+        if vecs is None or idx_map is None:
+            self.last_error = "Не удалось загрузить исходные эмбеддинги и индекс."
+            return False
+
         vector_lookup = dict()
-        if vecs is not None and idx_map is not None:
-            for fname, indices in idx_map.items():
-                for i, row_idx in enumerate(indices):
-                    if row_idx < len(vecs):
-                        vector_lookup[f"{fname}::{i}"] = vecs[row_idx]
-                        if len(indices) == 1 and i == 0:
-                            vector_lookup[fname] = vecs[row_idx]
+        for fname, indices in idx_map.items():
+            if not isinstance(indices, list):
+                self.last_error = f"Некорректный индекс эмбеддингов для {fname}."
+                return False
+            for i, row_idx in enumerate(indices):
+                if not isinstance(row_idx, int) or not 0 <= row_idx < len(vecs):
+                    self.last_error = f"Некорректная ссылка на эмбеддинг {fname}::{i}."
+                    return False
+                vector_lookup[f"{fname}::{i}"] = vecs[row_idx]
+                if len(indices) == 1 and i == 0:
+                    vector_lookup[fname] = vecs[row_idx]
 
         new_json_data = dict()
         new_vectors = list()
         new_index_map = dict()
-        files_to_remove = list()
+        record_updates = dict()
 
-        for filename, record in list(self.records.items()):
-            valid_faces = list()
+        for filename, record in self.records.items():
+            valid_faces = [face for face in record.faces if not face.is_trash]
+            if not valid_faces:
+                record_updates[filename] = (list(), list(), list())
+                continue
+
+            valid_removed_faces = [
+                face for face in record.removed_faces if not face.is_trash
+            ]
+            retained_faces = valid_faces + valid_removed_faces
             file_indices = list()
-            
-            for i, face in enumerate(record.faces):
-                if face.is_trash: continue
-                
-                # Поиск вектора
-                vector = None
-                if face.embedding_key and face.embedding_key in vector_lookup:
-                    vector = vector_lookup[face.embedding_key]
-                elif face.face_index is not None:
-                    key = f"{filename}::{face.face_index}"
-                    if key in vector_lookup: vector = vector_lookup[key]
-                elif len(record.faces) == 1 and filename in vector_lookup:
-                    vector = vector_lookup[filename]
-                else:
-                    key = f"{filename}::{i}"
-                    if key in vector_lookup: vector = vector_lookup[key]
+            serialized_faces = list()
+            serialized_removed = list()
+            assigned_indices = list()
 
-                if vector is not None:
-                    new_idx = len(new_vectors)
-                    new_vectors.append(vector)
-                    file_indices.append(new_idx)
-                    
-                    face.face_index = len(valid_faces)
-                    face.embedding_key = f"{filename}::{face.face_index}"
-                    valid_faces.append(face)
-                else:
-                    logger.warning(f"Vector missing for face, removing to prevent corruption: {filename}")
+            for position, face in enumerate(retained_faces):
+                candidate_keys = []
+                if face.embedding_key:
+                    candidate_keys.append(face.embedding_key)
+                if face.face_index is not None:
+                    candidate_keys.append(f"{filename}::{face.face_index}")
+                if len(record.faces) + len(record.removed_faces) == 1:
+                    candidate_keys.append(filename)
+                candidate_keys.append(f"{filename}::{position}")
 
-            record.faces = valid_faces
-            record.face_count = len(valid_faces)
-            
-            if valid_faces:
-                new_json_data[filename] = record.to_dict()
-                if file_indices:
-                    new_index_map[filename] = file_indices
-                record.commit_changes()
+                vector = next(
+                    (vector_lookup[key] for key in candidate_keys if key in vector_lookup),
+                    None,
+                )
+                if vector is None:
+                    self.last_error = (
+                        f"Не найден эмбеддинг для сохранённого лица {filename} "
+                        f"(face_index={face.face_index})."
+                    )
+                    return False
+
+                face_index = len(file_indices)
+                new_idx = len(new_vectors)
+                new_vectors.append(vector)
+                file_indices.append(new_idx)
+                assigned_indices.append(face_index)
+
+                face_data = face.to_dict()
+                face_data["face_index"] = face_index
+                if position < len(valid_faces):
+                    serialized_faces.append(face_data)
+                else:
+                    serialized_removed.append(face_data)
+
+            record_data = record.to_dict()
+            record_data["face_count"] = len(valid_faces)
+            record_data["faces"] = serialized_faces
+            if serialized_removed:
+                record_data["removed_faces"] = serialized_removed
             else:
-                files_to_remove.append(filename)
+                record_data.pop("removed_faces", None)
+            new_json_data[filename] = record_data
+            new_index_map[filename] = file_indices
+            record_updates[filename] = (
+                valid_faces,
+                valid_removed_faces,
+                assigned_indices,
+            )
 
-        for fname in files_to_remove:
-            del self.records[fname]
+        embedding_width = vecs.shape[1] if getattr(vecs, "ndim", 0) > 1 else 0
+        if new_vectors:
+            arr = np.asarray(new_vectors, dtype=np.float32)
+        else:
+            arr = np.empty((0, embedding_width), dtype=np.float32)
 
-        # 2. Перезапись NPY
+        npy_path = self.embeddings_dir / "faces_embeddings.npy"
+        index_path = self.embeddings_dir / "faces_index.json"
+
+        def write_embeddings(path: Path) -> None:
+            with path.open("wb") as stream:
+                np.save(stream, arr)
+                stream.flush()
+                os.fsync(stream.fileno())
+
         try:
-            if new_vectors:
-                arr = np.array(new_vectors, dtype=np.float32)
-                emb_loader.save("faces", arr, new_index_map)
+            if self.info_json_path.exists():
+                shutil.copy2(
+                    self.info_json_path,
+                    self.info_json_path.with_suffix(".json.bak"),
+                )
+            atomic_write_bundle({
+                npy_path: write_embeddings,
+                index_path: json_writer(new_index_map),
+                self.info_json_path: json_writer(new_json_data),
+            })
         except Exception as e:
             self.last_error = str(e)
-            logger.critical(f"Cleaning: NPY Save error: {e}")
+            logger.critical(f"Cleaning transaction failed: {e}")
             return False
 
-        # 3. Перезапись JSON
-        try:
-            atomic_write_json(self.info_json_path, new_json_data)
-            self.newly_created_clusters = list()
-        except Exception as e:
-            self.last_error = str(e)
-            logger.critical(f"Cleaning: JSON Save error: {e}")
-            return False
+        for filename, (faces, removed_faces, assigned_indices) in record_updates.items():
+            if not faces:
+                self.records.pop(filename, None)
+                continue
+            record = self.records[filename]
+            record.faces = faces
+            record.removed_faces = removed_faces
+            record.face_count = len(faces)
+            retained_faces = faces + removed_faces
+            for face, face_index in zip(retained_faces, assigned_indices):
+                face.face_index = face_index
+                face.embedding_key = (
+                    filename if len(retained_faces) == 1 else f"{filename}::{face_index}"
+                )
+            record.commit_changes()
 
-        self.strategy.invalidate_cache()    
+        self.newly_created_clusters = list()
+        self.strategy.invalidate_cache()
         return True
 
     def save_data(self) -> bool:
@@ -468,15 +528,18 @@ class ClusterDataManager:
                 "embeddings_dir": self.embeddings_dir
             }
             try:
-                strategy_saved = self.strategy.save(self.records, paths_config)
+                additional_outputs = self.strategy.build_save_outputs(
+                    self.records,
+                    paths_config,
+                )
             except Exception as exc:
                 self.last_error = str(exc)
                 logger.error(f"Сохранение режима {self.strategy.mode_name} остановлено: {exc}")
                 return False
-            if not strategy_saved:
-                self.last_error = "Стратегия режима не смогла сохранить дополнительные файлы."
-                return False
-            return self._standard_json_save()
+            return self._standard_json_save(additional_outputs)
+
+    def mark_location_covers_saved(self) -> None:
+        self._has_unsaved_covers = False
 
     # --- Legacy Wrappers & Clean APIs ---
 

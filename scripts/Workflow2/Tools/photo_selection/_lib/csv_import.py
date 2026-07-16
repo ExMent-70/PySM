@@ -12,9 +12,6 @@ from .number_parser import extract_numbers
 from .roster import StudentRoster, normalize_student_id
 
 
-ENCODINGS = ("utf-8-sig", "utf-16", "cp1251")
-
-
 @dataclass(frozen=True)
 class CsvTable:
     path: Path

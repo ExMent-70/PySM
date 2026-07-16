@@ -40,7 +40,7 @@ class RequirementsParserTests(unittest.TestCase):
                     'requests[socks]>=2.31; python_version >= "3.11"',
                     "torch==2.10.0",
                     "onnxruntime",
-                    "insightface==0.7.3",
+                    "insightface==1.0.1",
                     "triton",
                 ]
             )
@@ -52,6 +52,7 @@ class RequirementsParserTests(unittest.TestCase):
         self.assertEqual(plan.torch_packages[0].package_type, PackageType.TORCH)
         self.assertEqual(plan.onnx_packages[0].package_type, PackageType.ONNXRUNTIME)
         self.assertEqual(plan.insightface_packages[0].package_type, PackageType.INSIGHTFACE)
+        self.assertEqual(plan.insightface_packages[0].to_spec(), "insightface==1.0.1")
         self.assertEqual(plan.triton_packages[0].package_type, PackageType.TRITON)
         self.assertEqual(plan.torch_backend, "cu128")
         self.assertEqual(plan.onnx_package_name, "onnxruntime-gpu")

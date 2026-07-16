@@ -2,7 +2,7 @@
   "description": "Интеллектуально устанавливает Python-зависимости из requirements.txt или pyproject.toml, учитывая GPU, portable CUDA PySM и ABI целевого Python.",
   "category": "Утилиты",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.06.14",
+  "version": "2.2026.07.16",
   "command_line_args_meta": {
     "inst_search_path": {
       "type": "file_path",

@@ -23,12 +23,17 @@ try:
     # Импорт PySM
     from pysm_lib import pysm_context
     from pysm_lib import theme_api        
+    from pysm_lib.context_variable_ops import format_error
     from pysm_lib.pysm_context import ConfigResolver
+    from pysm_lib.input_processor import InputProcessor
     # ResourceNode, StandardTreeBuilder, DashboardBuilder удалены, так как не используются
     IS_MANAGED_RUN = True
 except ImportError as e:
     pysm_context = None
     ConfigResolver = None
+    InputProcessor = None
+    def format_error(message: str) -> str:
+        return f"❌ ОШИБКА: {message}"
     print(f"Ошибка импорта pysm_lib: {e}", file=sys.stderr)
     # Здесь можно не выходить, а продолжить в автономном режиме, если логика позволяет
 
@@ -59,7 +64,7 @@ def get_config():
     parser.add_argument(
         "--dlg_msg_var", 
         type=str,
-        help="Имя переменной контекста для сохранения результата.",
+        help="Имя переменной контекста для сохранения результата. Поддерживается точечная нотация, например project.confirmation.",
         default="var_user_choice"
     )
     parser.add_argument(
@@ -143,7 +148,12 @@ def main():
     if IS_MANAGED_RUN and pysm_context:
         try:
             # 1. Запись переменной
-            pysm_context.set(config.dlg_msg_var, result_string)
+            processor = InputProcessor(config, pysm_context, IS_MANAGED_RUN)
+            processor.process(
+                raw_value=result_string,
+                var_name=config.dlg_msg_var,
+                value_type="string",
+            )
             
             # 2. Логирование в HTML
             # Получаем стиль из темы (или дефолтный белый, если темы нет)
@@ -166,7 +176,7 @@ def main():
             pysm_context.log_html(info_html)
 
         except Exception as e:
-            logger.error(f"{icon_save_error} Ошибка при сохранении в контекст: {e}")
+            logger.error(format_error(f"Ошибка при сохранении в контекст: {e}"))
             sys.exit(1)
     else:
         print(f"Автономный режим. Выбор: {result_string}")

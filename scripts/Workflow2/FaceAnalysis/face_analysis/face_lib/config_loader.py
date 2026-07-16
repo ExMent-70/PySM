@@ -41,6 +41,7 @@ class ModelConfig(BaseModel):
     """Настройки моделей для анализа."""
     name: str = "antelopev2"
     det_thresh: float = 0.5
+    # Историческое имя: это размер холста исходного кадра, а не вход SCRFD.
     det_size: List[int] = Field(default_factory=lambda: list([1280, 1280]))
     gender_model: str = "FACEONNX/gender_efficientnet_b2.onnx"
     emotion_model: str = "FACEONNX/emotion_cnn.onnx"

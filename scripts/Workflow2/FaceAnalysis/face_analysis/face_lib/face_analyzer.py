@@ -2,6 +2,7 @@
 
 import logging
 import gc
+from importlib import metadata
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -42,6 +43,8 @@ class FaceAnalyzer:
     и выполняет анализ лиц на предоставленных изображениях.
     """
 
+    INSIGHTFACE_DETECTOR_SIZE = (640, 640)
+
     def __init__(self, config_manager: ConfigManager, output_dir_override: Path):
         self.config_manager = config_manager
         self.output_dir = output_dir_override
@@ -49,10 +52,11 @@ class FaceAnalyzer:
 
         # Извлечение параметров
         self.det_thresh = self.config_manager.get('model.det_thresh', 0.25)
-        self.det_size = tuple(self.config_manager.get('model.det_size', [1280, 1280]))
+        self.source_canvas_size = tuple(self.config_manager.get('model.det_size', [1280, 1280]))
         self.save_debug_kps = self.config_manager.get('task_flags.save_debug_kps', False)
         
         self.onnx_manager = ONNXModelManager(self.config_manager.get('provider', dict()))
+        self._validate_gpu_runtime()
         self.attribute_analyzer = AttributeAnalyzer(self.config_manager, self.onnx_manager)
         
         # Легкая инициализация (без прогрева)
@@ -60,6 +64,43 @@ class FaceAnalyzer:
         
         if self.save_debug_kps:
             logger.info("Сохранение отладочных изображений с ключевыми точками ВКЛЮЧЕНО.")
+
+    def _validate_gpu_runtime(self) -> None:
+        """Reject CPU-only or ambiguous ONNX Runtime installations."""
+        provider_name = self.onnx_manager.provider_name
+        gpu_providers = {"CUDAExecutionProvider", "TensorrtExecutionProvider"}
+
+        try:
+            gpu_runtime_version = metadata.version("onnxruntime-gpu")
+        except metadata.PackageNotFoundError:
+            raise FaceAnalyzerInitError(
+                "Для анализа лиц требуется пакет onnxruntime-gpu. "
+                "Установите GPU-версию ONNX Runtime и проверьте доступность CUDA."
+            ) from None
+
+        try:
+            cpu_runtime_version = metadata.version("onnxruntime")
+        except metadata.PackageNotFoundError:
+            cpu_runtime_version = None
+
+        if cpu_runtime_version is not None:
+            raise FaceAnalyzerInitError(
+                "Одновременно установлены onnxruntime и onnxruntime-gpu. "
+                "Удалите CPU-пакет onnxruntime: совместная установка двух вариантов может "
+                "подменить GPU-модули ONNX Runtime."
+            )
+
+        if provider_name not in gpu_providers:
+            raise FaceAnalyzerInitError(
+                "GPU-провайдер ONNX Runtime недоступен. "
+                "Требуется CUDAExecutionProvider или TensorrtExecutionProvider; "
+                f"выбран: {provider_name}."
+            )
+
+        logger.info(
+            "GPU-среда ONNX Runtime проверена "
+            f"(onnxruntime-gpu {gpu_runtime_version}, провайдер: {provider_name})"
+        )
 
     def _initialize_insightface(self) -> FaceAnalysis:
         """
@@ -96,14 +137,17 @@ class FaceAnalyzer:
                     provider_options=provider_options
                 )
                 ctx_id = 0 if "ExecutionProvider" in provider_name and "CPU" not in provider_name else -1
-                app.prepare(ctx_id=ctx_id, det_thresh=self.det_thresh)
+                app.prepare(
+                    ctx_id=ctx_id,
+                    det_thresh=self.det_thresh,
+                    det_size=self.INSIGHTFACE_DETECTOR_SIZE,
+                )
             
             logger.info(f"Объект <b>Insightface</b> создан (провайдер: {provider_name})")
             return app
         except Exception as e:
             message = f"Не удалось инициализировать модель InsightFace '{model_name}'. Причина: {e}"
             raise FaceAnalyzerInitError(message) from None
-
 
     def prepare_models(self):
             """
@@ -119,7 +163,7 @@ class FaceAnalyzer:
                      logger.warning(status)
             
             # 1. Прогрев Детектора (через штатный вызов get, чтобы учесть препроцессинг)
-            target_h, target_w = self.det_size
+            target_w, target_h = self.INSIGHTFACE_DETECTOR_SIZE
             logger.info(f"<br><b><i>Загрузка детектора лиц (Input: {target_w}x{target_h})</i></b>")
            
             try:
@@ -193,7 +237,7 @@ class FaceAnalyzer:
             
             # --- ЛОГИКА РЕСАЙЗА С ПАДДИНГОМ ---
             # 1. Вычисляем масштаб
-            target_h, target_w = self.det_size
+            target_h, target_w = self.source_canvas_size
             scale = min(target_h / original_shape[0], target_w / original_shape[1])
             
             if scale < 1.0:
@@ -214,7 +258,8 @@ class FaceAnalyzer:
             det_img[:new_h, :new_w, :] = img_resized
 
             # --- АНАЛИЗ ---
-            # Подаем в модель всегда 1280x1280 (или то, что в конфиге)
+            # 1280x1280 (или значение из конфигурации) — размер подготовленной
+            # копии исходного кадра. Сам SCRFD работает на фиксированных 640x640.
             #print(f"{datetime.datetime.now()} - Анализ лица - face_analyzer.py/analyze_image/initial_faces = self.analyzer.get(img_resized)")
 
             initial_faces = self.analyzer.get(det_img)

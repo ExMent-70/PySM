@@ -1,11 +1,9 @@
-# analize/cluster_editor/_lib/editor_viewer.py
 """
 Модуль, содержащий виджет для просмотра изображений (ImageViewer).
 Реализует навигацию по контексту локации и умную подсветку лиц.
 """
 import logging
 import re
-from pathlib import Path
 from typing import List, Optional
 
 from PySide6.QtWidgets import (
@@ -15,9 +13,16 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import (
     QPixmap, QWheelEvent, QAction, QKeySequence, QPainter, QTransform,
-    QPen, QColor, QBrush, QFont
+    QPen, QColor, QBrush
 )
-from PySide6.QtCore import Qt, QTimer, QEvent
+from PySide6.QtCore import Qt, QTimer, QEvent, Slot
+
+from pysm_lib.pysm_image_cache import (
+    AsyncImageLoader,
+    AsyncImageResult,
+    ImageRequest,
+    QtImageCache,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +36,26 @@ class ImageViewer(QDialog):
     Умеет отрисовывать цветные рамки лиц и осуществляет навигацию по локациям.
     """
 
-    def __init__(self, data_manager, start_filename: str, parent=None, target_face_index: Optional[int] = None, draw_boxes: bool = True):
+    def __init__(
+        self,
+        data_manager,
+        start_filename: str,
+        parent=None,
+        target_face_index: Optional[int] = None,
+        draw_boxes: bool = True,
+        *,
+        image_cache: QtImageCache,
+        image_loader: AsyncImageLoader,
+    ):
         super().__init__(parent)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowMaximizeButtonHint | Qt.WindowType.WindowMinimizeButtonHint)
         
         self.data_manager = data_manager
         self.target_face_index = target_face_index
         self.draw_boxes = draw_boxes # Флаг отрисовки рамок
+        self.image_cache = image_cache
+        self.image_loader = image_loader
+        self._image_channel = ("image-viewer", id(self))
         
         self.is_fitted_in_view = False
         self.filenames = list()
@@ -48,9 +66,8 @@ class ImageViewer(QDialog):
 
         self._build_navigation_list(start_filename)
         self._init_ui()
-        
+        self.image_loader.imageReady.connect(self._on_image_ready)
         self._load_image()
-        QTimer.singleShot(0, self.fit_in_view)
 
     def _build_navigation_list(self, start_filename: str):
         """Формирует список файлов для навигации Вперед/Назад на основе текущей локации."""
@@ -185,51 +202,82 @@ class ImageViewer(QDialog):
         else:
             path = self.data_manager.working_dir / "JPG" / current_fname
         
-        pixmap = QPixmap(str(path))
+        self.image_loader.cancel(self._image_channel)
         self.scene.clear()
         self.pixmap_item = QGraphicsPixmapItem()
         self.scene.addItem(self.pixmap_item)
-
-        if pixmap.isNull():
-            logger.warning(f"Не удалось загрузить изображение: {path}")
-            self.pixmap_item.setPixmap(QPixmap())
-        else:
-            self.pixmap_item.setPixmap(pixmap)
-            
-            # Отрисовываем рамки ТОЛЬКО если флаг draw_boxes = True
-            if self.draw_boxes:
-                record = self.data_manager.records.get(current_fname)
-                if record:
-                    for i, face in enumerate(record.faces):
-                        # Собираем имя для тултипа
-                        tooltip_text = (
-                            self.data_manager.student_label(face.student_id)
-                            or face.temp_child_name
-                            or ""
-                        )
-                        
-                        # СЦЕНАРИЙ 1: Клик по ОПОЗНАННОМУ лицу
-                        if self.target_face_index is not None:
-                            if i == self.target_face_index:
-                                self._draw_bounding_box(face.bbox, is_recognized=True, text=None, tooltip=tooltip_text)
-                            continue 
-                        
-                        # СЦЕНАРИЙ 2: Листание или клик по НЕОПОЗНАННОМУ
-                        rec_id = face.extra_data.get('matched_portrait_cluster_label')
-                        if rec_id is None:
-                            rec_id = face.cluster_label
-                        
-                        is_rec = (rec_id is not None and str(rec_id) not in ("-1", "trash", "None"))
-                        label_text = f"ID: {rec_id}" if is_rec else None
-                        
-                        self._draw_bounding_box(face.bbox, is_recognized=is_rec, text=label_text, tooltip=tooltip_text)
-
-        self.scene.setSceneRect(self.pixmap_item.boundingRect())
+        source_size = self.image_cache.source_size(path)
+        if source_size[0] <= 0 or source_size[1] <= 0:
+            logger.warning(f"Не удалось прочитать размер изображения: {path}")
+            return
+        request = ImageRequest(
+            path,
+            source_size,
+            mode="fit",
+            variant="cluster_editor.viewer.v2",
+        )
+        self.image_loader.request(
+            request,
+            channel=self._image_channel,
+            persist=False,
+        )
         self.nav_label.setText(f"Фото {self.current_index + 1} из {len(self.filenames)}")
         self.filename_label.setText(current_fname)
 
         self.prev_button.setEnabled(self.current_index > 0)
         self.next_button.setEnabled(self.current_index < len(self.filenames) - 1)
+
+    @Slot(object)
+    def _on_image_ready(self, result: AsyncImageResult) -> None:
+        if result.channel != self._image_channel:
+            return
+        if result.image.isNull():
+            logger.warning("Не удалось загрузить изображение для просмотра")
+            return
+
+        current_fname = self.filenames[self.current_index]
+        self.pixmap_item.setPixmap(QPixmap.fromImage(result.image))
+        if self.draw_boxes:
+            record = self.data_manager.records.get(current_fname)
+            if record:
+                for i, face in enumerate(record.faces):
+                    tooltip_text = (
+                        self.data_manager.student_label(face.student_id)
+                        or face.temp_child_name
+                        or ""
+                    )
+                    if self.target_face_index is not None:
+                        if i == self.target_face_index:
+                            self._draw_bounding_box(
+                                face.bbox,
+                                is_recognized=True,
+                                tooltip=tooltip_text,
+                            )
+                        continue
+                    rec_id = face.extra_data.get('matched_portrait_cluster_label')
+                    if rec_id is None:
+                        rec_id = face.cluster_label
+                    is_recognized = (
+                        rec_id is not None
+                        and str(rec_id) not in ("-1", "trash", "None")
+                    )
+                    self._draw_bounding_box(
+                        face.bbox,
+                        is_recognized=is_recognized,
+                        text=f"ID: {rec_id}" if is_recognized else None,
+                        tooltip=tooltip_text,
+                    )
+
+        self.scene.setSceneRect(self.pixmap_item.boundingRect())
+        QTimer.singleShot(0, self.fit_in_view)
+
+    def done(self, result: int) -> None:
+        self.image_loader.cancel(self._image_channel)
+        try:
+            self.image_loader.imageReady.disconnect(self._on_image_ready)
+        except (RuntimeError, TypeError):
+            pass
+        super().done(result)
 
     def fit_in_view(self):
         self.view.fitInView(self.pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)

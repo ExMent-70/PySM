@@ -41,10 +41,6 @@ GPU_GENERATION_TO_COMPUTE_CAPABILITY = {
 
 GPU_GENERATION_TENSORRT_SUPPORT = {"ampere", "ada lovelace", "blackwell"}
 
-INSIGHTFACE_WINDOWS_WHEEL_URLS = {
-    "cp311": "https://huggingface.co/hanamizuki-ai/pypi-wheels/resolve/main/insightface/insightface-0.7.3-cp311-cp311-win_amd64.whl",
-}
-
 TORCH_FAMILY = {"torch", "torchvision", "torchaudio", "torchtext", "torchdata"}
 ONNXRUNTIME_FAMILY = {"onnxruntime", "onnxruntime-gpu", "onnxruntime-directml"}
 INSIGHTFACE_FAMILY = {"insightface"}

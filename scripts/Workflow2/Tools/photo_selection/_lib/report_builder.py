@@ -6,19 +6,32 @@ from html import escape
 import json
 from pathlib import Path
 
-from .assignment_core import BuildResult, PHOTOGRAPHER_PREFIX, PhotoRecord, has_layout_ready_destination_file
+from .assignment_core import (
+    BuildResult,
+    PHOTOGRAPHER_PREFIX,
+    PhotoRecord,
+    has_layout_ready_destination_file,
+    index_records_by_student_location,
+)
 try:
     from pysm_lib import pysm_context, theme_api
-    from pysm_lib.pysm_icons import icons as pysm_icons
-    from pysm_lib.pysm_report_api import DashboardBuilder, ResourceNode
-    IS_MANAGED_RUN = True
 except ImportError:
     pysm_context = None
     theme_api = None
+
+try:
+    from pysm_lib.pysm_icons import icons as pysm_icons
+except ImportError:
     pysm_icons = None
+
+try:
+    from pysm_lib.pysm_report_api import DashboardBuilder, ResourceNode
+except ImportError:
     DashboardBuilder = None
     ResourceNode = None
-    IS_MANAGED_RUN = False
+
+IS_MANAGED_RUN = pysm_context is not None
+
 
 class ReportMixin:
     def _show_student_report(self, row: int) -> None:
@@ -332,15 +345,9 @@ class ReportMixin:
             title += f" — {location}"
         builder.add_header_boxed(title)
         locations = [location] if location else self._known_locations(result)
+        record_index = index_records_by_student_location(result)
         for location_name in locations:
-            records = sorted(
-                (
-                    record for record in result.records.values()
-                    if record.location == location_name
-                    and student_id in record.assigned_student_ids
-                ),
-                key=lambda record: record.number,
-            )
+            records = record_index.get((student_id, location_name), [])
             location_node = ResourceNode(
                 location_name,
                 Path(self.config.dest_dir) / location_name,

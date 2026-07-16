@@ -9,46 +9,62 @@ import sys
 import os
 import logging
 import argparse
+import html as html_module
 import json
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QMainWindow,
-    QInputDialog, QProgressBar, QMessageBox, QLineEdit, QMenu,
-    QListWidget, QListWidgetItem, QDialog, QSplitter, QSlider, QTextEdit, QGroupBox, QFileDialog
+    QApplication,
+    QDialog,
+    QListWidgetItem,
+    QMainWindow,
+    QMessageBox,
 )
-from PySide6.QtGui import QPixmap, QColor, QImage, QPainter, QPen
+from PySide6.QtGui import QPixmap, QColor, QPainter, QPen
 from PySide6.QtCore import Qt, Slot, QThread, QSize, QTimer
-
-try:
-    from PIL import Image, ImageQt
-except ImportError:
-    Image = None
 
 IS_MANAGED_RUN = False
 try:
     current_script_dir = Path(__file__).resolve().parent
     if str(current_script_dir) not in sys.path: sys.path.insert(0, str(current_script_dir))
-    project_root = current_script_dir.parent
+    face_analysis_root = current_script_dir.parent
+    if str(face_analysis_root) not in sys.path:
+        sys.path.insert(0, str(face_analysis_root))
+    project_root = next(
+        (
+            parent
+            for parent in current_script_dir.parents
+            if (parent / "pysm_lib").is_dir()
+        ),
+        None,
+    )
+    if project_root is None:
+        raise ImportError("Не найден корень PySM с папкой pysm_lib")
     if str(project_root) not in sys.path: sys.path.insert(0, str(project_root))
 
     from pysm_lib import pysm_context, theme_api
-    from pysm_lib.pysm_theme_api import set_widget_class
     from pysm_lib.pysm_context import ConfigResolver
-    from pysm_lib.pysm_report_api import ResourceNode, StandardTreeBuilder, DashboardBuilder
-    from pysm_lib.pysm_icons import icons as pysm_icons    
+    from pysm_lib.pysm_report_api import ResourceNode, StandardTreeBuilder
     from pysm_lib.window_state_manager import WindowStateManager
+    from pysm_lib.pysm_image_cache import AsyncImageResult, ImageRequest
     
     IS_MANAGED_RUN = True
 
     from _lib.editor_viewer import ImageViewer
-    from _lib.editor_workers import ChunkedImageLoader, ExportWorker
-    from _lib.editor_delegates import ClusterItemDelegate, ImageItemDelegate, THUMBNAIL_SIZE, FACE_SIZE, FACE_SIZE_PORTRAIT, FACE_MIN, FACE_MAX, PREVIEW_SIZE
-    from _lib.editor_widgets import ImageDragListWidget, ClusterDropListWidget, FaceDetailsWidget
-    from _lib.editor_dialogs import EnhanceSettingsDialog, RenameDialog, FaceSelectorDialog
+    from _lib.editor_workers import DataLoadWorker
+    from _lib.export_controller import ExportController
+    from _lib.editor_delegates import (
+        FACE_PIXMAP_ROLE,
+        FACE_STATUS_COLOR_ROLE,
+        PREVIEW_SIZE,
+        THUMBNAIL_SIZE,
+        ClusterItemDelegate,
+        ImageItemDelegate,
+    )
+    from _lib.editor_dialogs import EnhanceSettingsDialog, FaceSelectorDialog
     from _lib.data_manager import ClusterDataManager
-    from _lib.data_models import Face
     from _lib.editor_ui import EditorUIBuilder
     from _lib.editor_filters import GalleryFilterManager
     from _lib.editor_menus import EditorMenuManager
@@ -56,24 +72,54 @@ try:
         extract_photo_numbers,
         load_selected_photo_numbers,
     )
+    from _lib.image_requests import face_thumbnail_request, normalized_face_crop
+    from _lib.image_pipeline import ImagePipelineController
 
 except ImportError as e:
     print(f"Критическая ошибка импорта внутренних модулей: {e}", file=sys.stderr)
-    pysm_icons = None
     sys.exit(1)
 
 logger = logging.getLogger(__name__)
 
 
+def _safe_folder_name(value: str, fallback: str) -> str:
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", value).strip().rstrip(".")
+    reserved = {"CON", "PRN", "AUX", "NUL"}
+    reserved.update({f"COM{i}" for i in range(1, 10)})
+    reserved.update({f"LPT{i}" for i in range(1, 10)})
+    if cleaned.split(".", 1)[0].upper() in reserved:
+        cleaned = f"_{cleaned}"
+    return cleaned or fallback
+
+
+def _safe_export_path(root: Path, folder_name: str, filename: str) -> Path:
+    """Build an export path and reject every escape from ``root``."""
+
+    resolved_root = root.resolve()
+    candidate = (resolved_root / folder_name / filename).resolve()
+    if not candidate.is_relative_to(resolved_root):
+        raise ValueError(f"Путь экспорта выходит за пределы каталога: {filename!r}")
+    return candidate
+
+
+def _export_folder_name(display_name: str, stable_id: object, fallback: str) -> str:
+    """Keep human-readable export folders unique by their persistent ID."""
+
+    return _safe_folder_name(f"{display_name} [{stable_id}]", fallback)
+
+
 class MainWindow(QMainWindow):
+    _GALLERY_PROGRESS_MAX = 1000
+    _GALLERY_BUILD_PROGRESS_MAX = 200
     
     def __init__(self, working_dir: Path, reference_dir: Optional[Path], mode: str,
                  num_workers: int, export_dir: str, win_state_var_name: str,
                  student_list_file: Optional[Path] = None):
         super().__init__()
-        self.mode = mode # Сохраняем для специфичных UI-проверок (если остались)
+        self.mode = mode
         self.num_workers = num_workers
         self.working_dir = working_dir
+        self.student_list_file = student_list_file
         
         self.win_state_var_name = win_state_var_name
 
@@ -85,9 +131,16 @@ class MainWindow(QMainWindow):
         self.session_name = working_dir.parent.parent.name 
         self.photo_session = working_dir.name.replace("Analysis_", "")
        
-        exp_dir = Path(export_dir) if export_dir else self.working_dir.parent / self.session_name       
-        self.export_dir = exp_dir / f"Выбор_Фото_{self.photo_session}_{self.mode}"  
+        self._export_base_is_explicit = bool(export_dir)
+        self.export_base_dir = (
+            Path(export_dir) if export_dir else self.working_dir.parent / self.session_name
+        )
+        self.export_dir = self.export_base_dir / f"Выбор_Фото_{self.photo_session}_{self.mode}"
         self.export_end = False
+        self._close_after_export = False
+        self.data_load_thread = None
+        self.data_load_worker = None
+        self._pending_session_switch = None
 
         # 1. Инициализация Data Manager (здесь же создается Strategy)
         self.data_manager = ClusterDataManager(
@@ -110,22 +163,40 @@ class MainWindow(QMainWindow):
             logger.error(f"Error loading names: {e}")
 
         self.active_cluster_id: Optional[str] = None
-        self.image_pixmap_cache: Dict[str, QPixmap] = {} 
         self.selected_photo_numbers: Optional[set[str]] = None
-        # ДОБАВЛЕНО: Словарь для быстрого поиска ячейки по имени файла/ключу
-        self.gallery_items_map: Dict[str, QListWidgetItem] = {}        
+        # Быстрый поиск видимого элемента по ключу производного изображения.
+        self.gallery_items_map: Dict[str, QListWidgetItem] = {}
+        self.image_cache = None
+        self.image_loader = None
+        self.image_pipeline = ImagePipelineController(self)
+        self.image_pipeline.image_ready.connect(self._on_gallery_image_ready)
+        self._gallery_generation = 0
+        self._gallery_thumbnail_channels: Dict[tuple[object, ...], Dict[str, Any]] = {}
+        self._gallery_total_tasks = 0
+        self._gallery_completed_tasks = 0
+        self._cluster_cover_generation = 0
+        self._cluster_cover_channels: Dict[tuple[object, ...], Dict[str, Any]] = {}
+        self._face_panel_generation = 0
+        self._face_panel_channels: Dict[tuple[object, ...], Dict[str, Any]] = {}
+        self._defer_initial_gallery = True
+        self._pending_initial_cluster_id: Optional[str] = None
+        self._gallery_build_generation = 0
+        self._gallery_build_state: Optional[Dict[str, Any]] = None
+        self._gallery_build_batch_size = 80
 
-        self.loader_thread = None
         self.cluster_delegate = ClusterItemDelegate(parent=self)
         self.image_delegate = ImageItemDelegate(parent=self)
 
-        # --- ИЗМЕНЕНИЕ: Внешний билдер вместо внутреннего метода ---
-        self.menu_manager = EditorMenuManager(self)     # <--- ДОБАВЛЕНО
+        self.menu_manager = EditorMenuManager(self)
         self.filter_manager = GalleryFilterManager(self)
         
-        # Внешний билдер вместо внутреннего метода
         EditorUIBuilder.build_ui(self)
-        self.filter_manager.bind_ui()        
+        self.filter_manager.bind_ui()
+        self.export_controller = ExportController(self)
+        self.export_controller.progress_updated.connect(self.status_bar.setValue)
+        self.export_controller.finished.connect(self._on_export_finished)
+        self.export_controller.stopped.connect(self._on_export_thread_stopped)
+        self._reset_image_pipeline()
         try:
             screen_geometry = self.screen().geometry()
             window_geometry = self.frameGeometry()
@@ -135,7 +206,84 @@ class MainWindow(QMainWindow):
             pass
 
         
-        self._load_and_display_data()
+        QTimer.singleShot(0, self._start_initial_data_load)
+
+    def _reset_image_pipeline(self) -> None:
+        image_cache_root = self.working_dir / ".thumbnails" / "cluster_editor-v1"
+        self.image_cache, self.image_loader = self.image_pipeline.reset(
+            image_cache_root,
+            self.num_workers,
+        )
+
+    def begin_working_session_switch(self, new_json_path: Path) -> tuple[bool, str]:
+        """Validate another matches session off the GUI thread before adoption."""
+
+        if self.data_load_thread is not None and self.data_load_thread.isRunning():
+            return False, "Уже выполняется загрузка данных."
+        new_working_dir = new_json_path.parent
+        try:
+            candidate = ClusterDataManager(
+                new_working_dir,
+                self.reference_dir,
+                mode=self.mode,
+                student_list_file=self.student_list_file,
+            )
+            candidate.switch_working_session(new_json_path)
+        except Exception as exc:
+            return False, str(exc)
+
+        self._pending_session_switch = (candidate, new_json_path)
+        self.centralWidget().setEnabled(False)
+        self.gallery_label.setText("Загрузка новой сессии...")
+        self._start_data_load(candidate, self._on_session_data_loaded)
+        return True, ""
+
+    @Slot(bool, str)
+    def _on_session_data_loaded(self, success: bool, message: str) -> None:
+        pending = self._pending_session_switch
+        self._pending_session_switch = None
+        self.centralWidget().setEnabled(True)
+        if pending is None:
+            return
+        candidate, new_json_path = pending
+        if not success:
+            QMessageBox.critical(self, "Ошибка смены сессии", message)
+            if self.active_cluster_id:
+                self._render_gallery(self.active_cluster_id, preserve_state=True)
+            return
+
+        self._adopt_working_session(candidate, new_json_path)
+
+    def _adopt_working_session(
+        self,
+        candidate: ClusterDataManager,
+        new_json_path: Path,
+    ) -> None:
+        new_working_dir = new_json_path.parent
+
+        self._stop_loader()
+        self._cancel_cluster_cover_requests()
+        self.data_manager = candidate
+        self.working_dir = new_working_dir
+        self.working_images_dir = self.working_dir / "JPG"
+        self.session_name = self.working_dir.parent.parent.name
+        self.photo_session = self.working_dir.name.replace("Analysis_", "")
+        if not self._export_base_is_explicit:
+            self.export_base_dir = self.working_dir.parent / self.session_name
+        self.export_dir = (
+            self.export_base_dir / f"Выбор_Фото_{self.photo_session}_{self.mode}"
+        )
+        self.active_cluster_id = None
+        self.gallery_items_map.clear()
+        self.search_bar.clear()
+        self._reset_image_pipeline()
+        self.setWindowTitle(self.data_manager.strategy.get_window_title(self.photo_session))
+        if hasattr(self, "cluster_list_title"):
+            self.cluster_list_title.setText(f"{self.photo_session}: Эталоны (Портреты)")
+        self._reload_selected_photo_numbers(
+            self.btn_filter_selected_photos.isChecked()
+        )
+        self._refresh_left_panel()
 
     def _get_image_path(self, filename: str) -> Path:
         # 1. Проверяем working dir
@@ -155,10 +303,27 @@ class MainWindow(QMainWindow):
             if data["id"] == cluster_id: return data
         return None
 
-    def _load_and_display_data(self):
-        success, msg = self.data_manager.load_data()
+    def _start_initial_data_load(self) -> None:
+        self.gallery_label.setText("Загрузка данных...")
+        self._start_data_load(self.data_manager, self._on_initial_data_loaded)
+
+    def _start_data_load(self, data_manager, result_slot) -> None:
+        self.data_load_thread = QThread(self)
+        self.data_load_worker = DataLoadWorker(data_manager)
+        self.data_load_worker.moveToThread(self.data_load_thread)
+        self.data_load_thread.started.connect(self.data_load_worker.run)
+        self.data_load_worker.finished.connect(result_slot)
+        self.data_load_worker.finished.connect(self.data_load_thread.quit)
+        self.data_load_worker.finished.connect(self.data_load_worker.deleteLater)
+        self.data_load_thread.finished.connect(self._on_data_load_thread_stopped)
+        self.data_load_thread.finished.connect(self.data_load_thread.deleteLater)
+        self.data_load_thread.start()
+
+    @Slot(bool, str)
+    def _on_initial_data_loaded(self, success: bool, msg: str) -> None:
         if not success:
             QMessageBox.critical(self, "Ошибка загрузки", msg)
+            self.gallery_label.setText("Ошибка загрузки данных")
             return
         
         # Legacy support for location covers via context
@@ -169,13 +334,20 @@ class MainWindow(QMainWindow):
                 self.data_manager.ingest_location_covers(covers_data)
         
         self._refresh_left_panel()
+        if self._pending_initial_cluster_id:
+            QTimer.singleShot(0, self._activate_initial_cluster)
+
+    @Slot()
+    def _on_data_load_thread_stopped(self) -> None:
+        self.data_load_thread = None
+        self.data_load_worker = None
 
     def _refresh_left_panel(self):
         active_id = self.active_cluster_id
         
-        # --- ИСПРАВЛЕНИЕ: Блокируем сигналы на всё время пересборки панели, 
-        # чтобы clear() не стирал active_cluster_id и центральную галерею! ---
+        # Сигналы блокируются, чтобы clear() не сбросил активную галерею.
         self.cluster_list_widget.blockSignals(True)
+        self._cancel_cluster_cover_requests()
         
         self.cluster_list_widget.clear()
         
@@ -227,8 +399,13 @@ class MainWindow(QMainWindow):
             self.cluster_list_widget.setCurrentRow(0)
             new_item = self.cluster_list_widget.currentItem()
             if new_item:
-                self.active_cluster_id = new_item.data(Qt.ItemDataRole.UserRole)["id"]
-                self._render_gallery(self.active_cluster_id) # Отрисовываем новый кластер
+                selected_id = new_item.data(Qt.ItemDataRole.UserRole)["id"]
+                if self._defer_initial_gallery:
+                    self._pending_initial_cluster_id = selected_id
+                    self.active_cluster_id = None
+                else:
+                    self.active_cluster_id = selected_id
+                    self._render_gallery(self.active_cluster_id) # Отрисовываем новый кластер
         elif not found:
             self.active_cluster_id = None
             self.image_list_widget.clear()
@@ -237,12 +414,30 @@ class MainWindow(QMainWindow):
         # --- Снимаем блокировку сигналов ---
         self.cluster_list_widget.blockSignals(False)
 
+    def _activate_initial_cluster(self):
+        self._defer_initial_gallery = False
+        cluster_id = self._pending_initial_cluster_id
+        self._pending_initial_cluster_id = None
+        if not cluster_id:
+            return
+
+        for i in range(self.cluster_list_widget.count()):
+            item = self.cluster_list_widget.item(i)
+            item_data = item.data(Qt.ItemDataRole.UserRole)
+            if item_data and item_data.get("id") == cluster_id:
+                self.cluster_list_widget.blockSignals(True)
+                self.cluster_list_widget.setCurrentItem(item)
+                self.cluster_list_widget.blockSignals(False)
+                self.active_cluster_id = cluster_id
+                self._render_gallery(cluster_id)
+                return
+
     def _add_cluster_item(self, cid: str, name: str, faces: List, is_special: bool = False):
         pixmap = QPixmap()
         fname = None
         best_face = None
 
-        # --- ИЗМЕНЕНИЕ: Приоритет выбора файла ---
+        # Источник обложки зависит от режима редактора.
         if self.mode == 'matches' and faces:
             # В режиме Matches faces содержит Портреты (эталоны). 
             # Берем файл оттуда напрямую.
@@ -259,48 +454,6 @@ class MainWindow(QMainWindow):
                 else:
                     fname = faces[0].filename
 
-        if fname:
-            # 2. Логика отображения
-            # В режиме Cleaning всегда делаем кроп с помощью PIL
-            if self.mode == 'cleaning' and best_face:
-                    full_path = self._get_image_path(fname)
-                    if full_path.exists() and Image:
-                        try:
-                            with Image.open(str(full_path)) as pil_img:
-                                bbox = best_face.bbox
-                                if len(bbox) == 4:
-                                    x1, y1, x2, y2 = map(int, bbox)
-                                    if x1 > x2: x1, x2 = x2, x1
-                                    if y1 > y2: y1, y2 = y2, y1
-                                    
-                                    w, h = x2 - x1, y2 - y1
-                                    pad = int(max(w, h) * 0.4)
-                                    cx1 = max(0, x1 - pad)
-                                    cy1 = max(0, y1 - pad)
-                                    cx2 = min(pil_img.width, x2 + pad)
-                                    cy2 = min(pil_img.height, y2 + pad)
-                                    
-                                    crop = pil_img.crop((cx1, cy1, cx2, cy2))
-                                    
-                                    # Цвет: Конвертация в RGBA перед созданием QImage
-                                    if crop.mode != "RGBA": crop = crop.convert("RGBA")
-                                    data = crop.tobytes("raw", "RGBA")
-                                    qim = QImage(data, crop.width, crop.height, QImage.Format.Format_RGBA8888).copy()
-                                    pixmap = QPixmap.fromImage(qim)
-                        except Exception as e:
-                            logger.error(f"Preview crop error: {e}")
-            
-            # РЕЖИМ MATCHES (Эталоны) и остальные
-            else:
-                # В режиме Matches (разные папки) fname может быть из reference
-                # Используем _get_image_path который сам проверит и там и там
-                path = self._get_image_path(fname)
-                if path.exists():
-                    pixmap = QPixmap(str(path))
-        
-        if not pixmap.isNull():
-            pixmap = pixmap.scaled(PREVIEW_SIZE, PREVIEW_SIZE, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-
         count = len(self.data_manager.get_files_for_cluster(dict(), cid))
 
         item_data = {
@@ -316,6 +469,16 @@ class MainWindow(QMainWindow):
             if cid == "error_matches": item.setBackground(QColor("#fff8e1"))
             
         self.cluster_list_widget.addItem(item)
+        if fname:
+            task = {
+                "full_path": self._get_image_path(fname),
+                "target_size": (PREVIEW_SIZE, PREVIEW_SIZE),
+                "variant": "cluster_editor.cluster_cover.v1",
+            }
+            if self.mode == 'cleaning' and best_face:
+                task["bbox"] = best_face.bbox
+                task["crop_padding"] = 0.4
+            self._request_cluster_cover(item, cid, task)
 
 
     @Slot(QListWidgetItem)
@@ -351,7 +514,14 @@ class MainWindow(QMainWindow):
         # Если не опознано, передаем None, чтобы Viewer отрисовал все лица на фото (Сценарий 2)
         target_idx = face_idx if is_recognized else None
         
-        ImageViewer(self.data_manager, fname, parent=self, target_face_index=target_idx).exec()
+        ImageViewer(
+            self.data_manager,
+            fname,
+            parent=self,
+            target_face_index=target_idx,
+            image_cache=self.image_cache,
+            image_loader=self.image_loader,
+        ).exec()
 
 
     @Slot(str, str, list)
@@ -376,7 +546,7 @@ class MainWindow(QMainWindow):
         face_selection = {}
         valid_files =[]
 
-        # --- ИСПРАВЛЕНИЕ: Нормализация путей и извлечение индексов лиц ---
+        # Элемент cleaning кодирует индекс лица после имени файла.
         filenames =[]
         parsed_indices = {}
         for raw_fname in raw_filenames:
@@ -424,8 +594,14 @@ class MainWindow(QMainWindow):
                         full_path = self._get_image_path(fname)
                         faces_to_show = [c[1] for c in candidates]
                         
-                        dlg = FaceSelectorDialog(full_path, faces_to_show, self, 
-                                                 f"Кто на фото - <b>{target_display_name}</b>?<br>(Показаны только неопознанные)")
+                        dlg = FaceSelectorDialog(
+                            full_path,
+                            faces_to_show,
+                            self,
+                            f"Кто на фото - <b>{html_module.escape(target_display_name)}</b>?<br>(Показаны только неопознанные)",
+                            image_cache=self.image_cache,
+                            image_loader=self.image_loader,
+                        )
                         
                         if dlg.exec() == QDialog.Accepted:
                             local_idx = dlg.get_selected_index()
@@ -447,13 +623,11 @@ class MainWindow(QMainWindow):
                 record = self.data_manager.records.get(fname)
                 if not record: continue
                 
-                # --- ИСПРАВЛЕНИЕ: Используем массив индексов, переданный через Drag&Drop ---
                 if fname in parsed_indices:
-                    # Теперь face_selection хранит СПИСОК индексов для этого файла
                     face_selection[fname] = parsed_indices[fname] 
                     valid_files.append(fname)
                 else:
-                    # Старый fallback на всякий случай
+                    # Совместимость с DnD-данными без индекса лица.
                     target_idx = -1
                     for i, f in enumerate(record.faces):
                         current_sid = "trash" if f.is_trash else str(f.temp_cluster_label)
@@ -472,7 +646,13 @@ class MainWindow(QMainWindow):
                 
                 if record.face_count > 1:
                     full_path = self._get_image_path(fname)
-                    dlg = FaceSelectorDialog(full_path, record.faces, self)
+                    dlg = FaceSelectorDialog(
+                        full_path,
+                        record.faces,
+                        self,
+                        image_cache=self.image_cache,
+                        image_loader=self.image_loader,
+                    )
                     if dlg.exec() == QDialog.Accepted:
                         face_selection[fname] = dlg.get_selected_index()
                         valid_files.append(fname)
@@ -501,20 +681,23 @@ class MainWindow(QMainWindow):
 
 
     def _save_changes(self, silent=False):
-        self._stop_loader()
-        
         # Специфичное подтверждение для Cleaning
         if self.mode == 'cleaning':
             if QMessageBox.warning(self, "Подтверждение очистки", 
                                    "Внимание! Все лица и файлы, находящиеся в 'Корзине', будут удалены БЕЗВОЗВРАТНО.\nПродолжить?",
                                    QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
                 return False
+            self._stop_loader()
         
         # Единая точка сохранения
         if self.data_manager.save_data():
             # Обновление контекста (если нужно для Legacy)
             if self.mode == 'location' and IS_MANAGED_RUN:
-                self._update_pysm_context()
+                if not self._update_pysm_context():
+                    details = self.data_manager.last_error or "Не удалось сохранить обложки локаций."
+                    QMessageBox.critical(self, "Ошибка сохранения", details)
+                    return False
+                self.data_manager.mark_location_covers_saved()
                 
             if not silent:
                 msg = "Мусор удален, данные обновлены." if self.mode == 'cleaning' else "Сохранено."
@@ -523,9 +706,10 @@ class MainWindow(QMainWindow):
             self._refresh_left_panel() # Перезагрузка UI (важно для Cleaning, чтобы убрать удаленное)
             return True
         else:
-            if not silent:
-                details = self.data_manager.last_error or "Не удалось сохранить данные."
-                QMessageBox.critical(self, "Ошибка сохранения", details)
+            details = self.data_manager.last_error or "Не удалось сохранить данные."
+            QMessageBox.critical(self, "Ошибка сохранения", details)
+            if self.mode == "cleaning" and self.active_cluster_id:
+                self._render_gallery(self.active_cluster_id, preserve_state=True)
             return False
 
     # --- UI Helpers ---
@@ -590,355 +774,627 @@ class MainWindow(QMainWindow):
     def _render_gallery(self, cluster_id: str, preserve_state: bool = False):
         saved_scroll = 0
         saved_row = 0
-        
-        # --- ДОБАВЛЕНО: Запоминаем текущий скролл и строку перед очисткой ---
         if preserve_state and self.image_list_widget.count() > 0:
             saved_scroll = self.image_list_widget.verticalScrollBar().value()
             selected = self.image_list_widget.selectedItems()
             if selected:
-                # Если выделено несколько, берем верхний, чтобы после удаления оказаться на "следующем"
-                saved_row = min([self.image_list_widget.row(i) for i in selected])
+                saved_row = min([self.image_list_widget.row(item) for item in selected])
             else:
-                saved_row = self.image_list_widget.currentRow()
-                if saved_row < 0: saved_row = 0
+                saved_row = max(0, self.image_list_widget.currentRow())
 
         self._stop_loader()
-        
-        if not preserve_state: # Очищаем только если мы не пытаемся сохранить текущее состояние (например, после удаления фото)
-            self.image_pixmap_cache.clear()       
-        
-        
         cdata = self._get_cluster_item_data_by_id(cluster_id)
-        if not cdata: return
-        
-        # --- 1. Читаем текущие состояния кнопок и полей фильтров ---
+        if not cdata:
+            return
+
         has_gallery_filters = self.filter_manager.has_active_filters()
         has_selection_filter = (
             self.btn_filter_selected_photos.isChecked()
             and self.selected_photo_numbers is not None
         )
         has_filters = has_gallery_filters or has_selection_filter
-        
-        # Очищаем виджеты
+
         self.image_list_widget.clear()
         self.gallery_items_map.clear()
 
         filenames = self.data_manager.get_files_for_cluster(dict(), cluster_id)
-        if not filenames: 
+        if not filenames:
             self.gallery_label.setText(f"Галерея: {cdata['name']} (0 фото)")
             return
 
-        tasks =[]
+        self._begin_gallery_loader()
+        self._gallery_build_generation += 1
+        generation = self._gallery_build_generation
+        self._gallery_build_state = {
+            "generation": generation,
+            "cluster_id": cluster_id,
+            "cdata": cdata,
+            "filenames": filenames,
+            "index": 0,
+            "visible_count": 0,
+            "has_gallery_filters": has_gallery_filters,
+            "has_selection_filter": has_selection_filter,
+            "has_filters": has_filters,
+            "preserve_state": preserve_state,
+            "saved_scroll": saved_scroll,
+            "saved_row": saved_row,
+            "placeholder": self._create_gallery_placeholder(),
+        }
+        self.gallery_label.setText(f"Галерея: {cdata['name']} (загрузка...)")
+        QTimer.singleShot(0, self._process_gallery_build_batch)
+
+    def _create_gallery_placeholder(self) -> QPixmap:
         placeholder = QPixmap(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
-        placeholder.fill(QColor("#3e3e3e")) 
-        
-        visible_count = 0
-        
-        # --- 2. Перебираем файлы и создаем только те, что прошли фильтр ---
-        for fname in filenames:
-            if has_selection_filter and not (
-                extract_photo_numbers(fname) & self.selected_photo_numbers
-            ):
+        placeholder.fill(QColor("#3e3e3e"))
+        return placeholder
+
+    def _process_gallery_build_batch(self):
+        state = self._gallery_build_state
+        if not state:
+            return
+        if state["generation"] != self._gallery_build_generation:
+            return
+
+        filenames = state["filenames"]
+        start_index = state["index"]
+        end_index = min(start_index + self._gallery_build_batch_size, len(filenames))
+        batch_tasks = []
+
+        for fname in filenames[start_index:end_index]:
+            batch_tasks.extend(self._add_gallery_file_items(state, fname))
+
+        state["index"] = end_index
+        self._update_gallery_progress()
+        if batch_tasks:
+            self._queue_gallery_tasks(batch_tasks)
+
+        if end_index < len(filenames):
+            QTimer.singleShot(0, self._process_gallery_build_batch)
+            return
+
+        self._finish_gallery_build(state)
+
+    def _add_gallery_file_items(self, state: Dict[str, Any], fname: str) -> List[Dict[str, Any]]:
+        if state["has_selection_filter"] and not (
+            extract_photo_numbers(fname) & self.selected_photo_numbers
+        ):
+            return []
+
+        record = self.data_manager.records.get(fname)
+        if not record:
+            return []
+
+        full_path = self._get_image_path(fname)
+        current_keys = []
+        if self.mode == 'cleaning':
+            target_faces = []
+            for i, face in enumerate(record.faces):
+                if state["cluster_id"] == "trash":
+                    if face.is_trash:
+                        target_faces.append(i)
+                else:
+                    if str(face.temp_cluster_label) == state["cluster_id"]:
+                        target_faces.append(i)
+            for idx in target_faces:
+                current_keys.append((f"{fname}::{idx}", idx))
+        else:
+            current_keys.append((fname, None))
+
+        tasks = []
+        for cache_key, face_idx in current_keys:
+            display_name = cache_key.split("::")[0]
+            user_data = {"filename": display_name, "overlays": list()}
+            if face_idx is not None:
+                user_data["face_index"] = face_idx
+
+            face_for_icon = None
+            if face_idx is not None and face_idx < len(record.faces):
+                face_for_icon = record.faces[face_idx]
+            elif record.face_count == 1 and record.faces:
+                face_for_icon = record.faces[0]
+
+            if face_for_icon:
+                gender = face_for_icon.extra_data.get('gender_faceonnx')
+                if gender == 'Male':
+                    user_data["overlays"].append("GENDER_MALE")
+                elif gender == 'Female':
+                    user_data["overlays"].append("GENDER_FEMALE")
+
+                eye_left = face_for_icon.extra_data.get('eye_left_state')
+                eye_right = face_for_icon.extra_data.get('eye_right_state')
+                if eye_left == 'Closed' or eye_right == 'Closed':
+                    user_data["overlays"].append("EYE_CLOSED")
+
+                kp_analysis = face_for_icon.extra_data.get('keypoint_analysis', dict())
+                mouth_state = kp_analysis.get('mouth_state')
+                if mouth_state in ("open", "slightly_open", "wide_open"):
+                    user_data["overlays"].append("MOUTH_OPEN")
+
+                beauty = face_for_icon.extra_data.get('beauty_faceonnx')
+                if beauty is not None:
+                    try:
+                        user_data["beauty_score"] = int(float(beauty))
+                    except (ValueError, TypeError):
+                        pass
+
+            user_data["face_count"] = record.face_count
+            if state["has_gallery_filters"] and not self.filter_manager.passes(user_data):
                 continue
 
-            record = self.data_manager.records.get(fname)
-            if not record: continue
-            
-            full_path = self.working_images_dir / fname
-            current_keys =[]
-            
-            if self.mode == 'cleaning':
-                target_faces =[]
-                for i, f in enumerate(record.faces):
-                    if cluster_id == "trash":
-                        if f.is_trash: target_faces.append(i)
-                    else:
-                        if str(f.temp_cluster_label) == cluster_id: target_faces.append(i)
-                
-                for idx in target_faces:
-                    cache_key = f"{fname}::{idx}"
-                    current_keys.append((cache_key, idx)) 
+            state["visible_count"] += 1
+            item = QListWidgetItem(display_name)
+            item.setData(Qt.ItemDataRole.UserRole, user_data)
+
+            item.setData(Qt.ItemDataRole.DecorationRole, state["placeholder"])
+            task = {
+                "filename": fname,
+                "cache_key": cache_key,
+                "full_path": full_path,
+                "source_size": self._source_size_from_record(record),
+            }
+            if face_idx is not None:
+                task["bbox"] = record.faces[face_idx].bbox
+                task["draw_face_rect"] = True
+            tasks.append(task)
+
+            self.image_list_widget.addItem(item)
+            self.gallery_items_map[cache_key] = item
+
+        return tasks
+
+    @staticmethod
+    def _source_size_from_record(record) -> Optional[tuple[int, int]]:
+        shape = getattr(record, "original_shape", None)
+        if not shape or len(shape) < 2:
+            return None
+        height, width = int(shape[0]), int(shape[1])
+        if width <= 0 or height <= 0:
+            return None
+        return width, height
+
+    def _finish_gallery_build(self, state: Dict[str, Any]):
+        if state["generation"] != self._gallery_build_generation:
+            return
+        self._gallery_build_state = None
+
+        if hasattr(self, "status_bar") and not self._export_is_running():
+            if self._gallery_thumbnail_channels:
+                self._update_gallery_progress()
             else:
-                current_keys.append((fname, None))
+                self.status_bar.reset()
 
-            for cache_key, face_idx in current_keys:
-                display_name = cache_key.split("::")[0]
-                
-                user_data = {"filename": display_name, "overlays": list()}
-                if face_idx is not None:
-                    user_data["face_index"] = face_idx 
-                
-                face_for_icon = None
-                if face_idx is not None and face_idx < len(record.faces):
-                    face_for_icon = record.faces[face_idx]
-                elif record.face_count == 1 and record.faces:
-                    face_for_icon = record.faces[0]
-                    
-                if face_for_icon:
-                    gender = face_for_icon.extra_data.get('gender_faceonnx')
-                    if gender == 'Male':
-                        user_data["overlays"].append("GENDER_MALE")
-                    elif gender == 'Female':
-                        user_data["overlays"].append("GENDER_FEMALE")
-                        
-                    eye_left = face_for_icon.extra_data.get('eye_left_state')
-                    eye_right = face_for_icon.extra_data.get('eye_right_state')
-                    if eye_left == 'Closed' or eye_right == 'Closed':
-                        user_data["overlays"].append("EYE_CLOSED")
-                        
-                    kp_analysis = face_for_icon.extra_data.get('keypoint_analysis', dict())
-                    mouth_state = kp_analysis.get('mouth_state')
-                    if mouth_state in ("open", "slightly_open", "wide_open"):
-                        user_data["overlays"].append("MOUTH_OPEN")
-
-                    beauty = face_for_icon.extra_data.get('beauty_faceonnx')
-                    if beauty is not None:
-                        try:
-                            user_data["beauty_score"] = int(float(beauty))
-                        except (ValueError, TypeError):
-                            pass
-                
-                user_data["face_count"] = record.face_count
-                
-                # --- 3. ЛОГИКА ФИЛЬТРАЦИИ НА ЭТАПЕ СОЗДАНИЯ ---
-                if has_gallery_filters and not self.filter_manager.passes(user_data):
-                    continue # Элемент не прошел фильтр -> пропускаем
-                
-                visible_count += 1
-
-                # Добавляем только прошедшие элементы (используем стандартный DecorationRole)
-                item = QListWidgetItem(display_name)
-                item.setData(Qt.ItemDataRole.UserRole, user_data)
-                
-                if cache_key in self.image_pixmap_cache:
-                    item.setData(Qt.ItemDataRole.DecorationRole, self.image_pixmap_cache[cache_key])
-                else:
-                    item.setData(Qt.ItemDataRole.DecorationRole, placeholder)
-                    task = {
-                        "filename": fname,
-                        "cache_key": cache_key,
-                        "full_path": full_path
-                    }
-                    if face_idx is not None: 
-                        task["bbox"] = record.faces[face_idx].bbox
-                        task["draw_face_rect"] = True
-                    
-                    tasks.append(task)
-                
-                self.image_list_widget.addItem(item)
-                self.gallery_items_map[cache_key] = item
-
-        # Запускаем лоадер (он загрузит только видимые фото!)
-        if tasks:
-            self._start_loader(tasks)
-
-        # --- 4. Обновляем заголовок ---
-        if has_filters:
+        cdata = state["cdata"]
+        visible_count = state["visible_count"]
+        if state["has_filters"]:
             self.gallery_label.setText(f"Галерея: {cdata['name']} (Показано {visible_count} из {cdata['count']})")
         else:
             self.gallery_label.setText(f"Галерея: {cdata['name']} ({cdata['count']} фото)")
 
-        # --- 5. УМНЫЙ АВТОВЫБОР С УЧЕТОМ СОХРАНЕНИЯ ПОЗИЦИИ ---
         if self.image_list_widget.count() == 0:
             self.image_list_widget.setCurrentItem(None)
         else:
             target_row = 0
-            if preserve_state:
-                # Корректируем цель, если элементов стало меньше
-                target_row = min(saved_row, self.image_list_widget.count() - 1)
-                
+            if state["preserve_state"]:
+                target_row = min(state["saved_row"], self.image_list_widget.count() - 1)
+
             visible_found = False
-            
-            # Ищем вниз первую видимую ячейку
             for i in range(target_row, self.image_list_widget.count()):
                 if not self.image_list_widget.item(i).isHidden():
                     self.image_list_widget.setCurrentRow(i)
                     visible_found = True
                     break
-            
-            # Если внизу ничего нет (например, перетащили последние элементы списка), ищем вверх
-            if not visible_found and preserve_state:
+
+            if not visible_found and state["preserve_state"]:
                 for i in range(target_row - 1, -1, -1):
                     if not self.image_list_widget.item(i).isHidden():
                         self.image_list_widget.setCurrentRow(i)
                         visible_found = True
                         break
-                        
+
             if not visible_found:
                 self.image_list_widget.setCurrentItem(None)
-                
-            # Восстанавливаем прокрутку с микро-задержкой (чтобы Qt успел расставить элементы по сетке)
-            if preserve_state:
-                QTimer.singleShot(10, lambda: self.image_list_widget.verticalScrollBar().setValue(saved_scroll))
 
-    def _start_loader(self, tasks: List[Dict]):
-        self.status_bar.setRange(0, len(tasks))
-        self.status_bar.setValue(0)
-        self.loader_thread = QThread()
-        self.loader_worker = ChunkedImageLoader(tasks, self.image_pixmap_cache, self.num_workers)
-        self.loader_worker.moveToThread(self.loader_thread)
-        self.loader_worker.chunk_ready.connect(self._on_chunk_ready)
-        self.loader_worker.progress_updated.connect(self.status_bar.setValue)
-        self.loader_worker.finished.connect(self._on_loader_finished)
-        self.loader_thread.started.connect(self.loader_worker.run)
-        self.loader_thread.start()
+            if state["preserve_state"]:
+                QTimer.singleShot(
+                    10,
+                    lambda: self.image_list_widget.verticalScrollBar().setValue(state["saved_scroll"]),
+                )
+
+    def _begin_gallery_loader(self):
+        self._gallery_generation += 1
+        self._gallery_completed_tasks = 0
+        self._gallery_thumbnail_channels.clear()
+        self._gallery_total_tasks = 0
+        if hasattr(self, 'status_bar') and not self._export_is_running():
+            self.status_bar.setRange(0, self._GALLERY_PROGRESS_MAX)
+            self.status_bar.setValue(0)
+
+    def _update_gallery_progress(self):
+        if not hasattr(self, "status_bar") or self._export_is_running():
+            return
+
+        state = self._gallery_build_state
+        if state is not None:
+            total_files = max(1, len(state["filenames"]))
+            processed_files = min(total_files, state["index"])
+            value = round(
+                self._GALLERY_BUILD_PROGRESS_MAX * processed_files / total_files
+            )
+        elif self._gallery_total_tasks > 0:
+            completed_tasks = min(
+                self._gallery_total_tasks,
+                self._gallery_completed_tasks,
+            )
+            loading_range = (
+                self._GALLERY_PROGRESS_MAX - self._GALLERY_BUILD_PROGRESS_MAX
+            )
+            value = self._GALLERY_BUILD_PROGRESS_MAX + round(
+                loading_range * completed_tasks / self._gallery_total_tasks
+            )
+        else:
+            value = self._GALLERY_PROGRESS_MAX
+
+        self.status_bar.setValue(max(self.status_bar.value(), value))
+
+    def _queue_gallery_tasks(self, tasks: List[Dict]):
+        added = 0
+        for task in tasks:
+            request_data = self._gallery_request_for_task(task)
+            if request_data is None:
+                continue
+
+            request, rect_norm = request_data
+            cache_key = str(task.get("cache_key") or task.get("filename") or "")
+            channel = ("cluster-gallery", id(self), self._gallery_generation, cache_key)
+            self._gallery_thumbnail_channels[channel] = {
+                "cache_key": cache_key,
+                "rect_norm": rect_norm,
+                "generation": self._gallery_generation,
+            }
+            self.image_loader.request(
+                request,
+                channel=channel,
+                persist=True,
+                disk_format="PNG",
+            )
+            added += 1
+
+        self._gallery_total_tasks += added
 
     def _stop_loader(self):
-        worker = getattr(self, 'loader_worker', None)
-        if worker:
-            try:
-                worker.finished.disconnect(self._on_loader_finished)
-            except Exception:
-                pass
-            worker.requestInterruption()
-            
-        thread = getattr(self, 'loader_thread', None)
-        if thread:
-            if thread.isRunning():
-                thread.quit()
-                thread.wait() # Гарантированно ждем завершения C++ потока
-            thread.deleteLater() # Безопасное удаление объекта в движке Qt
-            
-        self.loader_thread = None
-        self.loader_worker = None
+        self._cancel_face_panel_requests()
+        for channel in list(self._gallery_thumbnail_channels):
+            self.image_loader.cancel(channel)
+        self._gallery_thumbnail_channels.clear()
+        self._gallery_generation += 1
+        self._gallery_build_generation += 1
+        self._gallery_build_state = None
+        self._gallery_total_tasks = 0
+        self._gallery_completed_tasks = 0
         
-        if hasattr(self, 'status_bar'):
+        if hasattr(self, 'status_bar') and not self._export_is_running():
             self.status_bar.reset()
 
-    @Slot(list)
-    def _on_chunk_ready(self, items: List):
-        """
-        Вызывается, когда поток загрузил пачку картинок.
-        Обновляет иконки в уже созданных ячейках.
-        """
-        for key, qimage in items:
-            pixmap = QPixmap.fromImage(qimage)
-            self.image_pixmap_cache[key] = pixmap
-            
-            # Находим нужную ячейку по ключу и обновляем картинку
-            if key in self.gallery_items_map:
-                item = self.gallery_items_map[key]
-                # setIcon требует QIcon, setData(DecorationRole) принимает QPixmap
-                # Делегат использует DecorationRole
+    def _cancel_cluster_cover_requests(self) -> None:
+        for channel in list(self._cluster_cover_channels):
+            self.image_loader.cancel(channel)
+        self._cluster_cover_channels.clear()
+        self._cluster_cover_generation += 1
+
+    def _request_cluster_cover(
+        self,
+        item: QListWidgetItem,
+        cluster_id: str,
+        task: Dict[str, Any],
+    ) -> None:
+        request_data = self._gallery_request_for_task(task)
+        if request_data is None:
+            return
+
+        request, _ = request_data
+        channel = ("cluster-cover", id(self), self._cluster_cover_generation, cluster_id)
+        self._cluster_cover_channels[channel] = {
+            "item": item,
+            "generation": self._cluster_cover_generation,
+        }
+        self.image_loader.request(
+            request,
+            channel=channel,
+            persist=True,
+            disk_format="PNG",
+        )
+
+    def _gallery_request_for_task(
+        self,
+        task: Dict[str, Any],
+    ) -> Optional[tuple[ImageRequest, Optional[tuple[float, float, float, float]]]]:
+        full_path_value = task.get("full_path")
+        if not full_path_value:
+            return None
+        full_path = Path(full_path_value)
+        if not full_path.is_file():
+            return None
+
+        crop = None
+        rect_norm = None
+        bbox = task.get("bbox")
+        if bbox and len(bbox) == 4:
+            source_size = task.get("source_size")
+            if source_size and len(source_size) >= 2:
+                source_width, source_height = int(source_size[0]), int(source_size[1])
+            else:
+                source_width, source_height = self.image_cache.source_size(full_path)
+            if source_width <= 0 or source_height <= 0:
+                return None
+
+            x1, y1, x2, y2 = map(int, bbox)
+            if x1 > x2:
+                x1, x2 = x2, x1
+            if y1 > y2:
+                y1, y2 = y2, y1
+
+            x1 = max(0, min(source_width, x1))
+            x2 = max(0, min(source_width, x2))
+            y1 = max(0, min(source_height, y1))
+            y2 = max(0, min(source_height, y2))
+            pad_ratio = float(task.get("crop_padding", 0.5))
+            crop = normalized_face_crop(
+                (source_width, source_height),
+                (x1, y1, x2, y2),
+                padding=pad_ratio,
+            )
+            if crop is None:
+                return None
+            if task.get("draw_face_rect", False):
+                crop_x1 = crop[0] * source_width
+                crop_y1 = crop[1] * source_height
+                crop_width = crop[2] * source_width
+                crop_height = crop[3] * source_height
+                rect_left = max(0.0, min(1.0, (x1 - crop_x1) / crop_width))
+                rect_top = max(0.0, min(1.0, (y1 - crop_y1) / crop_height))
+                rect_right = max(0.0, min(1.0, (x2 - crop_x1) / crop_width))
+                rect_bottom = max(0.0, min(1.0, (y2 - crop_y1) / crop_height))
+                rect_norm = (
+                    rect_left,
+                    rect_top,
+                    max(0.0, rect_right - rect_left),
+                    max(0.0, rect_bottom - rect_top),
+                )
+
+        target_size = tuple(task.get("target_size") or (THUMBNAIL_SIZE, THUMBNAIL_SIZE))
+        variant = str(task.get("variant") or "cluster_editor.gallery_thumbnail.v2")
+        request = ImageRequest(
+            full_path,
+            target_size,
+            mode="fit",
+            crop=crop,
+            allow_upscale=crop is not None,
+            variant=variant,
+        )
+        return request, rect_norm
+
+    def _draw_gallery_face_rect(
+        self,
+        pixmap: QPixmap,
+        rect_norm: Optional[tuple[float, float, float, float]],
+    ) -> QPixmap:
+        if rect_norm is None or pixmap.isNull():
+            return pixmap
+
+        result = QPixmap(pixmap)
+        painter = QPainter(result)
+        pen = QPen(QColor(255, 165, 0))
+        pen.setWidth(max(2, int(min(result.width(), result.height()) * 0.04)))
+        painter.setPen(pen)
+        x, y, width, height = rect_norm
+        painter.drawRect(
+            int(result.width() * x),
+            int(result.height() * y),
+            max(1, int(result.width() * width)),
+            max(1, int(result.height() * height)),
+        )
+        painter.end()
+        return result
+
+    @Slot(object)
+    def _on_gallery_image_ready(self, result: AsyncImageResult):
+        channel = result.channel
+        if (
+            not isinstance(channel, tuple)
+            or len(channel) != 4
+            or channel[1] != id(self)
+        ):
+            return
+        if channel[0] == "cluster-cover":
+            self._on_cluster_cover_ready(result, channel)
+            return
+        if channel[0] == "face-panel":
+            self._on_face_panel_image_ready(result, channel)
+            return
+        if channel[0] != "cluster-gallery":
+            return
+
+        task_data = self._gallery_thumbnail_channels.pop(channel, None)
+        if task_data is None:
+            return
+        if task_data.get("generation") != self._gallery_generation:
+            return
+
+        self._gallery_completed_tasks += 1
+        gallery_build_finished = self._gallery_build_state is None
+        if gallery_build_finished:
+            self._update_gallery_progress()
+
+        if not result.image.isNull():
+            pixmap = QPixmap.fromImage(result.image)
+            pixmap = self._draw_gallery_face_rect(pixmap, task_data.get("rect_norm"))
+            cache_key = task_data["cache_key"]
+            item = self.gallery_items_map.get(cache_key)
+            if item is not None:
                 item.setData(Qt.ItemDataRole.DecorationRole, pixmap)
 
-    @Slot()
-    def _on_loader_finished(self):
-        self.status_bar.reset()
-        self._stop_loader()
+        if (
+            gallery_build_finished
+            and not self._gallery_thumbnail_channels
+            and hasattr(self, "status_bar")
+            and not self._export_is_running()
+        ):
+            self.status_bar.reset()
 
+    def _on_cluster_cover_ready(self, result: AsyncImageResult, channel: tuple[object, ...]) -> None:
+        task_data = self._cluster_cover_channels.pop(channel, None)
+        if task_data is None:
+            return
+        if task_data.get("generation") != self._cluster_cover_generation:
+            return
+        if result.image.isNull():
+            return
+
+        item = task_data["item"]
+        pixmap = QPixmap.fromImage(result.image)
+        item_data = item.data(Qt.ItemDataRole.UserRole)
+        if item_data is None:
+            return
+        item_data = dict(item_data)
+        item_data["pixmap"] = pixmap
+        item.setData(Qt.ItemDataRole.UserRole, item_data)
+        list_widget = item.listWidget()
+        if list_widget is not None:
+            list_widget.viewport().update()
+
+    def _cancel_face_panel_requests(self) -> None:
+        for channel in list(self._face_panel_channels):
+            self.image_loader.cancel(channel)
+        self._face_panel_channels.clear()
+        self._face_panel_generation += 1
+
+    def _on_face_panel_image_ready(
+        self,
+        result: AsyncImageResult,
+        channel: tuple[object, ...],
+    ) -> None:
+        task_data = self._face_panel_channels.pop(channel, None)
+        if task_data is None:
+            return
+        if task_data["generation"] != self._face_panel_generation:
+            return
+        item = task_data["item"]
+        if result.image.isNull() or item.listWidget() is None:
+            return
+
+        item.setData(FACE_PIXMAP_ROLE, QPixmap.fromImage(result.image))
+        list_widget = item.listWidget()
+        if list_widget is not None:
+            list_widget.viewport().update(list_widget.visualItemRect(item))
 
     @Slot(QListWidgetItem)
     def _update_face_panel(self, current: QListWidgetItem, prev=None):
         """Обновляет правую панель при выборе фото в галерее."""
-        if self.mode == 'cleaning': return 
+        if self.mode == 'cleaning':
+            return
 
-        # Очистка панелей
-        if hasattr(self, 'face_details_widget'): self.face_details_widget.clear()
-        if hasattr(self, 'photo_info_viewer'): self.photo_info_viewer.clear()
-        if hasattr(self, 'face_info_viewer'): self.face_info_viewer.clear()
-        
-        if not current: return
-        
+        self._cancel_face_panel_requests()
+        if hasattr(self, 'face_details_widget'):
+            self.face_details_widget.clear()
+        if hasattr(self, 'photo_info_viewer'):
+            self.photo_info_viewer.clear()
+        if hasattr(self, 'face_info_viewer'):
+            self.face_info_viewer.clear()
+        if not current:
+            return
+
         fname = current.data(Qt.ItemDataRole.UserRole)["filename"]
         record = self.data_manager.records.get(fname)
-        if not record: return
-        
-        # 1. Заполнение информации о ФОТО
+        if not record:
+            return
+
         info_html = f"""
         <style>td {{ padding-right: 10px; }}</style>
         <table>
-        <tr><td><b>Файл:</b></td><td>{fname}</td></tr>
+        <tr><td><b>Файл:</b></td><td>{html_module.escape(fname)}</td></tr>
         <tr><td><b>Размер:</b></td><td>{record.original_shape[1]} x {record.original_shape[0]}</td></tr>
         <tr><td><b>Лиц найдено:</b></td><td>{record.face_count}</td></tr>
         <tr><td><b>Тип:</b></td><td>{record.image_type}</td></tr>
         """
         
         if record.location_name:
-            info_html += f"<tr><td><b>Локация:</b></td><td>{record.location_name} (ID: {record.location_cluster})</td></tr>"
+            info_html += (
+                "<tr><td><b>Локация:</b></td><td>"
+                f"{html_module.escape(str(record.location_name))} "
+                f"(ID: {html_module.escape(str(record.location_cluster))})</td></tr>"
+            )
             
         info_html += "</table>"
         self.photo_info_viewer.setHtml(info_html)
 
-        # 2. Отрисовка списка лиц (существующий код)
         full_path = self._get_image_path(fname)
-        if not full_path.exists(): return
-        
-        try:
-            if Image:
-                pil_img = Image.open(str(full_path))
-                w, h = pil_img.size
-                for i, face in enumerate(record.faces):
-                    bbox = face.bbox
-                    if len(bbox) != 4: continue
-                    
-                    x1, y1, x2, y2 = map(int, bbox)
-                    if x1 > x2: x1, x2 = x2, x1
-                    if y1 > y2: y1, y2 = y2, y1
-                    pad = int(max(x2-x1, y2-y1)*0.3)
-                    cx1 = max(0, x1-pad); cy1 = max(0, y1-pad)
-                    cx2 = min(w, x2+pad); cy2 = min(h, y2+pad)
-                    
-                    crop = pil_img.crop((cx1, cy1, cx2, cy2))
-                    if crop.mode != "RGBA": crop = crop.convert("RGBA")
-                    
-                    qim = ImageQt.ImageQt(crop)
-                    pixmap = QPixmap.fromImage(qim)
-                    
-                    # Цветные рамки для Matches
-                    txt_color = "#dcdcdc"
-                    border_color = None
+        if not full_path.is_file():
+            return
 
-                    if self.mode == 'matches':
-                        matched_id = face.extra_data.get('matched_portrait_cluster_label')
-                        painter = QPainter(pixmap)
-                        pen_width = max(3, int(min(pixmap.width(), pixmap.height()) * 0.04))
-                        
-                        if matched_id is None:
-                            color = QColor(255, 50, 50) 
-                            status_text = "Не опознан"
-                            txt_color = "#ff6666"
-                        elif str(matched_id) == str(self.active_cluster_id):
-                            color = QColor(50, 205, 50) 
-                            status_text = "(Этот кластер)"
-                            txt_color = "#66ff66"
-                        else:
-                            color = QColor(65, 105, 225) 
-                            status_text = self.data_manager.student_label(face.student_id)
-                            if not status_text:
-                                status_text = f"ID кластера {matched_id}"
-                            txt_color = "#66ccff"
-                        
-                        pen = QPen(color); pen.setWidth(pen_width)
-                        painter.setPen(pen)
-                        offset = pen_width // 2
-                        painter.drawRect(offset, offset, pixmap.width() - pen_width, pixmap.height() - pen_width)
-                        painter.end()
-                        
-                        txt = f"Лицо #{i+1}\n{status_text}"
-                    else:
-                        txt = f"Лицо #{i+1}"
-                        student_label = self.data_manager.student_label(face.student_id)
-                        if student_label:
-                            txt += f"\n{student_label}"
+        generation = self._face_panel_generation
+        source_size = self._source_size_from_record(record)
+        icon_extent = max(
+            self.face_details_widget.iconSize().width(),
+            self.face_details_widget.iconSize().height(),
+        )
+        target_size = (icon_extent, icon_extent)
 
-                    item = QListWidgetItem()
-                    item.setIcon(pixmap)
-                    item.setText(txt)
-                    # Сохраняем индекс лица в списке record.faces для дальнейшего доступа
-                    item.setData(Qt.ItemDataRole.UserRole, i) 
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    self.face_details_widget.addItem(item)
-                    
-        except Exception as e:
-            logger.error(f"Error face panel: {e}")
+        for i, face in enumerate(record.faces):
+            border_color = None
+            if self.mode == 'matches':
+                matched_id = face.extra_data.get('matched_portrait_cluster_label')
+                if matched_id is None:
+                    status_text = "Не опознан"
+                    border_color = "#ff3232"
+                elif str(matched_id) == str(self.active_cluster_id):
+                    status_text = "(Этот кластер)"
+                    border_color = "#32cd32"
+                else:
+                    status_text = (
+                        self.data_manager.student_label(face.student_id)
+                        or f"ID кластера {matched_id}"
+                    )
+                    border_color = "#4169e1"
+                text = f"Лицо #{i + 1}\n{status_text}"
+            else:
+                text = f"Лицо #{i + 1}"
+                student_label = self.data_manager.student_label(face.student_id)
+                if student_label:
+                    text += f"\n{student_label}"
 
-        # --- Автовыбор первого лица в правой панели ---
-        if hasattr(self, 'face_details_widget') and self.face_details_widget.count() > 0:
+            item = QListWidgetItem(text)
+            item.setData(Qt.ItemDataRole.UserRole, i)
+            item.setData(FACE_STATUS_COLOR_ROLE, border_color or "")
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.face_details_widget.addItem(item)
+
+            request = face_thumbnail_request(
+                self.image_cache,
+                full_path,
+                face.bbox,
+                target_size,
+                padding=0.3,
+                variant="cluster_editor.face_panel.v3",
+                source_size=source_size,
+            )
+            if request is None:
+                continue
+            channel = ("face-panel", id(self), generation, f"{fname}::{i}")
+            self._face_panel_channels[channel] = {
+                "generation": generation,
+                "item": item,
+            }
+            self.image_loader.request(
+                request,
+                channel=channel,
+                persist=True,
+                disk_format="PNG",
+            )
+
+        if self.face_details_widget.count() > 0:
             first_face_item = self.face_details_widget.item(0)
             self.face_details_widget.setCurrentItem(first_face_item)
-            # Принудительно вызываем обновление информации о лице (т.к. программный выбор не эмулирует клик мыши)
-            self._on_face_item_clicked(first_face_item)            
+            self._on_face_item_clicked(first_face_item)
 
     @Slot(QListWidgetItem)
     def _on_face_item_clicked(self, item):
@@ -961,25 +1417,22 @@ class MainWindow(QMainWindow):
         face = record.faces[face_idx]
         
         # --- ЛОГИКА ОТОБРАЖЕНИЯ ---
-        display_status = "Не определено"
         display_cluster_id = "None"
         display_name = self.data_manager.student_name(face.student_id) or "---"
         match_distance = None
 
         # 1. Если это Портрет (есть cluster_label)
         if face.cluster_label is not None:
-            display_status = "Портрет (Cluster)"
             display_cluster_id = str(face.cluster_label)
             
         # 2. Если есть Матч (matched_portrait_cluster_label)
         elif face.extra_data.get('matched_portrait_cluster_label') is not None:
-            display_status = "Сопоставление (Match)"
             display_cluster_id = str(face.extra_data.get('matched_portrait_cluster_label'))
             match_distance = face.extra_data.get('match_distance')
             
         # 3. Иначе - данные не заполняются (Temp ID игнорируем)
         else:
-            display_status = "Не опознан"
+            display_cluster_id = "None"
 
         # Формируем HTML
         html = f"""
@@ -998,7 +1451,7 @@ class MainWindow(QMainWindow):
             # Добавлена визуализация пола из FaceONNX
             html += f"<tr><td><b>Пол (FaceONNX):</b></td><td>{gender}</td></tr>"
 
-        # --- ДОБАВЛЕНО: Beauty в правую панель ---
+        # Beauty score.
         beauty_score = face.extra_data.get('beauty_faceonnx')
         if beauty_score is not None:
              try:
@@ -1006,7 +1459,7 @@ class MainWindow(QMainWindow):
              except (ValueError, TypeError):
                  pass
 
-        # --- ДОБАВЛЕНО: Глаза и рот ---
+        # Состояние глаз и рта.
         eye_left = face.extra_data.get('eye_left_state')
         eye_right = face.extra_data.get('eye_right_state')
         kp_analysis = face.extra_data.get('keypoint_analysis', dict())
@@ -1020,8 +1473,8 @@ class MainWindow(QMainWindow):
         html += "<tr><td colspan='2'><hr></td></tr>"
         
         html += f"<tr><td><b>Cluster ID:</b></td><td>{display_cluster_id}</td></tr>"
-        html += f"<tr><td><b>Ученик:</b></td><td>{display_name}</td></tr>"
-        html += f"<tr><td><b>student_id:</b></td><td>{face.student_id or '---'}</td></tr>"
+        html += f"<tr><td><b>Ученик:</b></td><td>{html_module.escape(str(display_name))}</td></tr>"
+        html += f"<tr><td><b>student_id:</b></td><td>{html_module.escape(str(face.student_id or '---'))}</td></tr>"
         
         if match_distance is not None:
              html += f"<tr><td><b>Дистанция:</b></td><td>{match_distance:.4f}</td></tr>"
@@ -1051,12 +1504,27 @@ class MainWindow(QMainWindow):
         if self.mode == 'cleaning':
             # В cleaning открываем с выделением конкретного лица
             face_idx = data.get("face_index")
-            ImageViewer(self.data_manager, fname, parent=self, target_face_index=face_idx, draw_boxes=True).exec()
+            ImageViewer(
+                self.data_manager,
+                fname,
+                parent=self,
+                target_face_index=face_idx,
+                draw_boxes=True,
+                image_cache=self.image_cache,
+                image_loader=self.image_loader,
+            ).exec()
             return
 
         # --- СТАНДАРТНАЯ ЛОГИКА (Галерея) ---
         # Открываем чистое фото БЕЗ рамок для детального рассмотрения
-        ImageViewer(self.data_manager, fname, parent=self, draw_boxes=False).exec()
+        ImageViewer(
+            self.data_manager,
+            fname,
+            parent=self,
+            draw_boxes=False,
+            image_cache=self.image_cache,
+            image_loader=self.image_loader,
+        ).exec()
 
     @Slot()
     def _on_export_all_triggered(self):
@@ -1070,7 +1538,9 @@ class MainWindow(QMainWindow):
             self._start_export([self.active_cluster_id])
 
     def _start_export(self, cluster_ids):
-        # NOTE: Export logic remains mostly same, but we can clean it up later in Optimization phase
+        if self._export_is_running():
+            QMessageBox.warning(self, "Экспорт", "Экспорт уже выполняется.")
+            return
         self.export_end = False
 
         tasks = []
@@ -1081,15 +1551,27 @@ class MainWindow(QMainWindow):
             
             student_id = cdata.get("student_id")
             if self.mode in {"face", "matches"}:
-                cname = self.data_manager.student_name(student_id)
-                if not cname:
+                display_name = self.data_manager.student_name(student_id)
+                if not display_name:
                     logger.error(f"Экспорт кластера {cid} остановлен: отсутствует student_id.")
                     continue
             else:
-                cname = self.data_manager.strategy._strip_name_prefix(cdata["name"])
+                display_name = self.data_manager.strategy.normalize_cluster_name(
+                    cdata["name"]
+                )
+            stable_id = student_id if self.mode in {"face", "matches"} else cid
+            folder_name = _export_folder_name(
+                display_name,
+                stable_id,
+                f"cluster_{cid}",
+            )
             
             files = self.data_manager.get_files_for_cluster({}, cid)
             for fname in files:
+                source_path = self._get_image_path(fname)
+                if not source_path.is_file():
+                    logger.error(f"Экспорт пропускает отсутствующий файл: {source_path}")
+                    continue
                 faces_bboxes = []
                 record = self.data_manager.records.get(fname)
                 if record:
@@ -1097,52 +1579,79 @@ class MainWindow(QMainWindow):
                         if face.bbox and len(face.bbox) == 4:
                             faces_bboxes.append(face.bbox)
 
+                try:
+                    output_path = _safe_export_path(
+                        self.export_dir,
+                        folder_name,
+                        fname,
+                    )
+                except ValueError as exc:
+                    logger.error(str(exc))
+                    continue
+
                 tasks.append({
-                    "source_path": self.working_images_dir / fname,
-                    "output_path": self.export_dir / cname / fname,
-                    "student_name": cname,
+                    "source_path": source_path,
+                    "output_path": output_path,
+                    "student_name": display_name,
                     "faces_bboxes": faces_bboxes
                 })
         
-        if not tasks: return
+        if not tasks:
+            QMessageBox.warning(self, "Экспорт", "Нет доступных файлов для экспорта.")
+            return
         preview_bboxes = tasks[0].get("faces_bboxes", [])
-        dlg = EnhanceSettingsDialog(tasks[0]["source_path"], preview_bboxes, self)
+        dlg = EnhanceSettingsDialog(
+            tasks[0]["source_path"],
+            preview_bboxes,
+            self,
+            image_cache=self.image_cache,
+            image_loader=self.image_loader,
+        )
         if dlg.exec() != QDialog.Accepted: return
         settings = dlg.get_export_settings()
         
         self.status_bar.setFormat("Экспорт... %p%")
         self.status_bar.setRange(0, len(tasks))
+        self.status_bar.setValue(0)
+        if hasattr(self, "export_button"):
+            self.export_button.setEnabled(False)
         
-        self.export_thread = QThread()
-        # TODO: Move to ProcessPool in optimization phase
-        self.export_worker = ExportWorker(tasks, self.num_workers, settings["factors"], 
-                                          (settings["width"], settings["height"]),
-                                          (settings["dpi"], settings["dpi"]),
-                                          settings["quality"], settings["watermarks"])
-        self.export_worker.moveToThread(self.export_thread)
-        self.export_worker.progress_updated.connect(self.status_bar.setValue)
-        self.export_worker.finished.connect(self._on_export_finished)
-        self.export_thread.started.connect(self.export_worker.run)
-        self.export_thread.start()
+        self.export_controller.start(
+            tasks,
+            self.num_workers,
+            settings["factors"],
+            (settings["width"], settings["height"]),
+            (settings["dpi"], settings["dpi"]),
+            settings["quality"],
+            settings["watermarks"],
+        )
+
+    def _export_is_running(self) -> bool:
+        return self.export_controller.is_running
 
     @Slot(str)
     def _on_export_finished(self, message: str):
         self.status_bar.reset()
         self.status_bar.setFormat("")
      
-        QMessageBox.information(self, "Экспорт завершен", message)
+        if not self._close_after_export:
+            QMessageBox.information(self, "Экспорт завершен", message)
         self.export_end = True
 
-        thread = getattr(self, 'export_thread', None)
-        if thread: 
-            if thread.isRunning():
-                thread.quit()
-                thread.wait()
-            thread.deleteLater()
-            self.export_thread = None
+    @Slot()
+    def _on_export_thread_stopped(self):
+        if hasattr(self, "export_button"):
+            self.export_button.setEnabled(True)
+        if self._gallery_build_state is not None or self._gallery_thumbnail_channels:
+            self.status_bar.setRange(0, self._GALLERY_PROGRESS_MAX)
+            self.status_bar.setValue(0)
+            self._update_gallery_progress()
+        if self._close_after_export:
+            self._close_after_export = False
+            QTimer.singleShot(0, self.close)
 
-    def _update_pysm_context(self):
-        # Helper to update legacy context if managed run
+    def _update_pysm_context(self) -> bool:
+        # Контракт обложек локаций хранится в контексте PySM.
         if self.mode == 'location' and IS_MANAGED_RUN:
             try:
                 location_previews = self.data_manager.get_location_covers_dict()
@@ -1151,71 +1660,68 @@ class MainWindow(QMainWindow):
                         location_previews[name] = ""
                 var_name = f"sys_location_name_{self.photo_session}"
                 pysm_context.set(var_name, location_previews)
+                return True
             except Exception as e:
+                self.data_manager.last_error = f"Context update error: {e}"
                 logger.error(f"Context update error: {e}")
+                return False
+        return True
 
 
     def _log_final_report(self):
-            """Формирует и выводит финальный отчет перед закрытием."""
-            if not IS_MANAGED_RUN or not pysm_context:
-                return
+        """Формирует и выводит финальный отчет перед закрытием."""
+        if not IS_MANAGED_RUN or not pysm_context:
+            return
 
-            try:
-                # 1. Инициализация
-                tv_builder = StandardTreeBuilder(icon_size=28)
-                report_folder = [] # Создаем пустой список
+        try:
+            tree_builder = StandardTreeBuilder(icon_size=28)
+            resources = []
+            if self.reference_dir != self.working_dir:
+                resources.append(ResourceNode(
+                    self.reference_dir.name,
+                    Path(self.reference_dir),
+                    "folder",
+                    "Папка референсной фотосессии с эталонными портретами",
+                ))
+            resources.append(ResourceNode(
+                self.working_dir.name,
+                Path(self.working_dir),
+                "folder",
+                "Целевая папка текущей фотосессии",
+            ))
+            if self.export_end:
+                resources.append(ResourceNode(
+                    self.export_dir.name,
+                    self.export_dir,
+                    "folder",
+                    "Папка с экспортированными файлами JPG",
+                ))
+            tree_builder.add_section("<br>Рабочие папки и файлы", resources)
+            pysm_context.log_html(tree_builder.get_html())
+        except Exception as exc:
+            logger.error(f"Ошибка при формировании финального отчета: {exc}")
 
-                # 2. Наполнение списка
-                if self.reference_dir != self.working_dir:
-                    root_node_ref = ResourceNode(self.reference_dir.name, Path(self.reference_dir), "folder", "Папка референсной фотосессии с эталонными портретами")
-                    report_folder.append(root_node_ref) # <--- ИСПРАВЛЕНО: append
-                    
-                root_node_target = ResourceNode(self.working_dir.name, Path(self.working_dir), "folder", "Целевая папка текущей фотосессии")
-                report_folder.append(root_node_target) # <--- ИСПРАВЛЕНО: append
-
-                # Проверяем атрибуты через getattr на случай, если экспорт не запускался и переменные не созданы
-                if getattr(self, 'export_end', False) and hasattr(self, 'export_dir'):
-                    root_node_export = ResourceNode(Path(self.export_dir).name, Path(self.export_dir), "folder", "Папка с экспортированными файлами JPG")
-                    report_folder.append(root_node_export) # <--- ИСПРАВЛЕНО: append
-
-                # 3. Передача списка в билдер
-                # Передаем сам список report_folder
-                tv_builder.add_section("<br>Рабочие папки и файлы", report_folder)
-                
-                # 4. Вывод в лог
-                pysm_context.log_html(tv_builder.get_html())
-            except Exception as e:
-                logger.error(f"Ошибка при формировании финального отчета: {e}")
-
-
-             
     def closeEvent(self, event):
-        # --- ДОБАВЛЕНО: Сохранение состояния окна и сплиттеров ---
-        if IS_MANAGED_RUN and pysm_context and self.win_state_var_name and WindowStateManager:
-            mode_var_name = f"{self.win_state_var_name}.{self.mode}"
-            window_state = WindowStateManager.save_state(
-                window=self,
-                splitters={'main': self.main_splitter}
+        if self.data_load_thread is not None and self.data_load_thread.isRunning():
+            QMessageBox.information(
+                self,
+                "Загрузка данных",
+                "Дождитесь завершения загрузки данных.",
             )
-            pysm_context.set_structured(mode_var_name, window_state)
-        # --- ИСПРАВЛЕНИЕ: Останавливаем загрузчик фото перед выходом ---
-        self._stop_loader()
-      
-        # --- ИСПРАВЛЕНИЕ: Безопасное завершение экспорта (предотвращает зомби-процессы) ---
-        if hasattr(self, 'export_thread') and self.export_thread and self.export_thread.isRunning():
+            event.ignore()
+            return
+        if self._export_is_running():
             reply = QMessageBox.question(self, "Прерывание", 
                                          "В данный момент выполняется экспорт фотографий.\nПрервать процесс и закрыть программу?",
                                          QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.No:
                 event.ignore()
                 return
-            else:
-                if hasattr(self, 'export_worker') and self.export_worker:
-                    self.export_worker.requestInterruption()
-                self.export_thread.quit()
-                self.export_thread.wait()
-                self.export_thread.deleteLater() # <--- ДОБАВЛЕНО
-                self.export_thread = None                 
+            self._close_after_export = True
+            self.export_controller.request_interruption()
+            self.status_bar.setFormat("Завершение экспорта...")
+            event.ignore()
+            return
 
         # Стандартная обработка несохраненных изменений
         if self.data_manager.has_changes():
@@ -1223,18 +1729,32 @@ class MainWindow(QMainWindow):
                                          QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel)
             if reply == QMessageBox.StandardButton.Save:
                 if self._save_changes(silent=True):
-                    self._log_final_report()
-                    event.accept()
+                    self._finalize_close(event)
                 else:
                     event.ignore()
             elif reply == QMessageBox.StandardButton.Discard:
-                self._log_final_report()
-                event.accept()
+                self._finalize_close(event)
             else:
                 event.ignore()
         else:
-            self._log_final_report()
-            event.accept()        
+            self._finalize_close(event)
+
+    def _finalize_close(self, event) -> None:
+        if IS_MANAGED_RUN and pysm_context and self.win_state_var_name and WindowStateManager:
+            try:
+                mode_var_name = f"{self.win_state_var_name}.{self.mode}"
+                window_state = WindowStateManager.save_state(
+                    window=self,
+                    splitters={'main': self.main_splitter},
+                )
+                pysm_context.set_structured(mode_var_name, window_state)
+            except Exception as exc:
+                logger.error(f"Не удалось сохранить состояние окна: {exc}")
+        self._stop_loader()
+        self._cancel_cluster_cover_requests()
+        self.image_pipeline.shutdown()
+        self._log_final_report()
+        event.accept()
 
 def get_config() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Редактор кластеров.")
@@ -1256,10 +1776,9 @@ def get_config() -> argparse.Namespace:
     return ConfigResolver(parser).resolve_all()
 
 if __name__ == "__main__":
+    cli_config = get_config()
     print("<b>ВЕРИФИКАЦИЯ РЕЗУЛЬТАТОВ КЛАСТЕРИЗАЦИИ</b>")
     print("<i>Инициализация...</i><br>")
-
-    cli_config = get_config()
     arg_prefix = "ce_"
     
     log_level = "INFO"
@@ -1280,7 +1799,9 @@ if __name__ == "__main__":
         list_file = Path(list_file_str) if list_file_str else None
         if not w_dir.exists(): raise FileNotFoundError(f"Нет папки: {w_dir}")
 
-        num_workers = cli_config.all_threads or (os.cpu_count() or 8)    
+        if cli_config.all_threads < 0:
+            raise ValueError("--all_threads не может быть отрицательным")
+        num_workers = max(1, cli_config.all_threads or (os.cpu_count() or 8))
 
         window = MainWindow(
             w_dir, r_dir, cli_config.mode, num_workers, e_dir_str, win_var, list_file

@@ -371,6 +371,46 @@ class SetManager:
             self.current_collection_model.context_data = new_context
             self._set_dirty(True)
 
+    def replace_context_from_raw_snapshot(self, raw_context_data: dict) -> bool:
+        if not isinstance(raw_context_data, dict):
+            return False
+        try:
+            context_data = {
+                k: ContextVariableModel(**v)
+                for k, v in raw_context_data.items()
+                if not k.startswith("pysm_")
+            }
+        except (TypeError, ValidationError) as e:
+            logger.error(f"Failed to apply runtime context snapshot: {e}", exc_info=True)
+            return False
+        self.current_collection_model.context_data = context_data
+        self._set_dirty(True)
+        return True
+
+    def save_current_context_to_file(
+        self, context_file_path: Optional[pathlib.Path] = None
+    ) -> bool:
+        target_path = context_file_path
+        if target_path is None:
+            if not self.current_collection_file_path:
+                return False
+            target_path = self._get_context_file_path(self.current_collection_file_path)
+
+        context_data_to_save = {
+            k: v.model_dump(mode="json")
+            for k, v in self.current_collection_model.context_data.items()
+        }
+        try:
+            if context_data_to_save:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                self._atomic_write_json(target_path, context_data_to_save)
+            elif target_path.exists():
+                target_path.unlink()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save context checkpoint '{target_path}': {e}", exc_info=True)
+            return False
+
     def update_collection_properties(
         self, name: Optional[str] = None, description: Optional[str] = None
     ):

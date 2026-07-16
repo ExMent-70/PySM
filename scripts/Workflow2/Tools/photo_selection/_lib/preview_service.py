@@ -8,6 +8,7 @@ from .assignment_core import PhotoRecord
 from .constants import ITEM_NUMBER_ROLE, ITEM_STUDENT_ROLE, ITEM_LOCATION_ROLE
 from PySide6.QtWidgets import QTreeWidgetItem
 
+
 class PreviewMixin:
     def _show_import_student_preview(self, row: int) -> None:
         """Show the best available preview for a student selected on import tab."""
@@ -23,16 +24,6 @@ class PreviewMixin:
             self._show_preview_for_number(preview_number)
         else:
             self.preview.show_message("Для выбранного ученика нет найденных фотографий")
-
-    def _rebuild_preview_index(self) -> None:
-        self._preview_by_stem = {}
-        self.preview.clear_cache()
-        jpg_dir = Path(self.config.analysis_dir) / "JPG"
-        if not jpg_dir.is_dir():
-            return
-        for path in sorted(jpg_dir.rglob("*")):
-            if path.is_file() and path.suffix.casefold() in {".jpg", ".jpeg"}:
-                self._preview_by_stem.setdefault(path.stem.casefold(), path)
 
     def _find_preview_jpg(self, number: str) -> Path | None:
         result = self.state.build_result
@@ -75,9 +66,6 @@ class PreviewMixin:
                 self._show_preview_for_number(preview_number)
             else:
                 self.preview.show_message("Для выбранной строки нет фотографии")
-
-    def _first_assigned_number(self, student_id: str, location: str | None) -> str | None:
-        return self._preferred_preview_number_for_student(student_id, location)
 
     def _preferred_preview_number_for_student(
         self,

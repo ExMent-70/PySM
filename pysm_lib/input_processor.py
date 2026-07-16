@@ -4,6 +4,8 @@ import sys
 import logging
 from typing import Optional, Dict, Tuple, Any
 
+from .context_variable_ops import initial_value_as_text, write_context_value
+
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
@@ -142,22 +144,17 @@ class InputProcessor:
     # ==============================================================================
     def get_initial_value(self, var_name: str, default: str) -> str:
         if self.managed and self.pysm_context:
-            val = self.pysm_context.get_structured(var_name)
-
-            if val is not None:
-                if isinstance(val, (dict, list)):
-                    return json.dumps(val, ensure_ascii=False)
-                return str(val)
+            return initial_value_as_text(self.pysm_context, var_name, default)
 
         return default
 
     # ==============================================================================
     # SAVE
     # ==============================================================================
-    def save(self, var_name: str, value: Any):
+    def save(self, var_name: str, value: Any, var_type: Optional[str] = None):
         if self.managed and self.pysm_context:
             try:
-                self.pysm_context.set_structured(var_name, value)
+                write_context_value(self.pysm_context, var_name, value, var_type=var_type)
             except Exception as e:
                 logger.critical(f"Ошибка сохранения: {e}")
                 sys.exit(1)

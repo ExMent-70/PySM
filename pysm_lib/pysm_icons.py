@@ -57,6 +57,9 @@ SVG_PATHS: Dict[str, str] = {
     "NEW": '<path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 14h-3v3h-2v-3H8v-2h3v-3h2v3h3v2zm-3-7V3.5L18.5 9H13z"/>', 
     "OPEN": '<path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/><path d="M12 10l-4 4h3v4h2v-4h3z" fill="#FFF" fill-opacity="0.7"/>',
     "SAVE": '<path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>',
+    "IMPORT": '<path d="M4 14v6h16v-6h2v8H2v-8h2zm9-12v10.17l3.59-3.58L18 10l-6 6-6-6 1.41-1.41L11 12.17V2h2z"/>',
+    "EXPORT": '<path d="M4 14v6h16v-6h2v8H2v-8h2zM13 22V11.83l3.59 3.58L18 14l-6-6-6 6 1.41 1.41L11 11.83V22h2z"/>',
+    "PRINT": '<path d="M18 3H6v4h12V3zm0 16H6v-5h12v5zm2-10H4c-1.1 0-2 .9-2 2v6h3v4h14v-4h3v-6c0-1.1-.9-2-2-2zm-2 10H6v-5h12v5zm1-6.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>',
     "SLIDERS": '<path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/>', 
     "REFRESH": '<path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>',
     "SETTINGS": '<path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c.59-.24 1.13-.57 1.62-.94l-2.39-.96c-.22-.08-.47 0-.59.22L5.09 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .43-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>',
@@ -161,6 +164,7 @@ SVG_PATHS: Dict[str, str] = {
 THEME_KEYS = {
     # Actions
     "NEW": "icon_primary", "OPEN": "icon_folder", "SAVE": "icon_primary",
+    "IMPORT": "icon_success", "EXPORT": "icon_info", "PRINT": "icon_primary",
     "SLIDERS": "icon_primary", "REFRESH": "icon_info", "SETTINGS": "icon_primary", "CONSOLE": "icon_archive",
 
     # Window Actions
@@ -325,7 +329,7 @@ icons = PysmIcons()
 
 # Категоризация иконок для отображения в диалоге выбора
 ICON_CATEGORIES: Dict[str, List[str]] = {
-    "system":["FOLDER", "FOLDER_OPEN", "FILE", "NEW", "OPEN", "SAVE", "SLIDERS", "REFRESH", "SETTINGS", "CONSOLE", "EXIT", "CLOSE"],
+    "system":["FOLDER", "FOLDER_OPEN", "FILE", "NEW", "OPEN", "SAVE", "IMPORT", "EXPORT", "PRINT", "SLIDERS", "REFRESH", "SETTINGS", "CONSOLE", "EXIT", "CLOSE"],
     "files":[
         "FILE_PY", "FILE_CODE", "FILE_TXT", "FILE_HTML", "FILE_IMAGE", "FILE_DB", "FILE_ARCHIVE", 
         "FILE_JPG", "FILE_CSV", "FILE_PSD", "FILE_INDD", "FILE_C1", "REPORT", "TABLE", "LIST",

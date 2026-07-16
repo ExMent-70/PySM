@@ -40,6 +40,8 @@ except ImportError:
 
 
 from .locale_manager import LocaleManager
+from .context_store import FileContextStore, ContextStoreError
+from .context_shared_memory import SharedMemoryContextStore, SharedMemoryContextError
 
 
 locale_manager = LocaleManager()
@@ -102,6 +104,10 @@ class PySMContext:
     def __init__(self):
         """Инициализирует объект, находит путь к файлу контекста и настраивает кэш."""
         self._context_file_path: Optional[pathlib.Path] = None
+        self._context_shm_name: Optional[str] = None
+        self._context_store: Optional[Union[FileContextStore, SharedMemoryContextStore]] = None
+        self._context_store_generation: int = -1
+        self._context_mode: str = "file"
         self._raw_context_data_cache: Optional[Dict[str, Any]] = None
         self._is_dirty: bool = False  # Флаг наличия несохраненных изменений
         self._initialize()
@@ -119,11 +125,37 @@ class PySMContext:
         parser.add_argument(
             "--pysm-context-file", type=str, dest="pysm_context_file_path"
         )
+        parser.add_argument(
+            "--pysm-context-shm-name", type=str, dest="pysm_context_shm_name"
+        )
+        parser.add_argument(
+            "--pysm-context-mode", type=str, dest="pysm_context_mode"
+        )
         args, remaining_argv = parser.parse_known_args(args=sys.argv[1:])
-        if args.pysm_context_file_path:
-            path = pathlib.Path(args.pysm_context_file_path)
-            if path.is_file():
-                self._context_file_path = path
+        context_file_arg = args.pysm_context_file_path or os.environ.get("PYSM_CONTEXT_FILE")
+        context_shm_arg = args.pysm_context_shm_name or os.environ.get("PYSM_CONTEXT_SHM_NAME")
+        context_mode_arg = args.pysm_context_mode or os.environ.get("PYSM_CONTEXT_MODE")
+        self._context_mode = (
+            context_mode_arg or ("shared_memory" if context_shm_arg else "file")
+        ).strip().lower()
+
+        if context_file_arg:
+            self._context_file_path = pathlib.Path(context_file_arg)
+
+        if context_shm_arg and self._context_mode == "shared_memory":
+            self._context_shm_name = context_shm_arg
+            try:
+                self._context_store = SharedMemoryContextStore.open(context_shm_arg)
+            except SharedMemoryContextError as e:
+                print(
+                    f"PySM Context Error: failed to open shared memory context: {e}",
+                    file=sys.stderr,
+                )
+                self._context_store = None
+
+        if self._context_store is None and self._context_file_path:
+            self._context_store = FileContextStore(self._context_file_path)
+
         sys.argv = [sys.argv[0]] + remaining_argv
         self._read_data()
 
@@ -137,7 +169,30 @@ class PySMContext:
 
     def _read_data(self) -> Dict[str, Any]:
         """Читает данные из файла контекста и кэширует их."""
+        context_store = getattr(self, "_context_store", None)
+        if context_store and context_store.backend_name == "shared_memory":
+            try:
+                current_generation = context_store.generation
+                if (
+                    self._raw_context_data_cache is None
+                    or current_generation != self._context_store_generation
+                ):
+                    self._raw_context_data_cache = context_store.load()
+                    self._context_store_generation = context_store.generation
+                return self._raw_context_data_cache
+            except ContextStoreError as e:
+                print(
+                    f"PySM Context Error: failed to read shared memory context: {e}",
+                    file=sys.stderr,
+                )
+                self._raw_context_data_cache = self._raw_context_data_cache or {}
+                return self._raw_context_data_cache
+
         if self._raw_context_data_cache is not None:
+            return self._raw_context_data_cache
+        if context_store:
+            self._raw_context_data_cache = context_store.load()
+            self._context_store_generation = context_store.generation
             return self._raw_context_data_cache
         path = self._context_file_path
         if not path or not path.is_file():
@@ -158,7 +213,17 @@ class PySMContext:
         """
         if not self._is_dirty:
             return
-            
+
+        context_store = getattr(self, "_context_store", None)
+        if self._raw_context_data_cache is not None and context_store:
+            try:
+                context_store.save(self._raw_context_data_cache)
+                self._context_store_generation = context_store.generation
+                self._is_dirty = False
+            except Exception as e:
+                print(f"PySM Context Error: failed to save context store: {e}", file=sys.stderr)
+            return
+
         path = self._context_file_path
         if not path:
             # Если файл не передан (запуск вне PySM), мы просто сбрасываем флаг,
@@ -179,8 +244,23 @@ class PySMContext:
         """Обновляет кэш в памяти и помечает его для отложенного сохранения."""
         self._raw_context_data_cache = data
         self._is_dirty = True
+        context_store = getattr(self, "_context_store", None)
+        if context_store and context_store.backend_name == "shared_memory":
+            self.commit()
+            return
         if force_commit:
             self.commit()
+
+    @property
+    def is_managed(self) -> bool:
+        return getattr(self, "_context_store", None) is not None or self._context_file_path is not None
+
+    @property
+    def backend_name(self) -> str:
+        context_store = getattr(self, "_context_store", None)
+        if context_store:
+            return context_store.backend_name
+        return "memory"
 
     def _infer_type_from_value(self, value: Any) -> str:
         """Определяет тип переменной по ее значению."""
@@ -1015,7 +1095,7 @@ class ConfigResolver:
         self._parser = parser
         self._cli_args, _ = parser.parse_known_args()
         self._context = pysm_context
-        self._is_managed = self._context._context_file_path is not None
+        self._is_managed = self._context.is_managed
         self._arg_actions = {action.dest: action for action in self._parser._actions}
         self._force_path_args = set(force_path_args or[])
         

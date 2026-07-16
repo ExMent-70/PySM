@@ -64,6 +64,11 @@ class TestInstallationManager(InstallationManager):
         self.installed_packages = {}
         self.installed_torch_info = {"installed": False}
         self.torch_family_info = None
+        self.captured_commands = []
+
+    def _run_install_command(self, cmd, category_name):
+        self.captured_commands.append((category_name, list(cmd)))
+        return super()._run_install_command(cmd, category_name)
 
     def _get_installed_torch_family_info(self, packages):
         if self.torch_family_info is not None:
@@ -72,6 +77,55 @@ class TestInstallationManager(InstallationManager):
 
 
 class GpuInstallationPlanTests(unittest.TestCase):
+    def test_insightface_uses_requested_version_without_cpu_runtime_dependencies(self):
+        plan = InstallationPlan(
+            insightface_packages=[
+                package(
+                    "insightface",
+                    PackageType.INSIGHTFACE,
+                    "insightface==1.0.1",
+                    version="==1.0.1",
+                )
+            ]
+        )
+        manager = TestInstallationManager(plan, nvidia_cuda_system())
+
+        manager._install_insightface_packages()
+
+        category, command = manager.captured_commands[-1]
+        self.assertEqual(category, "Insightface")
+        self.assertIn("--no-deps", command)
+        self.assertIn("insightface==1.0.1", command)
+        self.assertNotIn("numpy==1.26.4", command)
+        self.assertFalse(any(item == "onnxruntime" for item in command))
+
+    def test_insightface_gpu_verification_rejects_cpu_runtime_collision(self):
+        manager = TestInstallationManager(InstallationPlan(), nvidia_cuda_system())
+        manager._get_installed_insightface_info = lambda: {
+            "installed": True,
+            "insightface_version": "1.0.1",
+            "gpu_runtime_version": "1.27.0",
+            "cpu_runtime_version": "1.27.0",
+            "providers": ["CUDAExecutionProvider", "CPUExecutionProvider"],
+        }
+
+        with self.assertLogs(level="ERROR"):
+            self.assertFalse(manager._verify_insightface_gpu_installation())
+
+        self.assertIn("ONNX Runtime CPU/GPU package collision", manager.failures)
+
+    def test_insightface_gpu_verification_accepts_cuda_provider(self):
+        manager = TestInstallationManager(InstallationPlan(), nvidia_cuda_system())
+        manager._get_installed_insightface_info = lambda: {
+            "installed": True,
+            "insightface_version": "1.0.1",
+            "gpu_runtime_version": "1.27.0",
+            "cpu_runtime_version": None,
+            "providers": ["CUDAExecutionProvider", "CPUExecutionProvider"],
+        }
+
+        self.assertTrue(manager._verify_insightface_gpu_installation())
+
     def test_uv_base_command_includes_torch_backend_for_cuda(self):
         plan = InstallationPlan(
             torch_backend="cu128",

@@ -1,4 +1,3 @@
-# analize/cluster_editor/_lib/editor_dialogs.py
 # -*- coding: utf-8 -*-
 
 import logging
@@ -9,15 +8,34 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QGraphicsView,
     QGraphicsScene, QGraphicsPixmapItem, QPushButton, QSlider, QFrame, QComboBox, QDialogButtonBox,
     QListWidget, QListWidgetItem, QSpinBox, QDoubleSpinBox, QCheckBox, QGroupBox, QFormLayout,
-    QToolBox, QLineEdit, QWidget, QScrollArea, QSizePolicy
+    QToolBox, QLineEdit, QWidget, QScrollArea
 )
-from PySide6.QtGui import QPixmap, QPainter, QTransform, QWheelEvent, QIcon, QColor, QMouseEvent 
-from PySide6.QtCore import Qt, Slot, QEvent, QSize, QTimer
+from PySide6.QtGui import QImage, QPixmap, QPainter, QTransform, QWheelEvent, QMouseEvent
+from PySide6.QtCore import (
+    QObject,
+    QRunnable,
+    QThreadPool,
+    Qt,
+    Signal,
+    Slot,
+    QEvent,
+    QSize,
+    QTimer,
+)
+
+from pysm_lib.pysm_image_cache import (
+    AsyncImageLoader,
+    AsyncImageResult,
+    ImageRequest,
+    QtImageCache,
+)
+
+from .image_requests import face_thumbnail_request
+from .editor_delegates import FACE_PIXMAP_ROLE, FaceItemDelegate
 
 
 try:
     from pysm_lib import pysm_context
-    from pysm_lib.pysm_theme_api import set_widget_class    
     IS_MANAGED_RUN = True
 except ImportError:
     pysm_context = None
@@ -52,6 +70,50 @@ class DoubleClickSlider(QSlider):
             super().mouseDoubleClickEvent(event)
 
 
+class _PreviewRenderSignals(QObject):
+    finished = Signal(int, object, str)
+
+
+class _PreviewRenderTask(QRunnable):
+    """Render one export-preview generation outside the GUI thread."""
+
+    def __init__(
+        self,
+        generation: int,
+        source_image,
+        factors: Dict[str, Any],
+        bboxes: List[List[float]],
+        show_watermark: bool,
+    ) -> None:
+        super().__init__()
+        self.generation = generation
+        self.source_image = source_image
+        self.factors = factors
+        self.bboxes = bboxes
+        self.show_watermark = show_watermark
+        self.signals = _PreviewRenderSignals()
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            image = apply_color_corrections(self.source_image, self.factors)
+            if self.show_watermark:
+                if image.mode != "RGBA":
+                    image = image.convert("RGBA")
+                layer = create_watermark_layer(
+                    image.size,
+                    self.bboxes,
+                    self.factors,
+                    "Имя Фамилия",
+                )
+                if layer is not None:
+                    image = Image.alpha_composite(image, layer)
+            qimage = QImage(ImageQt.ImageQt(image)).copy()
+            self.signals.finished.emit(self.generation, qimage, "")
+        except Exception as exc:
+            self.signals.finished.emit(self.generation, QImage(), str(exc))
+
+
 class EnhanceSettingsDialog(QDialog):
     RECOMMENDED_DEFAULTS = {
         # Base
@@ -65,13 +127,24 @@ class EnhanceSettingsDialog(QDialog):
         "wm_text": "ВЫБОР ФОТОГРАФИИ", "wm_text_alpha": 150
     }
 
-    def __init__(self, preview_image_path: Path, faces_bboxes: List[List[float]], parent=None):
+    def __init__(
+        self,
+        preview_image_path: Path,
+        faces_bboxes: List[List[float]],
+        parent=None,
+        *,
+        image_cache: QtImageCache,
+        image_loader: AsyncImageLoader,
+    ):
         super().__init__(parent)
         if not IS_PILLOW_AVAILABLE:
             raise ImportError("Pillow required.")
 
         self.preview_image_path = preview_image_path
         self.faces_bboxes = faces_bboxes 
+        self.image_cache = image_cache
+        self.image_loader = image_loader
+        self._image_channel = ("enhance-preview", id(self))
         
         self.original_pil_image: Optional[Image.Image] = None
         self.original_qt_pixmap: Optional[QPixmap] = None
@@ -79,33 +152,57 @@ class EnhanceSettingsDialog(QDialog):
         self.enhancement_factors: Dict[str, Any] = self.RECOMMENDED_DEFAULTS.copy()
         self.slider_controls: Dict[str, Dict] = {} 
         
-        self.original_size = (0, 0)
+        self.original_size = self.image_cache.source_size(self.preview_image_path)
+        if self.original_size[0] <= 0 or self.original_size[1] <= 0:
+            self.original_size = (500, 500)
         self.original_dpi = 300
         self.is_fitted_in_view = False
+        self.preview_timer = QTimer(self)
+        self.preview_timer.setSingleShot(True)
+        self.preview_timer.setInterval(80)
+        self.preview_timer.timeout.connect(self._update_preview)
+        self._preview_generation = 0
+        self._preview_pool = QThreadPool(self)
+        self._preview_pool.setMaxThreadCount(1)
 
         self.setWindowTitle("Настройка экспорта")
         self.setMinimumSize(1200, 850)
 
-        self._load_original_image()
         self._init_ui()
         self._load_settings()
-        self._update_preview()
+        self.image_loader.imageReady.connect(self._on_original_image_ready)
+        self._load_original_image()
 
     def _load_original_image(self):
-        try:
-            self.original_pil_image = Image.open(self.preview_image_path).convert("RGB")
-            self.original_size = self.original_pil_image.size
-            info = self.original_pil_image.info
-            self.original_dpi = int(info.get('dpi', (300, 300))[0])
-            
-            if ImageQt:
-                qimage = ImageQt.ImageQt(self.original_pil_image)
-                self.original_qt_pixmap = QPixmap.fromImage(qimage)
-        except Exception as e:
-            logger.error(f"Preview load error: {e}")
+        request = ImageRequest(
+            self.preview_image_path,
+            (1600, 1200),
+            mode="fit",
+            variant="cluster_editor.enhance_preview.v2",
+        )
+        self.image_loader.request(
+            request,
+            channel=self._image_channel,
+            persist=True,
+            disk_format="PNG",
+        )
+
+    @Slot(object)
+    def _on_original_image_ready(self, result: AsyncImageResult) -> None:
+        if result.channel != self._image_channel:
+            return
+        if result.image.isNull():
+            logger.error(f"Preview load error: {result.error}")
             self.original_pil_image = Image.new("RGB", (500, 500), "black")
             self.original_qt_pixmap = QPixmap(500, 500)
             self.original_qt_pixmap.fill(Qt.GlobalColor.black)
+        else:
+            self.original_qt_pixmap = QPixmap.fromImage(result.image)
+            self.original_pil_image = ImageQt.fromqimage(result.image).convert("RGB")
+            if result.image.dotsPerMeterX() > 0:
+                self.original_dpi = round(result.image.dotsPerMeterX() * 0.0254)
+        self.is_fitted_in_view = False
+        self._update_preview()
 
     def showEvent(self, event):
         """
@@ -260,9 +357,6 @@ class EnhanceSettingsDialog(QDialog):
         self.btn_preview_wm.setChecked(False) # По умолчанию выкл
         self.btn_preview_wm.setFixedWidth(100)
         self.btn_preview_wm.toggled.connect(self._update_preview)
-        if IS_MANAGED_RUN:
-             # Стиль обычной кнопки, но можно выделить
-             pass
 
         wm_header_layout.addWidget(self.wm_export_check)
         wm_header_layout.addStretch()
@@ -341,13 +435,13 @@ class EnhanceSettingsDialog(QDialog):
             label.setText(f"{real_val:.2f}")
             
         self.enhancement_factors[key] = real_val
-        self._update_preview()
+        self.preview_timer.start()
 
     def _update_factor(self, key: str, value: Any, update_preview: bool = False):
         self.enhancement_factors[key] = value
         # Если включен режим превью WM, то обновляем картинку
         if update_preview and self.btn_preview_wm.isChecked():
-            self._update_preview()
+            self.preview_timer.start()
 
     def _load_settings(self):
         settings = self.RECOMMENDED_DEFAULTS.copy()
@@ -394,33 +488,55 @@ class EnhanceSettingsDialog(QDialog):
         self._update_preview()
 
     def _update_preview(self):
-        if not self.original_pil_image: return
-        
-        # 1. Цветокоррекция (всегда)
-        enhanced_image = apply_color_corrections(self.original_pil_image, self.enhancement_factors)
-        
-        # 2. Водяные знаки (только если нажата кнопка "Показать")
-        if self.btn_preview_wm.isChecked():
-            if enhanced_image.mode != 'RGBA':
-                enhanced_image = enhanced_image.convert("RGBA")
-            
-            wm_layer = create_watermark_layer(
-                enhanced_image.size, 
-                self.faces_bboxes, 
-                self.enhancement_factors, 
-                "Имя Фамилия"
-            )
-            
-            if wm_layer:
-                enhanced_image = Image.alpha_composite(enhanced_image, wm_layer)
-        
-        if ImageQt:
-            qimage = ImageQt.ImageQt(enhanced_image)
-            pixmap = QPixmap.fromImage(qimage)
-            self.pixmap_item.setPixmap(pixmap)
-            
-            if not self.pixmap_item.pixmap() or not self.is_fitted_in_view:
-                self.fit_in_view()
+        if not self.original_pil_image:
+            return
+
+        self._preview_generation += 1
+        generation = self._preview_generation
+        self._preview_pool.clear()
+        source = self.original_pil_image.copy()
+        task = _PreviewRenderTask(
+            generation,
+            source,
+            self.enhancement_factors.copy(),
+            self._preview_bboxes(source.size),
+            self.btn_preview_wm.isChecked(),
+        )
+        task.signals.finished.connect(self._on_preview_rendered)
+        self._preview_pool.start(task)
+
+    @Slot(int, object, str)
+    def _on_preview_rendered(
+        self,
+        generation: int,
+        image: QImage,
+        error: str,
+    ) -> None:
+        if generation != self._preview_generation:
+            return
+        if image.isNull():
+            logger.error(f"Preview render error: {error}")
+            return
+        self.pixmap_item.setPixmap(QPixmap.fromImage(image))
+        if not self.is_fitted_in_view:
+            self.fit_in_view()
+
+    def _preview_bboxes(self, preview_size: tuple[int, int]) -> List[List[float]]:
+        source_width, source_height = self.original_size
+        if source_width <= 0 or source_height <= 0:
+            return []
+        scale_x = preview_size[0] / source_width
+        scale_y = preview_size[1] / source_height
+        return [
+            [
+                bbox[0] * scale_x,
+                bbox[1] * scale_y,
+                bbox[2] * scale_x,
+                bbox[3] * scale_y,
+            ]
+            for bbox in self.faces_bboxes
+            if len(bbox) == 4
+        ]
 
     def fit_in_view(self):
         self.view.fitInView(self.pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
@@ -474,6 +590,16 @@ class EnhanceSettingsDialog(QDialog):
             pysm_context.set("enhancer_settings", settings)
             self.enhancement_factors.update(settings)
         super().accept()
+
+    def done(self, result: int) -> None:
+        self._preview_generation += 1
+        self._preview_pool.clear()
+        self.image_loader.cancel(self._image_channel)
+        try:
+            self.image_loader.imageReady.disconnect(self._on_original_image_ready)
+        except (RuntimeError, TypeError):
+            pass
+        super().done(result)
 
     def get_export_settings(self) -> Dict[str, Any]:
         non_slider_wm = {
@@ -577,10 +703,22 @@ class RenameDialog(QDialog):
     def get_selected_name(self) -> str: return self.combo_box.currentText().strip()
 
 class FaceSelectorDialog(QDialog):
-    def __init__(self, image_path: Path, faces: List, parent=None, instruction_text: Optional[str] = None):
+    def __init__(
+        self,
+        image_path: Path,
+        faces: List,
+        parent=None,
+        instruction_text: Optional[str] = None,
+        *,
+        image_cache: QtImageCache,
+        image_loader: AsyncImageLoader,
+    ):
         super().__init__(parent)
         self.image_path = image_path
         self.faces = faces
+        self.image_cache = image_cache
+        self.image_loader = image_loader
+        self._image_channels = set()
         self.selected_index = -1
         self.setWindowTitle("Выбор лица")
         self.setMinimumSize(600, 400)
@@ -595,6 +733,9 @@ class FaceSelectorDialog(QDialog):
         self.list_widget = QListWidget()
         self.list_widget.setViewMode(QListWidget.ViewMode.IconMode)
         self.list_widget.setIconSize(QSize(150, 150))
+        self.list_widget.setGridSize(QSize(170, 210))
+        self.list_widget.setUniformItemSizes(True)
+        self.list_widget.setItemDelegate(FaceItemDelegate(self.list_widget))
         self.list_widget.setResizeMode(QListWidget.ResizeMode.Adjust)
         self.list_widget.setSpacing(10)
         self.list_widget.itemDoubleClicked.connect(self._on_item_double_clicked)
@@ -603,50 +744,58 @@ class FaceSelectorDialog(QDialog):
         btn_box.accepted.connect(self._on_accept)
         btn_box.rejected.connect(self.reject)
         self.layout.addWidget(btn_box)
+        self.image_loader.imageReady.connect(self._on_image_ready)
         self._load_faces()
 
     def _load_faces(self):
-        if not IS_PILLOW_AVAILABLE or not Image:
-            for i, face in enumerate(self.faces):
-                item = QListWidgetItem(f"Лицо #{i+1}")
-                item.setData(Qt.ItemDataRole.UserRole, i)
-                self.list_widget.addItem(item)
+        source_size = self.image_cache.source_size(self.image_path)
+        for i, face in enumerate(self.faces):
+            item = QListWidgetItem(f"Лицо #{i + 1}")
+            item.setData(Qt.ItemDataRole.UserRole, i)
+            self.list_widget.addItem(item)
+            request = face_thumbnail_request(
+                self.image_cache,
+                self.image_path,
+                face.bbox,
+                (150, 150),
+                padding=0.2,
+                variant="cluster_editor.face_selector.v3",
+                source_size=source_size,
+            )
+            if request is None:
+                item.setText(f"Лицо #{i + 1} (ошибка координат)")
+                continue
+            channel = ("face-selector", id(self), i)
+            self._image_channels.add(channel)
+            self.image_loader.request(
+                request,
+                channel=channel,
+                persist=True,
+                disk_format="PNG",
+            )
+
+    @Slot(object)
+    def _on_image_ready(self, result: AsyncImageResult) -> None:
+        channel = result.channel
+        if channel not in self._image_channels:
             return
+        self._image_channels.discard(channel)
+        face_index = channel[2]
+        if result.image.isNull() or not 0 <= face_index < self.list_widget.count():
+            return
+        item = self.list_widget.item(face_index)
+        item.setData(FACE_PIXMAP_ROLE, QPixmap.fromImage(result.image))
+        self.list_widget.viewport().update(self.list_widget.visualItemRect(item))
+
+    def done(self, result: int) -> None:
+        for channel in list(self._image_channels):
+            self.image_loader.cancel(channel)
+        self._image_channels.clear()
         try:
-            full_img = Image.open(str(self.image_path)).convert("RGBA")
-            img_w, img_h = full_img.size
-            for i, face in enumerate(self.faces):
-                bbox = face.bbox
-                if len(bbox) == 4:
-                    v1, v2, v3, v4 = map(int, bbox)
-                    x1, y1, x2, y2 = v1, v2, v3, v4
-                    if x1 > x2: x1, x2 = x2, x1
-                    if y1 > y2: y1, y2 = y2, y1
-                    width = x2 - x1; height = y2 - y1
-                    padding = int(max(width, height) * 0.2)
-                    final_x1 = max(0, x1 - padding); final_y1 = max(0, y1 - padding)
-                    final_x2 = min(img_w, x2 + padding); final_y2 = min(img_h, y2 + padding)
-                    if final_x2 <= final_x1 or final_y2 <= final_y1:
-                        self.list_widget.addItem(f"Лицо #{i+1} (Ошибка координат)")
-                        continue
-                    face_img = full_img.crop((final_x1, final_y1, final_x2, final_y2))
-                    if ImageQt:
-                        qim = ImageQt.ImageQt(face_img)
-                        pixmap = QPixmap.fromImage(qim)
-                        icon = QIcon(pixmap)
-                        item = QListWidgetItem(f"Лицо {i+1}")
-                        item.setIcon(icon)
-                        item.setData(Qt.ItemDataRole.UserRole, i)
-                        self.list_widget.addItem(item)
-                    else:
-                        self.list_widget.addItem(f"Лицо {i+1}")
-        except Exception as e:
-            logger.error(f"Ошибка при нарезке лиц: {e}")
-            self.list_widget.clear()
-            for i in range(len(self.faces)):
-                item = QListWidgetItem(f"Лицо #{i+1} (Ошибка)")
-                item.setData(Qt.ItemDataRole.UserRole, i)
-                self.list_widget.addItem(item)
+            self.image_loader.imageReady.disconnect(self._on_image_ready)
+        except (RuntimeError, TypeError):
+            pass
+        super().done(result)
 
     def _on_item_double_clicked(self, item):
         self.selected_index = item.data(Qt.ItemDataRole.UserRole)

@@ -86,6 +86,53 @@ class FaceModelTests(unittest.TestCase):
         self.assertNotIn("child_name", data)
         self.assertNotIn("matched_child_name", data)
 
+    def test_rejects_invalid_bbox(self):
+        with self.assertRaisesRegex(ValueError, "bbox"):
+            Face.from_dict({"bbox": [1, 2, 3]})
+
+    def test_rejects_non_finite_bbox_and_untyped_student_id(self):
+        with self.assertRaisesRegex(ValueError, "bbox"):
+            Face.from_dict({"bbox": [1, 2, float("nan"), 4]})
+        with self.assertRaisesRegex(ValueError, "student_id"):
+            Face.from_dict({"bbox": [1, 2, 3, 4], "student_id": []})
+
+    def test_rejects_fractional_face_index(self):
+        with self.assertRaisesRegex(ValueError, "face_index"):
+            Face.from_dict({"bbox": [1, 2, 3, 4], "face_index": 1.5})
+
+    def test_rejects_filename_path_escape(self):
+        payload = {
+            "face_count": 1,
+            "original_shape": [100, 100],
+            "faces": [{"bbox": [1, 2, 3, 4]}],
+        }
+        for filename in ("../escape.jpg", "folder/escape.jpg", "C:\\escape.jpg"):
+            with self.subTest(filename=filename):
+                with self.assertRaisesRegex(ValueError, "имя файла"):
+                    ImageRecord.from_dict(filename, payload)
+
+    def test_rejects_mismatched_face_count(self):
+        with self.assertRaisesRegex(ValueError, "face_count"):
+            ImageRecord.from_dict(
+                "bad.jpg",
+                {
+                    "face_count": 2,
+                    "original_shape": [100, 100],
+                    "faces": [{"bbox": [1, 2, 3, 4]}],
+                },
+            )
+
+    def test_rejects_fractional_original_shape(self):
+        with self.assertRaisesRegex(ValueError, "original_shape"):
+            ImageRecord.from_dict(
+                "bad.jpg",
+                {
+                    "face_count": 1,
+                    "original_shape": [100.5, 100],
+                    "faces": [{"bbox": [1, 2, 3, 4]}],
+                },
+            )
+
 
 class DataManagerTests(unittest.TestCase):
     def test_optional_roster_resolves_student_name_in_location_mode(self):
@@ -202,8 +249,11 @@ class MatchesTests(unittest.TestCase):
                 "portrait.jpg": record("portrait.jpg", portrait),
                 "group.jpg": record("group.jpg", matched, group=True),
             }
-            self.assertTrue(strategy.save(records, {"json_path": root / "info_faces.json"}))
-            report = json.loads((root / "matches_portrait_to_group.json").read_text(encoding="utf-8"))
+            outputs = strategy.build_save_outputs(
+                records,
+                {"json_path": root / "info_faces.json"},
+            )
+            report = outputs[root / "matches_portrait_to_group.json"]
             self.assertEqual(report["0"]["student_id"], "A7K3-S001")
             self.assertNotIn("child_name", report["0"])
             self.assertEqual(report["0"]["group_photos"][0]["min_distance"], 0.1573)

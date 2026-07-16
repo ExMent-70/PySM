@@ -1,4 +1,3 @@
-# analize/cluster_editor/_lib/editor_menus.py
 # -*- coding: utf-8 -*-
 
 """
@@ -31,7 +30,7 @@ class EditorMenuManager(QObject):
         if cid in ["trash", "error_matches"]: return
         if w.mode == 'face' and cid in ["group", "-1"]: return
         
-        current_name = w.data_manager.strategy._strip_name_prefix(data["name"])
+        current_name = w.data_manager.strategy.normalize_cluster_name(data["name"])
         new_name = None
         
         if w.mode == 'face':
@@ -118,13 +117,21 @@ class EditorMenuManager(QObject):
 
     def _load_other_session(self):
         w = self.window
+        if w._export_is_running():
+            QMessageBox.warning(
+                w,
+                "Смена сессии",
+                "Дождитесь завершения текущего экспорта.",
+            )
+            return
         if w.data_manager.has_changes():
             reply = QMessageBox.question(w, "Смена сессии", 
                                          "Есть несохраненные изменения. Сохранить перед переключением?", 
                                          QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel)
             if reply == QMessageBox.StandardButton.Cancel: return
             if reply == QMessageBox.StandardButton.Save:
-                w._save_changes(silent=False)
+                if not w._save_changes(silent=False):
+                    return
 
         file_path, _ = QFileDialog.getOpenFileName(
             w, 
@@ -135,20 +142,15 @@ class EditorMenuManager(QObject):
         
         if not file_path: return
         
-        new_path = Path(file_path)
-        w.working_dir = new_path.parent
-        w.working_images_dir = w.working_dir / "JPG"
-        w.photo_session = w.working_dir.name.replace("Analysis_", "")
-        w.setWindowTitle(w.data_manager.strategy.get_window_title(w.photo_session))
-        w.data_manager.switch_working_session(new_path)
-        w._reload_selected_photo_numbers(w.btn_filter_selected_photos.isChecked())
-        w._load_and_display_data()        
+        success, message = w.begin_working_session_switch(Path(file_path))
+        if not success:
+            QMessageBox.critical(w, "Ошибка смены сессии", message)
 
     def _create_cluster(self):
         w = self.window
         new_name = None
         
-        # --- ИЗМЕНЕНИЕ: В режиме location используем диалог с выпадающим списком ---
+        # В location имя выбирается из предопределённого списка.
         if w.mode == 'face':
             available_students = w.data_manager.available_students()
             if not available_students:

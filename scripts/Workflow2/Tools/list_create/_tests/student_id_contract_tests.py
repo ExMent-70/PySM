@@ -12,14 +12,18 @@ import unittest
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+PROJECT_ROOT = SCRIPT_DIR.parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from domain import (  # noqa: E402
+from _lib.domain import (  # noqa: E402
     Student,
     StudentIdAllocator,
     generate_list_id,
     parse_student_id,
 )
-import io_services  # noqa: E402
+from _lib import io_services  # noqa: E402
+from pysm_lib.ai import AiJsonRequest  # noqa: E402
 
 
 class StudentIdAllocatorTests(unittest.TestCase):
@@ -159,16 +163,64 @@ class SessionIoTests(unittest.TestCase):
 
 class AiEnrichmentTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.info_columns = ["Цитата", "Дата рождения", "Любимый фильм"]
         self.students = [
             Student(student_id="A7K3-S001", surname="Иванов", name="Иван"),
             Student(student_id="A7K3-S002", surname="Петров", name="Пётр"),
         ]
 
-    def test_reference_contains_names_and_ids(self) -> None:
-        reference = io_services.build_ai_student_reference(self.students)
+    def test_reference_contains_schema_fields_for_every_student(self) -> None:
+        self.students[0].info = {
+            "Цитата": "Старое значение",
+            "Больше не используемое поле": "Не должно попасть в prompt",
+        }
+        reference = io_services.build_ai_student_reference(
+            self.students, self.info_columns
+        )
 
         self.assertEqual("A7K3-S001", reference[0]["student_id"])
         self.assertEqual("Иванов", reference[0]["surname"])
+        self.assertEqual(
+            {
+                "Цитата": "Старое значение",
+                "Дата рождения": "",
+                "Любимый фильм": "",
+            },
+            reference[0]["info"],
+        )
+        self.assertEqual(
+            {
+                "Цитата": "",
+                "Дата рождения": "",
+                "Любимый фильм": "",
+            },
+            reference[1]["info"],
+        )
+
+    def test_prompt_includes_full_configured_schema(self) -> None:
+        request = AiJsonRequest(
+            prompt_template=io_services.get_ai_prompt_template(
+                SCRIPT_DIR / "_lib" / "resources"
+            ),
+            prompt_values={
+                "INFO_FIELDS_JSON": self.info_columns,
+                "STUDENT_LIST_JSON": io_services.build_ai_student_reference(
+                    self.students, self.info_columns
+                ),
+            },
+            raw_text_required=False,
+            response_validator=lambda payload: payload,
+        )
+
+        prompt = request.build_prompt("Иванов любит кино")
+
+        self.assertNotIn("{{INFO_FIELDS_JSON}}", prompt)
+        self.assertNotIn("{{STUDENT_LIST_JSON}}", prompt)
+        self.assertIn('"Дата рождения"', prompt)
+        self.assertIn('"Любимый фильм"', prompt)
+        self.assertIn('"Цитата": ""', prompt)
+        self.assertIn("Точные имена полей обязательны только в ключах JSON-ответа", prompt)
+        self.assertIn("распознавай значение по смыслу и распространённым синонимам", prompt)
 
     def test_response_is_addressed_by_student_id(self) -> None:
         payload = {
@@ -176,18 +228,73 @@ class AiEnrichmentTests(unittest.TestCase):
                 {
                     "student_id": "A7K3-S002",
                     "source_person": "Петров",
-                    "info": {"Цитата": "Текст"},
+                    "info": {
+                        "Цитата": "Текст",
+                        "Дата рождения": "14.03.2009",
+                        "Любимый фильм": "Интерстеллар",
+                        "Придуманное AI поле": "Не применять",
+                    },
                 }
             ],
             "unresolved": [],
         }
 
         updates, unresolved = io_services.validate_ai_enrichment_response(
-            payload, self.students
+            payload, self.students, self.info_columns
         )
 
-        self.assertEqual({"A7K3-S002": {"Цитата": "Текст"}}, updates)
+        self.assertEqual(
+            {
+                "A7K3-S002": {
+                    "Цитата": "Текст",
+                    "Дата рождения": "14.03.2009",
+                    "Любимый фильм": "Интерстеллар",
+                }
+            },
+            updates,
+        )
         self.assertEqual([], unresolved)
+
+    def test_response_with_only_unknown_fields_does_not_update_student(self) -> None:
+        payload = {
+            "matched": [
+                {
+                    "student_id": "A7K3-S001",
+                    "info": {"Непредусмотренное поле": "Не применять"},
+                }
+            ],
+            "unresolved": [],
+        }
+
+        updates, _ = io_services.validate_ai_enrichment_response(
+            payload, self.students, self.info_columns
+        )
+
+        self.assertEqual({}, updates)
+
+    def test_empty_ai_values_do_not_clear_existing_info(self) -> None:
+        self.students[0].info = {"Любимый фильм": "Матрица"}
+        payload = {
+            "matched": [
+                {
+                    "student_id": "A7K3-S001",
+                    "info": {
+                        "Любимый фильм": "",
+                        "Дата рождения": "   ",
+                        "Цитата": None,
+                    },
+                }
+            ],
+            "unresolved": [],
+        }
+
+        updates, _ = io_services.validate_ai_enrichment_response(
+            payload, self.students, self.info_columns
+        )
+        self.students[0].info.update(updates.get("A7K3-S001", {}))
+
+        self.assertEqual({}, updates)
+        self.assertEqual("Матрица", self.students[0].info["Любимый фильм"])
 
     def test_unresolved_entry_does_not_create_update(self) -> None:
         payload = {
@@ -202,7 +309,7 @@ class AiEnrichmentTests(unittest.TestCase):
         }
 
         updates, unresolved = io_services.validate_ai_enrichment_response(
-            payload, self.students
+            payload, self.students, self.info_columns
         )
 
         self.assertEqual({}, updates)
@@ -215,7 +322,9 @@ class AiEnrichmentTests(unittest.TestCase):
         }
 
         with self.assertRaisesRegex(ValueError, "неизвестный student_id"):
-            io_services.validate_ai_enrichment_response(payload, self.students)
+            io_services.validate_ai_enrichment_response(
+                payload, self.students, self.info_columns
+            )
 
 
 if __name__ == "__main__":

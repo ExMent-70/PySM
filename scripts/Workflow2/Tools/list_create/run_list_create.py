@@ -15,36 +15,59 @@ import pathlib
 import sys
 from typing import Dict, Optional, Any, List
 
+SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
+LIB_DIR = SCRIPT_DIR / "_lib"
+RESOURCE_DIR = LIB_DIR / "resources"
+PROJECT_ROOT = SCRIPT_DIR.parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 # Опциональная зависимость для интеграции с внутренней экосистемой
 try:
     from pysm_lib import theme_api
     from pysm_lib.pysm_context import ConfigResolver
     from pysm_lib import pysm_context
+    from pysm_lib.ai import AiJsonRequest
+    from pysm_lib.gui.ai import edit_ai_json_response
+    from pysm_lib.pysm_icons import icons
     IS_MANAGED_RUN = True
 except ImportError:
     IS_MANAGED_RUN = False
     theme_api = None
     ConfigResolver = None
     pysm_context = None
+    AiJsonRequest = None
+    edit_ai_json_response = None
+    icons = None
 
 from PySide6.QtCore import Qt, QUrl, QPoint, QEvent, QTimer, QModelIndex
-from PySide6.QtGui import QAction, QKeySequence, QDesktopServices, QColor
+from PySide6.QtGui import QAction, QKeySequence, QDesktopServices, QColor, QIcon
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QSplitter, QLabel, QLineEdit, QTextEdit, QTableView, QPushButton, QHeaderView,
-    QComboBox, QMenu, QStyle, QTabWidget, QTextBrowser, QMessageBox, QFileDialog
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QSplitter, QLabel, QTextEdit, QTableView, QPushButton, QHeaderView,
+    QComboBox, QMenu, QTabWidget, QTextBrowser, QMessageBox, QFileDialog,
+    QSizePolicy,
 )
 
-from domain import AppConfig, Student, ExtraService, StudentIdAllocator
-from parser import SmartParser, simple_parse_text
-from ui_models import StudentTableModel, EnterKeyDelegate, StudentProxyModel
-from ui_dialogs import (
+from _lib.domain import AppConfig, Student, ExtraService, StudentIdAllocator
+from _lib.parser import SmartParser, simple_parse_text
+from _lib.ui_models import StudentTableModel, EnterKeyDelegate, StudentProxyModel
+from _lib.ui_dialogs import (
     ServicesEditorDialog, ExtraServicesDialog, NamesEditorDialog,
-    InfoSchemaEditorDialog, StudentInfoEditorDialog, AIParsingDialog, RanksEditorDialog
+    InfoSchemaEditorDialog, StudentInfoEditorDialog, RanksEditorDialog
 )
+from _lib import io_services
 
 
-import io_services
+def _pysm_icon(name: str) -> QIcon:
+    """Return a themed PySM icon, or an empty one in standalone fallback mode."""
+
+    if icons is None:
+        return QIcon()
+    try:
+        return icons.get_qicon(name, size=18)
+    except Exception:
+        return QIcon()
 
 
 def get_raw_config() -> AppConfig:
@@ -81,12 +104,16 @@ def get_raw_config() -> AppConfig:
 class ClassListEditor(QMainWindow):
     """Главное окно приложения."""
 
+    WINDOW_TITLE = "PySM — Редактор списка класса"
+
     def __init__(self, config: AppConfig) -> None:
         super().__init__()
         self.config = config
         self._is_dirty: bool = False
         self._save_children: bool = False
         self._is_loading: bool = False
+        self._class_name: str = ""
+        self._import_panel_width = 300
         self.id_allocator = StudentIdAllocator()
 
         self.SERVICES: Dict[str, int] = {}
@@ -147,11 +174,11 @@ class ClassListEditor(QMainWindow):
             self.table_alternate_bg_color = QColor("#f6f6f6")
 
     def _init_ui(self) -> None:
-        self.setWindowTitle("PySM - Редактор списка класса")
+        self._set_class_name("")
         self.resize(1400, 800)
         
         self._create_actions()
-        self._create_menus()
+        self.menuBar().hide()
 
         main_widget = QWidget()
         main_layout = QVBoxLayout(main_widget)
@@ -165,108 +192,235 @@ class ClassListEditor(QMainWindow):
         self._is_loading = True
         if self.config.wf_dest_dir:
             path = pathlib.Path(self.config.wf_dest_dir)
-            self.class_name_input.setText(path.name)
+            self._set_class_name(path.name)
             self._load_current_session()
         
         self._update_cost_label() 
         self._update_summary_info()
         self._is_loading = False
 
+    def _set_class_name(self, class_name: str) -> None:
+        """Store the class name and reflect it in the window title."""
+
+        self._class_name = str(class_name).strip()
+        title = self.WINDOW_TITLE
+        if self._class_name:
+            title = f"{title}: {self._class_name}"
+        self.setWindowTitle(title)
+
 # --- ИЗМЕНЕННЫЙ БЛОК: run_list_create.py (Внутри класса ClassListEditor) ---
     def _create_actions(self) -> None:
-        self.add_row_action = QAction("Добавить строку", self)
+        self.add_row_action = QAction(_pysm_icon("ADD"), "Добавить строку", self)
         self.add_row_action.triggered.connect(self._add_new_row)
 
-        self.delete_rows_action = QAction("Удалить выделенные строки", self)
+        self.delete_rows_action = QAction(
+            _pysm_icon("DELETE"), "Удалить выделенные строки", self
+        )
         self.delete_rows_action.triggered.connect(self._delete_selected_rows)
 
-        self.swap_names_action = QAction("Поменять Имя/Фамилию", self)
+        self.swap_names_action = QAction(
+            _pysm_icon("REFRESH"), "Поменять Имя/Фамилию", self
+        )
         self.swap_names_action.triggered.connect(self._swap_current_row_names)
         
-        self.edit_extras_action = QAction("Редактировать доп. услуги", self)
+        self.edit_extras_action = QAction(
+            _pysm_icon("SLIDERS"), "Редактировать доп. услуги", self
+        )
         # ИЗМЕНЕНО: Используем QTimer.singleShot(0, ...), чтобы отвязать запуск 
         # диалога от цикла закрытия контекстного меню и избежать мерцания (flicker).
         self.edit_extras_action.triggered.connect(
             lambda: QTimer.singleShot(0, self._open_extra_services_editor)
         )
 
-        self.edit_info_action = QAction("Редактировать информацию", self)
+        self.edit_info_action = QAction(
+            _pysm_icon("INFO"), "Редактировать информацию", self
+        )
         # ИЗМЕНЕНО: То же самое для редактора информации
         self.edit_info_action.triggered.connect(
             lambda: QTimer.singleShot(0, self._open_student_info_editor)
         )
 
-    def _create_menus(self) -> None:
-            file_menu = self.menuBar().addMenu("&Файл")
-            
-            actions = [
-                ("Загрузить список текущей сессии", self._load_current_session, None),
-                ("Загрузить список...", self._load_any_session, None),
-                ("-", None, None),
-                ("Сохранить список", self._save_list, QKeySequence.StandardKey.Save),
-                ("Сохранить список как...", lambda: self._save_list(save_as=True), None),
-                ("-", None, None),
-                # --- ИЗМЕНЕНИЕ: Разделение на обычный и полный HTML ---
-                ("Сохранить HTML как...", lambda: self._save_html(save_as=True, extended_mode=False), None),
-                ("Сохранить полный HTML как...", lambda: self._save_html(save_as=True, extended_mode=True), None),
-                # -----------------------------------------------------
-                ("Сохранить CSV как...", self._save_csv, None),
-                ("-", None, None),
-                ("Сохранить как имена кластеров (TXT)", self._save_for_processing, None),
-                ("-", None, None),
-                ("Печать HTML", self._print_html, QKeySequence.StandardKey.Print),
-                ("-", None, None),
-                ("Выход", self.close, None),
-            ]
+        self.load_current_action = QAction(
+            _pysm_icon("FOLDER_OPEN"), "Загрузить список текущего класса", self
+        )
+        self.load_current_action.triggered.connect(self._load_current_session)
+        self.load_any_action = QAction(_pysm_icon("OPEN"), "Загрузить список...", self)
+        self.load_any_action.triggered.connect(self._load_any_session)
+        self.open_class_folder_action = QAction(
+            _pysm_icon("FOLDER_OPEN"), "Открыть папку текущего класса", self
+        )
+        self.open_class_folder_action.triggered.connect(self._open_session_folder)
 
-            for name, handler, shortcut in actions:
-                if name == "-":
-                    file_menu.addSeparator()
-                    continue
-                action = QAction(name, self)
-                action.triggered.connect(handler)
-                if shortcut:
-                    action.setShortcut(shortcut)
-                file_menu.addAction(action)
+        self.save_action = QAction(_pysm_icon("SAVE"), "Сохранить", self)
+        self.save_action.setShortcut(QKeySequence.StandardKey.Save)
+        self.save_action.triggered.connect(self._save_list)
+        self.save_as_action = QAction(_pysm_icon("SAVE"), "Сохранить как...", self)
+        self.save_as_action.triggered.connect(lambda: self._save_list(save_as=True))
+        self.save_cluster_names_action = QAction(
+            _pysm_icon("FILE_TXT"), "Сохранить как имена кластеров (TXT)", self
+        )
+        self.save_cluster_names_action.triggered.connect(self._save_for_processing)
 
-            settings_menu = self.menuBar().addMenu("&Настройки")
-            settings_menu.addAction("Редактировать услуги...", self._open_services_editor)
-            settings_menu.addAction("Редактировать словарь имен...", self._open_names_editor)
-            settings_menu.addAction("Редактировать ранги...", self._open_ranks_editor)
-            settings_menu.addSeparator()
-            settings_menu.addAction("Настроить поля информации...", self._open_info_schema_editor)
+        self.export_html_action = QAction(
+            _pysm_icon("FILE_HTML"), "Экспорт в HTML...", self
+        )
+        self.export_html_action.triggered.connect(
+            lambda: self._save_html(save_as=True, extended_mode=False)
+        )
+        self.export_full_html_action = QAction(
+            _pysm_icon("REPORT"), "Экспорт в полный HTML...", self
+        )
+        self.export_full_html_action.triggered.connect(
+            lambda: self._save_html(save_as=True, extended_mode=True)
+        )
+        self.export_csv_action = QAction(
+            _pysm_icon("FILE_CSV"), "Экспорт в CSV...", self
+        )
+        self.export_csv_action.triggered.connect(self._save_csv)
 
-            ai_menu = self.menuBar().addMenu("&AI")
-            ai_menu.addAction("Обработка данных (Gemini)...", self._open_ai_dialog)            
+        self.print_html_action = QAction(_pysm_icon("PRINT"), "Печать HTML", self)
+        self.print_html_action.setShortcut(QKeySequence.StandardKey.Print)
+        self.print_html_action.triggered.connect(
+            lambda: self._print_html(extended_mode=False)
+        )
+        self.print_full_html_action = QAction(
+            _pysm_icon("PRINT"), "Печать полного HTML", self
+        )
+        self.print_full_html_action.triggered.connect(
+            lambda: self._print_html(extended_mode=True)
+        )
+
+        self.edit_services_action = QAction(
+            _pysm_icon("SLIDERS"), "Редактировать список услуг", self
+        )
+        self.edit_services_action.triggered.connect(self._open_services_editor)
+        self.edit_names_action = QAction(
+            _pysm_icon("LIST"), "Редактировать словарь имён", self
+        )
+        self.edit_names_action.triggered.connect(self._open_names_editor)
+        self.edit_ranks_action = QAction(_pysm_icon("STAR"), "Редактировать ранги", self)
+        self.edit_ranks_action.triggered.connect(self._open_ranks_editor)
+        self.edit_info_columns_action = QAction(
+            _pysm_icon("TABLE"), "Список дополнительных столбцов таблицы", self
+        )
+        self.edit_info_columns_action.triggered.connect(self._open_info_schema_editor)
+
+        self.ai_prompt_action = QAction(_pysm_icon("WAND"), "AI-промпт/JSON", self)
+        self.ai_prompt_action.triggered.connect(self._open_ai_dialog)
+
+    def _create_menu_button(
+        self,
+        text: str,
+        icon_name: str,
+        actions: list[QAction | None],
+    ) -> QPushButton:
+        """Create a standard push button with a menu of existing actions."""
+
+        button = QPushButton(text, self)
+        button.setIcon(_pysm_icon(icon_name))
+        menu = QMenu(button)
+        for action in actions:
+            if action is None:
+                menu.addSeparator()
+            else:
+                menu.addAction(action)
+        button.setMenu(menu)
+        return button
+
+    def _create_command_buttons(self, layout: QHBoxLayout) -> None:
+        """Place all primary commands in the compact top-row toolbar."""
+
+        self.import_panel_button = QPushButton("Импорт", self)
+        self.import_panel_button.setIcon(_pysm_icon("IMPORT"))
+        self.import_panel_button.setCheckable(True)
+        self.import_panel_button.setChecked(False)
+        self.import_panel_button.setToolTip("Показать или скрыть панель импорта фамилий")
+        self.import_panel_button.toggled.connect(self._set_import_panel_visible)
+        layout.addWidget(self.import_panel_button)
+
+        layout.addWidget(
+            self._create_menu_button(
+                "Загрузить",
+                "OPEN",
+                [
+                    self.load_current_action,
+                    self.load_any_action,
+                    None,
+                    self.open_class_folder_action,
+                ],
+            )
+        )
+        layout.addWidget(
+            self._create_menu_button(
+                "Сохранить",
+                "SAVE",
+                [
+                    self.save_action,
+                    self.save_as_action,
+                    self.save_cluster_names_action,
+                ],
+            )
+        )
+        layout.addWidget(
+            self._create_menu_button(
+                "Экспортировать",
+                "EXPORT",
+                [
+                    self.export_html_action,
+                    self.export_full_html_action,
+                    self.export_csv_action,
+                ],
+            )
+        )
+        layout.addWidget(
+            self._create_menu_button(
+                "Печать",
+                "PRINT",
+                [self.print_html_action, self.print_full_html_action],
+            )
+        )
+        layout.addWidget(
+            self._create_menu_button(
+                "Настройки",
+                "SETTINGS",
+                [
+                    self.edit_services_action,
+                    self.edit_names_action,
+                    self.edit_ranks_action,
+                    None,
+                    self.edit_info_columns_action,
+                ],
+            )
+        )
+        layout.addWidget(self._create_menu_button("AI", "WAND", [self.ai_prompt_action]))
 
     def _create_top_panel(self, parent_layout: QVBoxLayout) -> None:
-        top_panel = QGridLayout()
-        parent_layout.addLayout(top_panel)
-        top_panel.addWidget(QLabel("Название класса:"), 0, 0)
+        """Create the fixed-height row with commands and current service."""
 
-        class_name_layout = QHBoxLayout()
-        class_name_layout.setContentsMargins(0, 0, 0, 0)
-        self.class_name_input = QLineEdit()
-        self.open_folder_button = QPushButton(icon=self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
-        self.open_folder_button.setFixedSize(self.class_name_input.sizeHint().height(), self.class_name_input.sizeHint().height())
-        self.open_folder_button.clicked.connect(self._open_session_folder)
-        class_name_layout.addWidget(self.class_name_input)
-        class_name_layout.addWidget(self.open_folder_button)
-        top_panel.addLayout(class_name_layout, 0, 1)
+        top_panel_widget = QWidget()
+        top_panel_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
+        top_panel = QHBoxLayout(top_panel_widget)
+        parent_layout.addWidget(top_panel_widget)
 
-        top_panel.addWidget(QLabel("Вид фотоуслуги:"), 0, 2)
+        self._create_command_buttons(top_panel)
+        top_panel.addStretch(1)
+
+        top_panel.addWidget(QLabel("Вид фотоуслуги:"))
         self.service_type_combo = QComboBox()
         self.service_type_combo.addItems(sorted(self.SERVICES.keys()))
-        top_panel.addWidget(self.service_type_combo, 0, 3)
-        top_panel.addWidget(QLabel("Стоимость:"), 0, 4)
+        top_panel.addWidget(self.service_type_combo)
+        top_panel.addWidget(QLabel("Стоимость:"))
         self.service_cost_label = QLabel()
         self.service_cost_label.setStyleSheet("font-weight: bold;")
-        top_panel.addWidget(self.service_cost_label, 0, 5)
+        top_panel.addWidget(self.service_cost_label)
         self.service_type_combo.currentIndexChanged.connect(self._update_cost_label)
 
     def _create_main_panels(self, parent_layout: QVBoxLayout) -> None:
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        parent_layout.addWidget(splitter)
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        parent_layout.addWidget(self.main_splitter, 1)
 
         # Tabs
         self.left_tabs = QTabWidget()
@@ -285,6 +439,7 @@ class ClassListEditor(QMainWindow):
         self.raw_list_input.setHtml("<b>ИНСТРУКЦИЯ:</b><br>1. Вставьте текст.<br>2. Нажмите <b>Обработать текст</b>.")
         input_layout.addWidget(self.raw_list_input)
         self.process_button = QPushButton("Обработать текст")
+        self.process_button.setIcon(_pysm_icon("PLAY"))
         self.process_button.clicked.connect(self._process_raw_list)
         input_layout.addWidget(self.process_button)
         self.left_tabs.addTab(input_tab, "Ввод")
@@ -296,7 +451,7 @@ class ClassListEditor(QMainWindow):
         markup_layout.addWidget(self.markup_browser)
         self.left_tabs.addTab(markup_tab, "Результат разбора")
         
-        splitter.addWidget(self.left_tabs)
+        self.main_splitter.addWidget(self.left_tabs)
         
         # Right Panel (Table)
         right_panel = QWidget()
@@ -304,8 +459,29 @@ class ClassListEditor(QMainWindow):
         right_layout.addWidget(QLabel("Обработанный список:"))
         self._create_table_view(right_layout)
         self._create_summary_panel(right_layout)
-        splitter.addWidget(right_panel)
-        splitter.setSizes([300, 1100])
+        self.main_splitter.addWidget(right_panel)
+        self.main_splitter.setStretchFactor(1, 1)
+        self.main_splitter.setSizes([self._import_panel_width, 1100])
+        self._set_import_panel_visible(False)
+
+    def _set_import_panel_visible(self, visible: bool) -> None:
+        """Show or hide the rarely used text-import and parse-result panel."""
+
+        if not hasattr(self, "left_tabs"):
+            return
+
+        if visible:
+            self.left_tabs.show()
+            total_width = max(self.main_splitter.width(), self.width())
+            self.main_splitter.setSizes(
+                [self._import_panel_width, max(1, total_width - self._import_panel_width)]
+            )
+            return
+
+        current_width = self.main_splitter.sizes()[0]
+        if current_width > 0:
+            self._import_panel_width = current_width
+        self.left_tabs.hide()
 
     def _create_table_view(self, parent_layout: QVBoxLayout) -> None:
         self.processed_table = QTableView()
@@ -379,7 +555,7 @@ class ClassListEditor(QMainWindow):
     # --- Data Logic ---
 
     def _load_services(self) -> None:
-        services_path = pathlib.Path(__file__).parent / "_services.json"
+        services_path = RESOURCE_DIR / "_services.json"
         default_services = {"Стандарт": 1500, "-": 0}
         if services_path.exists():
             try:
@@ -392,8 +568,9 @@ class ClassListEditor(QMainWindow):
             self._save_services()
 
     def _save_services(self) -> None:
-        services_path = pathlib.Path(__file__).parent / "_services.json"
+        services_path = RESOURCE_DIR / "_services.json"
         try:
+            services_path.parent.mkdir(parents=True, exist_ok=True)
             with open(services_path, 'w', encoding='utf-8') as f:
                 json.dump(self.SERVICES, f, ensure_ascii=False, indent=4)
         except IOError as e:
@@ -401,7 +578,7 @@ class ClassListEditor(QMainWindow):
 
     def _load_ranks(self) -> None:
         """НОВОЕ: Загрузка списка рангов из файла."""
-        ranks_path = pathlib.Path(__file__).parent / "_ranks.json"
+        ranks_path = RESOURCE_DIR / "_ranks.json"
         default_ranks =["ученик", "учитель", "директор", "завуч", "классный руководитель"]
         if ranks_path.exists():
             try:
@@ -415,8 +592,9 @@ class ClassListEditor(QMainWindow):
 
     def _save_ranks(self) -> None:
         """НОВОЕ: Сохранение списка рангов в файл."""
-        ranks_path = pathlib.Path(__file__).parent / "_ranks.json"
+        ranks_path = RESOURCE_DIR / "_ranks.json"
         try:
+            ranks_path.parent.mkdir(parents=True, exist_ok=True)
             with open(ranks_path, 'w', encoding='utf-8') as f:
                 json.dump(self.RANKS, f, ensure_ascii=False, indent=4)
         except IOError as e:
@@ -582,7 +760,8 @@ class ClassListEditor(QMainWindow):
         if dialog.exec():
             try:
                 self.smart_parser.normalization_dict = dialog.get_names_dict()
-                dict_path = pathlib.Path(__file__).parent / "_names_normalization.json"
+                dict_path = RESOURCE_DIR / "_names_normalization.json"
+                dict_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(dict_path, 'w', encoding='utf-8') as f:
                     json.dump(self.smart_parser.normalization_dict, f, ensure_ascii=False, indent=4)
                 self.statusBar().showMessage("Словарь имен обновлен.", 3000)
@@ -639,51 +818,69 @@ class ClassListEditor(QMainWindow):
 
     def _open_ai_dialog(self) -> None:
         """Открывает диалог интеграции с AI."""
+        if AiJsonRequest is None or edit_ai_json_response is None:
+            QMessageBox.critical(
+                self,
+                "Недоступен AI JSON",
+                "Общий API PySM для обработки AI JSON недоступен.",
+            )
+            return
         if self.table_model.rowCount() == 0:
             QMessageBox.warning(self, "Пусто", "Сначала загрузите или создайте список учеников.")
             return
 
         students = self.table_model.get_all_data()
+        info_columns = tuple(self.INFO_COLUMNS)
         try:
             self.id_allocator.validate_students(students)
         except ValueError as exc:
             QMessageBox.critical(self, "Ошибка идентификаторов", str(exc))
             return
 
-        dialog = AIParsingDialog(students, self)
-        
-        # Если диалог завершился (пользователь нажал Закрыть после импорта),
-        # нужно обновить таблицу, так как данные могли измениться.
-        dialog.exec()
-        
-        # Обновляем таблицу, так как поля info могли измениться
-        # Также это перерисует колонки, если AI добавил новые ключи? 
-        # Нет, AI обновляет только словарь. Если AI добавил ключ, которого нет в схеме INFO_COLUMNS,
-        # он не отобразится в таблице, пока мы не добавим его в схему.
-        
-        # Поэтому полезно проверить ключи
-        self._sync_info_columns_with_data()
-        
+        request = AiJsonRequest(
+            title="AI обработка данных",
+            prompt_template=io_services.get_ai_prompt_template(RESOURCE_DIR),
+            prompt_values={
+                "INFO_FIELDS_JSON": list(info_columns),
+                "STUDENT_LIST_JSON": io_services.build_ai_student_reference(
+                    students, info_columns
+                ),
+            },
+            raw_text_label="Неструктурированный текст с данными об учениках:",
+            raw_text_placeholder=(
+                "Пример:\nВася Пупкин: любит футбол, цитата 'Вперёд!'"
+            ),
+            response_validator=lambda payload: io_services.validate_ai_enrichment_response(
+                payload, students, info_columns
+            ),
+            show_success_message=False,
+        )
+        result = edit_ai_json_response(request, self)
+        if not result.accepted:
+            return
+
+        updates, unresolved = result.value
+        students_by_id = {student.student_id: student for student in students}
+        for student_id, new_info in updates.items():
+            students_by_id[student_id].info.update(new_info)
+
+        message = f"Успешно обновлено учеников: {len(updates)}"
+        if unresolved:
+            unresolved_lines = []
+            for item in unresolved[:10]:
+                source = str(item.get("source_person", "Неизвестная запись"))
+                reason = str(item.get("reason", "Нет однозначного совпадения"))
+                unresolved_lines.append(f"{source}: {reason}")
+            message += (
+                f"\n\nНе применено неоднозначных записей ({len(unresolved)}):\n"
+                + "\n".join(unresolved_lines)
+            )
+            if len(unresolved) > 10:
+                message += "\n..."
+        QMessageBox.information(self, "Результат AI", message)
+
         self.table_model.layoutChanged.emit()
         self._is_dirty = True
-
-    def _sync_info_columns_with_data(self):
-        """
-        Проверяет, появились ли в данных студентов новые ключи info,
-        которых нет в INFO_COLUMNS, и добавляет их.
-        """
-        students = self.table_model.get_all_data()
-        changed = False
-        for s in students:
-            for key in s.info.keys():
-                if key not in self.INFO_COLUMNS:
-                    self.INFO_COLUMNS.append(key)
-                    changed = True
-        
-        if changed:
-            self.table_model.set_info_columns(self.INFO_COLUMNS)
-            self._setup_table_headers()
-            QMessageBox.information(self, "Схема обновлена", "AI добавил новые поля информации. Таблица обновлена.")
 
 
 
@@ -717,7 +914,7 @@ class ClassListEditor(QMainWindow):
                 metadata["list_id"], metadata["next_student_number"]
             )
             
-            self.class_name_input.setText(metadata["class_name"])
+            self._set_class_name(metadata["class_name"])
             self.service_type_combo.setCurrentText(metadata["service_type"])
             
             # Загружаем схему полей из файла
@@ -753,17 +950,18 @@ class ClassListEditor(QMainWindow):
     def _save_list(self, save_as: bool = False) -> bool:
         path = self._get_default_filepath('list') if not save_as else None
         if not path:
-            default_path = str(pathlib.Path(self.config.wf_dest_dir or os.getcwd()) / f"{self.class_name_input.text()}.list")
+            default_name = self._class_name or "Список класса"
+            default_path = str(pathlib.Path(self.config.wf_dest_dir or os.getcwd()) / f"{default_name}.list")
             path_str, _ = QFileDialog.getSaveFileName(self, "Сохранить как...", default_path, "Списки (*.list)")
             if not path_str: return False
             path = pathlib.Path(path_str)
             self.config.wf_dest_dir = str(path.parent)
 
-        self.class_name_input.setText(path.stem)
+        self._set_class_name(path.stem)
         try:
             io_services.save_session(
                 path, 
-                self.class_name_input.text(),
+                self._class_name,
                 self.service_type_combo.currentText(),
                 self.table_model.get_all_data(),
                 self.INFO_COLUMNS, # Сохраняем схему
@@ -817,9 +1015,9 @@ class ClassListEditor(QMainWindow):
 
                 io_services.export_to_html(
                     path, 
-                    self.class_name_input.text(), 
+                    self._class_name,
                     self.table_model.get_all_data(),
-                    pathlib.Path(__file__).parent,
+                    RESOURCE_DIR,
                     extended_mode=use_extended
                 )
                 self.statusBar().showMessage(f"HTML сохранен: {path.name}", 5000)
@@ -852,8 +1050,8 @@ class ClassListEditor(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить TXT:\n{e}")
 
-    def _print_html(self) -> None:
-        path = self._save_html(save_as=False)
+    def _print_html(self, *, extended_mode: bool) -> None:
+        path = self._save_html(save_as=False, extended_mode=extended_mode)
         if path and not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path))):
             QMessageBox.warning(self, "Ошибка", "Не удалось открыть браузер.")
 

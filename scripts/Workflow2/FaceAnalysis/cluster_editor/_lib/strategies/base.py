@@ -1,4 +1,3 @@
-# analize/cluster_editor/_lib/strategies/base.py
 
 import re
 from abc import ABC, abstractmethod
@@ -83,9 +82,14 @@ class EditorStrategy(ABC):
     def rename_cluster(self, cluster_id: str, new_name: str, records: Dict[str, ImageRecord]) -> None:
         pass
 
-    @abstractmethod
-    def save(self, records: Dict[str, ImageRecord], paths_config: Dict[str, Path]) -> bool:
-        pass
+    def build_save_outputs(
+        self,
+        records: Dict[str, ImageRecord],
+        paths_config: Dict[str, Path],
+    ) -> Dict[Path, Any]:
+        """Return additional JSON payloads that must commit with the main file."""
+
+        return {}
 
     def show_face_details_panel(self) -> bool:
         return True
@@ -98,5 +102,7 @@ class EditorStrategy(ABC):
     def get_name_prefix(self, cluster_id: str) -> str:
         return ""
         
-    def _strip_name_prefix(self, name: str) -> str:
+    def normalize_cluster_name(self, name: str) -> str:
+        """Return the persisted cluster name without UI-only prefixes."""
+
         return name

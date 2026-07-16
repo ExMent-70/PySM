@@ -1,12 +1,11 @@
-# analize/cluster_editor/_lib/editor_delegates.py
 # -*- coding: utf-8 -*-
 
 """
 Модуль делегатов (Delegates) для кастомной отрисовки элементов списков.
-ОПТИМИЗИРОВАНО: Убраны буферы QPixmap для выделений (ускорена отрисовка).
+Выделения рисуются делегатами без дополнительных буферов QPixmap.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Optional
 
 from PySide6.QtWidgets import (
     QStyledItemDelegate, 
@@ -20,7 +19,6 @@ from PySide6.QtGui import (
     QPainter, 
     QColor, 
     QPalette, 
-    QPen,
     QBrush
 )
 from PySide6.QtCore import Qt, QRect, QSize, QRectF
@@ -36,6 +34,11 @@ FACE_SIZE = 130       # Базовый размер лица (используе
 FACE_SIZE_PORTRAIT = 290 # Базовый размер лица
 FACE_MIN = 100        # Мин. размер слайдера лиц
 FACE_MAX = 400        # Макс. размер слайдера лиц
+
+# Custom roles used by FaceItemDelegate. Face thumbnails are deliberately not
+# stored as QIcon: QIcon changes the native item size when async data arrives.
+FACE_PIXMAP_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+FACE_STATUS_COLOR_ROLE = int(Qt.ItemDataRole.UserRole) + 2
 
 # --- Отступы и рамки ---
 ITEM_PADDING = 6           # Внутренний отступ от края ячейки до контента
@@ -62,6 +65,7 @@ except ImportError:
         def get_parsed_style(self, key: str, *args, **kwargs) -> Dict[str, str]:
             defaults = {
                 "delegate_changed_indicator": {"color": "#f0ad4e"},
+                "delegate_face_hover": {"color": "#f0ad4e"},
                 "delegate_preview_background": {"color": "#e8e8e8"},
                 "delegate_secondary_text": {"color": "#555555"},
                 "delegate_hover_border": {"color": "#0078d7"}
@@ -108,7 +112,7 @@ class ClusterItemDelegate(QStyledItemDelegate):
         
         bg_rect = option.rect
 
-        # --- Шаг 1: Отрисовка скругленного фона (ОПТИМИЗИРОВАНО) ---
+        # Скругленный фон состояния карточки.
         if is_selected or is_hovered:
             if is_selected:
                 bg_color = option.palette.color(QPalette.ColorRole.Highlight)
@@ -201,6 +205,104 @@ class ClusterItemDelegate(QStyledItemDelegate):
         width = PREVIEW_SIZE + (ITEM_PADDING * 2)
         height = PREVIEW_SIZE + (ITEM_PADDING * 2) + TEXT_NAME_HEIGHT + TEXT_COUNT_HEIGHT
         return QSize(width, height)
+
+
+class FaceItemDelegate(QStyledItemDelegate):
+    """Draw a face cell with geometry independent from async image delivery."""
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        hover_style = theme_api.get_parsed_style("delegate_face_hover")
+        preview_style = theme_api.get_parsed_style("delegate_preview_background")
+        self.hover_color = QColor(hover_style.get("color", "#f0ad4e"))
+        self.preview_color = QColor(preview_style.get("color", "#e8e8e8"))
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index) -> None:
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+        selected = bool(option.state & QStyle.StateFlag.State_Selected)
+        hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)
+        cell_rect = QRectF(option.rect).adjusted(4, 4, -4, -4)
+
+        if hovered and not selected:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(self.hover_color)
+            painter.drawRoundedRect(cell_rect, 5, 5)
+        elif selected:
+            pen = painter.pen()
+            pen.setColor(option.palette.color(QPalette.ColorRole.Highlight))
+            pen.setWidth(2)
+            pen.setStyle(Qt.PenStyle.SolidLine)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRoundedRect(cell_rect, 5, 5)
+
+        widget = option.widget
+        icon_size = widget.iconSize() if isinstance(widget, QListWidget) else QSize(FACE_SIZE, FACE_SIZE)
+        image_rect = QRect(
+            option.rect.x() + (option.rect.width() - icon_size.width()) // 2,
+            option.rect.y() + ITEM_PADDING,
+            icon_size.width(),
+            icon_size.height(),
+        )
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self.preview_color)
+        painter.drawRoundedRect(image_rect, BORDER_RADIUS, BORDER_RADIUS)
+
+        pixmap = index.data(FACE_PIXMAP_ROLE)
+        drawn_rect = QRect()
+        if isinstance(pixmap, QPixmap) and not pixmap.isNull():
+            drawn_size = pixmap.size().scaled(
+                image_rect.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+            )
+            drawn_rect = QRect(0, 0, drawn_size.width(), drawn_size.height())
+            drawn_rect.moveCenter(image_rect.center())
+            painter.drawPixmap(drawn_rect, pixmap, pixmap.rect())
+
+            status_color = str(index.data(FACE_STATUS_COLOR_ROLE) or "")
+            if status_color:
+                pen_width = max(
+                    3,
+                    int(min(drawn_rect.width(), drawn_rect.height()) * 0.04),
+                )
+                status_pen = painter.pen()
+                status_pen.setColor(QColor(status_color))
+                status_pen.setWidth(pen_width)
+                status_pen.setStyle(Qt.PenStyle.SolidLine)
+                painter.setPen(status_pen)
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                inset = max(1, pen_width // 2)
+                painter.drawRect(drawn_rect.adjusted(inset, inset, -inset, -inset))
+
+        text_rect = QRect(
+            option.rect.x() + ITEM_PADDING,
+            image_rect.bottom() + 4,
+            option.rect.width() - 2 * ITEM_PADDING,
+            max(1, option.rect.bottom() - image_rect.bottom() - 8),
+        )
+        painter.setPen(option.palette.color(QPalette.ColorRole.WindowText))
+        lines = str(index.data(Qt.ItemDataRole.DisplayRole) or "").splitlines()
+        metrics = painter.fontMetrics()
+        line_height = metrics.height()
+        y = text_rect.top()
+        for line in lines[:2]:
+            line_rect = QRect(text_rect.x(), y, text_rect.width(), line_height)
+            painter.drawText(
+                line_rect,
+                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+                metrics.elidedText(line, Qt.TextElideMode.ElideRight, line_rect.width()),
+            )
+            y += line_height
+
+        painter.restore()
+
+    def sizeHint(self, option: QStyleOptionViewItem, index) -> QSize:
+        widget = option.widget
+        icon_size = widget.iconSize() if isinstance(widget, QListWidget) else QSize(FACE_SIZE, FACE_SIZE)
+        return QSize(icon_size.width() + 20, icon_size.height() + 60)
 
 
 class ImageItemDelegate(QStyledItemDelegate):

@@ -587,6 +587,11 @@ class AppController(QObject):
         self, target_file_path: Optional[pathlib.Path]
     ) -> bool:
 
+        if self.current_orchestrator and getattr(
+            self.current_orchestrator, "uses_runtime_context", False
+        ):
+            self.current_orchestrator.sync_runtime_context_for_save()
+
         if self.set_manager.save_collection_to_file(target_file_path):
             self.current_collection_file_path = (
                 self.set_manager.current_collection_file_path
@@ -665,6 +670,10 @@ class AppController(QObject):
 
     def update_collection_context(self, new_context: Dict[str, ContextVariableModel]):
         self.set_manager.update_collection_context(new_context)
+        if self.current_orchestrator and getattr(
+            self.current_orchestrator, "uses_runtime_context", False
+        ):
+            self.current_orchestrator.refresh_runtime_context_from_set_manager()
         self.collection_dirty_state_changed.emit(self.set_manager.is_dirty)
 
     def add_script_root_to_collection(self, path: str):
@@ -1080,7 +1089,11 @@ class AppController(QObject):
     def _on_orchestrator_finished(self, set_name: str, success: Optional[bool] = None):
         # --- НАЧАЛО ИЗМЕНЕНИЙ ---
         # КОММЕНТАРИЙ: Перезагружаем контекст здесь, когда все операции завершены.
-        if self.set_manager.current_collection_file_path:
+        uses_runtime_context = bool(
+            self.current_orchestrator
+            and getattr(self.current_orchestrator, "uses_runtime_context", False)
+        )
+        if self.set_manager.current_collection_file_path and not uses_runtime_context:
             self.set_manager.reload_context_from_file()
         # --- КОНЕЦ ИЗМЕНЕНИЙ ---
         if success is not None:
@@ -1108,7 +1121,11 @@ class AppController(QObject):
     @Slot()
     def _on_orchestrator_context_reloaded(self):
         """Тихо обновляет контекст в памяти без перерисовки всего дерева UI."""
-        if self.set_manager.current_collection_file_path:
+        uses_runtime_context = bool(
+            self.current_orchestrator
+            and getattr(self.current_orchestrator, "uses_runtime_context", False)
+        )
+        if self.set_manager.current_collection_file_path and not uses_runtime_context:
             self.set_manager.reload_context_from_file()
 
 

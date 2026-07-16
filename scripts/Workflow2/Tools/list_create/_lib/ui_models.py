@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate, QComboBox, QLineEdit, QAbstractItemDelegate, QMessageBox
 )
 
-from domain import Student, ExtraService
+from .domain import Student, ExtraService
 
 
 class ValidationError(Exception):
@@ -439,4 +439,4 @@ class StudentProxyModel(QSortFilterProxyModel):
         elif col == model.COL_TOTAL:
             return student_left.total_cost < student_right.total_cost
             
-        return super().lessThan(source_left, source_right)        
+        return super().lessThan(source_left, source_right)

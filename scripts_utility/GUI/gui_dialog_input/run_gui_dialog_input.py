@@ -21,6 +21,7 @@ import sys
 try:
     from pysm_lib import pysm_context
     from pysm_lib import theme_api
+    from pysm_lib.context_variable_ops import format_success
     from pysm_lib.pysm_context import ConfigResolver
     from pysm_lib.input_processor import InputProcessor, VALIDATION_PRESETS
     IS_MANAGED_RUN = True
@@ -28,6 +29,9 @@ except ImportError:
     pysm_context = None
     ConfigResolver = None
     InputProcessor = None
+    VALIDATION_PRESETS = {}
+    def format_success(var_name: str, value) -> str:
+        return f"✅ <b>{var_name}</b> = <i>{value}</i>"
     IS_MANAGED_RUN = False
 
     class MockThemeApi:
@@ -139,7 +143,7 @@ def main():
             QMessageBox.warning(None, "Ошибка", str(e))
             initial_val = result  # повторный ввод
 
-    logger.info(f"✅ <b>{config.dlg_input_var}</b> = <i>{result}</i>\n")
+    logger.info(format_success(config.dlg_input_var, result))
 
     sys.exit(0)
 

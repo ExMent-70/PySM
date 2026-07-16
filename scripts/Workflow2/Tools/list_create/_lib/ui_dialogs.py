@@ -10,20 +10,17 @@ ui_dialogs.py
 """
 
 from typing import Dict, List, Any, Tuple, Optional
-import json
-import pathlib
 
 from PySide6.QtCore import Qt, QEvent  # Добавили QEvent
 from PySide6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
     QTableWidgetItem, QPushButton, QDialogButtonBox, QHeaderView,
     QMessageBox, QComboBox, QSpinBox, QLineEdit, QListWidget, QListWidgetItem,
-    QInputDialog, QFormLayout, QLabel, QScrollArea, QPlainTextEdit, QFrame, QTabWidget, QTextEdit, QApplication 
+    QInputDialog, QFormLayout, QLabel, QScrollArea, QPlainTextEdit, QFrame, QTextEdit
 )
 from PySide6.QtGui import QKeySequence, QShortcut
 
-from domain import ExtraService, Student
-import io_services
+from .domain import ExtraService, Student
 
 
 class ServicesEditorDialog(QDialog):
@@ -668,138 +665,3 @@ class StudentInfoEditorDialog(QDialog):
     def accept(self):
         self._save_current()
         super().accept()
-        
-class AIParsingDialog(QDialog):
-    """
-    Диалог для взаимодействия с AI (Gemini).
-    Вкладка 1: Генерация промпта (вставка данных в шаблон).
-    Вкладка 2: Импорт JSON-ответа от AI.
-    """
-    def __init__(self, students: List[Student], parent: QWidget = None):
-        super().__init__(parent)
-        self.setWindowTitle("AI Обработка данных")
-        self.resize(700, 500)
-        self.students = students
-        
-        self.layout = QVBoxLayout(self)
-        
-        self.tabs = QTabWidget()
-        self.layout.addWidget(self.tabs)
-        
-        self._init_tab_generate()
-        self._init_tab_import()
-        
-        # Кнопка закрытия общая для всех
-        self.btn_close = QPushButton("Закрыть")
-        self.btn_close.clicked.connect(self.accept)
-        self.layout.addWidget(self.btn_close)
-
-    def _init_tab_generate(self):
-        """Вкладка 1: Подготовка данных для отправки в чат."""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        
-        layout.addWidget(QLabel("1. Вставьте неструктурированный текст (из чата/документа):"))
-        self.raw_text_edit = QPlainTextEdit()
-        self.raw_text_edit.setPlaceholderText("Пример:\nВася Пупкин: любит футбол, цитата 'Вперед!'\nМаша Иванова: любит танцы...")
-        layout.addWidget(self.raw_text_edit)
-        
-        self.btn_copy_prompt = QPushButton("Сформировать промпт и скопировать в буфер")
-        self.btn_copy_prompt.setStyleSheet("background-color: #e3f2fd; font-weight: bold; padding: 10px;")
-        self.btn_copy_prompt.clicked.connect(self._generate_and_copy)
-        layout.addWidget(self.btn_copy_prompt)
-        
-        layout.addWidget(QLabel("Предпросмотр того, что скопировано:"))
-        self.preview_edit = QPlainTextEdit()
-        self.preview_edit.setReadOnly(True)
-        self.preview_edit.setStyleSheet("color: #666; background-color: #f5f5f5;")
-        layout.addWidget(self.preview_edit)
-        
-        self.tabs.addTab(tab, "1. Генерация запроса")
-
-    def _init_tab_import(self):
-        """Вкладка 2: Обработка ответа."""
-        tab = QWidget()
-        layout = QVBoxLayout(tab)
-        
-        layout.addWidget(QLabel("2. Вставьте JSON-ответ от Gemini:"))
-        self.json_input_edit = QPlainTextEdit()
-        self.json_input_edit.setPlaceholderText(
-            '{"matched": [{"student_id": "A7K3-S001", "source_person": "Иванов", "info": {}}], '
-            '"unresolved": []}'
-        )
-        layout.addWidget(self.json_input_edit)
-        
-        self.btn_apply = QPushButton("Распознать и Обновить список")
-        self.btn_apply.setStyleSheet("background-color: #e8f5e9; font-weight: bold; padding: 10px;")
-        self.btn_apply.clicked.connect(self._apply_json)
-        layout.addWidget(self.btn_apply)
-        
-        self.tabs.addTab(tab, "2. Импорт ответа")
-
-    def _generate_and_copy(self):
-        raw_text = self.raw_text_edit.toPlainText()
-        if not raw_text.strip():
-            QMessageBox.warning(self, "Внимание", "Введите текст с данными об учениках.")
-            return
-
-        # Справочник содержит ФИО для сопоставления и ID для безопасного ответа.
-        mini_list = io_services.build_ai_student_reference(self.students)
-        json_str = json.dumps(mini_list, ensure_ascii=False, indent=2)
-        
-        template = io_services.get_ai_prompt_template(pathlib.Path(__file__).parent)
-        
-        # 3. Заменяем плейсхолдеры
-        final_prompt = template.replace("{{STUDENT_LIST_JSON}}", json_str)
-        final_prompt = final_prompt.replace("{{RAW_TEXT}}", raw_text)
-        
-        # 4. Копируем
-        clipboard = QApplication.clipboard()
-        clipboard.setText(final_prompt)
-        
-        self.preview_edit.setPlainText(final_prompt)
-        QMessageBox.information(self, "Готово", "Промпт скопирован в буфер обмена!\nВставьте его в чат Gemini.")
-
-    def _apply_json(self):
-        json_text = self.json_input_edit.toPlainText().strip()
-        if not json_text: return
-
-        try:
-            # Извлекаем JSON-объект, если AI обернул его в markdown-блок.
-            object_start = json_text.find("{")
-            object_end = json_text.rfind("}")
-            if object_start != -1 and object_end >= object_start:
-                json_text = json_text[object_start:object_end + 1]
-
-            imported_data = json.loads(json_text)
-            updates, unresolved = io_services.validate_ai_enrichment_response(
-                imported_data, self.students
-            )
-
-            students_by_id = {student.student_id: student for student in self.students}
-            for student_id, new_info in updates.items():
-                students_by_id[student_id].info.update(new_info)
-
-            msg = f"Успешно обновлено учеников: {len(updates)}"
-            if unresolved:
-                unresolved_lines = []
-                for item in unresolved[:10]:
-                    source = str(item.get("source_person", "Неизвестная запись"))
-                    reason = str(item.get("reason", "Нет однозначного совпадения"))
-                    unresolved_lines.append(f"{source}: {reason}")
-                msg += (
-                    f"\n\nНе применено неоднозначных записей ({len(unresolved)}):\n"
-                    + "\n".join(unresolved_lines)
-                )
-                if len(unresolved) > 10:
-                    msg += "\n..."
-            
-            QMessageBox.information(self, "Результат", msg)
-            
-            # Если успешно, можно закрыть (или оставить для проверки)
-            # self.accept() 
-
-        except json.JSONDecodeError as e:
-            QMessageBox.critical(self, "Ошибка JSON", f"Некорректный формат JSON:\n{e}")
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка обработки:\n{e}")

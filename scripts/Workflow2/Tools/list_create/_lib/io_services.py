@@ -11,9 +11,9 @@ import sys
 import pathlib
 import re  # Добавлен для поиска версии в файле
 import tempfile
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Sequence, Tuple
 
-from domain import Student, StudentIdAllocator, validate_list_id
+from .domain import Student, StudentIdAllocator, validate_list_id
 
 try:
     import jinja2
@@ -39,18 +39,32 @@ DEFAULT_AI_PROMPT = """
 Нужно сопоставить упомянутых людей со справочником и извлечь дополнительные данные.
 
 **Входные данные:**
-1. Справочник текущего списка (`student_id`, ФИО и поля `info`):
+1. Разрешённые поля дополнительной информации. Используй только точные имена
+из этого списка:
+{{INFO_FIELDS_JSON}}
+
+2. Справочник текущего списка (`student_id`, ФИО и поля `info`):
 {{STUDENT_LIST_JSON}}
 
-2. Неструктурированный текст (список имен и данных, например, цитат, хобби и т.д.):
+3. Неструктурированный текст (список имен и данных, например, цитат, хобби и т.д.):
 {{RAW_TEXT}}
 
 **Инструкции (Строго к исполнению):**
 
 1. **Анализ структуры (Dynamic Field Mapping):**
-   - Посмотри, какие ключи есть внутри объекта `info` в исходном JSON (например: "Цитата", "Мечта", "Хобби").
-   - Найди соответствующую информацию в тексте для каждого поля.
-   - Если в тексте есть данные только для одного поля (например, только цитаты), заполни только его, остальные оставь без изменений.
+   - Поля из списка «Разрешённые поля» — единственная допустимая схема `info`.
+   - Найди соответствующую информацию в тексте для каждого из этих полей.
+   - Точные имена полей обязательны только в ключах JSON-ответа. Исходный текст
+     свободный: распознавай значение по смыслу и распространённым синонимам.
+     Например, «фильм», «кино» и «любимая картина» могут означать поле
+     «Любимый фильм», а «цитата», «любимая фраза» и «слова» — поле «Цитата»,
+     если эти поля есть в разрешённой схеме.
+   - Если формулировка не позволяет уверенно определить значение поля, не
+     придумывай его и не включай это поле в `info`.
+   - В ответе `info` указывай только разрешённые поля, для которых в исходном
+     тексте есть новое или исправленное значение. Не добавляй пустые значения и
+     не включай поля, которые не нужно менять: приложение сохранит их прежние
+     значения.
 
 2. **Сопоставление (Smart Matching):**
    - Ищи людей нестрого: "Саша" = "Александр", "Лера" = "Валерия", "Вячеслав" = "Слава".
@@ -71,9 +85,11 @@ DEFAULT_AI_PROMPT = """
 4. **Формат вывода:**
    - Верни ТОЛЬКО валидный JSON.
    - Используй объект вида:
-     {"matched": [{"student_id": "A7K3-S001", "source_person": "Иванов", "info": {}}], "unresolved": [{"source_person": "Петров", "reason": "Несколько кандидатов", "candidates": ["A7K3-S002", "A7K3-S005"]}]}
+     {"matched": [{"student_id": "A7K3-S001", "source_person": "Иванов", "info": {"<разрешённое поле>": "Новое значение"}}], "unresolved": [{"source_person": "Петров", "reason": "Несколько кандидатов", "candidates": ["A7K3-S002", "A7K3-S005"]}]}
    - В `matched` включай только однозначные сопоставления.
-   - Сохраняй существующие значения `info`, если в тексте нет новых данных для поля.
+   - Не включай поле в `info`, если в тексте нет для него новых данных:
+     приложение сохранит существующее значение.
+   - Никогда не добавляй в `info` поля, которых нет в списке разрешённых.
 """
 
 
@@ -94,8 +110,26 @@ def _atomic_write_text(path: pathlib.Path, text: str, encoding: str = "utf-8") -
         raise
 
 
-def build_ai_student_reference(students: List[Student]) -> List[Dict[str, Any]]:
-    """Формирует справочник, по которому AI разрешает ФИО в student_id."""
+def _normalize_info_columns(info_columns: Sequence[str]) -> List[str]:
+    """Return unique non-empty field names, preserving the configured order."""
+
+    normalized: List[str] = []
+    seen: set[str] = set()
+    for column in info_columns:
+        name = str(column).strip()
+        if name and name not in seen:
+            normalized.append(name)
+            seen.add(name)
+    return normalized
+
+
+def build_ai_student_reference(
+    students: List[Student],
+    info_columns: Sequence[str],
+) -> List[Dict[str, Any]]:
+    """Build an AI reference with every configured field for every student."""
+
+    allowed_fields = _normalize_info_columns(info_columns)
 
     return [
         {
@@ -103,16 +137,21 @@ def build_ai_student_reference(students: List[Student]) -> List[Dict[str, Any]]:
             "surname": student.surname,
             "name": student.name,
             "patronymic": student.patronymic,
-            "info": student.info,
+            "info": {
+                field: str(student.info.get(field, ""))
+                for field in allowed_fields
+            },
         }
         for student in students
     ]
 
 
 def validate_ai_enrichment_response(
-    payload: Any, students: List[Student]
+    payload: Any,
+    students: List[Student],
+    info_columns: Sequence[str],
 ) -> Tuple[Dict[str, Dict[str, str]], List[Dict[str, Any]]]:
-    """Проверяет ответ AI и возвращает обновления, адресованные только по ID."""
+    """Validate IDs and retain only values from the configured info schema."""
 
     if not isinstance(payload, dict):
         raise ValueError("Ожидался JSON-объект с массивами matched и unresolved.")
@@ -123,6 +162,7 @@ def validate_ai_enrichment_response(
         raise ValueError("Поля matched и unresolved должны быть массивами.")
 
     students_by_id = {student.student_id: student for student in students}
+    allowed_fields = set(_normalize_info_columns(info_columns))
     updates: Dict[str, Dict[str, str]] = {}
     for index, item in enumerate(matched, start=1):
         if not isinstance(item, dict):
@@ -138,7 +178,16 @@ def validate_ai_enrichment_response(
         info = item.get("info")
         if not isinstance(info, dict):
             raise ValueError(f"matched[{index}].info должен быть JSON-объектом.")
-        updates[student_id] = {str(key): str(value) for key, value in info.items()}
+        allowed_update: Dict[str, str] = {}
+        for key, value in info.items():
+            field_name = str(key)
+            if field_name not in allowed_fields or value is None:
+                continue
+            text_value = str(value).strip()
+            if text_value:
+                allowed_update[field_name] = text_value
+        if allowed_update:
+            updates[student_id] = allowed_update
 
     for index, item in enumerate(unresolved, start=1):
         if not isinstance(item, dict):

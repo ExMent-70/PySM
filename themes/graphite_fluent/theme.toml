@@ -8,6 +8,7 @@ collection_info = "color: #E0E0E0; background-color: #263238; padding: 5px; bord
 
 console_background = "background-color: #202020;"
 delegate_changed_indicator = "color: #D32F2F;"
+delegate_face_hover = "color: #f0ad4e;"
 delegate_hover_border = "color: #00A29A;"
 delegate_preview_background = "color: #383838;"
 delegate_secondary_text = "color: #A0A0A0;"

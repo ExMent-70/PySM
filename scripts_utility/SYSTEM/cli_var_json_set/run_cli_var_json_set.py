@@ -19,6 +19,7 @@ import sys
 
 try:
     from pysm_lib import pysm_context
+    from pysm_lib.context_variable_ops import format_error, format_success
     from pysm_lib.pysm_context import ConfigResolver
     from pysm_lib.input_processor import InputProcessor, VALIDATION_PRESETS
     IS_MANAGED_RUN = True
@@ -26,6 +27,11 @@ except ImportError:
     pysm_context = None
     ConfigResolver = None
     InputProcessor = None
+    VALIDATION_PRESETS = {}
+    def format_error(message: str) -> str:
+        return f"❌ ОШИБКА: {message}"
+    def format_success(var_name: str, value) -> str:
+        return f"✅ <b>{var_name}</b> = <i>{value}</i>"
     IS_MANAGED_RUN = False
 
 logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stdout)
@@ -92,10 +98,10 @@ def main():
             value_type=config.set_value_type,
         )
 
-        logger.info(f"✅ <b>{config.set_var_name}</b> = <i>{result}</i>\n")
+        logger.info(format_success(config.set_var_name, result) + "\n")
 
     except Exception as e:
-        logger.error(f"❌ Ошибка: {e}")
+        logger.error(format_error(str(e)))
         sys.exit(1)
 
     sys.exit(0)

@@ -15,6 +15,7 @@ Git-обновление portable-установки PySM.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -1241,14 +1242,81 @@ def force_update(git_path: Path, target_dir: Path, remote_ref: str, logger: Upda
     run_git(git_path, target_dir, ["reset", "--hard", remote_ref])
 
 
-def check_requirements(target_dir: Path, logger: UpdateLogger):
-    """Напомнить оператору про зависимости после обновления файлов."""
+def requirements_sha256(target_dir: Path) -> str | None:
+    """Return the exact requirements file signature without resolving packages."""
 
-    req_file = target_dir / "requirements.txt"
-    if req_file.exists():
-        logger.write()
-        logger.icon_line("Найден requirements.txt. Если обновление добавило зависимости, выполните:", "INFO")
-        logger.write(f"  pip install -r {req_file}")
+    requirements_file = target_dir / "requirements.txt"
+    if not requirements_file.is_file():
+        return None
+    return hashlib.sha256(requirements_file.read_bytes()).hexdigest()
+
+
+def portable_setup_state_dir(target_dir: Path) -> Path | None:
+    """Find the state directory owned by a neighboring portable pysm-setup.
+
+    A development checkout must not gain installer metadata, so the marker is
+    available only for the portable layout `<root>/repos/PySM` with an existing
+    `<root>/ps_env/state` directory.
+    """
+
+    if target_dir.name.lower() != "pysm" or target_dir.parent.name.lower() != "repos":
+        return None
+    state_dir = target_dir.parent.parent / "ps_env" / "state"
+    return state_dir if state_dir.is_dir() else None
+
+
+def record_pending_dependency_sync(
+    target_dir: Path,
+    requirements_before: str | None,
+    requirements_after: str | None,
+    after_commit: str,
+    logger: UpdateLogger,
+) -> str | None:
+    """Create a launcher-readable marker only when requirements changed.
+
+    The updater never invokes pip and never changes the active PySM venv. The
+    external launcher consumes this marker and asks `pysm-setup` to prepare a
+    separately verified candidate environment before the next PySM launch.
+    """
+
+    if requirements_before == requirements_after:
+        logger.icon_line("requirements.txt не изменился: синхронизация зависимостей не требуется.", "INFO")
+        return None
+
+    state_dir = portable_setup_state_dir(target_dir)
+    if state_dir is None:
+        logger.icon_line(
+            "requirements.txt изменился. Это не portable-установка с pysm-setup, поэтому marker синхронизации не создан.",
+            "INFO",
+        )
+        return None
+
+    marker_path = state_dir / "pending-pysm-dependency-sync.json"
+    temporary_path = marker_path.with_suffix(f"{marker_path.suffix}.tmp")
+    payload = {
+        "schema_version": 1,
+        "requirements_before_sha256": requirements_before,
+        "requirements_after_sha256": requirements_after,
+        "after_commit": after_commit,
+    }
+    try:
+        with temporary_path.open("w", encoding="utf-8", newline="\n") as marker_file:
+            json.dump(payload, marker_file, ensure_ascii=False, indent=2)
+            marker_file.write("\n")
+        os.replace(temporary_path, marker_path)
+    except OSError as error:
+        logger.icon_line(
+            f"requirements.txt изменился, но marker синхронизации не удалось сохранить: {error}",
+            "WARNING",
+        )
+        return None
+
+    logger.icon_line(
+        "requirements.txt изменился. Перед следующим запуском PySM launcher предложит безопасно синхронизировать зависимости.",
+        "WARNING",
+    )
+    logger.write(f"Создан marker синхронизации зависимостей: {marker_path}")
+    return str(marker_path)
 
 
 def log_report_links(logger: UpdateLogger):
@@ -1333,6 +1401,8 @@ def main():
         logger.kv_line("Git", str(git_path), "CONSOLE")
 
         assert_git_checkout(git_path, target_path)
+        requirements_before = requirements_sha256(target_path)
+        payload["requirements_before_sha256"] = requirements_before
 
         remote = config.remote or DEFAULT_REMOTE
         branch = config.branch or DEFAULT_BRANCH
@@ -1503,7 +1573,15 @@ def main():
         after_commit = git_output(git_path, target_path, ["rev-parse", "--short", "HEAD"])
         payload["after_commit"] = after_commit
         payload["result"] = "updated"
-        check_requirements(target_path, logger)
+        requirements_after = requirements_sha256(target_path)
+        payload["requirements_after_sha256"] = requirements_after
+        payload["pending_dependency_sync_marker"] = record_pending_dependency_sync(
+            target_path,
+            requirements_before,
+            requirements_after,
+            after_commit,
+            logger,
+        )
 
         logger.section("Итог", "OK")
         logger.icon_line(f"Обновление завершено успешно. Текущий commit: {after_commit}", "OK")

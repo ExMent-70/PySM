@@ -10,12 +10,19 @@ from argparse import Namespace
 IS_MANAGED_RUN = False
 try:
     from pysm_lib import pysm_context
+    from pysm_lib.context_variable_ops import format_error, format_success
     from pysm_lib.pysm_context import ConfigResolver
+    from pysm_lib.input_processor import InputProcessor
     from pysm_lib import theme_api
     IS_MANAGED_RUN = True
 except ImportError:
     pysm_context = None
     ConfigResolver = None
+    InputProcessor = None
+    def format_error(message: str) -> str:
+        return f"❌ ОШИБКА: {message}"
+    def format_success(var_name: str, value) -> str:
+        return f"✅ <b>{var_name}</b> = <i>{value}</i>"
 
 try:
     from PySide6.QtWidgets import QApplication, QInputDialog
@@ -37,7 +44,7 @@ def get_config() -> Namespace:
     )
     parser.add_argument(
         "--dlg_choice_var", type=str,
-        help="Имя переменной для сохранения результата в контекст.",
+        help="Имя переменной для сохранения результата в контекст. Поддерживается точечная нотация, например project.choice.",
         required=True
     )
     parser.add_argument(
@@ -71,27 +78,30 @@ def get_config() -> Namespace:
 # ==============================================================================
 def main():
     """Основная функция-оркестратор."""
-    
-    if not IS_MANAGED_RUN or not pysm_context:
-        logger.critical("❌ Этот скрипт может быть запущен только в среде PySM")
-        sys.exit(1)
-
     config = get_config()
+
+    if not IS_MANAGED_RUN or not pysm_context:
+        logger.critical(format_error("Этот скрипт может быть запущен только в среде PySM"))
+        sys.exit(1)
 
     choices = config.dlg_choice_list
     if isinstance(choices, str):
         choices = [item.strip() for item in choices.splitlines() if item.strip()]
 
     if not choices:
-        logger.critical("❌ Список для выбора (--dlg_choice_list) пуст.")
+        logger.critical(format_error("Список для выбора (--dlg_choice_list) пуст."))
         sys.exit(1)
 
-    # --- НАЧАЛО ИЗМЕНЕНИЙ ---
+    processor = InputProcessor(config, pysm_context, IS_MANAGED_RUN)
+
     # Определяем значение по умолчанию с учетом приоритетов
     default_value = None
     
     # Приоритет 1: Значение из контекста
-    context_value = pysm_context.get(config.dlg_choice_var)
+    context_value = processor.get_initial_value(
+        config.dlg_choice_var,
+        config.dlg_choice_dvalue or "",
+    )
     if context_value is not None and context_value in choices:
         default_value = context_value
         logger.debug(f"Текущее значение переменной <i>{config.dlg_choice_var}</i> = <b>{context_value}</b>\n")
@@ -109,7 +119,6 @@ def main():
         except ValueError:
             # На случай, если значение есть, но его нет в списке
             logger.warning(f"Предупреждение: значение по умолчанию '{default_value}' не найдено в списке вариантов.")
-    # --- КОНЕЦ ИЗМЕНЕНИЙ ---
     q_app = QApplication.instance() or QApplication(sys.argv)
     theme_api.apply_theme_to_app(q_app)
     
@@ -124,16 +133,20 @@ def main():
 
     if ok and selected_item:
         try:
-            pysm_context.set(config.dlg_choice_var, selected_item)
+            processor.process(
+                raw_value=selected_item,
+                var_name=config.dlg_choice_var,
+                value_type="string",
+            )
             logger.debug(f"Переменная <i>{config.dlg_choice_var}</i> = <b>{selected_item}</b> успешно сохранена\n\n")
             logger.info(f"<b>{config.dlg_choice_title}</b>")
-            logger.info(f"✅ <b>{config.dlg_choice_var}</b> = <i>{selected_item}</i>\n")
+            logger.info(format_success(config.dlg_choice_var, selected_item) + "\n")
             sys.exit(0)
         except Exception as e:
-            logger.critical(f"❌ Ошибка при сохранении данных в контекст: {e}")
+            logger.critical(format_error(f"Ошибка при сохранении данных в контекст: {e}"))
             sys.exit(1)
     else:
-        logger.critical("❌ Операция отменена пользователем<br>")
+        logger.critical(format_error("Операция отменена пользователем<br>"))
         sys.exit(1)
 
 

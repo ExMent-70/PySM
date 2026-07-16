@@ -24,6 +24,17 @@ except ImportError:
 
 
 Operation = Literal["refresh", "copy", "build", "copy_and_build"]
+SelectionSignature = tuple[int, int, int] | None
+
+
+def file_signature(path: Path) -> SelectionSignature:
+    """Return a cheap signature used to reject stale worker results."""
+
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size
 
 
 @dataclass(frozen=True)
@@ -36,6 +47,7 @@ class BuildRequest:
     dest_dir: Path
     exclude_dirs: tuple[str, ...]
     assignment_path: Path
+    selection_signature: SelectionSignature
 
 
 @dataclass(frozen=True)
@@ -46,6 +58,8 @@ class OperationOutcome:
     result: BuildResult
     copy_summary: CopySummary | None = None
     assignment_saved: bool = False
+    selection_signature: SelectionSignature = None
+    preview_by_stem: dict[str, Path] | None = None
 
 
 class PhotoSelectionOperationWorker(QThread):
@@ -70,12 +84,52 @@ class PhotoSelectionOperationWorker(QThread):
             exclude_dirs=request.exclude_dirs,
         )
 
+    def _selection_is_current(self) -> bool:
+        selection_path = self.request.analysis_dir / "photo_selection.json"
+        return file_signature(selection_path) == self.request.selection_signature
+
+    def _preview_index(self) -> dict[str, Path]:
+        """Build a deterministic JPG index off the GUI thread."""
+
+        root = self.request.analysis_dir / "JPG"
+        if not root.is_dir():
+            return {}
+        result: dict[str, Path] = {}
+        for path in root.rglob("*"):
+            if not path.is_file() or path.suffix.casefold() not in {".jpg", ".jpeg"}:
+                continue
+            key = path.stem.casefold()
+            previous = result.get(key)
+            if previous is None or str(path).casefold() < str(previous).casefold():
+                result[key] = path
+        return result
+
+    def _outcome(
+        self,
+        result: BuildResult,
+        summary: CopySummary | None = None,
+        saved: bool = False,
+        *,
+        include_preview: bool = True,
+    ) -> OperationOutcome:
+        return OperationOutcome(
+            self.operation,
+            result,
+            summary,
+            saved,
+            self.request.selection_signature,
+            self._preview_index() if include_preview else {},
+        )
+
     def run(self) -> None:
         try:
             self.stageChanged.emit("Сканирование исходной и целевой папок…")
             result = self._build()
+            if not self._selection_is_current():
+                self.completed.emit(self._outcome(result, include_preview=False))
+                return
             if result.has_errors:
-                self.completed.emit(OperationOutcome(self.operation, result))
+                self.completed.emit(self._outcome(result))
                 return
 
             summary: CopySummary | None = None
@@ -89,8 +143,11 @@ class PhotoSelectionOperationWorker(QThread):
                 )
                 result.issues.extend(summary.issues)
                 if any(issue.severity == "error" for issue in summary.issues):
+                    self.completed.emit(self._outcome(result, summary))
+                    return
+                if not self._selection_is_current():
                     self.completed.emit(
-                        OperationOutcome(self.operation, result, summary)
+                        self._outcome(result, summary, include_preview=False)
                     )
                     return
                 self.stageChanged.emit("Повторное сканирование целевой папки…")
@@ -98,18 +155,19 @@ class PhotoSelectionOperationWorker(QThread):
 
             saved = False
             if self.operation in {"build", "copy_and_build"} and not result.has_errors:
+                if not self._selection_is_current():
+                    self.completed.emit(
+                        self._outcome(result, summary, include_preview=False)
+                    )
+                    return
                 result.issues.extend(publishability_issues(result))
                 if result.has_errors:
-                    self.completed.emit(
-                        OperationOutcome(self.operation, result, summary)
-                    )
+                    self.completed.emit(self._outcome(result, summary))
                     return
                 self.stageChanged.emit("Создание photo_assignments.json…")
                 save_assignments(self.request.assignment_path, result)
                 saved = True
 
-            self.completed.emit(
-                OperationOutcome(self.operation, result, summary, saved)
-            )
+            self.completed.emit(self._outcome(result, summary, saved))
         except Exception as exc:
             self.failed.emit(str(exc))
