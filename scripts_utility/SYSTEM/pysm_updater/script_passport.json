@@ -2,7 +2,7 @@
   "description": "Обновляет PySM через portable Git, показывает список коммитов и измененных файлов перед применением.",
   "category": "Системные",
   "author": "System",
-  "version": "2.2026.06.14",
+  "version": "2.2026.07.16",
   "command_line_args_meta": {
     "target_dir": {
       "type": "dir_path",
@@ -44,11 +44,15 @@
       "required": false,
       "default": false
     },
-    "dry_run": {
-      "type": "bool",
-      "description": "Только получить данные с GitHub и показать план обновления, не менять файлы.",
+    "update_mode": {
+      "type": "choice",
+      "description": "Режим обновления: plan только показывает план, apply применяет изменения.",
       "required": false,
-      "default": true
+      "default": "plan",
+      "choices": [
+        "plan",
+        "apply"
+      ]
     },
     "force": {
       "type": "bool",

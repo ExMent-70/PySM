@@ -326,9 +326,8 @@ def git_output_raw(git_path: Path, target_dir: Path, args: list[str], check: boo
     return run_git(git_path, target_dir, args, check=check).stdout
 
 
-def get_config():
-    """Разобрать параметры из PySM config/context или из командной строки."""
-
+def build_argument_parser() -> argparse.ArgumentParser:
+    """Build one explicit update-mode contract for every launch environment."""
     parser = argparse.ArgumentParser(description="Обновление PySM через portable Git.")
     parser.add_argument("--target_dir", type=str, help="Папка установки PySM")
     parser.add_argument("--git_path", type=str, help="Путь к git.exe; обычно определяется автоматически")
@@ -352,10 +351,10 @@ def get_config():
         help="Разрешить обновление из remote, который не прошел проверку expected_remote_contains",
     )
     parser.add_argument(
-        "--dry_run",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help="Только показать изменения, не обновлять файлы",
+        "--update_mode",
+        choices=("plan", "apply"),
+        default="plan",
+        help="Режим работы: plan показывает план, apply применяет обновление",
     )
     parser.add_argument("--force", action="store_true", help="Принудительно заменить tracked-файлы версией из remote")
     parser.add_argument(
@@ -373,6 +372,13 @@ def get_config():
         default=DEFAULT_CONSOLE_PREVIEW_LIMIT,
         help="Максимум строк предпросмотра для длинных списков в консоли PySM",
     )
+    return parser
+
+
+def get_config():
+    """Разобрать параметры из PySM config/context или из командной строки."""
+
+    parser = build_argument_parser()
 
     if IS_MANAGED_RUN and ConfigResolver:
         return ConfigResolver(parser).resolve_all()
@@ -466,7 +472,7 @@ def ensure_local_git_excludes(
 
     if not apply_changes:
         logger.icon_line(
-            f"Локальные Git-исключения требуют обновления, но dry-run не меняет .git/info/exclude: {exclude_path}",
+            f"Локальные Git-исключения требуют обновления, но режим plan не меняет .git/info/exclude: {exclude_path}",
             "INFO",
         )
         return exclude_path
@@ -1381,6 +1387,8 @@ def main():
 
     try:
         console_preview_limit = max(0, int(config.console_preview_limit))
+        apply_update = config.update_mode == "apply"
+        payload["update_mode"] = config.update_mode
 
         logger.section("ЗАПУСК ОБНОВЛЕНИЯ PySM", "ROCKET")
         logger.kv_line("Целевая папка", str(target_path), "FOLDER_OPEN")
@@ -1388,7 +1396,7 @@ def main():
         logger.kv_line(
             "Режимы",
             (
-                f"dry_run={bool(config.dry_run)}, "
+                f"update_mode={config.update_mode}, "
                 f"repair_git_state={bool(config.repair_git_state)}, "
                 f"force={bool(config.force)}, "
                 f"no_backup={bool(config.no_backup)}"
@@ -1426,7 +1434,7 @@ def main():
             git_path,
             target_path,
             logger,
-            apply_changes=not bool(config.dry_run),
+            apply_changes=apply_update,
         )
         payload["local_git_exclude"] = str(local_exclude_path)
 
@@ -1451,14 +1459,18 @@ def main():
         payload["local_state"] = local_state
         write_local_state(logger, local_state, int(config.max_files), console_preview_limit=console_preview_limit)
 
-        if config.force and config.dry_run:
+        if config.force and not apply_update:
             logger.write()
-            logger.icon_line("Force включен, но dry-run не меняет файлы. Для применения отключите dry_run.", "INFO")
+            logger.icon_line(
+                "Force включен, но режим plan не меняет файлы. "
+                "Для применения выберите update_mode=apply.",
+                "INFO",
+            )
 
-        if config.dry_run:
-            payload["result"] = "dry_run"
+        if not apply_update:
+            payload["result"] = "plan"
             logger.section("Итог", "OK")
-            logger.icon_line("Dry-run завершен. Файлы не изменялись.", "OK")
+            logger.icon_line("Режим plan завершен. Файлы не изменялись.", "OK")
             return
 
         if plan["ahead"] > 0:
@@ -1498,7 +1510,7 @@ def main():
             # "Новых commit нет" не означает "checkout чистый". К этому моменту
             # missing tracked уже могли быть восстановлены, а optional repair все
             # еще может убрать ложные modified-статусы.
-            if config.repair_git_state and not config.dry_run:
+            if config.repair_git_state and apply_update:
                 repair_git_state(git_path, target_path, remote_ref, logger, local_state)
                 after_repair_state = analyze_local_state(git_path, target_path, remote_ref, plan)
                 payload["local_state_after_repair"] = after_repair_state
@@ -1565,7 +1577,7 @@ def main():
                 if local_state["already_remote"]:
                     raise UpdaterError(
                         "Git не смог выполнить fast-forward из-за локальных изменений, хотя часть файлов уже совпадает с remote.\n"
-                        "Если dry-run показывает, что локальных конфликтов с обновлением нет, включите repair_git_state.\n"
+                        "Если режим plan показывает, что локальных конфликтов с обновлением нет, включите repair_git_state.\n"
                         f"{details}"
                     )
                 raise UpdaterError(f"Команда завершилась с ошибкой: git merge --ff-only {remote_ref}\n{details}")
