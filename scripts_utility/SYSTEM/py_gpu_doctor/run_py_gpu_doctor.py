@@ -1,129 +1,259 @@
-# pysm_lib/script_samples/py_gpu_report/run_py_gpu_report.py
+"""Сводная диагностика драйвера NVIDIA, GPU, CUDA и PyTorch."""
 
+from __future__ import annotations
+
+import json
+import os
+import platform
+import shutil
 import sys
-
-# Попытка импорта необходимых библиотек
-try:
-    import torch
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
-
-try:
-    import pynvml
-    PYNVML_AVAILABLE = True
-except ImportError:
-    PYNVML_AVAILABLE = False
+import warnings
+from pathlib import Path
+from typing import Any
 
 
-def print_header(title):
-    print(f"\n<h3>--- {title} ---</h3>")
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts_utility.SYSTEM._common.gpu_doctor_report import (  # noqa: E402
+    DiagnosticReport,
+    build_help_parser,
+    compact_python_version,
+    format_bytes,
+)
 
 
-print("<b>Полный отчет о конфигурации GPU и библиотек</b>")
-print(f"Версия Python: {sys.version}")
+def build_parser():
+    """Создаёт CLI диагностического скрипта."""
+    return build_help_parser("Собрать сводный отчёт о драйвере NVIDIA, GPU, CUDA и PyTorch.")
 
-# --- Проверка наличия PYNVML ---
-if not PYNVML_AVAILABLE:
-    print("\n❌ КРИТИЧЕСКАЯ ОШИБКА: Библиотека 'pynvml' не найдена.")
-    print("  Для сбора детальной информации о драйвере и GPU необходима эта библиотека.")
-    print("  Установите ее командой: pip install pynvml")
-    sys.exit()
 
-try:
-    pynvml.nvmlInit()
+def _text(value: Any) -> str:
+    """Нормализует строки, которые NVML разных версий возвращает как str или bytes."""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
 
-    # --- Секция 1: Информация о драйвере и системной CUDA ---
-    print_header("Информация о системе и драйвере NVIDIA")
-    
-    # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
-    #
-    # ИСПРАВЛЕНИЕ: Удаляем вызов .decode('utf-8'), так как pynvml.nvmlSystemGetDriverVersion()
-    # уже возвращает строку (str), а не байты (bytes).
-    #
-    driver_version = pynvml.nvmlSystemGetDriverVersion()
-    # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
-    
-    print(f"Версия драйвера NVIDIA: <b>{driver_version}</b>")
+
+def _optional_nvml(call: Any, *args: Any) -> Any | None:
+    """Возвращает значение необязательного NVML-показателя или None."""
+    try:
+        return call(*args)
+    except Exception:
+        return None
+
+
+def _find_portable_cuda() -> tuple[Path | None, str | None, str | None]:
+    """Ищет portable CUDA PySM и читает её версию из version.json."""
+    candidates: list[Path] = []
+    env_path = os.environ.get("PYSM_CUDA_PATH")
+    if env_path:
+        candidates.append(Path(env_path))
+    candidates.append(PROJECT_ROOT.parent.parent / "ps_env" / "CUDA")
+
+    executable_path = Path(sys.executable).resolve()
+    if len(executable_path.parents) > 2:
+        candidates.append(executable_path.parents[2] / "ps_env" / "CUDA")
+
+    seen: set[Path] = set()
+    for cuda_path in candidates:
+        normalized_path = cuda_path.resolve()
+        if normalized_path in seen:
+            continue
+        seen.add(normalized_path)
+
+        version_file = normalized_path / "version.json"
+        if not version_file.is_file():
+            continue
+        try:
+            data = json.loads(version_file.read_text(encoding="utf-8"))
+            version = data.get("cuda", {}).get("version")
+            return normalized_path, str(version) if version else None, None
+        except (OSError, TypeError, ValueError) as error:
+            return normalized_path, None, f"не удалось прочитать {version_file}: {error}"
+    return None, None, None
+
+
+def report_environment(report: DiagnosticReport) -> None:
+    """Показывает Python, ОС и обнаруженные системные инструменты CUDA."""
+    report.section(1, "Окружение Python и CUDA")
+    report.detail("Версия Python", compact_python_version(sys.version))
+    report.detail("Интерпретатор", sys.executable)
+    report.detail("Операционная система", platform.platform())
+    report.detail("CUDA_PATH", os.environ.get("CUDA_PATH") or "не задан")
+    report.detail("PYSM_CUDA_PATH", os.environ.get("PYSM_CUDA_PATH") or "не задан")
+
+    portable_path, portable_version, portable_error = _find_portable_cuda()
+    if portable_path is None:
+        report.detail("Portable CUDA PySM", "не найдена")
+    else:
+        report.detail("Portable CUDA PySM", portable_path)
+        report.detail("Версия portable CUDA", portable_version or "не указана")
+        portable_nvcc = portable_path / "bin" / "nvcc.exe"
+        report.detail(
+            "Компилятор portable CUDA",
+            portable_nvcc if portable_nvcc.is_file() else "не найден",
+        )
+    if portable_error:
+        report.warning(f"Сведения о portable CUDA неполны: {portable_error}")
+
+    report.detail("Утилита nvidia-smi", shutil.which("nvidia-smi") or "не найдена в PATH")
+    report.detail("Системный nvcc из PATH", shutil.which("nvcc") or "не найден")
+
+
+def report_nvml(report: DiagnosticReport) -> tuple[bool, int]:
+    """Собирает сведения о драйвере и физических GPU через NVML."""
+    report.section(2, "Драйвер NVIDIA и физические устройства")
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", FutureWarning)
+            import pynvml
+    except ImportError:
+        report.warning("Модуль NVML для Python не установлен; системная часть отчёта пропущена.")
+        report.line("Для этого раздела нужен пакет nvidia-ml-py.", indent=1)
+        return False, 0
+
+    initialized = False
+    try:
+        pynvml.nvmlInit()
+        initialized = True
+        driver_version = _text(pynvml.nvmlSystemGetDriverVersion())
+        report.detail("Версия драйвера NVIDIA", driver_version)
+
+        cuda_version = _optional_nvml(pynvml.nvmlSystemGetCudaDriverVersion)
+        if cuda_version is None:
+            report.detail("CUDA, поддерживаемая драйвером", "не удалось определить")
+        else:
+            report.detail(
+                "CUDA, поддерживаемая драйвером",
+                f"{cuda_version // 1000}.{(cuda_version % 1000) // 10}",
+            )
+
+        device_count = pynvml.nvmlDeviceGetCount()
+        report.detail("Количество GPU", device_count)
+        if device_count == 0:
+            report.warning("NVML инициализирована, но совместимые GPU не обнаружены.")
+            return True, 0
+
+        for index in range(device_count):
+            handle = pynvml.nvmlDeviceGetHandleByIndex(index)
+            name = _text(pynvml.nvmlDeviceGetName(handle))
+            report.info(f"GPU {index}: {name}")
+
+            memory = _optional_nvml(pynvml.nvmlDeviceGetMemoryInfo, handle)
+            if memory is not None:
+                report.detail("Память всего", format_bytes(memory.total), indent=1)
+                report.detail("Память занято", format_bytes(memory.used), indent=1)
+                report.detail("Память свободно", format_bytes(memory.free), indent=1)
+
+            capability = _optional_nvml(pynvml.nvmlDeviceGetCudaComputeCapability, handle)
+            if capability is not None:
+                report.detail("Вычислительная способность", f"{capability[0]}.{capability[1]}", indent=1)
+
+            utilization = _optional_nvml(pynvml.nvmlDeviceGetUtilizationRates, handle)
+            if utilization is not None:
+                report.detail("Загрузка GPU", f"{utilization.gpu}%", indent=1)
+
+            temperature = _optional_nvml(
+                pynvml.nvmlDeviceGetTemperature,
+                handle,
+                pynvml.NVML_TEMPERATURE_GPU,
+            )
+            if temperature is not None:
+                report.detail("Температура", f"{temperature} °C", indent=1)
+
+        report.success("Драйвер NVIDIA и физические GPU доступны через NVML.")
+        return True, device_count
+    except Exception as error:
+        report.exception("Не удалось получить сведения через NVML.", error)
+        return False, 0
+    finally:
+        if initialized:
+            try:
+                pynvml.nvmlShutdown()
+            except Exception:
+                pass
+
+
+def report_pytorch(report: DiagnosticReport) -> tuple[bool, int]:
+    """Показывает состояние CUDA с точки зрения текущей установки PyTorch."""
+    report.section(3, "PyTorch, CUDA Runtime и cuDNN")
+    try:
+        import torch
+    except ImportError:
+        report.warning("PyTorch не установлен; библиотечная часть отчёта пропущена.")
+        return False, 0
+    except Exception as error:
+        report.exception("PyTorch установлен, но его импорт завершился ошибкой.", error)
+        return False, 0
+
+    report.detail("Версия PyTorch", torch.__version__)
+    report.detail("CUDA сборки PyTorch", torch.version.cuda or "сборка только для CPU")
+    report.detail("Версия cuDNN", torch.backends.cudnn.version() or "недоступна")
 
     try:
-        # Эта функция может отсутствовать в очень старых драйверах
-        cuda_driver_version_int = pynvml.nvmlSystemGetCudaDriverVersion()
-        cuda_driver_version_str = f"{cuda_driver_version_int // 1000}.{(cuda_driver_version_int % 1000) // 10}"
-        print(f"Версия CUDA (поддерживаемая драйвером): <b>{cuda_driver_version_str}</b>")
-    except pynvml.NVMLError_FunctionNotFound:
-        print("Версия CUDA (поддерживаемая драйвером): <b>Не удалось определить (старая версия драйвера)</b>")
+        cuda_available = torch.cuda.is_available()
+        device_count = torch.cuda.device_count()
+    except Exception as error:
+        report.exception("PyTorch не смог опросить подсистему CUDA.", error)
+        return False, 0
+
+    report.detail("CUDA доступна PyTorch", "да" if cuda_available else "нет")
+    report.detail("Количество GPU в PyTorch", device_count)
+
+    for index in range(device_count):
+        try:
+            properties = torch.cuda.get_device_properties(index)
+            report.info(f"Устройство PyTorch {index}: {properties.name}")
+            report.detail("Память всего", format_bytes(properties.total_memory), indent=1)
+            report.detail(
+                "Вычислительная способность",
+                f"{properties.major}.{properties.minor}",
+                indent=1,
+            )
+        except Exception as error:
+            report.exception(f"Не удалось получить свойства GPU {index} через PyTorch.", error)
+
+    if cuda_available and device_count > 0:
+        report.success("PyTorch обнаружил CUDA и хотя бы одно устройство GPU.")
+        return True, device_count
+
+    report.warning("Текущая установка PyTorch не готова к вычислениям на CUDA.")
+    return False, device_count
 
 
-    # --- Секция 2: Информация из PyTorch ---
-    print_header("Информация из библиотеки PyTorch")
-    if not TORCH_AVAILABLE:
-        print("❌ PyTorch не установлен. Информация недоступна.")
+def main() -> int:
+    """Запускает все независимые разделы диагностики."""
+    build_parser().parse_args()
+    report = DiagnosticReport("Сводная диагностика GPU")
+    report.begin()
+
+    report_environment(report)
+    nvml_ready, nvml_devices = report_nvml(report)
+    torch_ready, torch_devices = report_pytorch(report)
+
+    report.section(4, "Сопоставление результатов")
+    if nvml_devices and torch_devices and nvml_devices != torch_devices:
+        report.warning(
+            "NVML и PyTorch обнаружили разное количество GPU; проверьте ограничения видимости устройств."
+        )
+    elif nvml_devices and torch_devices:
+        report.success("NVML и PyTorch обнаружили одинаковое количество GPU.")
     else:
-        print(f"Версия PyTorch: <b>{torch.__version__}</b>")
-        if torch.cuda.is_available():
-            print("Состояние CUDA в PyTorch: ✅ <b>Доступно</b>")
-            print(f"Версия PyTorch CUDA: <b>{torch.version.cuda}</b> (скомпилировано с этой версией)")
-            # Проверка доступности и версии CUDNN
-            if torch.backends.cudnn.is_available():
-                print("Состояние CUDNN в PyTorch: ✅ <b>Доступно</b>")
-                cudnn_version = torch.backends.cudnn.version()
-                print(f"Версия CUDNN: <b>{cudnn_version}</b>")
-            else:
-                print("Состояние CUDNN в PyTorch: ❌ <b>Недоступно</b>")
-        else:
-            print("Состояние CUDA в PyTorch: ❌ <b>Недоступно</b>")
+        report.info("Сопоставление количества GPU невозможно из-за неполных данных.")
 
-
-    # --- Секция 3: Детальная информация по каждому GPU ---
-    print_header("Обнаруженные устройства GPU")
-    device_count = pynvml.nvmlDeviceGetCount()
-    if device_count == 0:
-        print("Не найдено ни одного GPU.")
+    if nvml_ready and torch_ready:
+        conclusion = "Драйвер NVIDIA и PyTorch видят GPU; базовая конфигурация выглядит работоспособной."
+    elif nvml_ready:
+        conclusion = "Драйвер видит GPU, но PyTorch не подтвердил готовность CUDA."
+    elif torch_ready:
+        conclusion = "PyTorch использует GPU, но системные сведения NVML недоступны."
     else:
-        print(f"Найдено устройств: <b>{device_count}</b>")
-        for i in range(device_count):
-            print(f"\n<i><u>--- Устройство ID: {i} ---</u></i>")
-            handle = pynvml.nvmlDeviceGetHandleByIndex(i)
-            
-            # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
-            #
-            # ИСПРАВЛЕНИЕ: Удаляем вызов .decode('utf-8'), так как pynvml.nvmlDeviceGetName()
-            # также возвращает строку (str), а не байты (bytes).
-            #
-            name = pynvml.nvmlDeviceGetName(handle)
-            # --- КОНЕЦ ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
-            
-            print(f"  Название: <b>{name}</b>")
-
-            # Память
-            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-            total_mem_mb = mem_info.total / (1024**2)
-            used_mem_mb = mem_info.used / (1024**2)
-            free_mem_mb = mem_info.free / (1024**2)
-            print(f"  Память: {used_mem_mb:.0f} МБ / {total_mem_mb:.0f} МБ (Использовано / Всего)")
-
-            # Вычислительная способность
-            try:
-                major, minor = pynvml.nvmlDeviceGetCudaComputeCapability(handle)
-                print(f"  Вычислительная способность (Compute Capability): <b>{major}.{minor}</b>")
-            except pynvml.NVMLError_FunctionNotFound:
-                 print("  Вычислительная способность (Compute Capability): <b>Не удалось определить</b>")
-
-            # Температура
-            try:
-                temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
-                print(f"  Температура: <b>{temp}°C</b>")
-            except pynvml.NVMLError:
-                print("  Температура: Не удалось получить данные")
+        conclusion = "Готовность GPU не подтверждена; изучите ошибки и предупреждения выше."
+    report.finish(conclusion)
+    return 0
 
 
-
-except pynvml.NVMLError as error:
-    print(f"\n❌ ОШИБКА NVML: Не удалось инициализировать библиотеку. {error}")
-    print("  Это может означать, что драйвер NVIDIA не установлен или работает некорректно.")
-finally:
-    if PYNVML_AVAILABLE:
-        pynvml.nvmlShutdown()
-
-print("\n<b>Отчет завершен</b>\n")
+if __name__ == "__main__":
+    raise SystemExit(main())

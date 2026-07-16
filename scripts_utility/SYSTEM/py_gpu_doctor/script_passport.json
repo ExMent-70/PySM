@@ -1,7 +1,7 @@
 {
-  "description": "Генерирует полный отчет о конфигурации GPU, включая версии драйвера, CUDA, cuDNN, а также детальную информацию по каждой видеокарте.",
-  "category": "Без категории",
+  "description": "Собирает единый отчёт о Python, драйвере NVIDIA, физических GPU, CUDA, cuDNN и состоянии PyTorch.",
+  "category": "Системные утилиты",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "1.0",
+  "version": "2.2026.07.16",
   "command_line_args_meta": {}
 }
