@@ -2,7 +2,7 @@
   "description": "Пакетно переименовывает файлы после выбранной сортировки: по дате создания, по дате изменения, по имени или без сортировки. Подходит для RAW-файлов с карт памяти, где нумерация камеры переходит с 9999 на 0001.",
   "category": "Файловые операции",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.05.10",
+  "version": "2.2026.07.17",
   "command_line_args_meta": {
     "br_source_dir": {
       "type": "dir_path",
@@ -20,7 +20,7 @@
     },
     "br_template": {
       "type": "choice",
-      "description": "Шаблон нового имени файла. Токены скрипта: %index%, %ext%, %stem%, %name%, %prefix%, %suffix%, %created_date%, %created_time%. Переменные PySM вида {session_name} тоже можно использовать.",
+      "description": "Шаблон нового имени файла. Токены скрипта: %index%, %ext%, %stem%, %name%, %prefix%, %suffix%. Переменные PySM вида {session_name} тоже можно использовать.",
       "required": true,
       "default": "{wf_session_name}_%index%%ext%",
       "choices": [
@@ -30,8 +30,6 @@
         "{wf_session_name}_%index%%ext%",
         "{wf_session_name}_%prefix%%index%%ext%",
         "{wf_session_name}_RAW_%index%%ext%",
-        "%created_date%_%index%%ext%",
-        "%created_date%_%created_time%_%index%%ext%",
         "%index%_%stem%%ext%"
       ]
     },
