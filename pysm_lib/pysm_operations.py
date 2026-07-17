@@ -8,7 +8,6 @@
 # 1. БЛОК: Импорты
 # ==============================================================================
 import concurrent.futures
-from datetime import datetime
 import pathlib
 import re
 import shutil
@@ -127,8 +126,6 @@ def _render_batch_rename_template(
     lowercase_extension: bool,
 ) -> str:
     """Подставляет внутренние токены batch rename в имя файла."""
-    stat_result = source_path.stat()
-    modified_dt = datetime.fromtimestamp(stat_result.st_mtime)
     ext = source_path.suffix.lower() if lowercase_extension else source_path.suffix
     replacements = {
         "%index%": _format_batch_rename_index(index, index_digits),
@@ -137,13 +134,44 @@ def _render_batch_rename_template(
         "%ext%": ext,
         "%prefix%": prefix or "",
         "%suffix%": suffix or "",
-        "%created_date%": modified_dt.strftime("%Y-%m-%d"),
-        "%created_time%": modified_dt.strftime("%H-%M-%S"),
     }
     rendered = template
     for token, value in replacements.items():
         rendered = rendered.replace(token, value)
     return rendered
+
+
+def _get_batch_rename_path_key(path: pathlib.Path) -> str:
+    """Возвращает регистронезависимый абсолютный ключ без обращения к диску."""
+    return os.path.normcase(os.path.abspath(os.fspath(path)))
+
+
+def _get_unique_path_for_batch_rename(
+    path: pathlib.Path,
+    assigned_targets: set[str],
+    existing_paths: set[str],
+) -> tuple[pathlib.Path, str]:
+    """Подбирает свободное имя с учётом файлов и уже назначенных целей."""
+    parent, stem, ext = path.parent, path.stem, path.suffix
+    index = 1
+    while True:
+        candidate = parent / f"{stem} ({index}){ext}"
+        candidate_key = _get_batch_rename_path_key(candidate)
+        if (
+            candidate_key not in assigned_targets
+            and candidate_key not in existing_paths
+        ):
+            return candidate, candidate_key
+        index += 1
+
+
+def _scan_batch_rename_directory(directory: pathlib.Path) -> set[str]:
+    """Одним проходом получает ключи всех занятых имён в каталоге."""
+    with os.scandir(directory) as entries:
+        return {
+            _get_batch_rename_path_key(pathlib.Path(entry.path))
+            for entry in entries
+        }
 
 
 # 4. БЛОК: Публичная функция API для операций с директориями
@@ -411,7 +439,9 @@ def perform_batch_rename_operation(
     for pattern in include_patterns:
         iterator = source_dir.rglob(pattern) if recursive else source_dir.glob(pattern)
         items_to_process.extend(list(iterator))
-    items_to_process = list(set(item for item in items_to_process if item.is_file()))
+    items_to_process = list(
+        dict.fromkeys(item for item in items_to_process if item.is_file())
+    )
 
     if sort_method == "created_time":
         items_to_process = sorted(
@@ -447,7 +477,7 @@ def perform_batch_rename_operation(
     )
 
     candidate_entries = []
-    assigned_targets: set[pathlib.Path] = set()
+    assigned_targets: set[str] = set()
     plan = []
     stats = {"planned": 0, "skipped": 0, "error": 0}
 
@@ -477,24 +507,52 @@ def perform_batch_rename_operation(
             continue
 
         target_path = source_path.with_name(rendered_name)
-        candidate_entries.append((source_path, target_path))
+        source_key = _get_batch_rename_path_key(source_path)
+        target_key = _get_batch_rename_path_key(target_path)
+        candidate_entries.append((source_path, target_path, source_key, target_key))
+
+    target_directories = {
+        _get_batch_rename_path_key(target_path.parent): target_path.parent
+        for _source_path, target_path, _source_key, _target_key in candidate_entries
+    }
+    existing_paths: set[str] = set()
+    directory_progress = tqdm(
+        target_directories.values(),
+        total=len(target_directories),
+        desc="Чтение каталогов",
+        unit="dir",
+    )
+    try:
+        for target_directory in directory_progress:
+            existing_paths.update(_scan_batch_rename_directory(target_directory))
+    except OSError as error:
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_error} '
+            f'Не удалось прочитать каталог при построении плана: '
+            f'<b>{error}</b></div>'
+        )
+        return 1
 
     renamed_sources = {
-        source_path.resolve()
-        for source_path, target_path in candidate_entries
-        if source_path.resolve() != target_path.resolve()
+        source_key
+        for _source_path, _target_path, source_key, target_key in candidate_entries
+        if source_key != target_key
     }
 
-    for source_path, target_path in candidate_entries:
-        target_resolved = target_path.resolve()
-
+    plan_progress = tqdm(
+        candidate_entries,
+        total=len(candidate_entries),
+        desc="Проверка плана",
+        unit="file",
+    )
+    for source_path, target_path, source_key, target_key in plan_progress:
         while True:
-            target_already_assigned = target_resolved in assigned_targets
-            target_is_current_source = source_path.resolve() == target_resolved
+            target_already_assigned = target_key in assigned_targets
+            target_is_current_source = source_key == target_key
             target_is_external_existing = (
-                target_path.exists()
+                target_key in existing_paths
                 and not target_is_current_source
-                and target_resolved not in renamed_sources
+                and target_key not in renamed_sources
             )
             if not target_already_assigned and not target_is_external_existing:
                 break
@@ -503,8 +561,11 @@ def perform_batch_rename_operation(
                 target_path = None
                 break
             if on_conflict == "rename":
-                target_path = _get_unique_path_for_dir_op(target_path)
-                target_resolved = target_path.resolve()
+                target_path, target_key = _get_unique_path_for_batch_rename(
+                    target_path,
+                    assigned_targets,
+                    existing_paths,
+                )
                 continue
             stats["error"] += 1
             tqdm.write(f"[FAIL] Target file already exists: {target_path}")
@@ -514,8 +575,8 @@ def perform_batch_rename_operation(
         if target_path is None:
             continue
 
-        assigned_targets.add(target_resolved)
-        if source_path.resolve() == target_resolved:
+        assigned_targets.add(target_key)
+        if source_key == target_key:
             stats["skipped"] += 1
             continue
 
