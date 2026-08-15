@@ -1,0 +1,134 @@
+{
+  "description": "Выводит HTML-текст или содержимое HTML-файла в консоль PySM, настраиваемое диалоговое окно либо одновременно в оба места. При показе диалога сохраняет выбор пользователя в Контекст Коллекции и управляет продолжением цепочки кодом выхода.",
+  "category": "Интерфейс пользователя",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2.2026.08.14",
+  "command_line_args_meta": {
+    "html_content": {
+      "type": "string_multiline",
+      "description": "Строка с HTML-разметкой. Если одновременно указан HTML-файл, этот блок будет показан первым.",
+      "required": false,
+      "default": ""
+    },
+    "html_file": {
+      "type": "file_path",
+      "description": "Путь к UTF-8 HTML-файлу. Относительный путь разрешается от папки Коллекции.",
+      "required": false
+    },
+    "html_output": {
+      "type": "choice",
+      "description": "Место вывода HTML: только консоль, только диалог или одновременно консоль и диалог.",
+      "required": true,
+      "default": "console_dialog",
+      "choices": [
+        "console",
+        "dialog",
+        "console_dialog"
+      ]
+    },
+    "html_align": {
+      "type": "choice",
+      "description": "Горизонтальное выравнивание HTML-контента.",
+      "required": false,
+      "default": "left",
+      "choices": [
+        "left",
+        "center",
+        "right"
+      ]
+    },
+    "html_margin": {
+      "type": "int",
+      "description": "Вертикальный внешний отступ HTML-блока в пикселях.",
+      "required": false,
+      "default": 0,
+      "min_val": 0,
+      "max_val": 100
+    },
+    "html_padding": {
+      "type": "int",
+      "description": "Внутренний отступ HTML-блока в пикселях.",
+      "required": false,
+      "default": 10,
+      "min_val": 0,
+      "max_val": 100
+    },
+    "html_style": {
+      "type": "choice",
+      "description": "Стиль оформления HTML-блока из активной темы PySM.",
+      "required": false,
+      "default": "script_description",
+      "choices": [
+        "script_description",
+        "script_error_block",
+        "script_header_block",
+        "script_info",
+        "script_success_block",
+        "collection_info",
+        "set_header",
+        "status_error",
+        "status_pending",
+        "status_running",
+        "status_skipped",
+        "status_success",
+        "tooltip_instance_args_block",
+        "tooltip_script_args_block"
+      ]
+    },
+    "dlg_msg_var": {
+      "type": "string",
+      "description": "Переменная Контекста Коллекции для результата: ok, yes, no, cancel или unknown. Поддерживается точечная нотация, например project.confirmation. В режиме console не используется.",
+      "required": false,
+      "default": "dlg_go_var"
+    },
+    "dlg_msg_type": {
+      "type": "choice",
+      "description": "Набор кнопок диалогового окна. В режиме console не используется.",
+      "required": true,
+      "default": "yes_no",
+      "choices": [
+        "ok",
+        "yes_no",
+        "yes_no_cancel"
+      ]
+    },
+    "dlg_msg_text_ok": {
+      "type": "string",
+      "description": "Произвольная подпись кнопки OK. Пустое значение сохраняет системное название. На результат ok и код выхода не влияет.",
+      "required": false,
+      "default": "Продолжить"
+    },
+    "dlg_msg_text_no": {
+      "type": "string",
+      "description": "Произвольная подпись кнопки No. Пустое значение сохраняет системное название. На результат no и код выхода не влияет.",
+      "required": false,
+      "default": "Остановить"
+    },
+    "dlg_msg_text_cancel": {
+      "type": "string",
+      "description": "Произвольная подпись кнопки Cancel. Пустое значение сохраняет системное название. На результат cancel и код выхода не влияет.",
+      "required": false,
+      "default": "Отменить"
+    },
+    "dlg_msg_title": {
+      "type": "string",
+      "description": "Заголовок диалогового окна.",
+      "required": false,
+      "default": "Информационное сообщение"
+    },
+    "dlg_msg_size_width": {
+      "type": "int",
+      "description": "Начальная ширина изменяемого диалогового окна в пикселях.",
+      "required": false,
+      "default": 700,
+      "max_val": 3840
+    },
+    "dlg_msg_size_height": {
+      "type": "int",
+      "description": "Начальная высота изменяемого диалогового окна в пикселях.",
+      "required": false,
+      "default": 500,
+      "max_val": 2160
+    }
+  }
+}

@@ -2,7 +2,7 @@
   "description": "Командная оболочка публичного API визуального редактора JSON-переменных PySM. Поддерживает вложенные объекты и массивы, служебные схемы вида <var_name>__schema и иконки элементов через pysm_icons.",
   "category": "Интерфейс пользователя",
   "author": "PySM",
-  "version": "2.2026.07.10",
+  "version": "2.2026.08.15",
   "command_line_args_meta": {
     "var_name": {
       "type": "string",
@@ -15,11 +15,70 @@
       "required": false,
       "default": "Редактор JSON"
     },
-    "msg": {
+    "html_content": {
       "type": "string_multiline",
       "description": "HTML-текст, который будет показан над таблицей вместо стандартного сообщения.",
       "required": false,
       "default": ""
+    },
+    "html_output": {
+      "type": "choice",
+      "description": "Выводить HTML только в редактор или одновременно в редактор и консоль PySM.",
+      "required": true,
+      "default": "dialog",
+      "choices": [
+        "dialog",
+        "console_dialog"
+      ]
+    },
+    "html_align": {
+      "type": "choice",
+      "description": "Горизонтальное выравнивание HTML-контента.",
+      "required": false,
+      "default": "left",
+      "choices": [
+        "left",
+        "center",
+        "right"
+      ]
+    },
+    "html_margin": {
+      "type": "int",
+      "description": "Вертикальный внешний отступ HTML-блока в пикселях.",
+      "required": false,
+      "default": 0,
+      "min_val": 0,
+      "max_val": 100
+    },
+    "html_padding": {
+      "type": "int",
+      "description": "Внутренний отступ HTML-блока в пикселях.",
+      "required": false,
+      "default": 10,
+      "min_val": 0,
+      "max_val": 100
+    },
+    "html_style": {
+      "type": "choice",
+      "description": "Стиль оформления HTML-блока из активной темы PySM.",
+      "required": false,
+      "default": "script_description",
+      "choices": [
+        "script_description",
+        "script_error_block",
+        "script_header_block",
+        "script_info",
+        "script_success_block",
+        "collection_info",
+        "set_header",
+        "status_error",
+        "status_pending",
+        "status_running",
+        "status_skipped",
+        "status_success",
+        "tooltip_instance_args_block",
+        "tooltip_script_args_block"
+      ]
     }
   }
 }

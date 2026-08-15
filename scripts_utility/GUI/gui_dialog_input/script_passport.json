@@ -1,36 +1,95 @@
 {
-  "description": "Показывает диалоговое окно для ввода текстового значения с возможностью гибкой валидации. Может использовать значение из контекста как значение по умолчанию.",
+  "description": "Показывает настраиваемый HTML-диалог для ввода значения, выполняет выбранную валидацию и сохраняет преобразованный результат в Контекст Коллекции.",
   "category": "Интерфейс пользователя",
   "author": "Ваше Имя (адаптация)",
-  "version": "2.2026.07.07",
+  "version": "2.2026.08.14",
   "command_line_args_meta": {
     "dlg_input_var": {
       "type": "string",
-      "description": "Имя переменной для сохранения результата. Также используется для получения начального значения из контекста. Поддерживается точечная нотация, например project.name.",
+      "description": "Имя переменной для сохранения результата и получения текущего начального значения. Поддерживается точечная нотация, например project.name.",
       "required": true,
       "default": "dlg_input_user_var"
     },
     "dlg_input_title": {
       "type": "string",
-      "description": "Заголовок, который будет отображаться в верхней части диалогового окна.",
+      "description": "Заголовок диалогового окна.",
       "required": false,
       "default": "Ввод значения"
     },
-    "dlg_input_msg": {
+    "html_content": {
       "type": "string_multiline",
-      "description": "Текст-приглашение для ввода, который будет показан пользователю над полем ввода.",
+      "description": "HTML-текст приглашения над полем ввода. Обычные переводы строк автоматически сохраняются при отображении.",
       "required": true,
-      "default": "Введите значение:"
+      "default": "<b>Введите значение:</b>"
+    },
+    "html_output": {
+      "type": "choice",
+      "description": "Выводить HTML только в диалог или одновременно в диалог и консоль PySM.",
+      "required": true,
+      "default": "console_dialog",
+      "choices": [
+        "dialog",
+        "console_dialog"
+      ]
+    },
+    "html_align": {
+      "type": "choice",
+      "description": "Горизонтальное выравнивание HTML-контента.",
+      "required": false,
+      "default": "left",
+      "choices": [
+        "left",
+        "center",
+        "right"
+      ]
+    },
+    "html_margin": {
+      "type": "int",
+      "description": "Вертикальный внешний отступ HTML-блока в пикселях.",
+      "required": false,
+      "default": 0,
+      "min_val": 0,
+      "max_val": 100
+    },
+    "html_padding": {
+      "type": "int",
+      "description": "Внутренний отступ HTML-блока в пикселях.",
+      "required": false,
+      "default": 10,
+      "min_val": 0,
+      "max_val": 100
+    },
+    "html_style": {
+      "type": "choice",
+      "description": "Стиль оформления HTML-блока из активной темы PySM.",
+      "required": false,
+      "default": "script_description",
+      "choices": [
+        "script_description",
+        "script_error_block",
+        "script_header_block",
+        "script_info",
+        "script_success_block",
+        "collection_info",
+        "set_header",
+        "status_error",
+        "status_pending",
+        "status_running",
+        "status_skipped",
+        "status_success",
+        "tooltip_instance_args_block",
+        "tooltip_script_args_block"
+      ]
     },
     "dlg_input_dvalue": {
       "type": "string_multiline",
-      "description": "Значение, которое будет в поле ввода по умолчанию, ЕСЛИ в контексте нет значения для переменной, указанной выше.",
+      "description": "Начальное значение поля ввода, если указанная переменная ещё отсутствует в Контексте Коллекции.",
       "required": false,
       "default": ""
     },
     "dlg_input_valid_type": {
       "type": "choice",
-      "description": "Тип проверки для вводимого значения. Выбор 'custom' активирует поля для ввода своего шаблона.",
+      "description": "Тип проверки вводимого значения. Выбор custom активирует пользовательское регулярное выражение.",
       "required": true,
       "default": "not_empty",
       "choices": [
@@ -47,7 +106,7 @@
     },
     "dlg_input_value_type": {
       "type": "choice",
-      "description": "Тип преобразования введенного значения",
+      "description": "Тип преобразования введённого значения перед сохранением.",
       "required": true,
       "default": "auto",
       "choices": [
@@ -61,13 +120,41 @@
     },
     "dlg_input_custom_regexp": {
       "type": "string",
-      "description": "Ваш шаблон регулярного выражения. Активно только если тип валидации - 'custom'.",
+      "description": "Пользовательское регулярное выражение. Используется только при dlg_input_valid_type=custom.",
       "required": false
     },
     "dlg_input_custom_regexp_desc": {
       "type": "string_multiline",
-      "description": "Ваше описание формата для сообщения об ошибке. Активно только если тип валидации - 'custom'.",
+      "description": "Описание ожидаемого формата для сообщения об ошибке пользовательской валидации.",
       "required": false
+    },
+    "dlg_input_text_ok": {
+      "type": "string",
+      "description": "Произвольная подпись кнопки OK. Пустое значение сохраняет системное название и не меняет семантику кнопки.",
+      "required": false,
+      "default": "ОК"
+    },
+    "dlg_input_text_cancel": {
+      "type": "string",
+      "description": "Произвольная подпись кнопки Cancel. Пустое значение сохраняет системное название и не меняет семантику кнопки.",
+      "required": false,
+      "default": "Отмена"
+    },
+    "dlg_input_size_width": {
+      "type": "int",
+      "description": "Начальная ширина изменяемого диалогового окна в пикселях.",
+      "required": false,
+      "default": "350",
+      "min_val": 320,
+      "max_val": 3840
+    },
+    "dlg_input_size_height": {
+      "type": "int",
+      "description": "Начальная высота изменяемого диалогового окна в пикселях.",
+      "required": false,
+      "default": "170",
+      "min_val": 200,
+      "max_val": 2160
     }
   }
 }
