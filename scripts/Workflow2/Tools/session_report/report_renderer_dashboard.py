@@ -4,7 +4,7 @@ from pysm_lib.pysm_report_api import ResourceNode, DashboardBuilder, icons
 from report_common import scan_directory_for_extensions, scan_subfolders, scan_analysis_structure, check_xmp_presence
 from pathlib import Path
 
-def generate_dashboard_html(config, path_session_base, path_psd_base, path_c1_session, session_name, photo_session, children_file_name, wf_portrait_session, wf_idsgn_catalog_str) -> str:
+def generate_dashboard_html(config, path_session_base, path_psd_base, path_c1_session, session_name, photo_session, wf_portrait_session, wf_idsgn_catalog_str) -> str:
     
     # 1. Создаем билдер
     builder = DashboardBuilder(icon_size=config.icon_size_dashboard)
@@ -45,7 +45,7 @@ def generate_dashboard_html(config, path_session_base, path_psd_base, path_c1_se
         builder.add_header_boxed(session_node.name, session_node, extra_html=xmp_html)
 
         # Собираем матрицу
-        # Ряд 1: Папка Analysis, JPG, Маски, Отчет, Список детей
+        # Ряд 1: Папка Analysis, JPG, Маски, Отчет
         # Ряд 2: JSON файлы
         
         # Находим детей по именам (как раньше)
@@ -64,10 +64,9 @@ def generate_dashboard_html(config, path_session_base, path_psd_base, path_c1_se
         if n_error: n_error.name = "Ошибки<br>идентификации<br>(JSON)"
 
         anode.name = "AI-анализ"
-        child_file = ResourceNode(f"{suffix}_{children_file_name}", path_c1_session / f"{suffix}_{children_file_name}", "txt")
 
         rows = [
-            [anode, n_jpg, n_masks, n_html, child_file],
+            [anode, n_jpg, n_masks, n_html],
             [n_json_face, n_matches, n_error] # None для пустой ячейки
         ]
         builder.add_table_matrix(rows)

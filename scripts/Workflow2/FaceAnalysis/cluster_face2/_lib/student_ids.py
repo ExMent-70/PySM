@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from pathlib import Path
 import re
 from typing import Any, Iterable, MutableMapping, Sequence
 
@@ -14,13 +13,15 @@ import numpy as np
 STUDENT_ID_PATTERN = re.compile(
     r"^(?P<list_id>[A-HJ-NP-Z2-9]{4})-S(?P<number>\d{3})$"
 )
+STUDENT_IDS_ORDER_CONTEXT_BASE = "wf_student_ids_order"
+STUDENT_IDS_ORDER_CONTEXT_SUFFIX = "_ids_order"
 
 
 @dataclass(frozen=True)
 class StudentIdList:
     """Проверенный список ID одной фотосессии в порядке съёмки."""
 
-    path: Path
+    context_key: str
     list_id: str
     student_ids: tuple[str, ...]
 
@@ -46,76 +47,67 @@ def parse_student_id(value: str) -> tuple[str, int]:
     return match.group("list_id"), number
 
 
-def load_student_ids(path: Path) -> StudentIdList:
-    """Загружает TXT, сохраняя порядок и строго проверяя каждую строку."""
+def build_student_ids_order_context_key(photo_session: Any) -> str:
+    """Строит dot-notation путь порядка съёмки для текущей фотосессии."""
 
-    if not path.is_file():
-        raise FileNotFoundError(f"Файл идентификаторов фотосессии не найден: {path}")
+    normalized = str(photo_session or "").strip()
+    if not normalized:
+        raise ValueError("Не задана переменная контекста wf_photo_session.")
+    if "." in normalized:
+        raise ValueError("wf_photo_session не должна содержать точку.")
+    return (
+        f"{STUDENT_IDS_ORDER_CONTEXT_BASE}."
+        f"{normalized}{STUDENT_IDS_ORDER_CONTEXT_SUFFIX}"
+    )
 
-    try:
-        raw_lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError as exc:
-        raise OSError(f"Не удалось прочитать файл идентификаторов {path}: {exc}") from exc
+
+def load_student_ids_order(raw_value: Any, context_key: str) -> StudentIdList:
+    """Проверяет JSON-массив student_id, сохраняя порядок съёмки."""
+
+    if not isinstance(raw_value, list):
+        raise ValueError(
+            f"Переменная {context_key} должна содержать JSON-массив student_id."
+        )
 
     student_ids: list[str] = []
     seen: set[str] = set()
     list_id: str | None = None
-    for line_number, raw_line in enumerate(raw_lines, start=1):
-        value = raw_line.strip().upper()
+    for item_number, raw_item in enumerate(raw_value, start=1):
+        if not isinstance(raw_item, str):
+            raise ValueError(
+                f"Элемент {item_number} переменной {context_key} должен быть строкой."
+            )
+        value = raw_item.strip().upper()
         if not value:
             continue
         try:
             current_list_id, _ = parse_student_id(value)
         except ValueError as exc:
-            raise ValueError(f"Строка {line_number} файла {path.name}: {exc}.") from exc
+            raise ValueError(
+                f"Элемент {item_number} переменной {context_key}: {exc}."
+            ) from exc
 
         if list_id is None:
             list_id = current_list_id
         elif current_list_id != list_id:
             raise ValueError(
-                f"Строка {line_number} файла {path.name}: student_id {value} "
+                f"Элемент {item_number} переменной {context_key}: student_id {value} "
                 f"относится к списку {current_list_id}, ожидался {list_id}."
             )
         if value in seen:
             raise ValueError(
-                f"Строка {line_number} файла {path.name}: student_id {value} повторяется."
+                f"Элемент {item_number} переменной {context_key}: "
+                f"student_id {value} повторяется."
             )
         seen.add(value)
         student_ids.append(value)
 
     if not student_ids or list_id is None:
-        raise ValueError(f"Файл идентификаторов пуст: {path}")
-    return StudentIdList(path=path, list_id=list_id, student_ids=tuple(student_ids))
-
-
-def find_student_ids_file(
-    target_dir: Path,
-    photo_session: str,
-    children_file_name: str,
-) -> Path:
-    """Находит файл конкретной фотосессии без fallback на children.txt."""
-
-    photo_session = str(photo_session).strip()
-    children_file_name = str(children_file_name).strip()
-    if not photo_session or not children_file_name:
-        raise ValueError(
-            "Не заданы wf_photo_session или wf_children_file_name; "
-            "невозможно определить файл идентификаторов фотосессии."
-        )
-
-    filename = f"{photo_session}_{children_file_name}"
-    if not filename.lower().endswith(".txt"):
-        filename += ".txt"
-
-    candidates = (target_dir.parent / filename, target_dir.parent.parent / filename)
-    for candidate in candidates:
-        if candidate.is_file():
-            return candidate.resolve()
-
-    checked = "\n".join(f"- {candidate}" for candidate in candidates)
-    raise FileNotFoundError(
-        "Файл идентификаторов текущей фотосессии не найден. "
-        f"Проверены пути:\n{checked}"
+        raise ValueError(f"Переменная {context_key} не содержит student_id.")
+    return StudentIdList(
+        context_key=context_key,
+        list_id=list_id,
+        student_ids=tuple(student_ids),
     )
 
 

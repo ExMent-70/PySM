@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "paths": {
+    "py/AILab_RMBG.py": [
+      "rmbg_2_0"
+    ],
+    "py/AILab_BiRefNet.py": [
+      "birefnet_general",
+      "birefnet_512x512",
+      "birefnet_hr",
+      "birefnet_portrait",
+      "birefnet_matting",
+      "birefnet_hr_matting",
+      "birefnet_lite",
+      "birefnet_lite_2k",
+      "birefnet_dynamic",
+      "birefnet_lite_matting",
+      "lucida"
+    ],
+    "py/AILab_SDMatte.py": [
+      "sdmatte"
+    ],
+    "py/AILab_utils.py": [
+      "rmbg_2_0",
+      "birefnet_general",
+      "birefnet_512x512",
+      "birefnet_hr",
+      "birefnet_portrait",
+      "birefnet_matting",
+      "birefnet_hr_matting",
+      "birefnet_lite",
+      "birefnet_lite_2k",
+      "birefnet_dynamic",
+      "birefnet_lite_matting",
+      "lucida",
+      "sdmatte"
+    ],
+    "models/SDMatte/modeling/SDMatte/meta_arch.py": [
+      "sdmatte"
+    ],
+    "models/SDMatte/utils/replace.py": [
+      "sdmatte"
+    ],
+    "models/SDMatte/utils/utils.py": [
+      "sdmatte"
+    ],
+    "requirements.txt": [
+      "rmbg_2_0",
+      "birefnet_general",
+      "birefnet_512x512",
+      "birefnet_hr",
+      "birefnet_portrait",
+      "birefnet_matting",
+      "birefnet_hr_matting",
+      "birefnet_lite",
+      "birefnet_lite_2k",
+      "birefnet_dynamic",
+      "birefnet_lite_matting",
+      "lucida",
+      "sdmatte"
+    ]
+  }
+}

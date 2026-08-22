@@ -77,13 +77,8 @@ def get_raw_config() -> AppConfig:
     )
     parser.add_argument("-d", "--wf_dest_dir", type=str, help="Директория назначения.")
     parser.add_argument(
-        "--wf_output_txt_file",
-        type=str,
-        help="Путь к файлу student_id текущей фотосессии.",
-    )
-    parser.add_argument(
         "--wf_autosave_formats", type=str, nargs='+', 
-        choices=["html", "txt", "csv"], default=["html", "txt"], 
+        choices=["html", "csv"], default=["html", "csv"],
         help="Форматы для автосохранения."
     )
     
@@ -110,7 +105,6 @@ class ClassListEditor(QMainWindow):
         super().__init__()
         self.config = config
         self._is_dirty: bool = False
-        self._save_children: bool = False
         self._is_loading: bool = False
         self._class_name: str = ""
         self._import_panel_width = 300
@@ -256,10 +250,10 @@ class ClassListEditor(QMainWindow):
         self.save_action.triggered.connect(self._save_list)
         self.save_as_action = QAction(_pysm_icon("SAVE"), "Сохранить как...", self)
         self.save_as_action.triggered.connect(lambda: self._save_list(save_as=True))
-        self.save_cluster_names_action = QAction(
-            _pysm_icon("FILE_TXT"), "Сохранить как имена кластеров (TXT)", self
+        self.save_order_action = QAction(
+            _pysm_icon("VAR_SET"), "Сохранить порядок съёмки в контекст", self
         )
-        self.save_cluster_names_action.triggered.connect(self._save_for_processing)
+        self.save_order_action.triggered.connect(self._save_student_ids_order)
 
         self.export_html_action = QAction(
             _pysm_icon("FILE_HTML"), "Экспорт в HTML...", self
@@ -357,7 +351,7 @@ class ClassListEditor(QMainWindow):
                 [
                     self.save_action,
                     self.save_as_action,
-                    self.save_cluster_names_action,
+                    self.save_order_action,
                 ],
             )
         )
@@ -969,11 +963,12 @@ class ClassListEditor(QMainWindow):
             )
             self.statusBar().showMessage(f"Сохранено: {path.name}", 5000)
             self._is_dirty = False
-            
+
+            self._save_student_ids_order()
+
             for fmt in self.config.wf_autosave_formats:
                 if fmt == "html": self._save_html(save_as=False)
                 elif fmt == "csv": self._save_csv(save_as=False)
-                elif fmt == "txt": self._save_for_processing()
             return True
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
@@ -1028,27 +1023,37 @@ class ClassListEditor(QMainWindow):
                  QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить HTML:\n{e}")
             return None
 
-    def _save_for_processing(self) -> None:
-        if self.table_model.rowCount() == 0: return
-        if not self.config.wf_output_txt_file:
+    def _save_student_ids_order(self) -> bool:
+        """Сохраняет порядок student_id текущей фотосессии в контекст PySM."""
+
+        if self.table_model.rowCount() == 0:
+            return False
+        if not IS_MANAGED_RUN or pysm_context is None:
             QMessageBox.warning(
                 self,
-                "Файл фотосессии не сохранён",
-                "Не указан --wf_output_txt_file. Общий children.txt больше не создаётся.",
+                "Порядок съёмки не сохранён",
+                "Контекст PySM недоступен. Запустите редактор из рабочего процесса.",
             )
-            return
+            return False
 
         try:
-            output_path = pathlib.Path(self.config.wf_output_txt_file)
-            io_services.export_to_txt(
-                output_path,
+            context_key, _student_ids = io_services.save_student_ids_order_to_context(
+                pysm_context,
+                pysm_context.get("wf_photo_session", ""),
                 self.table_model.get_all_data(),
                 self.id_allocator,
             )
-            self.statusBar().showMessage("Файл для обработки сохранен.", 3000)
-            self._save_children = True
+            self.statusBar().showMessage(
+                f"Порядок съёмки сохранён: {context_key}", 5000
+            )
+            return True
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить TXT:\n{e}")
+            QMessageBox.critical(
+                self,
+                "Ошибка",
+                f"Не удалось сохранить порядок съёмки в контекст:\n{e}",
+            )
+            return False
 
     def _print_html(self, *, extended_mode: bool) -> None:
         path = self._save_html(save_as=False, extended_mode=extended_mode)
@@ -1110,16 +1115,19 @@ class ClassListEditor(QMainWindow):
     def add_link(self) -> None:
         if IS_MANAGED_RUN and pysm_context and self.config.wf_dest_dir:
             print(" ", file=sys.stderr)
-            if self._save_children and self.config.wf_output_txt_file:
-                path = pathlib.Path(self.config.wf_output_txt_file)
-                pysm_context.log_link(url_or_path=str(path), text=f"Открыть файл <i>{path.name}</i>")
             pysm_context.log_link(url_or_path=str(self.config.wf_dest_dir), text="Открыть папку с файлами")
             print(" ", file=sys.stderr)
 
     def closeEvent(self, event: QEvent) -> None:
-        out_txt = self.config.wf_output_txt_file
-        if out_txt and not pathlib.Path(out_txt).exists() and self.table_model.rowCount() > 0:
-             self._save_for_processing()
+        if IS_MANAGED_RUN and pysm_context and self.table_model.rowCount() > 0:
+            try:
+                context_key = io_services.build_student_ids_order_context_key(
+                    pysm_context.get("wf_photo_session", "")
+                )
+                if pysm_context.get_structured(context_key, default=None) is None:
+                    self._save_student_ids_order()
+            except ValueError:
+                self._save_student_ids_order()
 
         if not self._is_dirty:
             #self.add_link()

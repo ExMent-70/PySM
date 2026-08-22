@@ -12,7 +12,7 @@ from typing import List, Optional, Any, Dict
 # ----------------------------------------------------------------------
 # Константы
 # ----------------------------------------------------------------------
-DEFAULT_AUTOSAVE_FORMATS = ["html", "txt"]
+DEFAULT_AUTOSAVE_FORMATS = ["html", "csv"]
 LIST_ID_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 LIST_ID_PATTERN = re.compile(r"^[A-HJ-NP-Z2-9]{4}$")
 STUDENT_ID_PATTERN = re.compile(r"^(?P<list_id>[A-HJ-NP-Z2-9]{4})-S(?P<number>\d{3})$")
@@ -207,7 +207,6 @@ class AppConfig:
     Конфигурация приложения.
     """
     wf_dest_dir: Optional[str] = None
-    wf_output_txt_file: Optional[str] = None
     wf_autosave_formats: List[str] = field(default_factory=lambda: DEFAULT_AUTOSAVE_FORMATS)   
     wf_default_info_fields: List[str] = field(default_factory=list)
 
@@ -216,7 +215,6 @@ class AppConfig:
         """Создает конфиг из аргументов argparse (Namespace)."""
         return cls(
             wf_dest_dir=getattr(args_namespace, 'wf_dest_dir', None),
-            wf_output_txt_file=getattr(args_namespace, 'wf_output_txt_file', None),
             wf_autosave_formats=getattr(args_namespace, 'wf_autosave_formats', DEFAULT_AUTOSAVE_FORMATS),
             wf_default_info_fields=getattr(args_namespace, 'wf_default_info_fields', [])
         )

@@ -155,7 +155,7 @@ def main():
 
         strategy.run(config, data_manager)
         if pysm_context is not None:
-            photo_session = pysm_context.get("ws_photo_session", "SCHOOL")
+            photo_session = pysm_context.get("wf_photo_session", "SCHOOL")
             pysm_context.set_structured(f"var_claster_run.{photo_session}.{mode}", "yes")
         logger.debug("=== ВЫПОЛНЕНИЕ ЗАВЕРШЕНО УСПЕШНО ===")
        

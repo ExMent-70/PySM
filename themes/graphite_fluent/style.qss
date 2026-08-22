@@ -152,6 +152,14 @@ QTreeView, QListWidget, QTableWidget {
 QTreeView::item, QListWidget::item, QTableWidget::item { border: none; padding: 3px; }
 QTreeView::item:hover, QListWidget::item:hover { background-color: @bgColorHoverAlpha; }
 QTreeView::item:selected, QListWidget::item:selected { background-color: @accentColor; color: @textColorOnAccent; }
+QTreeWidget#InstanceSelectionTree::item,
+QTreeWidget#InstanceSelectionTree::item:hover,
+QTreeWidget#InstanceSelectionTree::item:selected,
+QTreeWidget#InstanceSelectionTree::item:selected:active,
+QTreeWidget#InstanceSelectionTree::item:selected:!active {
+    border: none;
+    padding: 0px 2px;
+}
 
 QHeaderView::section {
     background-color: @bgColorHeader; border: none;
@@ -171,13 +179,25 @@ QTableWidget QLineEdit:focus, QTableWidget QComboBox:focus, QTableWidget QDateEd
 
 /* --- [7] ЧЕКБОКСЫ И ПРОГРЕСС-БАРЫ --- */
 QCheckBox { /* Пустой селектор для группировки */ }
-QCheckBox::indicator {
+QCheckBox::indicator, QTreeWidget::indicator {
     width: 16px; height: 16px; border: 1px solid #707070; border-radius: 3px;
 }
+QTreeWidget::indicator,
+QTreeWidget::indicator:unchecked,
+QTreeWidget::indicator:checked,
+QTreeWidget::indicator:indeterminate {
+    border: 1px solid #707070;
+    width: 16px; height: 16px; margin: 0px; padding: 0px;
+}
 QCheckBox::indicator:hover { border-color: @accentColor; }
-QCheckBox::indicator:checked {
-    background-color: @accentColor; border-color: @accentColor;
+QCheckBox::indicator:checked, QTreeWidget::indicator:checked {
+    background-color: @accentColor; border: 1px solid @accentColor;
+    width: 16px; height: 16px; margin: 0px; padding: 0px;
     image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="white" d="M4.2,9.6L1.4,6.8L0,8.2l4.2,4.2L12,4.6L10.6,3.2L4.2,9.6z"/></svg>');
+}
+QTreeWidget::indicator:indeterminate {
+    background-color: @accentColor; border: 1px solid @accentColor;
+    width: 16px; height: 16px; margin: 0px; padding: 0px;
 }
 
 QProgressBar { border: 1px solid @borderColor; border-radius: 3px; text-align: center; color: @textColor; background-color: @bgColorHover; }

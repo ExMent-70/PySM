@@ -1,0 +1,517 @@
+{
+  "schema_version": 1,
+  "models": {
+    "rmbg_2_0": {
+      "repository": "1038lab/RMBG-2.0",
+      "revision": null,
+      "files": {
+        "model.safetensors": "566ed80c3d95f87ada6864d4cbe2290a1c5eb1c7bb0b123e984f60f76b02c3a7",
+        "config.json": "c97ea21569daf66b205491a4635147dd3bc42c7c168b89d7d75b53f67ef548ae",
+        "birefnet.py": "8f498727f4bdb7dfaa4d66190f0ebf55392bda62c1b4f224be39f9b750a8915d",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "1cd4787601caeb4c8e826dba7ea8e2163b5208df",
+        "files": {
+          "model.safetensors": {
+            "size": 884878856,
+            "sha256": "566ed80c3d95f87ada6864d4cbe2290a1c5eb1c7bb0b123e984f60f76b02c3a7"
+          },
+          "config.json": {
+            "size": 405,
+            "sha256": "c97ea21569daf66b205491a4635147dd3bc42c7c168b89d7d75b53f67ef548ae"
+          },
+          "birefnet.py": {
+            "size": 91320,
+            "sha256": "8f498727f4bdb7dfaa4d66190f0ebf55392bda62c1b4f224be39f9b750a8915d"
+          },
+          "BiRefNet_config.py": {
+            "size": 298,
+            "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+          }
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16",
+        "device": "cuda",
+        "precision": "fp16_autocast",
+        "resolution": 1024,
+        "qa_images": [
+          "scripts/img2mask/_input/001.jpg",
+          "scripts/img2mask/_input/003.jpg",
+          "scripts/img2mask/_input/008.jpg"
+        ],
+        "qa_manifest": "_RMBG/qa_rmbg_2_0/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual edge review passed; FP32 storage with CUDA FP16 autocast verified"
+      }
+    },
+    "birefnet_general": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet-general.safetensors": "77277264c0e8c74149d3ff2fade4fd8176965b7108f3c5fc3b8c9c811edb4519",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet.py": "16bb87e4a25bf39808a61e04a45d5712ad365934002eefd1c71a2df10e39e2cb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet-general.safetensors": {
+            "size": 884878856,
+            "sha256": "77277264c0e8c74149d3ff2fade4fd8176965b7108f3c5fc3b8c9c811edb4519"
+          },
+          "config.json": {
+            "size": 402,
+            "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"
+          },
+          "birefnet.py": {
+            "size": 92068,
+            "sha256": "a9566611aa07a6fbb68ddb6ac8e19e62c879a428fbfc2f44efa53d233f2e302f"
+          },
+          "BiRefNet_config.py": {
+            "size": 298,
+            "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+          }
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16",
+        "device": "cuda",
+        "precision": "fp16",
+        "resolution": 1024,
+        "qa_images": [
+          "scripts/img2mask/_input/001.jpg",
+          "scripts/img2mask/_input/003.jpg",
+          "scripts/img2mask/_input/008.jpg"
+        ],
+        "qa_manifest": "_RMBG/qa_birefnet_general/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual edge review passed"
+      }
+    },
+    "birefnet_512x512": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet_512x512.safetensors": "d94ae0eefb2d2020192001e984ecd6b367478118257a3132e6a484bbf18b0f41",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet.py": "16bb87e4a25bf39808a61e04a45d5712ad365934002eefd1c71a2df10e39e2cb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet_512x512.safetensors": {"size": 444473596, "sha256": "d94ae0eefb2d2020192001e984ecd6b367478118257a3132e6a484bbf18b0f41"},
+          "config.json": {"size": 402, "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"},
+          "birefnet.py": {"size": 92068, "sha256": "a9566611aa07a6fbb68ddb6ac8e19e62c879a428fbfc2f44efa53d233f2e302f"},
+          "BiRefNet_config.py": {"size": 298, "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"}
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16", "device": "cuda", "precision": "fp16",
+        "resolution": 512,
+        "qa_images": ["001.jpg", "003.jpg", "008.jpg"],
+        "qa_manifest": "_RMBG/qa_birefnet_512x512/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual review and 256/1024 boundary inference passed"
+      }
+    },
+    "birefnet_hr": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet-HR.safetensors": "9d678bafec0b0019fbb073b7fd02f05ede25dc4b15254f23b2fb0be333200c0d",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet.py": "16bb87e4a25bf39808a61e04a45d5712ad365934002eefd1c71a2df10e39e2cb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet-HR.safetensors": {"size": 444473596, "sha256": "9d678bafec0b0019fbb073b7fd02f05ede25dc4b15254f23b2fb0be333200c0d"},
+          "config.json": {"size": 402, "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"},
+          "birefnet.py": {"size": 92068, "sha256": "a9566611aa07a6fbb68ddb6ac8e19e62c879a428fbfc2f44efa53d233f2e302f"},
+          "BiRefNet_config.py": {"size": 298, "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"}
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16", "device": "cuda", "precision": "fp16",
+        "resolution": 2048,
+        "qa_images": ["001.jpg", "003.jpg", "008.jpg"],
+        "qa_manifest": "_RMBG/qa_birefnet_hr/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual review and 1024/2560 boundary inference passed"
+      }
+    },
+    "birefnet_portrait": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet-portrait.safetensors": "4a4eb3a5469b75f0cccaec6772c22fc30e6c12ed429c2c0ba71b43e3d8d97182",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet.py": "16bb87e4a25bf39808a61e04a45d5712ad365934002eefd1c71a2df10e39e2cb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet-portrait.safetensors": {
+            "size": 884878856,
+            "sha256": "4a4eb3a5469b75f0cccaec6772c22fc30e6c12ed429c2c0ba71b43e3d8d97182"
+          },
+          "config.json": {
+            "size": 402,
+            "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"
+          },
+          "birefnet.py": {
+            "size": 92068,
+            "sha256": "a9566611aa07a6fbb68ddb6ac8e19e62c879a428fbfc2f44efa53d233f2e302f"
+          },
+          "BiRefNet_config.py": {
+            "size": 298,
+            "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+          }
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16",
+        "device": "cuda",
+        "precision": "fp16",
+        "resolution": 1024,
+        "qa_images": [
+          "scripts/img2mask/_input/001.jpg",
+          "scripts/img2mask/_input/003.jpg",
+          "scripts/img2mask/_input/008.jpg"
+        ],
+        "qa_manifest": "_RMBG/qa_birefnet_portrait/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual edge review passed",
+        "download_source_qa": {
+          "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+          "image": "scripts/img2mask/_input/003.jpg",
+          "result": "relative-import source downloaded, checksum verified, CUDA FP16 inference passed"
+        }
+      }
+    },
+    "birefnet_matting": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet-matting.safetensors": "a9875de5b1e6c8eb5fdaa8c727a82927ce442cdc87ba3abee6a77e6fa46c25bb",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet.py": "16bb87e4a25bf39808a61e04a45d5712ad365934002eefd1c71a2df10e39e2cb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet-matting.safetensors": {"size": 884878856, "sha256": "a9875de5b1e6c8eb5fdaa8c727a82927ce442cdc87ba3abee6a77e6fa46c25bb"},
+          "config.json": {"size": 402, "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"},
+          "birefnet.py": {"size": 92068, "sha256": "a9566611aa07a6fbb68ddb6ac8e19e62c879a428fbfc2f44efa53d233f2e302f"},
+          "BiRefNet_config.py": {"size": 298, "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"}
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16", "device": "cuda", "precision": "fp16",
+        "resolution": 1024,
+        "qa_images": ["001.jpg", "003.jpg", "008.jpg"],
+        "qa_manifest": "_RMBG/qa_birefnet_matting/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual review and 512/2048 boundary inference passed"
+      }
+    },
+    "birefnet_hr_matting": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet-HR-matting.safetensors": "a5a4de698739ea5e0e8bbab28e1b293dde95092b87a442d566cbc585c53cef55",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet.py": "16bb87e4a25bf39808a61e04a45d5712ad365934002eefd1c71a2df10e39e2cb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet-HR-matting.safetensors": {"size": 444473596, "sha256": "a5a4de698739ea5e0e8bbab28e1b293dde95092b87a442d566cbc585c53cef55"},
+          "config.json": {"size": 402, "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"},
+          "birefnet.py": {"size": 92068, "sha256": "a9566611aa07a6fbb68ddb6ac8e19e62c879a428fbfc2f44efa53d233f2e302f"},
+          "BiRefNet_config.py": {"size": 298, "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"}
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16", "device": "cuda", "precision": "fp16",
+        "resolution": 2048,
+        "qa_images": ["001.jpg", "003.jpg", "008.jpg"],
+        "qa_manifest": "_RMBG/qa_birefnet_hr_matting/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual review and 1024/2560 boundary inference passed"
+      }
+    },
+    "birefnet_lite": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet_lite.safetensors": "4417d89795250e698c3cb0ae8df15743810065f646f48a694fdfa7ca052d0815",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet_lite.py": "1ec7679913fe0e042a108fc31a29a5ff12e84e7d91c9fff2747d45f3166ab5eb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet_lite.safetensors": {"size": 177634392, "sha256": "4417d89795250e698c3cb0ae8df15743810065f646f48a694fdfa7ca052d0815"},
+          "config.json": {"size": 402, "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"},
+          "birefnet_lite.py": {"size": 94257, "sha256": "1ec7679913fe0e042a108fc31a29a5ff12e84e7d91c9fff2747d45f3166ab5eb"},
+          "BiRefNet_config.py": {"size": 298, "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"}
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16", "device": "cuda", "precision": "fp16",
+        "resolution": 1024,
+        "qa_images": ["001.jpg", "003.jpg", "008.jpg"],
+        "qa_manifest": "_RMBG/qa_birefnet_lite/Reports/manifest.json",
+        "result": "3 processed, 0 failed; lite source, visual review and 512/2048 boundary inference passed"
+      }
+    },
+    "birefnet_lite_2k": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet_lite-2K.safetensors": "aa2e4a5af5eb3904694feb40f2b39ec5dd7cd9110906590cfeb982f09a46021d",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet_lite.py": "1ec7679913fe0e042a108fc31a29a5ff12e84e7d91c9fff2747d45f3166ab5eb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet_lite-2K.safetensors": {"size": 177634392, "sha256": "aa2e4a5af5eb3904694feb40f2b39ec5dd7cd9110906590cfeb982f09a46021d"},
+          "config.json": {"size": 402, "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"},
+          "birefnet_lite.py": {"size": 94257, "sha256": "1ec7679913fe0e042a108fc31a29a5ff12e84e7d91c9fff2747d45f3166ab5eb"},
+          "BiRefNet_config.py": {"size": 298, "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"}
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16", "device": "cuda", "precision": "fp16",
+        "resolution": 2048,
+        "qa_images": ["001.jpg", "003.jpg", "008.jpg"],
+        "qa_manifest": "_RMBG/qa_birefnet_lite_2k/Reports/manifest.json",
+        "result": "3 processed, 0 failed; lite source, visual review and 1024/2560 boundary inference passed"
+      }
+    },
+    "birefnet_dynamic": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet_dynamic.safetensors": "e3d2e4884e51ff30f0cd630edc6b1e41b06b7f23a0a2a5169f7b7cb33a711c2d",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet.py": "16bb87e4a25bf39808a61e04a45d5712ad365934002eefd1c71a2df10e39e2cb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet_dynamic.safetensors": {"size": 444473596, "sha256": "e3d2e4884e51ff30f0cd630edc6b1e41b06b7f23a0a2a5169f7b7cb33a711c2d"},
+          "config.json": {"size": 402, "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"},
+          "birefnet.py": {"size": 92068, "sha256": "a9566611aa07a6fbb68ddb6ac8e19e62c879a428fbfc2f44efa53d233f2e302f"},
+          "BiRefNet_config.py": {"size": 298, "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"}
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16", "device": "cuda", "precision": "fp16",
+        "resolution": 1024,
+        "qa_images": ["001.jpg", "003.jpg", "008.jpg"],
+        "qa_manifest": "_RMBG/qa_birefnet_dynamic/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual review and 512/2048 boundary inference passed"
+      }
+    },
+    "birefnet_lite_matting": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "BiRefNet_lite-matting.safetensors": "ce8bcfc045e336322c0424a5863dcfb7e9ce8fed0a5fd4d1b2b20adf12d97243",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet_lite.py": "1ec7679913fe0e042a108fc31a29a5ff12e84e7d91c9fff2747d45f3166ab5eb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "BiRefNet_lite-matting.safetensors": {"size": 88965896, "sha256": "ce8bcfc045e336322c0424a5863dcfb7e9ce8fed0a5fd4d1b2b20adf12d97243"},
+          "config.json": {"size": 402, "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"},
+          "birefnet_lite.py": {"size": 94257, "sha256": "1ec7679913fe0e042a108fc31a29a5ff12e84e7d91c9fff2747d45f3166ab5eb"},
+          "BiRefNet_config.py": {"size": 298, "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"}
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16", "device": "cuda", "precision": "fp16",
+        "resolution": 1024,
+        "qa_images": ["001.jpg", "003.jpg", "008.jpg"],
+        "qa_manifest": "_RMBG/qa_birefnet_lite_matting/Reports/manifest.json",
+        "result": "3 processed, 0 failed; lite source, visual review and 512/2048 boundary inference passed"
+      }
+    },
+    "lucida": {
+      "repository": "1038lab/BiRefNet",
+      "revision": null,
+      "files": {
+        "Lucida.safetensors": "2f1aa6913426537d4b93dd5f7138ae5c6664e99abda98c95f3d5b9101283e7d5",
+        "config.json": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd",
+        "birefnet.py": "16bb87e4a25bf39808a61e04a45d5712ad365934002eefd1c71a2df10e39e2cb",
+        "BiRefNet_config.py": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+      },
+      "download": {
+        "revision": "4d000788a9698c7f8d67c8c6ce2b40c768f5b909",
+        "files": {
+          "Lucida.safetensors": {
+            "size": 884878856,
+            "sha256": "2f1aa6913426537d4b93dd5f7138ae5c6664e99abda98c95f3d5b9101283e7d5"
+          },
+          "config.json": {
+            "size": 402,
+            "sha256": "966a1f0165b072d2d1309756e71907750e535ba5c3790d8cd0e69713ff3a56cd"
+          },
+          "birefnet.py": {
+            "size": 92068,
+            "sha256": "a9566611aa07a6fbb68ddb6ac8e19e62c879a428fbfc2f44efa53d233f2e302f"
+          },
+          "BiRefNet_config.py": {
+            "size": 298,
+            "sha256": "e7b8c2a74f6cea6a59553d517f71d47f2c1d90e670a13416af17c25fe2f3dc52"
+          }
+        }
+      },
+      "status": "verified",
+      "verification": {
+        "date": "2026-08-16",
+        "device": "cuda",
+        "precision": "fp16",
+        "resolution": 1024,
+        "qa_images": [
+          "scripts/img2mask/_input/001.jpg",
+          "scripts/img2mask/_input/003.jpg",
+          "scripts/img2mask/_input/008.jpg"
+        ],
+        "qa_manifest": "_RMBG/qa_lucida/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual edge review passed; expected foreground-prop retention observed"
+      }
+    }
+  },
+  "refiners": {
+    "sdmatte": {
+      "repository": "1038lab/SDMatte",
+      "revision": "865308b99de21fd16470cde8a44e973e80fdbcd4",
+      "upstream_commit": "9edb2bec390091fb9b7fb3d68a64a7af713ea2fc",
+      "status": "verified",
+      "variants": {
+        "sdmatte": "SDMatte.safetensors",
+        "sdmatte_plus": "SDMatte_plus.safetensors"
+      },
+      "weights": {
+        "SDMatte.safetensors": {
+          "size": 5188458340,
+          "sha256": "191a41d39e2f51dcca61be2b080b1b126d5acf603973eec5388b73f9dfe0e74e"
+        },
+        "SDMatte_plus.safetensors": {
+          "size": 5188458340,
+          "sha256": "7ad5137020a8f14b880865f2b92f2608ec71540bdf392412792fd6312c8be1c7"
+        }
+      },
+      "files": {
+        "scheduler/scheduler_config.json": {
+          "size": 359,
+          "sha256": "69b67209f92796b1c8fac38ebc25b546b2ae8c7a1c63d9d3e7b6eb9a60ab4b69"
+        },
+        "text_encoder/config.json": {
+          "size": 658,
+          "sha256": "e61e3fa7566aead9a1051949c1db6336933d854900d412b92164bcdc91ad9c5f"
+        },
+        "tokenizer/merges.txt": {
+          "size": 573514,
+          "sha256": "0bc7695944744789d6fd6d0ab754bcbbb9e36f1c182df0a006d619ce70a1e052"
+        },
+        "tokenizer/special_tokens_map.json": {
+          "size": 484,
+          "sha256": "a83f5831a70d1d21c057186d35aaa504894103d24ee905baa99bc7e83ceb70ee"
+        },
+        "tokenizer/tokenizer_config.json": {
+          "size": 858,
+          "sha256": "94087ffb39b7b404b877c5d8719d4c5e3bd3cd92e89b8e7a600eaee1744e1929"
+        },
+        "tokenizer/vocab.json": {
+          "size": 1109372,
+          "sha256": "fd67774a869730a6b27bf53d3e434e72054f2a825873c7af3bece183bb1f791e"
+        },
+        "unet/config.json": {
+          "size": 1061,
+          "sha256": "3fe405475255f5583e1eda1ea4b5835438dd3407ab778516c4f3bb0509c8247a"
+        },
+        "vae/config.json": {
+          "size": 641,
+          "sha256": "75ecccb13ea7ada0e906072b34d673ef8b57d614f03aac57a2abb5865c499437"
+        },
+        "__init__.py": {
+          "size": 42,
+          "sha256": "1ef5202d32610255eda0eb524cc9c0f95ed2ded259cdd293c1c1ba2c2fc059c6",
+          "url": "https://raw.githubusercontent.com/1038lab/ComfyUI-RMBG/9edb2bec390091fb9b7fb3d68a64a7af713ea2fc/models/SDMatte/__init__.py"
+        },
+        "modeling/__init__.py": {
+          "size": 54,
+          "sha256": "fc1b44dfd40d9630711a5e8cb9164b65788ea59423ddbee13c418dee9ee44515",
+          "url": "https://raw.githubusercontent.com/1038lab/ComfyUI-RMBG/9edb2bec390091fb9b7fb3d68a64a7af713ea2fc/models/SDMatte/modeling/__init__.py"
+        },
+        "modeling/SDMatte/__init__.py": {
+          "size": 26,
+          "sha256": "fcde31fe735feced90bd542cb591a4b27d874f9d3ad8e990c49b09f9340cd099",
+          "url": "https://raw.githubusercontent.com/1038lab/ComfyUI-RMBG/9edb2bec390091fb9b7fb3d68a64a7af713ea2fc/models/SDMatte/modeling/SDMatte/__init__.py"
+        },
+        "modeling/SDMatte/meta_arch.py": {
+          "size": 10329,
+          "sha256": "c62f4b425f4929f2eb2f4a72b58eda94d4622f6227ed462b5b903a11c912414d",
+          "url": "https://raw.githubusercontent.com/1038lab/ComfyUI-RMBG/9edb2bec390091fb9b7fb3d68a64a7af713ea2fc/models/SDMatte/modeling/SDMatte/meta_arch.py"
+        },
+        "utils/__init__.py": {
+          "size": 46,
+          "sha256": "8047afdfe18a4ac45b40bf0ec0375cbf6fedc42a19147cbbfee71254f4f62bc7",
+          "url": "https://raw.githubusercontent.com/1038lab/ComfyUI-RMBG/9edb2bec390091fb9b7fb3d68a64a7af713ea2fc/models/SDMatte/utils/__init__.py"
+        },
+        "utils/utils.py": {
+          "size": 3327,
+          "sha256": "273652016c58616f6e54483c7963f27615b28381d78efc0674cdc68748c725e9",
+          "url": "https://raw.githubusercontent.com/1038lab/ComfyUI-RMBG/9edb2bec390091fb9b7fb3d68a64a7af713ea2fc/models/SDMatte/utils/utils.py"
+        },
+        "utils/replace.py": {
+          "size": 23898,
+          "sha256": "aa75184c1106404b67484f97c3eb32458903d332f1d4829531303e10d230799b",
+          "url": "https://raw.githubusercontent.com/1038lab/ComfyUI-RMBG/9edb2bec390091fb9b7fb3d68a64a7af713ea2fc/models/SDMatte/utils/replace.py"
+        }
+      },
+      "verification": {
+        "date": "2026-08-16",
+        "runtime_variant": "sdmatte",
+        "compatible_variants": [
+          "sdmatte",
+          "sdmatte_plus"
+        ],
+        "device": "NVIDIA GeForce RTX 4070 Ti SUPER 16GB",
+        "precision": "fp16_autocast",
+        "resolution": 1024,
+        "base_model": "birefnet_portrait",
+        "peak_memory_gib": 8.74,
+        "qa_images": [
+          "scripts/img2mask/_input/001.jpg",
+          "scripts/img2mask/_input/003.jpg",
+          "scripts/img2mask/_input/008.jpg"
+        ],
+        "qa_manifest": "_RMBG/qa_sdmatte/Reports/manifest.json",
+        "result": "3 processed, 0 failed; visual edge review passed"
+      }
+    }
+  }
+}

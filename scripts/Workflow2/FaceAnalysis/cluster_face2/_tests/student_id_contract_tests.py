@@ -28,14 +28,15 @@ from _lib.strategies_analysis.matching import (  # noqa: E402
 )
 from _lib.strategies_analysis.portraits import PortraitsStrategy  # noqa: E402
 from _lib.student_ids import (  # noqa: E402
+    StudentIdList,
     build_cluster_student_map,
-    find_student_ids_file,
-    load_student_ids,
+    build_student_ids_order_context_key,
+    load_student_ids_order,
     remove_legacy_name_fields,
 )
 
 
-class StudentIdFileTests(unittest.TestCase):
+class StudentIdContextTests(unittest.TestCase):
     def test_legacy_name_fields_are_removed_without_touching_other_identity(self) -> None:
         face = {
             "child_name": None,
@@ -51,64 +52,75 @@ class StudentIdFileTests(unittest.TestCase):
         self.assertEqual("A7K3-S001", face["student_id"])
         self.assertEqual("Temp_Cluster_0", face["temp_child_name"])
 
-    def test_valid_file_preserves_order(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "session_children.txt"
-            path.write_text("A7K3-S002\n\nA7K3-S001\n", encoding="utf-8")
+    def test_context_key_uses_photo_session(self) -> None:
+        self.assertEqual(
+            "wf_student_ids_order.Main_ids_order",
+            build_student_ids_order_context_key("Main"),
+        )
 
-            result = load_student_ids(path)
+    def test_valid_json_array_preserves_order(self) -> None:
+        result = load_student_ids_order(
+            ["A7K3-S002", "", "A7K3-S001"],
+            "wf_student_ids_order.Main_ids_order",
+        )
 
         self.assertEqual("A7K3", result.list_id)
         self.assertEqual(("A7K3-S002", "A7K3-S001"), result.student_ids)
 
-    def test_invalid_line_reports_line_number(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "session_children.txt"
-            path.write_text("A7K3-S001\nИванов Иван\n", encoding="utf-8")
-
-            with self.assertRaisesRegex(ValueError, "Строка 2"):
-                load_student_ids(path)
+    def test_invalid_value_reports_array_position(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Элемент 2"):
+            load_student_ids_order(
+                ["A7K3-S001", "Иванов Иван"],
+                "wf_student_ids_order.Main_ids_order",
+            )
 
     def test_duplicate_id_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "session_children.txt"
-            path.write_text("A7K3-S001\nA7K3-S001\n", encoding="utf-8")
-
-            with self.assertRaisesRegex(ValueError, "повторяется"):
-                load_student_ids(path)
+        with self.assertRaisesRegex(ValueError, "повторяется"):
+            load_student_ids_order(
+                ["A7K3-S001", "A7K3-S001"],
+                "wf_student_ids_order.Main_ids_order",
+            )
 
     def test_mixed_list_ids_are_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "session_children.txt"
-            path.write_text("A7K3-S001\nB8M4-S002\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "ожидался A7K3"):
+            load_student_ids_order(
+                ["A7K3-S001", "B8M4-S002"],
+                "wf_student_ids_order.Main_ids_order",
+            )
 
-            with self.assertRaisesRegex(ValueError, "ожидался A7K3"):
-                load_student_ids(path)
+    def test_empty_array_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "не содержит student_id"):
+            load_student_ids_order(
+                [],
+                "wf_student_ids_order.Main_ids_order",
+            )
 
-    def test_empty_file_is_rejected(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "session_children.txt"
-            path.write_text("\n", encoding="utf-8")
+    def test_non_array_value_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "JSON-массив"):
+            load_student_ids_order(
+                {"student_id": "A7K3-S001"},
+                "wf_student_ids_order.Main_ids_order",
+            )
 
-            with self.assertRaisesRegex(ValueError, "пуст"):
-                load_student_ids(path)
+    def test_portraits_strategy_reads_automatic_context_key(self) -> None:
+        class FakeContext:
+            @staticmethod
+            def get(key, default=None):
+                return "Main" if key == "wf_photo_session" else default
 
-    def test_search_uses_session_file_without_children_fallback(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            session_dir = Path(temp_dir)
-            output_dir = session_dir / "Output"
-            target_dir = output_dir / "Analysis_Main"
-            target_dir.mkdir(parents=True)
-            (session_dir / "children.txt").write_text("A7K3-S001", encoding="utf-8")
+            @staticmethod
+            def get_structured(key, default=None):
+                if key == "wf_student_ids_order.Main_ids_order":
+                    return ["A7K3-S001"]
+                return default
 
-            with self.assertRaises(FileNotFoundError):
-                find_student_ids_file(target_dir, "Main", "children.txt")
+        with patch(
+            "_lib.strategies_analysis.portraits.pysm_context", FakeContext()
+        ):
+            result = PortraitsStrategy()._load_student_ids_order()
 
-            expected = output_dir / "Main_children.txt"
-            expected.write_text("A7K3-S001", encoding="utf-8")
-            found = find_student_ids_file(target_dir, "Main", "children.txt")
-
-        self.assertEqual(expected.resolve(), found)
+        self.assertEqual("A7K3", result.list_id)
+        self.assertEqual(("A7K3-S001",), result.student_ids)
 
 
 class ClusterMappingTests(unittest.TestCase):
@@ -151,8 +163,6 @@ class ClusterMappingTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            ids_path = root / "Main_children.txt"
-            ids_path.write_text("A7K3-S001\n", encoding="utf-8")
             manager = SimpleNamespace(
                 data_dir=root,
                 json_data={
@@ -173,7 +183,11 @@ class ClusterMappingTests(unittest.TestCase):
                 save_json=lambda: None,
             )
             strategy = PortraitsStrategy()
-            strategy._resolve_student_ids_file = lambda _target: ids_path
+            strategy._load_student_ids_order = lambda: StudentIdList(
+                context_key="wf_student_ids_order.Main_ids_order",
+                list_id="A7K3",
+                student_ids=("A7K3-S001",),
+            )
             config = Namespace(
                 a_algorithm="dbscan",
                 a_metric="cosine",

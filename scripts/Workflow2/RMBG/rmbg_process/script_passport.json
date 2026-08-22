@@ -1,0 +1,54 @@
+{
+  "description": "Пакетное удаление фона на RMBG-2.0, Lucida и десяти production-вариантах BiRefNet по профилю из JSON-контекста. Сохраняет PNG, WebP или JPEG, показывает настройки маски, итоговые счётчики и кликабельные ссылки на результаты; поддерживает быстрый и SDMatte HQ refinement и автоматическую загрузку моделей.",
+  "category": "Workflow2 / Обработка изображений",
+  "author": "PySM | адаптация ComfyUI-RMBG by 1038lab",
+  "version": "2.2026.08.20",
+  "command_line_args_meta": {
+    "config_var": {
+      "type": "string",
+      "description": "Имя JSON-переменной контекста с настройками RMBG.",
+      "required": true,
+      "default": "wf_rmbg_settings"
+    },
+    "input_dir": {
+      "type": "dir_path",
+      "description": "Папка с исходными изображениями.",
+      "required": true
+    },
+    "output_dir": {
+      "type": "dir_path",
+      "description": "Папка для результатов обработки.",
+      "required": true
+    },
+    "background_dir": {
+      "type": "dir_path",
+      "description": "Папка, содержащая фоновое изображение, выбранное в RMBG Configurator. Требуется для composite в режиме изображения.",
+      "required": false,
+      "default": ""
+    },
+    "recursive": {
+      "type": "bool",
+      "description": "Искать изображения во вложенных папках.",
+      "required": false,
+      "default": false
+    },
+    "overwrite": {
+      "type": "bool",
+      "description": "Разрешить перезапись существующих результатов.",
+      "required": false,
+      "default": false
+    },
+    "dry_run": {
+      "type": "bool",
+      "description": "Проверить конфигурацию и пути без загрузки моделей и записи файлов.",
+      "required": false,
+      "default": false
+    },
+    "fail_fast": {
+      "type": "bool",
+      "description": "Остановить пакет после первой ошибки.",
+      "required": false,
+      "default": false
+    }
+  }
+}

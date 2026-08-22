@@ -485,18 +485,45 @@ def export_to_csv(path: pathlib.Path, students: List[Student], info_columns: Lis
         writer.writerows(rows_to_write)
 
 
-def export_to_txt(
-    output_path: pathlib.Path,
+def build_student_ids_order(
     students: List[Student],
     allocator: StudentIdAllocator,
-) -> None:
+) -> List[str]:
+    """Возвращает проверенные student_id в порядке съёмки."""
+
     allocator.validate_students(students)
     sorted_students = sorted(
         [s for s in students if s.shoot_order is not None], 
         key=lambda s: s.shoot_order
     )
-    lines = [student.student_id for student in sorted_students]
-    _atomic_write_text(output_path, "\n".join(lines))
+    return [student.student_id for student in sorted_students]
+
+
+def build_student_ids_order_context_key(photo_session: Any) -> str:
+    """Строит dot-notation путь порядка съёмки для текущей фотосессии."""
+
+    normalized = str(photo_session or "").strip()
+    if not normalized:
+        raise ValueError("Не задана переменная контекста wf_photo_session.")
+    if "." in normalized:
+        raise ValueError("wf_photo_session не должна содержать точку.")
+    return f"wf_student_ids_order.{normalized}_ids_order"
+
+
+def save_student_ids_order_to_context(
+    context: Any,
+    photo_session: Any,
+    students: List[Student],
+    allocator: StudentIdAllocator,
+) -> tuple[str, List[str]]:
+    """Записывает порядок съёмки и проверяет результат через контекст PySM."""
+
+    context_key = build_student_ids_order_context_key(photo_session)
+    student_ids = build_student_ids_order(students, allocator)
+    context.set_structured(context_key, student_ids, commit=True)
+    if context.get_structured(context_key, default=None) != student_ids:
+        raise RuntimeError(f"Контекст не подтвердил запись переменной {context_key}.")
+    return context_key, student_ids
 
 
 def export_to_html(path: pathlib.Path, class_name: str, students: List[Student], 

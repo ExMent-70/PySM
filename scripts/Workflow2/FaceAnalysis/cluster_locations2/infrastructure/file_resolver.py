@@ -16,20 +16,22 @@ class FileResolver:
         resolved = []
 
         for p in paths:
+
             if not input_is_mask:
                 resolved.append(ResolvedImage(p, p))
                 continue
 
-            name = p.name
+            name = p.stem
+           
             if not name.endswith(self.mask_suffix):
                 logger.warning(f"Invalid mask filename: {name}")
                 continue
 
             base = name[: -len(self.mask_suffix)]
-            parent = p.parent.parent
-
+            parent = p.parent.parent.parent
+            
             candidates = [
-                parent / f"{base}{ext}"
+                parent / "JPG" / f"{base}{ext}"
                 for ext in self.original_exts
             ]
 

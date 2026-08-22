@@ -33,9 +33,10 @@ from _common import (
 
 from ..analysis_manager import AnalysisDataManager
 from ..student_ids import (
+    StudentIdList,
     build_cluster_student_map,
-    find_student_ids_file,
-    load_student_ids,
+    build_student_ids_order_context_key,
+    load_student_ids_order,
     remove_legacy_name_fields,
 )
 from .base import AnalysisStrategy
@@ -56,11 +57,11 @@ class PortraitsStrategy(AnalysisStrategy):
         # 1. Параметры
         algorithm = getattr(config, "a_algorithm", "dbscan")
         metric = getattr(config, "a_metric", "cosine")
-        student_ids_path = self._resolve_student_ids_file(data_manager.data_dir)
-        student_id_list = load_student_ids(student_ids_path)
+        student_id_list = self._load_student_ids_order()
         logger.info(
             f"{icon_ok} Загружен список идентификаторов: <b>{len(student_id_list.student_ids)}</b>, "
-            f"list_id=<b>{student_id_list.list_id}</b>"
+            f"list_id=<b>{student_id_list.list_id}</b>, "
+            f"контекст=<i>{student_id_list.context_key}</i>"
         )
 
         # 2. Фильтрация данных (Только портреты face_count == 1)
@@ -177,7 +178,6 @@ class PortraitsStrategy(AnalysisStrategy):
         # 2. Подготовка данных
         root_node = ResourceNode("Исходная<br>папка", Path(target_dir), "folder", "Исходная папка с результатами AI-анализа фотографий")
         root_node.children.append(ResourceNode("info_faces.json (таргет)", Path(target_dir) / "info_faces.json", "code", "Подробная информация о всех лицах обнаруженных на фотографиях текущей фотосессии"))
-        root_node.children.append(ResourceNode(student_ids_path.name, student_ids_path, "txt", "Список student_id текущей фотосессии в порядке съёмки"))
         
         # 3. Добавление секции
         # Можно вызывать несколько раз для разных блоков
@@ -188,17 +188,21 @@ class PortraitsStrategy(AnalysisStrategy):
                
 
 
-    def _resolve_student_ids_file(self, target_dir: Path) -> Path:
-        """Находит обязательный TXT с student_id текущей фотосессии."""
+    def _load_student_ids_order(self) -> StudentIdList:
+        """Загружает обязательный порядок student_id из контекста PySM."""
 
         if not pysm_context:
             raise RuntimeError(
-                "Контекст PySM недоступен: невозможно определить файл "
-                "идентификаторов текущей фотосессии."
+                "Контекст PySM недоступен: невозможно загрузить порядок "
+                "student_id текущей фотосессии."
             )
 
         photo_session = pysm_context.get("wf_photo_session", "")
-        children_file_name = pysm_context.get("wf_children_file_name", "")
-        path = find_student_ids_file(target_dir, photo_session, children_file_name)
-        logger.info(f"{icon_info} Файл идентификаторов: <i>{path}</i>")
-        return path
+        context_key = build_student_ids_order_context_key(photo_session)
+        raw_value = pysm_context.get_structured(context_key, default=None)
+        if raw_value is None:
+            raise ValueError(
+                f"В контексте отсутствует порядок student_id: {context_key}. "
+                "Сохраните список текущей фотосессии в list_create."
+            )
+        return load_student_ids_order(raw_value, context_key)

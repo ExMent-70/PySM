@@ -58,6 +58,14 @@ QTreeView, QListWidget { alternate-background-color: #050805; }
 QTreeView::item:hover, QListWidget::item:hover { background-color: #1A4A1A; }
 /* Эффект блочного курсора/выделенной строки */
 QTreeView::item:selected, QListWidget::item:selected { background-color: #33FF33; color: #0A0F0A; }
+QTreeWidget#InstanceSelectionTree::item,
+QTreeWidget#InstanceSelectionTree::item:hover,
+QTreeWidget#InstanceSelectionTree::item:selected,
+QTreeWidget#InstanceSelectionTree::item:selected:active,
+QTreeWidget#InstanceSelectionTree::item:selected:!active {
+    border: none;
+    padding: 0px 2px;
+}
 
 QHeaderView::section { background-color: #1A4A1A; padding: 5px; border: 1px solid #33FF33; border-top: none; border-left: none; }
 QTableWidget { border: 1px solid #1A4A1A; gridline-color: #1A4A1A; }
@@ -66,8 +74,25 @@ QTableWidget::item:selected { background-color: #33FF33; color: #0A0F0A; }
 /* --- 5. Элементы управления --- */
 QComboBox::drop-down { border-left: 1px solid #1A4A1A; }
 QComboBox::down-arrow { image: url(none); /* Можно добавить свою иконку */ }
-QCheckBox::indicator { border: 1px solid #33FF33; background-color: #0A0F0A; }
-QCheckBox::indicator:checked { background-color: #33FF33; }
+QCheckBox::indicator, QTreeWidget::indicator {
+    border: 1px solid #33FF33; background-color: #0A0F0A;
+    width: 16px; height: 16px;
+}
+QTreeWidget::indicator,
+QTreeWidget::indicator:unchecked,
+QTreeWidget::indicator:checked,
+QTreeWidget::indicator:indeterminate {
+    border: 1px solid #33FF33;
+    width: 16px; height: 16px; margin: 0px; padding: 0px;
+}
+QCheckBox::indicator:checked, QTreeWidget::indicator:checked {
+    background-color: #33FF33; border: 1px solid #33FF33;
+    width: 16px; height: 16px; margin: 0px; padding: 0px;
+}
+QTreeWidget::indicator:indeterminate {
+    background-color: #33FF33; border: 1px solid #33FF33;
+    width: 16px; height: 16px; margin: 0px; padding: 0px;
+}
 QProgressBar { border: 1px solid #33FF33; text-align: center; color: #33FF33; background-color: #0A0F0A; }
 QProgressBar::chunk { background-color: #1A4A1A; }
 

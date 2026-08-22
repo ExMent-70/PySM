@@ -65,6 +65,7 @@
         "script_info",
         "script_success_block",
         "collection_info",
+        "console_background",
         "set_header",
         "status_error",
         "status_pending",

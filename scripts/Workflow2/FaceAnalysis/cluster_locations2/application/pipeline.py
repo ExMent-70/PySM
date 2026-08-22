@@ -137,7 +137,8 @@ def run_pipeline(
     # ---------------- PATH ----------------
 
     if input_is_mask:
-        input_dir = data_dir / "JPG" / "Masks"
+        #input_dir = data_dir / "JPG" / "Masks"
+        input_dir = data_dir / "Masks" / "Cutout"
     else:
         input_dir = data_dir / "JPG"
 

@@ -2,7 +2,7 @@
   "description": "Генерация визуального отчета о состоянии проекта. \nПоддерживает режимы списка (Standard) и информационной панели (Dashboard), а также фильтрацию по текущей или всем сессиям.",
   "category": "Системные / Отчеты",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "v1.2026.01.22",
+  "version": "v2.2026.08.20",
   "command_line_args_meta": {
     "template": {
       "type": "choice",

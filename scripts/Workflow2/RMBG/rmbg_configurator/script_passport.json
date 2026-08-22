@@ -1,0 +1,20 @@
+{
+  "description": "GUI-конфигуратор RMBG с подробными подсказками, именованными шаблонами с описанием и тестовыми сессиями масок. Настраивает RMBG-2.0, Lucida и production-варианты BiRefNet, создаёт кэшированные тестовые наборы, просматривает один набор и сравнивает 2–4 варианта; сохраняет выбранный профиль единым JSON-объектом в контекст PySM.",
+  "category": "Workflow2 / Обработка изображений",
+  "author": "PySM | адаптация ComfyUI-RMBG by 1038lab",
+  "version": "2.2026.08.21",
+  "command_line_args_meta": {
+    "config_var": {
+      "type": "string",
+      "description": "Имя JSON-переменной контекста для настроек RMBG.",
+      "required": true,
+      "default": "wf_rmbg_settings"
+    },
+    "background_dir": {
+      "type": "dir_path",
+      "description": "Папка фоновых изображений. В GUI выбирается один файл, который будет применён ко всем исходникам.",
+      "required": false,
+      "default": ""
+    }
+  }
+}

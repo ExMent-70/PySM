@@ -17,7 +17,6 @@ def generate_standard_html(
     path_c1_session, 
     session_name, 
     photo_session, 
-    children_file_name, 
     wf_idsgn_catalog_str, 
     wf_portrait_session
 ) -> str:
@@ -47,7 +46,6 @@ def generate_standard_html(
         c1_nodes = [
             ResourceNode(session_name, path_c1_session, "folder", "Папка сессии"),
             ResourceNode(f"{session_name}.cosessiondb", path_c1_session / f"{session_name}.cosessiondb", "c1", "Файл сессии"),
-            ResourceNode(f"{photo_session}_{children_file_name}", path_c1_session / f"{photo_session}_{children_file_name}", "txt", "Список детей")
         ]
 
         if wf_portrait_session and path_session_base:

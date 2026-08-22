@@ -1,0 +1,75 @@
+{
+  "file_type": "pysm_rmbg_templates",
+  "schema_version": 1,
+  "updated_at": "2026-08-20T15:14:19+00:00",
+  "templates": [
+    {
+      "id": "291c91f7ed7f4540a55c0796991b4a96",
+      "name": "Кластеризация локаций",
+      "description": "Простая маска используемая для кластеризации фотографий по локациям/сюжетам.\nМаска инвертирована",
+      "created_at": "2026-08-20T10:40:20+00:00",
+      "updated_at": "2026-08-20T15:14:19+00:00",
+      "settings": {
+        "schema_version": 1,
+        "profile_name": "Маски для кластеризация локаций",
+        "task": {
+          "type": "background_removal",
+          "preset": "custom"
+        },
+        "model": {
+          "selection": "manual",
+          "name": "birefnet_portrait",
+          "model_dir": "_BIN/models/RMBG",
+          "process_resolution": 512,
+          "device": "auto",
+          "precision": "auto",
+          "unload_after_run": true
+        },
+        "segmentation": {
+          "prompt": "",
+          "threshold": 0.35,
+          "merge_instances": true,
+          "max_segments": 0
+        },
+        "mask": {
+          "sensitivity": 0.5,
+          "blur": 1,
+          "offset": 0,
+          "feather": 1,
+          "fill_holes": false,
+          "max_hole_area": 4096,
+          "remove_small_regions": true,
+          "min_region_area": 64,
+          "invert": true,
+          "refinement": "fast",
+          "sdmatte_variant": "sdmatte",
+          "sdmatte_resolution": 1024,
+          "sdmatte_transparent_object": true,
+          "sdmatte_constraint": 0.9
+        },
+        "output": {
+          "save_cutout": true,
+          "save_mask": false,
+          "save_composite": false,
+          "background_mode": "solid",
+          "background_color": "#FFFFFF",
+          "background_image": "",
+          "background_fit": "cover",
+          "background_position": "center",
+          "image_suffix": "_rmbg",
+          "mask_suffix": "_mask",
+          "composite_suffix": "_composite",
+          "image_format": "png",
+          "png_compress_level": 3,
+          "jpeg_quality": 95
+        },
+        "performance": {
+          "batch_size": 1,
+          "io_workers": 4,
+          "max_loaded_models": 1,
+          "allow_cpu_fallback": false
+        }
+      }
+    }
+  ]
+}

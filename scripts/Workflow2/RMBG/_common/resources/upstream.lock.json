@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/1038lab/ComfyUI-RMBG",
+  "release_version": "3.1.0",
+  "release_date": "2026-07-21",
+  "commit": "9edb2bec390091fb9b7fb3d68a64a7af713ea2fc",
+  "tree": "592270647d9aae16a6340d00f82ba210ca151f93",
+  "source_file_count": 215,
+  "import_method": "pending_git_subtree",
+  "adapter_contract_version": 1,
+  "source_status": "verified",
+  "runtime_status": "all_birefnet_models_and_sdmatte_production",
+  "verified_adapters": [
+    "rmbg_2_0",
+    "birefnet_general",
+    "birefnet_512x512",
+    "birefnet_hr",
+    "birefnet_portrait",
+    "birefnet_matting",
+    "birefnet_hr_matting",
+    "birefnet_lite",
+    "birefnet_lite_2k",
+    "birefnet_dynamic",
+    "birefnet_lite_matting",
+    "lucida",
+    "sdmatte"
+  ]
+}

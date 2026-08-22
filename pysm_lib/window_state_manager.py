@@ -7,12 +7,14 @@
 """
 
 import logging
-from typing import Dict, Any, Optional
+from collections.abc import Mapping
+from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QByteArray
-from PySide6.QtWidgets import QMainWindow, QSplitter
+from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtWidgets import QSplitter, QWidget
 
 logger = logging.getLogger(__name__)
+
 
 class WindowStateManager:
     """
@@ -21,56 +23,114 @@ class WindowStateManager:
     """
 
     @staticmethod
-    def save_state(window: QMainWindow, splitters: Optional[Dict[str, QSplitter]] = None) -> Dict[str, Any]:
+    def save_state(
+        window: QWidget,
+        splitters: Optional[Dict[str, QSplitter]] = None,
+    ) -> Dict[str, Any]:
         """
         Собирает геометрию окна и сплиттеров.
-        
-        :param window: Главное окно приложения.
+
+        :param window: Окно приложения, включая QMainWindow и QDialog.
         :param splitters: Словарь вида {'имя_сплиттера': QSplitter}.
         :return: Словарь с Base64-строками состояния.
         """
         state_data: Dict[str, Any] = {}
-        
+
         try:
-            # Сохраняем геометрию окна (размер, положение на мониторах)
-            state_data['geometry'] = window.saveGeometry().toBase64().data().decode('utf-8')
-            # Сохраняем состояние окна (максимизировано/свернуто)
-            state_data['window_state'] = window.saveState().toBase64().data().decode('utf-8')
-            
-            # Сохраняем состояния всех переданных сплиттеров
-            if splitters:
-                state_data['splitters'] = {}
-                for name, splitter in splitters.items():
-                    state_data['splitters'][name] = splitter.saveState().toBase64().data().decode('utf-8')
-                    
-            logger.debug("Состояние окна успешно сохранено.")
-        except Exception as e:
-            logger.error(f"Ошибка при сохранении состояния окна: {e}")
-            
+            state_data['geometry'] = (
+                window.saveGeometry().toBase64().data().decode('utf-8')
+            )
+        except Exception:
+            logger.warning("Не удалось сохранить геометрию окна", exc_info=True)
+
+        save_main_window_state = getattr(window, "saveState", None)
+        if callable(save_main_window_state):
+            try:
+                state_data['window_state'] = (
+                    save_main_window_state().toBase64().data().decode('utf-8')
+                )
+            except Exception:
+                logger.warning("Не удалось сохранить состояние QMainWindow", exc_info=True)
+
+        if window.isFullScreen():
+            state_data['window_mode'] = 'fullscreen'
+        elif window.isMaximized():
+            state_data['window_mode'] = 'maximized'
+        else:
+            # Свёрнутое окно при следующем запуске намеренно открывается обычным.
+            state_data['window_mode'] = 'normal'
+
+        if splitters:
+            saved_splitters: Dict[str, str] = {}
+            for name, splitter in splitters.items():
+                try:
+                    saved_splitters[name] = (
+                        splitter.saveState().toBase64().data().decode('utf-8')
+                    )
+                except Exception:
+                    logger.warning(
+                        "Не удалось сохранить разделитель %s", name, exc_info=True
+                    )
+            if saved_splitters:
+                state_data['splitters'] = saved_splitters
+
+        logger.debug("Состояние окна успешно сохранено.")
+
         return state_data
 
     @staticmethod
-    def restore_state(window: QMainWindow, state_data: Dict[str, Any], splitters: Optional[Dict[str, QSplitter]] = None) -> None:
+    def restore_state(
+        window: QWidget,
+        state_data: Mapping[str, Any],
+        splitters: Optional[Dict[str, QSplitter]] = None,
+    ) -> None:
         """
         Восстанавливает геометрию окна и сплиттеров из словаря.
         """
-        if not state_data:
+        if not isinstance(state_data, Mapping) or not state_data:
             return
 
-        try:
-            # Восстанавливаем окно
-            if 'geometry' in state_data and state_data['geometry']:
-                window.restoreGeometry(QByteArray.fromBase64(state_data['geometry'].encode('utf-8')))
-            if 'window_state' in state_data and state_data['window_state']:
-                window.restoreState(QByteArray.fromBase64(state_data['window_state'].encode('utf-8')))
-            
-            # Восстанавливаем сплиттеры
-            if splitters and 'splitters' in state_data:
-                saved_splitters = state_data['splitters']
-                for name, splitter in splitters.items():
-                    if name in saved_splitters and saved_splitters[name]:
-                        splitter.restoreState(QByteArray.fromBase64(saved_splitters[name].encode('utf-8')))
-                        
-            logger.debug("Состояние окна успешно восстановлено.")
-        except Exception as e:
-            logger.error(f"Ошибка при восстановлении состояния окна: {e}")
+        if state_data.get('geometry'):
+            try:
+                window.restoreGeometry(
+                    QByteArray.fromBase64(state_data['geometry'].encode('utf-8'))
+                )
+            except Exception:
+                logger.warning("Не удалось восстановить геометрию окна", exc_info=True)
+
+        restore_main_window_state = getattr(window, "restoreState", None)
+        if callable(restore_main_window_state) and state_data.get('window_state'):
+            try:
+                restore_main_window_state(
+                    QByteArray.fromBase64(state_data['window_state'].encode('utf-8'))
+                )
+            except Exception:
+                logger.warning(
+                    "Не удалось восстановить состояние QMainWindow", exc_info=True
+                )
+
+        mode = state_data.get('window_mode')
+        if mode == 'fullscreen':
+            window.setWindowState(Qt.WindowState.WindowFullScreen)
+        elif mode == 'maximized':
+            window.setWindowState(Qt.WindowState.WindowMaximized)
+        elif mode == 'normal':
+            window.setWindowState(Qt.WindowState.WindowNoState)
+
+        saved_splitters = state_data.get('splitters')
+        if splitters and isinstance(saved_splitters, Mapping):
+            for name, splitter in splitters.items():
+                encoded_state = saved_splitters.get(name)
+                if encoded_state:
+                    try:
+                        splitter.restoreState(
+                            QByteArray.fromBase64(encoded_state.encode('utf-8'))
+                        )
+                    except Exception:
+                        logger.warning(
+                            "Не удалось восстановить разделитель %s",
+                            name,
+                            exc_info=True,
+                        )
+
+        logger.debug("Состояние окна успешно восстановлено.")

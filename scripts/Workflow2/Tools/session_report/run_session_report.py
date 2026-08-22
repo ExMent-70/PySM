@@ -9,7 +9,7 @@ import traceback
 try:
     current_script_path = Path(__file__).resolve()
     script_dir = current_script_path.parent
-    project_root = script_dir.parent.parent
+    project_root = current_script_path.parents[4]
 
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
@@ -55,7 +55,6 @@ def main():
     wf_portrait_session = pysm_context.get("wf_portrait_session")
     session_name = pysm_context.get("wf_session_name")
     photo_session = pysm_context.get("wf_photo_session")
-    children_file_name = pysm_context.get("wf_children_file_name")
 
     path_session_base = Path(session_path_str) if session_path_str else None
     path_psd_base = Path(psd_path_str) if psd_path_str else None
@@ -72,7 +71,6 @@ def main():
             path_c1_session, 
             session_name, 
             photo_session, 
-            children_file_name,
             wf_portrait_session,
             wf_idsgn_catalog_str
         )
@@ -84,7 +82,6 @@ def main():
             path_c1_session, 
             session_name, 
             photo_session, 
-            children_file_name,
             wf_idsgn_catalog_str,
             wf_portrait_session
         )

@@ -60,7 +60,7 @@
 * `spatial_strategy` - способ сжатия spatial embeddings для `siglip2_onnx` в режиме `clustering`.
 * `a_cl_data_dir` - папка анализа с `info_faces.json` и `JPG`.
 * `a_cl_config_file` - путь к `config.toml`.
-* `use_originals` - использовать оригиналы из `JPG` вместо масок из `JPG/Masks`.
+* `use_originals` - использовать оригиналы из `JPG` вместо масок из `Masks/Cutout`.
 * `a_cl_location_prompts` - список текстовых описаний локаций для `classification`.
 * `match_threshold` - минимальный score для принятия результата классификации; значение по умолчанию `0.11`.
 * `a_cl_cluster_eps` - параметр `eps` для DBSCAN.
