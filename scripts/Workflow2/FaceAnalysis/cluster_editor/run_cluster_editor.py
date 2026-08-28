@@ -328,8 +328,8 @@ class MainWindow(QMainWindow):
         
         # Legacy support for location covers via context
         if self.mode == 'location' and IS_MANAGED_RUN:
-            var_name = f"sys_location_name_{self.photo_session}"
-            covers_data = pysm_context.get(var_name)
+            var_name = f"sys_location_name.{self.photo_session}"
+            covers_data = pysm_context.get_structured(var_name)
             if covers_data and isinstance(covers_data, dict):
                 self.data_manager.ingest_location_covers(covers_data)
         
@@ -1658,8 +1658,8 @@ class MainWindow(QMainWindow):
                 for name in ["portrait_A6", "portrait_A5", "portrait_A4"]:
                     if name not in location_previews:
                         location_previews[name] = ""
-                var_name = f"sys_location_name_{self.photo_session}"
-                pysm_context.set(var_name, location_previews)
+                var_name = f"sys_location_name.{self.photo_session}"
+                pysm_context.set_structured(var_name, location_previews)
                 return True
             except Exception as e:
                 self.data_manager.last_error = f"Context update error: {e}"

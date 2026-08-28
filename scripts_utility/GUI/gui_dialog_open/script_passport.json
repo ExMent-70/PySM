@@ -1,8 +1,8 @@
 {
-  "description": "Показывает системное диалоговое окно для выбора файла или папки. Сохраняет выбранный пользователем путь в Контекст. Запоминает последний выбор.",
+  "description": "Показывает системное диалоговое окно для выбора файла или папки. Сохраняет полный путь либо только имя. Поддерживает начальную папку и ограничение области выбора.",
   "category": "Системные скрипты",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.07.07",
+  "version": "2.2026.08.28",
   "command_line_args_meta": {
     "dlg_open_var": {
       "type": "string",
@@ -14,7 +14,7 @@
       "type": "choice",
       "description": "Тип диалога: 'file' для выбора файла, 'directory' для выбора папки.",
       "required": true,
-      "default": "directory",
+      "default": "file",
       "choices": [
         "file",
         "directory"
@@ -31,6 +31,34 @@
       "description": "Фильтр файлов для диалога (например, 'Изображения (*.png *.jpg)'). Актуально только для выбора файла.",
       "required": false,
       "default": "Все файлы (*.*)"
+    },
+    "dlg_open_result_mode": {
+      "type": "choice",
+      "description": "Формат сохраняемого результата: полный абсолютный путь или только имя выбранного файла/папки.",
+      "required": false,
+      "default": "full_path",
+      "choices": [
+        "full_path",
+        "name"
+      ]
+    },
+    "dlg_open_initial_dir": {
+      "type": "dir_path",
+      "description": "Начальная папка диалога. Поддерживает шаблоны контекста, например {photo_session_dir}.",
+      "required": false,
+      "default": ""
+    },
+    "dlg_open_limit_to_initial_dir": {
+      "type": "choice",
+      "description": "Область допустимого выбора относительно начальной папки.",
+      "required": false,
+      "default": "all",
+      "choices": [
+        "only_in_initial_dir",
+        "only_in_initial_dir_and_subfolders",
+        "initial_dir_and_subfolders",
+        "all"
+      ]
     }
   }
 }

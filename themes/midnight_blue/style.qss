@@ -233,14 +233,14 @@ QToolBox::tab:selected, QToolBox::tab:hover { background: @accentColor; color: @
 QToolBox QWidget, QToolBox QTextEdit { background-color: @bgColorContainer; border: none; }
 
 
-/* --- [6] СПИСКИ И ТАБЛИЦЫ (QTreeView, QListWidget, QTableWidget) --- */
-QTreeView, QListWidget, QTableWidget {
+/* --- [6] СПИСКИ И ТАБЛИЦЫ (QTreeView, QListWidget, QTableView, QTableWidget) --- */
+QTreeView, QListWidget, QTableView, QTableWidget {
     background-color: @bgColorContainer;
     alternate-background-color: @bgColorAlternate;
     border: 1px solid @borderColor; border-radius: 5px;
 }
-QTreeView::item:hover { background-color: @bgColorHover; }
-QTreeView::item:selected, QListWidget::item:selected { background-color: @accentColorSelection; color: @textColorOnAccent; }
+QTreeView::item:hover, QTableView::item:hover { background-color: @bgColorHover; }
+QTreeView::item:selected, QListWidget::item:selected, QTableView::item:selected { background-color: @accentColorSelection; color: @textColorOnAccent; }
 QTreeWidget#InstanceSelectionTree::item,
 QTreeWidget#InstanceSelectionTree::item:hover,
 QTreeWidget#InstanceSelectionTree::item:selected,
@@ -257,8 +257,8 @@ QHeaderView::section {
 }
 QHeaderView::section:!last-of-type { border-right: 1px solid @borderColorGrid; }
 
-QTableWidget { gridline-color: @borderColorGrid; }
-QTableWidget::item { padding: 2px; border: none; }
+QTableView, QTableWidget { gridline-color: @borderColorGrid; }
+QTableView::item, QTableWidget::item { padding: 2px; border: none; }
 QTableWidget::item:selected { background-color: @accentColorSelection; color: @textColorOnAccent; }
 QTableWidget QWidget { background-color: transparent; }
 QTableWidget QLineEdit, QTableWidget QComboBox { border: none; background-color: transparent; border-radius: 0px; }
@@ -430,3 +430,80 @@ QListWidget[class~="face-panel"]::item:selected {
     border: 2px solid @accentColor; 
     color: @textColor;
 }
+
+/* --- КАЛЕНДАРНЫЕ ПОЛЯ И КАЛЕНДАРИ --- */
+QDateEdit, QTimeEdit, QDateTimeEdit {
+    background-color: @bgColorContainer; color: @textColor;
+    border: 1px solid @borderColor; border-radius: 5px; padding: 4px;
+    selection-background-color: @accentColor; selection-color: @textColorOnAccent;
+}
+QDateEdit:focus, QTimeEdit:focus, QDateTimeEdit:focus {
+    border: 1px solid @accentColor;
+}
+QDateEdit::up-button, QTimeEdit::up-button, QDateTimeEdit::up-button,
+QDateEdit::down-button, QTimeEdit::down-button, QDateTimeEdit::down-button {
+    subcontrol-origin: border; width: 16px; background-color: transparent;
+    border-left: 1px solid @borderColor;
+}
+QDateEdit::up-button, QTimeEdit::up-button, QDateTimeEdit::up-button {
+    subcontrol-position: top right; border-bottom: 1px solid @borderColor;
+}
+QDateEdit::down-button, QTimeEdit::down-button, QDateTimeEdit::down-button {
+    subcontrol-position: bottom right;
+}
+QDateEdit::drop-down, QDateTimeEdit::drop-down {
+    subcontrol-origin: border; subcontrol-position: top right;
+    width: 18px; background-color: transparent;
+    border-left: 1px solid @borderColor;
+}
+QDateEdit::drop-down:hover, QDateTimeEdit::drop-down:hover {
+    background-color: @bgColorHover;
+}
+QDateEdit::up-button:hover, QTimeEdit::up-button:hover,
+QDateTimeEdit::up-button:hover, QDateEdit::down-button:hover,
+QTimeEdit::down-button:hover, QDateTimeEdit::down-button:hover {
+    background-color: @bgColorHover;
+}
+QDateEdit::up-arrow, QTimeEdit::up-arrow, QDateTimeEdit::up-arrow {
+    width: 0; height: 0; border-left: 3px solid transparent;
+    border-right: 3px solid transparent; border-bottom: 4px solid @textColor;
+}
+QDateEdit::down-arrow, QTimeEdit::down-arrow, QDateTimeEdit::down-arrow {
+    width: 0; height: 0; border-left: 3px solid transparent;
+    border-right: 3px solid transparent; border-top: 4px solid @textColor;
+}
+QCalendarWidget {
+    background-color: @bgColorBase; color: @textColor;
+    border: 1px solid @borderColor;
+}
+QCalendarWidget QWidget#qt_calendar_navigationbar {
+    background-color: @bgColorHeader; border-bottom: 1px solid @borderColor;
+}
+QCalendarWidget QToolButton {
+    background-color: @bgColorHeader; color: @textColor;
+    border: 1px solid transparent; padding: 5px; border-radius: 4px;
+}
+QCalendarWidget QToolButton#qt_calendar_monthbutton {
+    padding-left: 8px; padding-right: 28px;
+}
+QCalendarWidget QToolButton#qt_calendar_monthbutton::menu-indicator {
+    subcontrol-origin: padding; subcontrol-position: center right;
+    right: 4px;
+}
+QCalendarWidget QToolButton:hover {
+    background-color: @bgColorHover; border-color: @borderColor;
+}
+QCalendarWidget QToolButton:pressed {
+    background-color: @accentColorPressed; color: @textColorOnAccent;
+}
+QCalendarWidget QSpinBox {
+    background-color: @bgColorContainer; color: @textColor;
+    border: 1px solid @borderColor; selection-background-color: @accentColor;
+    selection-color: @textColorOnAccent;
+}
+QCalendarWidget QAbstractItemView:enabled {
+    background-color: @bgColorContainer; alternate-background-color: @bgColorAlternate;
+    color: @textColor; selection-background-color: @accentColor;
+    selection-color: @textColorOnAccent; outline: 0;
+}
+QCalendarWidget QAbstractItemView:disabled { color: @textColorDisabled; }

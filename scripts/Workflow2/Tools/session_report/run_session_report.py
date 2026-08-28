@@ -1,94 +1,105 @@
-# run_wf_report.py
+"""Generate an HTML resource report for the current Workflow2 project."""
 
-import sys
+from __future__ import annotations
+
 import argparse
-from pathlib import Path
+import sys
 import traceback
+from pathlib import Path
 
-# --- Настройка окружения ---
+
 try:
     current_script_path = Path(__file__).resolve()
     script_dir = current_script_path.parent
     project_root = current_script_path.parents[4]
+    tools_dir = script_dir.parent
+    for import_path in (project_root, tools_dir):
+        if str(import_path) not in sys.path:
+            sys.path.insert(0, str(import_path))
 
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
-    if str(script_dir) not in sys.path:
-        sys.path.insert(0, str(script_dir))
-
-    from pysm_lib.pysm_context import pysm_context, ConfigResolver
-    
-    # Импорт фабрик отчетов
-    from report_renderer_standard import generate_standard_html
-    from report_renderer_dashboard import generate_dashboard_html
+    from pysm_lib.pysm_context import ConfigResolver, pysm_context
+    from scripts.Workflow2.Tools._common.project_resources import (
+        ProjectReportContext,
+        ProjectReportOptions,
+        ProjectResourceError,
+        build_project_report,
+    )
 
     IS_MANAGED_RUN = True
-except ImportError as e:
-    print(f"Критическая ошибка импорта: {e}", file=sys.stderr)
+except ImportError as exc:
+    print(f"Критическая ошибка импорта: {exc}", file=sys.stderr)
     traceback.print_exc()
     IS_MANAGED_RUN = False
     pysm_context = None
 
 
-def main():
-    if not IS_MANAGED_RUN or not pysm_context:
-        print("Ошибка: Скрипт запущен вне окружения PySM.", file=sys.stderr)
-        return
+def get_config() -> argparse.Namespace:
+    """Resolve command-line options through the standard PySM contract."""
 
-    # --- 1. Аргументы ---
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--template", dest="report_template", default="standard")
-    parser.add_argument("--scope", dest="report_scope", default="current")
+    parser = argparse.ArgumentParser(
+        description="Формирует HTML-отчёт о ресурсах текущего проекта."
+    )
+    parser.add_argument(
+        "--template",
+        dest="report_template",
+        choices=("standard", "dashboard", "workflow"),
+        default="standard",
+    )
+    parser.add_argument(
+        "--scope",
+        dest="report_scope",
+        choices=("current", "full"),
+        default="current",
+    )
     parser.add_argument("--icon_size_tree", type=int, default=24)
     parser.add_argument("--icon_size_dashboard", type=int, default=48)
+    return ConfigResolver(parser).resolve_all()
 
-    resolver = ConfigResolver(parser)
-    config = resolver.resolve_all()
 
-    if not config.report_scope:
-        config.report_scope = "current"
+def _optional_path(value: object) -> Path | None:
+    text = str(value or "").strip()
+    return Path(text) if text else None
 
-    # --- 2. Контекст ---
-    session_path_str = pysm_context.get("wf_session_path")
-    psd_path_str = pysm_context.get("wf_psd_path")
-    wf_idsgn_catalog_str = pysm_context.get("wf_idsgn_catalog")
-    wf_portrait_session = pysm_context.get("wf_portrait_session")
-    session_name = pysm_context.get("wf_session_name")
-    photo_session = pysm_context.get("wf_photo_session")
 
-    path_session_base = Path(session_path_str) if session_path_str else None
-    path_psd_base = Path(psd_path_str) if psd_path_str else None
-    path_c1_session = (path_session_base / session_name) if (path_session_base and session_name) else None
+def main() -> int:
+    """Build the current project report and publish it to the PySM log."""
 
-    # --- 3. Генерация ---
-    html_content = ""
-    
-    if config.report_template == "dashboard":
-        html_content = generate_dashboard_html(
-            config, 
-            path_session_base, 
-            path_psd_base, 
-            path_c1_session, 
-            session_name, 
-            photo_session, 
-            wf_portrait_session,
-            wf_idsgn_catalog_str
+    if not IS_MANAGED_RUN or not pysm_context:
+        print("Ошибка: Скрипт запущен вне окружения PySM.", file=sys.stderr)
+        return 1
+
+    config = get_config()
+    session_root = _optional_path(pysm_context.get("wf_session_path"))
+    psd_root = _optional_path(pysm_context.get("wf_psd_path"))
+    project_name = str(pysm_context.get("wf_session_name") or "").strip()
+    try:
+        context = ProjectReportContext(
+            project_name=project_name,
+            session_root=session_root,
+            psd_root=psd_root,
+            capture_one_path=(session_root / project_name) if session_root else None,
+            project_path=(psd_root / project_name) if psd_root else None,
+            photo_session=str(pysm_context.get("wf_photo_session") or ""),
+            portrait_session=str(pysm_context.get("wf_portrait_session") or ""),
+            idsgn_catalog=_optional_path(pysm_context.get("wf_idsgn_catalog")),
+            cluster_run=pysm_context.get("var_claster_run"),
         )
-    else:
-        html_content = generate_standard_html(
-            config, 
-            path_session_base, 
-            path_psd_base, 
-            path_c1_session, 
-            session_name, 
-            photo_session, 
-            wf_idsgn_catalog_str,
-            wf_portrait_session
+        options = ProjectReportOptions(
+            template=config.report_template,
+            scope=config.report_scope or "current",
+            icon_size_tree=config.icon_size_tree,
+            icon_size_dashboard=config.icon_size_dashboard,
         )
+        result = build_project_report(context, options)
+    except ProjectResourceError as exc:
+        print(f"Не удалось сформировать отчёт: {exc}", file=sys.stderr)
+        return 1
 
-    # --- 4. Вывод ---
-    pysm_context.log_html(html_content)
+    for warning in result.warnings:
+        print(f"Предупреждение: {warning}", file=sys.stderr)
+    pysm_context.log_html(result.html)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

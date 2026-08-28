@@ -48,16 +48,16 @@ QToolBar QToolButton:hover, QToolBar QToolButton:checked { background-color: #1A
 QToolBar QToolButton:pressed { background-color: #33FF33; border: 1px solid #33FF33; }
 
 /* --- 4. Поля ввода, списки и таблицы --- */
-QLineEdit, QTextEdit, QPlainTextEdit, QTreeView, QListWidget, QComboBox, EmbeddedImageViewer { 
+QLineEdit, QTextEdit, QPlainTextEdit, QTreeView, QListWidget, QTableView, QComboBox, EmbeddedImageViewer {
     background-color: #0A0F0A; border: 1px solid #1A4A1A; padding: 4px; 
 }
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus { border: 1px solid #33FF33; }
 QLineEdit:disabled, QLineEdit:read-only { background-color: #050805; color: #1A4A1A; }
 
-QTreeView, QListWidget { alternate-background-color: #050805; }
-QTreeView::item:hover, QListWidget::item:hover { background-color: #1A4A1A; }
+QTreeView, QListWidget, QTableView { alternate-background-color: #050805; }
+QTreeView::item:hover, QListWidget::item:hover, QTableView::item:hover { background-color: #1A4A1A; }
 /* Эффект блочного курсора/выделенной строки */
-QTreeView::item:selected, QListWidget::item:selected { background-color: #33FF33; color: #0A0F0A; }
+QTreeView::item:selected, QListWidget::item:selected, QTableView::item:selected { background-color: #33FF33; color: #0A0F0A; }
 QTreeWidget#InstanceSelectionTree::item,
 QTreeWidget#InstanceSelectionTree::item:hover,
 QTreeWidget#InstanceSelectionTree::item:selected,
@@ -68,7 +68,7 @@ QTreeWidget#InstanceSelectionTree::item:selected:!active {
 }
 
 QHeaderView::section { background-color: #1A4A1A; padding: 5px; border: 1px solid #33FF33; border-top: none; border-left: none; }
-QTableWidget { border: 1px solid #1A4A1A; gridline-color: #1A4A1A; }
+QTableView, QTableWidget { border: 1px solid #1A4A1A; gridline-color: #1A4A1A; }
 QTableWidget::item:selected { background-color: #33FF33; color: #0A0F0A; }
 
 /* --- 5. Элементы управления --- */
@@ -106,3 +106,78 @@ QScrollBar::add-line, QScrollBar::sub-line { height: 0px; width: 0px; }
 QMenu { background-color: #0A0F0A; border: 1px solid #33FF33; }
 QMenu::item:selected { background-color: #33FF33; color: #0A0F0A; }
 QToolTip { background-color: #0A0F0A; color: #33FF33; border: 1px solid #33FF33; padding: 5px; }
+
+/* --- 8. Календарные поля и календари --- */
+QDateEdit, QTimeEdit, QDateTimeEdit {
+    background-color: #0A0F0A; color: #33FF33;
+    border: 1px solid #1A4A1A; padding: 4px;
+    selection-background-color: #33FF33; selection-color: #0A0F0A;
+}
+QDateEdit:focus, QTimeEdit:focus, QDateTimeEdit:focus {
+    border: 1px solid #33FF33;
+}
+QDateEdit::up-button, QTimeEdit::up-button, QDateTimeEdit::up-button,
+QDateEdit::down-button, QTimeEdit::down-button, QDateTimeEdit::down-button {
+    subcontrol-origin: border; width: 16px; background-color: #0A0F0A;
+    border-left: 1px solid #1A4A1A;
+}
+QDateEdit::up-button, QTimeEdit::up-button, QDateTimeEdit::up-button {
+    subcontrol-position: top right; border-bottom: 1px solid #1A4A1A;
+}
+QDateEdit::down-button, QTimeEdit::down-button, QDateTimeEdit::down-button {
+    subcontrol-position: bottom right;
+}
+QDateEdit::drop-down, QDateTimeEdit::drop-down {
+    subcontrol-origin: border; subcontrol-position: top right;
+    width: 18px; background-color: #0A0F0A;
+    border-left: 1px solid #1A4A1A;
+}
+QDateEdit::drop-down:hover, QDateTimeEdit::drop-down:hover {
+    background-color: #1A4A1A;
+}
+QDateEdit::up-button:hover, QTimeEdit::up-button:hover,
+QDateTimeEdit::up-button:hover, QDateEdit::down-button:hover,
+QTimeEdit::down-button:hover, QDateTimeEdit::down-button:hover {
+    background-color: #1A4A1A;
+}
+QDateEdit::up-arrow, QTimeEdit::up-arrow, QDateTimeEdit::up-arrow {
+    width: 0; height: 0; border-left: 3px solid transparent;
+    border-right: 3px solid transparent; border-bottom: 4px solid #33FF33;
+}
+QDateEdit::down-arrow, QTimeEdit::down-arrow, QDateTimeEdit::down-arrow {
+    width: 0; height: 0; border-left: 3px solid transparent;
+    border-right: 3px solid transparent; border-top: 4px solid #33FF33;
+}
+QCalendarWidget {
+    background-color: #0A0F0A; color: #33FF33;
+    border: 1px solid #1A4A1A;
+}
+QCalendarWidget QWidget#qt_calendar_navigationbar {
+    background-color: #1A4A1A; border-bottom: 1px solid #33FF33;
+}
+QCalendarWidget QToolButton {
+    background-color: #1A4A1A; color: #33FF33;
+    border: 1px solid transparent; padding: 5px;
+}
+QCalendarWidget QToolButton#qt_calendar_monthbutton {
+    padding-left: 8px; padding-right: 28px;
+}
+QCalendarWidget QToolButton#qt_calendar_monthbutton::menu-indicator {
+    subcontrol-origin: padding; subcontrol-position: center right;
+    right: 4px;
+}
+QCalendarWidget QToolButton:hover { border-color: #33FF33; }
+QCalendarWidget QToolButton:pressed {
+    background-color: #33FF33; color: #0A0F0A;
+}
+QCalendarWidget QSpinBox {
+    background-color: #0A0F0A; color: #33FF33;
+    border: 1px solid #33FF33; selection-background-color: #33FF33;
+    selection-color: #0A0F0A;
+}
+QCalendarWidget QAbstractItemView:enabled {
+    background-color: #0A0F0A; alternate-background-color: #050805;
+    color: #33FF33; selection-background-color: #33FF33;
+    selection-color: #0A0F0A; outline: 0;
+}
+QCalendarWidget QAbstractItemView:disabled { color: #1A4A1A; }

@@ -86,6 +86,10 @@ SVG_PATHS: Dict[str, str] = {
     "ERROR": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>',
     "WARNING": '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>',
     "INFO": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>',
+    "SHOOTING_PLANNED": '<path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>',
+    "SHOOTING_CONFIRMED": '<path d="M23 12l-2.44-2.79.34-3.69-3.61-.82L15.4 1.5 12 2.96 8.6 1.5 6.71 4.69l-3.61.82.34 3.69L1 12l2.44 2.79-.34 3.69 3.61.82 1.89 3.2 3.4-1.46 3.4 1.46 1.89-3.2 3.61-.82-.34-3.69L23 12zm-12.91 4.72-3.8-3.81 1.48-1.48 2.32 2.33 5.85-5.87 1.48 1.48-7.33 7.35z"/>',
+    "SHOOTING_COMPLETED": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>',
+    "SHOOTING_CANCELLED": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>',
     "LOCK": '<path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>',
     "ADD": '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>',
     "DELETE": '<path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>',
@@ -199,6 +203,10 @@ THEME_KEYS = {
     "ERROR": "icon_danger", "DELETE": "icon_danger",
     "WARNING": "icon_warning",
     "INFO": "icon_info",
+    "SHOOTING_PLANNED": "icon_info",
+    "SHOOTING_CONFIRMED": "icon_warning",
+    "SHOOTING_COMPLETED": "icon_success",
+    "SHOOTING_CANCELLED": "icon_danger",
     "LOCK": "icon_primary", "ARROW_SUB": "icon_primary",
     
     # Favorites
@@ -343,7 +351,11 @@ ICON_CATEGORIES: Dict[str, List[str]] = {
         "VAR_COPY", "VAR_SET", "VAR_REMOVE", "LOGIC_IF",
         "COPY_RAW", "CONVER_RAW"
     ],
-    "statuses":["OK", "ERROR", "WARNING", "INFO", "LOCK", "ARROW_SUB", "TARGET", "BUG"],
+    "statuses":[
+        "OK", "ERROR", "WARNING", "INFO", "LOCK", "ARROW_SUB", "TARGET", "BUG",
+        "SHOOTING_PLANNED", "SHOOTING_CONFIRMED", "SHOOTING_COMPLETED",
+        "SHOOTING_CANCELLED",
+    ],
     "pysm":["FOLDER_PY", "FOLDER_VIRTUAL", "INSTANCE_SET", "INSTANCE_ITEM", "STAR", "ROCKET", "LIGHTNING", "WAND", "WRENCH"],
     "attributes":["GENDER_MALE", "GENDER_FEMALE", "EYE_CLOSED", "MOUTH_OPEN"]    
 }
