@@ -1,6 +1,8 @@
+accelerate==0.34.2
 beautifulsoup4
 comtypes
 cssutils
+diffusers==0.30.3
 einops
 hdbscan
 huggingface_hub[hf_xet]
@@ -23,6 +25,7 @@ psutil
 pydantic
 pypiwin32
 pymorphy3
+python-dateutil
 PySide6
 pycryptodome
 rawpy
