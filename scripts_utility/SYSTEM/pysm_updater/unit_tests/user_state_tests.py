@@ -7,9 +7,9 @@ from unittest.mock import patch
 from scripts_utility.SYSTEM.pysm_updater.run_pysm_updater import (
     analyze_local_state,
     create_force_system_archive,
-    create_user_state_archive,
     is_user_state_path,
-    restore_user_state_archive,
+    restore_user_state_after_failed_merge,
+    save_user_state_copies,
 )
 
 
@@ -18,6 +18,8 @@ class DummyLogger:
 
     def __init__(self, report_dir: Path):
         self.log_path = report_dir / "update_test.log"
+        self.timestamp = "20260830_104512"
+        self.messages = []
 
     def section(self, *_args, **_kwargs):
         pass
@@ -28,8 +30,14 @@ class DummyLogger:
     def write(self, *_args, **_kwargs):
         pass
 
-    def icon_line(self, *_args, **_kwargs):
+    def write_html(self, *_args, **_kwargs):
         pass
+
+    def write_file(self, *_args, **_kwargs):
+        pass
+
+    def icon_line(self, message, *_args, **_kwargs):
+        self.messages.append(message)
 
 
 class UserStatePathTests(unittest.TestCase):
@@ -74,8 +82,43 @@ class UserStatePathTests(unittest.TestCase):
         self.assertTrue(state["has_blocking_conflicts"])
 
 
-class UserStateArchiveTests(unittest.TestCase):
-    def test_archive_restores_changed_file_and_local_deletion(self):
+class UserStateCopyTests(unittest.TestCase):
+    def test_copies_use_one_update_prefix_and_keep_collection_extensions(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            target_dir = Path(temporary_directory)
+            report_dir = target_dir / "_OUTPUT" / "pysm_updater"
+            report_dir.mkdir(parents=True)
+            logger = DummyLogger(report_dir)
+            config_path = target_dir / "config.toml"
+            collection_dir = target_dir / "script_collections"
+            collection_file = collection_dir / "Example.pysmc"
+            context_file = collection_dir / "Example.context.json"
+            config_path.write_text("local = true\n", encoding="utf-8")
+            collection_dir.mkdir(parents=True)
+            collection_file.write_text("local collection\n", encoding="utf-8")
+            context_file.write_text("local context\n", encoding="utf-8")
+
+            saved_state = save_user_state_copies(
+                target_dir,
+                logger,
+                [
+                    {"paths": ["config.toml"]},
+                    {"paths": ["script_collections/Example.pysmc"]},
+                    {"paths": ["script_collections/Example.context.json"]},
+                ],
+            )
+
+            copied_paths = {item["source_path"]: Path(item["copy_path"]).name for item in saved_state["copied_files"]}
+            self.assertEqual(copied_paths["config.toml"], "user_20260830_104512_config.toml")
+            self.assertEqual(copied_paths["script_collections/Example.pysmc"], "user_20260830_104512_Example.pysmc")
+            self.assertEqual(copied_paths["script_collections/Example.context.json"], "user_20260830_104512_Example.context.json")
+            self.assertEqual((target_dir / saved_state["copied_files"][0]["copy_path"]).read_text(encoding="utf-8"), "local = true\n")
+            self.assertIn(
+                "После обновления сравните исходный файл с сохраненной копией и вручную перенесите нужные настройки.",
+                logger.messages,
+            )
+
+    def test_failed_merge_restores_local_files_and_deletions(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             target_dir = Path(temporary_directory)
             report_dir = target_dir / "_OUTPUT" / "pysm_updater"
@@ -85,7 +128,7 @@ class UserStateArchiveTests(unittest.TestCase):
             deleted_collection_path = target_dir / "script_collections" / "Example.pysmc"
             config_path.write_text("local = true\n", encoding="utf-8")
 
-            archive_info = create_user_state_archive(
+            saved_state = save_user_state_copies(
                 target_dir,
                 logger,
                 [
@@ -97,7 +140,7 @@ class UserStateArchiveTests(unittest.TestCase):
             config_path.write_text("remote = true\n", encoding="utf-8")
             deleted_collection_path.parent.mkdir(parents=True, exist_ok=True)
             deleted_collection_path.write_text("remote collection\n", encoding="utf-8")
-            restore_user_state_archive(target_dir, archive_info, logger)
+            restore_user_state_after_failed_merge(target_dir, saved_state, logger)
 
             self.assertEqual(config_path.read_text(encoding="utf-8"), "local = true\n")
             self.assertFalse(deleted_collection_path.exists())
