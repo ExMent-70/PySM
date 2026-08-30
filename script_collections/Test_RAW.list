@@ -1,0 +1,467 @@
+{
+    "list_id": "HHC8",
+    "next_student_number": 48,
+    "class_name": "Test_RAW",
+    "service_type": "Альбом 6 стр.",
+    "info_columns": [
+        "Цитата"
+    ],
+    "students": [
+        {
+            "student_id": "HHC8-S024",
+            "surname": "Адигамова",
+            "name": "Виктория",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 1,
+            "alpha_order": 1,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Du bist mein Licht...»"
+            }
+        },
+        {
+            "student_id": "HHC8-S033",
+            "surname": "Алексеева",
+            "name": "Мария",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 5,
+            "alpha_order": 2,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Один важный секрет: нужно идти туда, куда хочется, а не туда, куда якобы надо»"
+            }
+        },
+        {
+            "student_id": "HHC8-S028",
+            "surname": "Андриевский",
+            "name": "Алексей",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 3,
+            "alpha_order": 3,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Возможно всё. На невозможное просто требуется больше времени»"
+            }
+        },
+        {
+            "student_id": "HHC8-S040",
+            "surname": "Буторин",
+            "name": "Егор",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 7,
+            "alpha_order": 4,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Не бойтесь мечтать о великом — вы способны на всё!»"
+            }
+        },
+        {
+            "student_id": "HHC8-S038",
+            "surname": "Гордеева",
+            "name": "Анна",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 8,
+            "alpha_order": 5,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Школа — это не здание, это люди, которых невозможно забыть!»"
+            }
+        },
+        {
+            "student_id": "HHC8-S047",
+            "surname": "Давлетханова",
+            "name": "Антонида",
+            "patronymic": "Анатольевна",
+            "rank": "учитель",
+            "shoot_order": 24,
+            "alpha_order": 6,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": ""
+            }
+        },
+        {
+            "student_id": "HHC8-S035",
+            "surname": "Дорофеев",
+            "name": "Егор",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 6,
+            "alpha_order": 7,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Учись находить в жизни радость — это лучший способ привлечь счастье»"
+            }
+        },
+        {
+            "student_id": "HHC8-S026",
+            "surname": "Зайцев",
+            "name": "Артём",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 20,
+            "alpha_order": 8,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Школа — это лишь одна из глав моей истории»"
+            }
+        },
+        {
+            "student_id": "HHC8-S032",
+            "surname": "Зайцев",
+            "name": "Ярослав",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 4,
+            "alpha_order": 9,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Спасибо школе за друзей, смех и память и наше будущее, которое уже начинается»"
+            }
+        },
+        {
+            "student_id": "HHC8-S045",
+            "surname": "Ивлева",
+            "name": "Милена",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 17,
+            "alpha_order": 10,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«I want to be forever young»"
+            }
+        },
+        {
+            "student_id": "HHC8-S041",
+            "surname": "Камалетдинова",
+            "name": "Кристина",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 11,
+            "alpha_order": 11,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Game Over. Уровень 9 пройден»"
+            }
+        },
+        {
+            "student_id": "HHC8-S036",
+            "surname": "Курдюкова",
+            "name": "Анастасия",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 10,
+            "alpha_order": 12,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Любовь спасёт нас всех. Любовь — это главное, главное — любить!»"
+            }
+        },
+        {
+            "student_id": "HHC8-S031",
+            "surname": "Михалёв",
+            "name": "Роман",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 12,
+            "alpha_order": 13,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Школа — не конец, а только начало большого пути!»"
+            }
+        },
+        {
+            "student_id": "HHC8-S046",
+            "surname": "Называев",
+            "name": "Александр",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 22,
+            "alpha_order": 14,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Мы не прощаемся — мы взрослеем»"
+            }
+        },
+        {
+            "student_id": "HHC8-S039",
+            "surname": "Неродов",
+            "name": "Иван",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 2,
+            "alpha_order": 15,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Дорога к успеху всегда строится из маленьких побед»"
+            }
+        },
+        {
+            "student_id": "HHC8-S025",
+            "surname": "Плюснина",
+            "name": "Маргарита",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 16,
+            "alpha_order": 16,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«В целом мне понравилось, только учёба мешала»"
+            }
+        },
+        {
+            "student_id": "HHC8-S030",
+            "surname": "Покацкий",
+            "name": "Александр",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 19,
+            "alpha_order": 17,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Škola nie je koniec, je to len začiatok dlhej cesty»"
+            }
+        },
+        {
+            "student_id": "HHC8-S034",
+            "surname": "Реховский",
+            "name": "Кирилл",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 21,
+            "alpha_order": 18,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": ""
+            }
+        },
+        {
+            "student_id": "HHC8-S042",
+            "surname": "Рыжова",
+            "name": "Елена",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 13,
+            "alpha_order": 19,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Я бы охотно перемотала плёнку в самое начало»"
+            }
+        },
+        {
+            "student_id": "HHC8-S027",
+            "surname": "Салкова",
+            "name": "Полина",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 9,
+            "alpha_order": 20,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«...in my darkest night»"
+            }
+        },
+        {
+            "student_id": "HHC8-S037",
+            "surname": "Сапунова",
+            "name": "Галина",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 18,
+            "alpha_order": 21,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Школа заканчивается, но уроки жизни только начинаются»"
+            }
+        },
+        {
+            "student_id": "HHC8-S029",
+            "surname": "Трифонов",
+            "name": "Михаил",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 23,
+            "alpha_order": 22,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Этот альбом — наш билет в страну воспоминаний»"
+            }
+        },
+        {
+            "student_id": "HHC8-S044",
+            "surname": "Фёдорова",
+            "name": "Анна",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 15,
+            "alpha_order": 23,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Анька, за накрашенные глазки пятёрки не ставят. — Ну и что. Я и без пятёрок всем нравлюсь»"
+            }
+        },
+        {
+            "student_id": "HHC8-S043",
+            "surname": "Чистякова",
+            "name": "Ирина",
+            "patronymic": "",
+            "rank": "ученик",
+            "shoot_order": 14,
+            "alpha_order": 24,
+            "color1": "#e3f2fd",
+            "color1_fg": "#0d47a1",
+            "color2": "#888888",
+            "color2_fg": "#eeeeee",
+            "service_type": "Альбом 6 стр.",
+            "service_cost": 2800,
+            "extra_services": [],
+            "info": {
+                "Цитата": "«Viva La Vida — да здравствует жизнь»"
+            }
+        }
+    ]
+}
