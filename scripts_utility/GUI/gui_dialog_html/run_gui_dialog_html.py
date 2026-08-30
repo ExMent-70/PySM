@@ -1,4 +1,4 @@
-"""Show HTML in the PySM console, a modal dialog, or both."""
+"""Show HTML in the PySM console, a modal dialog, both, or nowhere."""
 
 from __future__ import annotations
 
@@ -65,6 +65,7 @@ except ImportError:
 OUTPUT_CONSOLE = "console"
 OUTPUT_DIALOG = "dialog"
 OUTPUT_CONSOLE_DIALOG = "console_dialog"
+OUTPUT_NONE = "none"
 DIALOG_OUTPUT_MODES = {OUTPUT_DIALOG, OUTPUT_CONSOLE_DIALOG}
 CONSOLE_OUTPUT_MODES = {OUTPUT_CONSOLE, OUTPUT_CONSOLE_DIALOG}
 
@@ -74,13 +75,14 @@ def get_config() -> Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Выводит HTML-текст или HTML-файл в консоль PySM, "
-            "диалоговое окно либо одновременно в оба места."
+            "диалоговое окно, одновременно в оба места либо не выводит."
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
         "--html_content",
         type=str,
+        default="",
         help="Строка с HTML-разметкой для вывода.",
     )
     parser.add_argument(
@@ -91,9 +93,14 @@ def get_config() -> Namespace:
     parser.add_argument(
         "--html_output",
         type=str,
-        choices=[OUTPUT_CONSOLE, OUTPUT_DIALOG, OUTPUT_CONSOLE_DIALOG],
+        choices=[
+            OUTPUT_CONSOLE,
+            OUTPUT_DIALOG,
+            OUTPUT_CONSOLE_DIALOG,
+            OUTPUT_NONE,
+        ],
         default=OUTPUT_CONSOLE_DIALOG,
-        help="Куда выводить HTML-контент.",
+        help="Куда выводить HTML-контент; none завершает скрипт без вывода.",
     )
     parser.add_argument(
         "--html_align",
@@ -123,7 +130,7 @@ def get_config() -> Namespace:
     parser.add_argument(
         "--dlg_msg_var",
         type=str,
-        default="dlg_msg_user_var",
+        default="dlg_go_var",
         help=(
             "Переменная Контекста Коллекции для результата диалога. "
             "Поддерживается точечная нотация."
@@ -139,25 +146,25 @@ def get_config() -> Namespace:
     parser.add_argument(
         "--dlg_msg_text_ok",
         type=str,
-        default="",
+        default="Продолжить",
         help="Пользовательская подпись утвердительной кнопки OK или Yes.",
     )
     parser.add_argument(
         "--dlg_msg_text_no",
         type=str,
-        default="",
+        default="Остановить",
         help="Пользовательская подпись кнопки No.",
     )
     parser.add_argument(
         "--dlg_msg_text_cancel",
         type=str,
-        default="",
+        default="Отменить",
         help="Пользовательская подпись кнопки Cancel.",
     )
     parser.add_argument(
         "--dlg_msg_title",
         type=str,
-        default="Подтверждение",
+        default="Информационное сообщение",
         help="Заголовок диалогового окна.",
     )
     parser.add_argument(
@@ -377,6 +384,9 @@ def determine_exit_code(dialog_type: str, result: str) -> int:
 def main() -> int:
     """Run the configured output flow and return its process exit code."""
     config = get_config()
+
+    if config.html_output == OUTPUT_NONE:
+        return 0
 
     if not IS_MANAGED_RUN or pysm_context is None:
         logger.error(format_error("Скрипт предназначен для запуска в среде PySM."))

@@ -96,12 +96,28 @@ class RuntimeContextConfig(BaseModel):
         return value
 
 
+class WorkflowCopyConfig(BaseModel):
+    reset_context_variables: List[str] = Field(default_factory=list)
+
+    @field_validator("reset_context_variables")
+    @classmethod
+    def normalize_variable_names(cls, values: List[str]) -> List[str]:
+        """Удаляет пустые и повторяющиеся имена, сохраняя порядок списка."""
+        normalized = []
+        for value in values:
+            name = value.strip()
+            if name and name not in normalized:
+                normalized.append(name)
+        return normalized
+
+
 class AppConfigModel(BaseModel):
     paths: PathsConfig = Field(default_factory=PathsConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     runtime_context: RuntimeContextConfig = Field(default_factory=RuntimeContextConfig)
+    workflow_copy: WorkflowCopyConfig = Field(default_factory=WorkflowCopyConfig)
     environment_variables: Dict[str, str] = Field(default_factory=dict)
     
     # --- ИЗМЕНЕНИЕ ---
@@ -214,7 +230,30 @@ class ConfigManager:
         return config_text
 
     def save_config(self) -> bool:
+        self.reload_workflow_copy_config()
         return self._save_to_file(self.config)
+
+    def reload_workflow_copy_config(self) -> bool:
+        """Обновляет файловую секцию копирования без перезагрузки всего конфига."""
+        if not self.config_path.is_file():
+            return False
+
+        try:
+            config_data = toml.load(self.config_path)
+            workflow_copy_data = config_data.get("workflow_copy")
+            if workflow_copy_data is None:
+                return False
+            self.config.workflow_copy = WorkflowCopyConfig.model_validate(
+                workflow_copy_data
+            )
+            return True
+        except (toml.TomlDecodeError, ValidationError, OSError, TypeError) as e:
+            logger.warning(
+                "Не удалось перечитать секцию workflow_copy из '%s': %s",
+                self.config_path,
+                e,
+            )
+            return False
 
     # 5. Блок: Свойства доступа (ПОЛНЫЙ КОД)
     # ==============================================================================

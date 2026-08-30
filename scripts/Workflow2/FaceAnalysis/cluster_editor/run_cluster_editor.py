@@ -326,7 +326,8 @@ class MainWindow(QMainWindow):
             self.gallery_label.setText("Ошибка загрузки данных")
             return
         
-        # Legacy support for location covers via context
+        # Контракт обложек локаций хранится в структурированной переменной:
+        # sys_location_name.{photo_session}
         if self.mode == 'location' and IS_MANAGED_RUN:
             var_name = f"sys_location_name.{self.photo_session}"
             covers_data = pysm_context.get_structured(var_name)
@@ -1339,7 +1340,8 @@ class MainWindow(QMainWindow):
         )
         target_size = (icon_extent, icon_extent)
 
-        for i, face in enumerate(record.faces):
+        face_entries = self._ordered_face_panel_entries(record.faces)
+        for display_index, (face_index, face) in enumerate(face_entries, start=1):
             border_color = None
             if self.mode == 'matches':
                 matched_id = face.extra_data.get('matched_portrait_cluster_label')
@@ -1355,15 +1357,15 @@ class MainWindow(QMainWindow):
                         or f"ID кластера {matched_id}"
                     )
                     border_color = "#4169e1"
-                text = f"Лицо #{i + 1}\n{status_text}"
+                text = f"Лицо #{display_index}\n{status_text}"
             else:
-                text = f"Лицо #{i + 1}"
+                text = f"Лицо #{display_index}"
                 student_label = self.data_manager.student_label(face.student_id)
                 if student_label:
                     text += f"\n{student_label}"
 
             item = QListWidgetItem(text)
-            item.setData(Qt.ItemDataRole.UserRole, i)
+            item.setData(Qt.ItemDataRole.UserRole, face_index)
             item.setData(FACE_STATUS_COLOR_ROLE, border_color or "")
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.face_details_widget.addItem(item)
@@ -1379,7 +1381,7 @@ class MainWindow(QMainWindow):
             )
             if request is None:
                 continue
-            channel = ("face-panel", id(self), generation, f"{fname}::{i}")
+            channel = ("face-panel", id(self), generation, f"{fname}::{face_index}")
             self._face_panel_channels[channel] = {
                 "generation": generation,
                 "item": item,
@@ -1395,6 +1397,24 @@ class MainWindow(QMainWindow):
             first_face_item = self.face_details_widget.item(0)
             self.face_details_widget.setCurrentItem(first_face_item)
             self._on_face_item_clicked(first_face_item)
+
+    def _ordered_face_panel_entries(self, faces):
+        """Возвращает лица в порядке панели, сохраняя их исходные индексы."""
+
+        entries = list(enumerate(faces))
+        if self.mode != "matches":
+            return entries
+
+        def sort_key(entry):
+            original_index, face = entry
+            matched_id = face.extra_data.get("matched_portrait_cluster_label")
+            if self.active_cluster_id == "error_matches":
+                return (0 if matched_id is None else 1, original_index)
+            if matched_id is not None and str(matched_id) == str(self.active_cluster_id):
+                return (0, original_index)
+            return (1, original_index)
+
+        return sorted(entries, key=sort_key)
 
     @Slot(QListWidgetItem)
     def _on_face_item_clicked(self, item):
@@ -1651,7 +1671,8 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(0, self.close)
 
     def _update_pysm_context(self) -> bool:
-        # Контракт обложек локаций хранится в контексте PySM.
+        # Контракт обложек локаций хранится в структурированной переменной:
+        # sys_location_name.{photo_session}
         if self.mode == 'location' and IS_MANAGED_RUN:
             try:
                 location_previews = self.data_manager.get_location_covers_dict()

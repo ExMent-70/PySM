@@ -1,29 +1,30 @@
 {
-  "description": "Выводит HTML-текст или содержимое HTML-файла в консоль PySM, настраиваемое диалоговое окно либо одновременно в оба места. При показе диалога сохраняет выбор пользователя в Контекст Коллекции и управляет продолжением цепочки кодом выхода.",
+  "description": "Выводит HTML-текст или содержимое HTML-файла в консоль PySM, настраиваемое диалоговое окно, одновременно в оба места либо завершает работу без вывода. При показе диалога сохраняет выбор пользователя в Контекст Коллекции и управляет продолжением цепочки кодом выхода.",
   "category": "Интерфейс пользователя",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.08.14",
+  "version": "2.2026.08.29",
   "command_line_args_meta": {
     "html_content": {
       "type": "string_multiline",
-      "description": "Строка с HTML-разметкой. Если одновременно указан HTML-файл, этот блок будет показан первым.",
+      "description": "Строка с HTML-разметкой. Если одновременно указан HTML-файл, этот блок будет показан первым. В режиме none не используется.",
       "required": false,
       "default": ""
     },
     "html_file": {
       "type": "file_path",
-      "description": "Путь к UTF-8 HTML-файлу. Относительный путь разрешается от папки Коллекции.",
+      "description": "Путь к UTF-8 HTML-файлу. Относительный путь разрешается от папки Коллекции. В режиме none не используется.",
       "required": false
     },
     "html_output": {
       "type": "choice",
-      "description": "Место вывода HTML: только консоль, только диалог или одновременно консоль и диалог.",
+      "description": "Место вывода HTML: только консоль, только диалог, одновременно консоль и диалог или не выводить.",
       "required": true,
       "default": "console_dialog",
       "choices": [
         "console",
         "dialog",
-        "console_dialog"
+        "console_dialog",
+        "none"
       ]
     },
     "html_align": {
@@ -78,13 +79,13 @@
     },
     "dlg_msg_var": {
       "type": "string",
-      "description": "Переменная Контекста Коллекции для результата: ok, yes, no, cancel или unknown. Поддерживается точечная нотация, например project.confirmation. В режиме console не используется.",
+      "description": "Переменная Контекста Коллекции для результата: ok, yes, no, cancel или unknown. Поддерживается точечная нотация, например project.confirmation. В режимах console и none не используется.",
       "required": false,
       "default": "dlg_go_var"
     },
     "dlg_msg_type": {
       "type": "choice",
-      "description": "Набор кнопок диалогового окна. В режиме console не используется.",
+      "description": "Набор кнопок диалогового окна. В режимах console и none не используется.",
       "required": true,
       "default": "yes_no",
       "choices": [

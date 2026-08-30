@@ -2,12 +2,13 @@
   "description": "Генерация визуального отчета о состоянии проекта. \nПоддерживает дерево ресурсов (Standard), информационную панель (Dashboard), отчёт по этапам обработки (Workflow), а также фильтрацию по текущей или всем фотосессиям.",
   "category": "Системные / Отчеты",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "v2.2026.08.27",
+  "version": "v2.2026.08.28",
   "command_line_args_meta": {
     "template": {
       "type": "choice",
       "description": "Шаблон отображения отчета",
       "required": false,
+      "default": "standard",
       "choices": [
         "standard",
         "dashboard",
@@ -18,6 +19,7 @@
       "type": "choice",
       "description": "Объем данных (фильтр сессий)",
       "required": false,
+      "default": "current",
       "choices": [
         "current",
         "full"

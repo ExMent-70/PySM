@@ -198,6 +198,20 @@
     }
   },
   "dialogs": {
+    "collection_copy_save": {
+        "title": "Сохранение нового рабочего процесса",
+        "question": "Сохранить новый рабочий процесс?",
+        "save_button": "Сохранить",
+        "cancel_button": "Отменить",
+        "file_dialog_title": "Имя нового рабочего процесса",
+        "missing_root_error": "Переменная контекста wf_psd_path отсутствует или не содержит путь.",
+        "invalid_root_error": "Рабочая папка wf_psd_path недоступна или не существует:\n{path}",
+        "outside_root_error": "Новый рабочий процесс можно сохранить только в рабочей папке:\n{path}",
+        "empty_name_error": "Введите имя нового рабочего процесса.",
+        "project_exists_error": "Папка нового рабочего процесса уже существует:\n{path}\nВведите другое имя.",
+        "create_folder_error": "Не удалось создать папку нового рабочего процесса:\n{path}\n\n{error}",
+        "save_error": "Не удалось сохранить новый рабочий процесс:\n{path}"
+    },
     "instance_editor": {
 		"title": "Выбор экземпляра скрипта",
         "none_selected": "(не выбрано)",
@@ -420,7 +434,10 @@
     "collection_opened": "Загружен рабочий процесс '{name}'",
     "config_saved": "Конфигурация приложения сохранена.",
     "config_save_error": "ОШИБКА: Не удалось сохранить конфигурацию приложения.",
-	"collection_new_from_template": "Создан новый рабочий процесс на основе текущего.",
+    "collection_new_from_template": "Создан новый рабочий процесс на основе текущего.",
+    "context_variables_reset": "Сброшены переменные контекста:\n{variables}",
+    "collection_copy_save_warning": "<b>ОБЯЗАТЕЛЬНО СОХРАНИТЕ НОВЫЙ РАБОЧИЙ ПРОЦЕСС</b>\n\nНапример, в отдельную папку внутри текущей рабочей папки\n<b>{wf_psd_path}</b>",
+    "collection_copy_saved": "Новый проект сохранён.\n\nРабочая папка проекта - {project_dir}\n\nФайл проекта - {project_file}",
     "collection_renamed": "Рабочий процесс '{old_name}' переименована в '{new_name}'.",
     "collection_props_updated": "Свойства рабочего процесса обновлены.",
 	"collection_saved": "Рабочий процесс сохранена в '{path}'",

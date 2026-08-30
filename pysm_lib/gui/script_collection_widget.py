@@ -313,6 +313,19 @@ class ScriptCollectionWidget(QWidget):
         root = self.collection_model.invisibleRootItem()
         self._recursive_tooltip_update(root)
 
+    def _resolve_instance_tooltip_name(self, instance_id: str) -> Optional[str]:
+        """Возвращает читаемое имя экземпляра для всплывающей подсказки."""
+        result = self.controller.set_manager.find_entry_and_parent_set(instance_id)
+        if not result:
+            return None
+
+        entry, parent_set = result
+        script_info = self.controller.get_script_info_by_id(entry.id)
+        display_name = entry.name or (script_info.name if script_info else None)
+        if not display_name:
+            return None
+        return f"[{parent_set.name}] {display_name}"
+
     def _recursive_tooltip_update(self, parent_item: QStandardItem):
         for row in range(parent_item.rowCount()):
             item = parent_item.child(row)
@@ -322,7 +335,11 @@ class ScriptCollectionWidget(QWidget):
             if isinstance(item_data, ScriptSetEntryModel):
                 script_info = self.controller.get_script_info_by_id(item_data.id)
                 tooltip_html = generate_instance_tooltip_html(
-                    script_info, item_data, self.locale_manager, self.theme_manager
+                    script_info,
+                    item_data,
+                    self.locale_manager,
+                    self.theme_manager,
+                    instance_name_resolver=self._resolve_instance_tooltip_name,
                 )
                 item.setToolTip(tooltip_html)
             
@@ -358,7 +375,13 @@ class ScriptCollectionWidget(QWidget):
         display_name = updated_entry.name or (script_info.name if script_info else self.locale_manager.get("collection_widget.script_not_found_format", id=updated_entry.id))
         item.setText(display_name)
         
-        tooltip_html = generate_instance_tooltip_html(script_info, updated_entry, self.locale_manager, self.theme_manager)
+        tooltip_html = generate_instance_tooltip_html(
+            script_info,
+            updated_entry,
+            self.locale_manager,
+            self.theme_manager,
+            instance_name_resolver=self._resolve_instance_tooltip_name,
+        )
         item.setToolTip(tooltip_html)
 
         # 4. ОБНОВЛЯЕМ ВИЗУАЛ (Иконку и цвет статуса)
@@ -502,7 +525,13 @@ class ScriptCollectionWidget(QWidget):
                     status = self.controller.script_run_statuses.get(entry.instance_id)
                     self._update_item_visuals(entry_item, status)
 
-                    tooltip_html = generate_instance_tooltip_html(script_info, entry, self.locale_manager, self.theme_manager)
+                    tooltip_html = generate_instance_tooltip_html(
+                        script_info,
+                        entry,
+                        self.locale_manager,
+                        self.theme_manager,
+                        instance_name_resolver=self._resolve_instance_tooltip_name,
+                    )
                     entry_item.setToolTip(tooltip_html)
                     
                     if not (script_info and script_info.passport_valid):
@@ -914,7 +943,8 @@ class ScriptCollectionWidget(QWidget):
                 script_info=script_info,
                 instance_entry=entry,
                 locale_manager=self.locale_manager,
-                theme_manager=self.theme_manager
+                theme_manager=self.theme_manager,
+                instance_name_resolver=self._resolve_instance_tooltip_name,
             )
             btn.setToolTip(tooltip_html)
 

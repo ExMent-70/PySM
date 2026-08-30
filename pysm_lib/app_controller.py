@@ -4,10 +4,18 @@ import logging
 import pathlib
 import json
 import os
-from typing import List, Dict, Optional, Any
+from dataclasses import dataclass
+from typing import List, Dict, Optional, Any, Tuple
 
-from PySide6.QtCore import QObject, Signal, QTimer, Slot, QThread
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QDialog, QFileDialog
+from PySide6.QtCore import QObject, Signal, QTimer, Slot, QThread, Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QDialog,
+    QFileDialog,
+    QMessageBox,
+)
 
 # 1. Блок: Измененные импорты
 # ==============================================================================
@@ -27,15 +35,25 @@ from .models import (
     ScriptSetEntryValueEnabled,
     ContextVariableModel,
     ScriptArgMetaDetailModel,
+    ScriptSetsCollectionModel,
 )
-from . import pysm_context
+from .pysm_context import PySMContext
 from .set_manager import SetManager
 from .locale_manager import LocaleManager
 from .set_runner_orchestrator import SetRunnerOrchestrator
 from .app_enums import AppState, ScriptRunStatus
-from .app_constants import APPLICATION_ROOT_DIR
+from .app_constants import APPLICATION_ROOT_DIR, COLLECTION_EXTENSION
 
 logger = logging.getLogger(f"PyScriptManager.{__name__}")
+
+
+@dataclass(frozen=True)
+class _CollectionCopyRestorePoint:
+    collection_model: ScriptSetsCollectionModel
+    controller_file_path: Optional[pathlib.Path]
+    manager_file_path: Optional[pathlib.Path]
+    selected_set_node_id: Optional[str]
+    is_dirty: bool
 
 
 class AppController(QObject):
@@ -560,9 +578,263 @@ class AppController(QObject):
             self.locale_manager.get("app_controller.status_new_collection")
         )
 
+    def _confirm_new_collection_save(self, warning_text: str) -> bool:
+        """Запрашивает сохранение только что созданной копии рабочего процесса."""
+        message_box = QMessageBox(self.get_main_window())
+        message_box.setIcon(QMessageBox.Icon.Warning)
+        message_box.setWindowTitle(
+            self.locale_manager.get("dialogs.collection_copy_save.title")
+        )
+        message_box.setTextFormat(Qt.TextFormat.RichText)
+        rich_warning = warning_text.replace("\n", "<br>")
+        message_box.setText(
+            f"{rich_warning}<br><br><br>"
+            f"{self.locale_manager.get('dialogs.collection_copy_save.question')}"
+        )
+
+        save_button = message_box.addButton(
+            self.locale_manager.get("dialogs.collection_copy_save.save_button"),
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        message_box.addButton(
+            self.locale_manager.get("dialogs.collection_copy_save.cancel_button"),
+            QMessageBox.ButtonRole.RejectRole,
+        )
+        message_box.setDefaultButton(save_button)
+        message_box.exec()
+        return message_box.clickedButton() is save_button
+
+    @staticmethod
+    def _copy_project_paths(
+        working_root: pathlib.Path,
+        selected_file: pathlib.Path,
+    ) -> Tuple[str, pathlib.Path, pathlib.Path]:
+        """Строит пути проекта, разрешая только имя файла в корне рабочей папки."""
+        resolved_root = working_root.resolve(strict=True)
+        selected_parent = selected_file.parent.resolve(strict=False)
+        if selected_parent != resolved_root:
+            raise ValueError("outside_working_root")
+
+        selected_name = selected_file.name.strip()
+        if selected_name.lower().endswith(COLLECTION_EXTENSION.lower()):
+            project_name = selected_name[: -len(COLLECTION_EXTENSION)].strip()
+        else:
+            project_name = selected_name
+        if not project_name or project_name in {".", ".."}:
+            raise ValueError("empty_project_name")
+
+        project_dir = resolved_root / project_name
+        project_file = project_dir / f"{project_name}{COLLECTION_EXTENSION}"
+        return project_name, project_dir, project_file
+
+    def _show_collection_copy_save_error(self, text_key: str, **kwargs: Any) -> None:
+        QMessageBox.warning(
+            self.get_main_window(),
+            self.locale_manager.get("general.error_title"),
+            self.locale_manager.get(text_key, **kwargs),
+        )
+
+    def _select_new_collection_target(
+        self,
+        working_root: pathlib.Path,
+    ) -> Optional[Tuple[str, pathlib.Path, pathlib.Path]]:
+        """Запрашивает имя проекта и не принимает пути вне рабочей папки."""
+        suggested_name = self.set_manager.current_collection_model.collection_name
+        file_filter = self.locale_manager.get(
+            "main_window.file_dialog.filter",
+            extension=COLLECTION_EXTENSION,
+        )
+
+        while True:
+            selected_file, _ = QFileDialog.getSaveFileName(
+                self.get_main_window(),
+                self.locale_manager.get(
+                    "dialogs.collection_copy_save.file_dialog_title"
+                ),
+                str(working_root / f"{suggested_name}{COLLECTION_EXTENSION}"),
+                file_filter,
+            )
+            if not selected_file:
+                return None
+
+            try:
+                project_name, project_dir, project_file = self._copy_project_paths(
+                    working_root,
+                    pathlib.Path(selected_file),
+                )
+            except ValueError as error:
+                error_key = (
+                    "dialogs.collection_copy_save.outside_root_error"
+                    if str(error) == "outside_working_root"
+                    else "dialogs.collection_copy_save.empty_name_error"
+                )
+                self._show_collection_copy_save_error(error_key, path=working_root)
+                continue
+
+            if project_dir.exists():
+                self._show_collection_copy_save_error(
+                    "dialogs.collection_copy_save.project_exists_error",
+                    path=project_dir,
+                )
+                continue
+
+            return project_name, project_dir, project_file
+
+    def _save_new_collection_in_context_root(self) -> bool:
+        """Сохраняет копию в новой подпапке `wf_psd_path`."""
+        context_data = self.set_manager.current_collection_model.context_data
+        root_variable = context_data.get("wf_psd_path")
+        raw_root = root_variable.value if root_variable is not None else None
+        if not isinstance(raw_root, str) or not raw_root.strip():
+            self._show_collection_copy_save_error(
+                "dialogs.collection_copy_save.missing_root_error"
+            )
+            return False
+
+        try:
+            working_root = pathlib.Path(raw_root).expanduser().resolve(strict=True)
+        except (OSError, RuntimeError):
+            self._show_collection_copy_save_error(
+                "dialogs.collection_copy_save.invalid_root_error",
+                path=raw_root,
+            )
+            return False
+        if not working_root.is_dir():
+            self._show_collection_copy_save_error(
+                "dialogs.collection_copy_save.invalid_root_error",
+                path=working_root,
+            )
+            return False
+
+        target = self._select_new_collection_target(working_root)
+        if target is None:
+            return False
+        project_name, project_dir, project_file = target
+
+        try:
+            project_dir.mkdir(parents=False, exist_ok=False)
+        except OSError as error:
+            self._show_collection_copy_save_error(
+                "dialogs.collection_copy_save.create_folder_error",
+                path=project_dir,
+                error=error,
+            )
+            return False
+
+        previous_context = {
+            name: variable.model_copy(deep=True)
+            for name, variable in context_data.items()
+        }
+        previous_collection_name = (
+            self.set_manager.current_collection_model.collection_name
+        )
+        updated_context = {
+            name: variable.model_copy(deep=True)
+            for name, variable in context_data.items()
+        }
+        session_variable = updated_context.get("wf_session_name")
+        if session_variable is None:
+            updated_context["wf_session_name"] = ContextVariableModel(
+                type="string",
+                value=project_name,
+            )
+        else:
+            session_variable.value = project_name
+        self.update_collection_context(updated_context)
+
+        if not self.save_current_collection_requested_by_gui(project_file):
+            self.update_collection_context(previous_context)
+            self.set_manager.current_collection_model.collection_name = (
+                previous_collection_name
+            )
+            try:
+                project_dir.rmdir()
+            except OSError:
+                pass
+            self._show_collection_copy_save_error(
+                "dialogs.collection_copy_save.save_error",
+                path=project_file,
+            )
+            return False
+
+        self.log_message_to_console.emit(
+            "runner_info",
+            self.locale_manager.get(
+                "user_actions.collection_copy_saved",
+                project_dir=project_dir,
+                project_file=project_file,
+            ),
+        )
+        return True
+
+    def _restore_collection_after_copy_cancel(
+        self,
+        restore_point: _CollectionCopyRestorePoint,
+    ) -> None:
+        """Полностью возвращает состояние, существовавшее до создания копии."""
+        self.set_manager.current_collection_model = (
+            restore_point.collection_model.model_copy(deep=True)
+        )
+        self.set_manager.current_collection_file_path = (
+            restore_point.manager_file_path
+        )
+        self.set_manager._rebuild_nodes_cache()
+        self.set_manager._set_dirty(restore_point.is_dirty)
+        self.current_collection_file_path = restore_point.controller_file_path
+
+        self.selected_set_node_id = None
+        self.selected_set_node_model = None
+        self.set_active_script_set_node(restore_point.selected_set_node_id)
+
+        self.config_manager.last_used_sets_collection_file = (
+            str(restore_point.controller_file_path)
+            if restore_point.controller_file_path
+            else ""
+        )
+        self.config_manager.save_config()
+
+        self.clear_console_request.emit()
+        self._log_welcome_message()
+        self.log_message_to_console.emit(
+            "runner_info",
+            self.locale_manager.get(
+                "user_actions.collection_opened",
+                name=self.set_manager.current_collection_model.collection_name,
+            ),
+        )
+        self._log_collection_properties()
+
+        self._node_id_to_select_after_scan = restore_point.selected_set_node_id
+        self.refresh_available_scripts_list()
+        self._request_collection_view_update(restore_point.selected_set_node_id)
+        self.collection_dirty_state_changed.emit(self.set_manager.is_dirty)
+        restored_name = (
+            restore_point.controller_file_path.name
+            if restore_point.controller_file_path
+            else self.set_manager.current_collection_model.collection_name
+        )
+        self.status_message_updated.emit(
+            self.locale_manager.get(
+                "app_controller.status_collection_loaded",
+                name=restored_name,
+            )
+        )
+
     def new_collection_from_template_requested_by_gui(self):
+        restore_point = _CollectionCopyRestorePoint(
+            collection_model=(
+                self.set_manager.current_collection_model.model_copy(deep=True)
+            ),
+            controller_file_path=self.current_collection_file_path,
+            manager_file_path=self.set_manager.current_collection_file_path,
+            selected_set_node_id=self.selected_set_node_id,
+            is_dirty=self.set_manager.is_dirty,
+        )
         self._update_suggested_save_dir()
-        self.set_manager.create_collection_from_current()
+        self.config_manager.reload_workflow_copy_config()
+        self.set_manager.create_collection_from_current(
+            self.config_manager.config.workflow_copy.reset_context_variables
+        )
         self.current_collection_file_path = None
         
         self.clear_console_request.emit()
@@ -570,6 +842,37 @@ class AppController(QObject):
         self.log_message_to_console.emit(
             "runner_info", self.locale_manager.get("user_actions.collection_new_from_template")
         )
+        save_warning = None
+        if self.set_manager.last_reset_context_variables:
+            self.log_message_to_console.emit(
+                "runner_info",
+                self.locale_manager.get(
+                    "user_actions.context_variables_reset",
+                    variables="\n".join(
+                        f"• {name}"
+                        for name in self.set_manager.last_reset_context_variables
+                    ),
+                ),
+            )
+            self.log_message_to_console.emit("EMPTY_LINE", "")
+
+            context_snapshot = {
+                name: variable.model_dump(mode="python")
+                for name, variable in (
+                    self.set_manager.current_collection_model.context_data.items()
+                )
+            }
+            save_warning = self.locale_manager.get(
+                "user_actions.collection_copy_save_warning"
+            )
+            save_warning = PySMContext._resolve_template_from_snapshot(
+                save_warning,
+                context_snapshot,
+            )
+            self.log_message_to_console.emit(
+                "runner_info",
+                save_warning,
+            )
 
         self.config_manager.last_used_sets_collection_file = ""
         self.set_active_script_set_node(None)
@@ -580,6 +883,11 @@ class AppController(QObject):
         self.status_message_updated.emit(
             self.locale_manager.get("app_controller.status_new_collection")
         )
+        if save_warning:
+            if self._confirm_new_collection_save(save_warning):
+                self._save_new_collection_in_context_root()
+            else:
+                self._restore_collection_after_copy_cancel(restore_point)
     # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 

@@ -6,7 +6,7 @@ import logging
 import os
 import time
 import uuid
-from typing import List, Optional, Dict, Tuple, Union
+from typing import Any, List, Optional, Dict, Tuple, Union
 
 
 from .models import (
@@ -60,6 +60,7 @@ class SetManager:
 
         self._is_dirty: bool = False
         self._nodes_by_id_cache: Dict[str, SetHierarchyNodeType] = {}
+        self.last_reset_context_variables: List[str] = []
 
         self.current_collection_model: ScriptSetsCollectionModel = (
             self.create_new_empty_collection()
@@ -177,12 +178,128 @@ class SetManager:
         self._set_dirty(True)
         return self.current_collection_model
         
+    @staticmethod
+    def _empty_context_value(var_type: str) -> Any:
+        """Возвращает пустое значение, соответствующее типу переменной."""
+        if var_type in {
+            "string",
+            "string_multiline",
+            "file_path",
+            "dir_path",
+            "choice",
+            "date",
+            "datetime",
+            "password",
+            "instance",
+        }:
+            return ""
+        if var_type == "int":
+            return 0
+        if var_type == "float":
+            return 0.0
+        if var_type == "bool":
+            return False
+        if var_type == "list":
+            return []
+        if var_type == "json":
+            return {}
+        return None
+
+    @staticmethod
+    def _empty_nested_value(value: Any) -> Any:
+        """Возвращает пустое значение по фактическому типу вложенного поля."""
+        if isinstance(value, bool):
+            return False
+        if isinstance(value, str):
+            return ""
+        if isinstance(value, int):
+            return 0
+        if isinstance(value, float):
+            return 0.0
+        if isinstance(value, list):
+            return []
+        if isinstance(value, dict):
+            return {}
+        return None
+
+    @classmethod
+    def _reset_nested_context_value(
+        cls,
+        root_value: Any,
+        path_parts: List[str],
+    ) -> bool:
+        """Сбрасывает существующее поле dict/list по dot-notation."""
+        if not path_parts:
+            return False
+
+        current_value = root_value
+        for part in path_parts[:-1]:
+            if isinstance(current_value, dict):
+                if part not in current_value:
+                    return False
+                current_value = current_value[part]
+            elif isinstance(current_value, list) and part.isdigit():
+                index = int(part)
+                if index >= len(current_value):
+                    return False
+                current_value = current_value[index]
+            else:
+                return False
+
+        target = path_parts[-1]
+        if isinstance(current_value, dict):
+            if target not in current_value:
+                return False
+            current_value[target] = cls._empty_nested_value(current_value[target])
+            return True
+
+        if isinstance(current_value, list) and target.isdigit():
+            index = int(target)
+            if index >= len(current_value):
+                return False
+            current_value[index] = cls._empty_nested_value(current_value[index])
+            return True
+
+        return False
+
+    @classmethod
+    def _reset_context_variables(
+        cls,
+        context_data: Dict[str, ContextVariableModel],
+        variable_names: List[str],
+    ) -> List[str]:
+        """Сбрасывает существующие значения и возвращает их полные имена."""
+        reset_variables: List[str] = []
+        for variable_name in variable_names:
+            path_parts = variable_name.split(".")
+            variable = context_data.get(path_parts[0])
+            if variable is None:
+                continue
+
+            if len(path_parts) == 1:
+                variable.value = cls._empty_context_value(variable.type)
+                reset_variables.append(variable_name)
+                continue
+
+            if cls._reset_nested_context_value(variable.value, path_parts[1:]):
+                reset_variables.append(variable_name)
+
+        return reset_variables
+
     # --- НАЧАЛО ИЗМЕНЕНИЙ (Добавлен новый метод) ---
-    def create_collection_from_current(self) -> ScriptSetsCollectionModel:
+    def create_collection_from_current(
+        self,
+        reset_context_variables: Optional[List[str]] = None,
+    ) -> ScriptSetsCollectionModel:
         logger.info("SetManager: Создание рабочего процесса из шаблона.")
         
         # Делаем глубокую копию текущей модели (все настройки, переменные и структура сохранятся)
         new_model = self.current_collection_model.model_copy(deep=True)
+
+        self.last_reset_context_variables = self._reset_context_variables(
+            new_model.context_data,
+            reset_context_variables or [],
+        )
         
         # Сбрасываем имя коллекции на дефолтное "Новый рабочий процесс"
         new_model.collection_name = locale_manager.get("set_manager.new_collection_name")        

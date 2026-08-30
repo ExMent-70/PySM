@@ -139,6 +139,7 @@ class ParameterEditorWidget(QWidget):
     def _connect_signals(self):
         """Подключает базовые сигналы таблицы."""
         self.table.cellDoubleClicked.connect(self.on_cell_double_clicked)
+        self.table.itemChanged.connect(self._on_table_item_changed)
 
     def on_cell_double_clicked(self, row: int, column: int):
         """
@@ -474,6 +475,28 @@ class ParameterEditorWidget(QWidget):
         return item.text() if item else None
 
     # --- Слоты для обработки изменений от UI элементов ---
+
+    @Slot(QTableWidgetItem)
+    def _on_table_item_changed(self, item: QTableWidgetItem):
+        """Сохраняет текстовые изменения описания контекстной переменной."""
+        if (
+            self.mode != EditMode.CONTEXT_VARS
+            or item.column() != ParamTableColumn.CONTEXT_DESCRIPTION
+        ):
+            return
+
+        name = self._get_name_from_row(item.row())
+        if not name or name not in self._context_vars:
+            return
+
+        description = item.text()
+        model = self._context_vars[name]
+        if model.description == description:
+            return
+
+        model.description = description
+        item.setToolTip(description)
+        self.data_changed.emit()
 
     @Slot(int, bool)
     def _on_required_toggled(self, row: int, state: bool):

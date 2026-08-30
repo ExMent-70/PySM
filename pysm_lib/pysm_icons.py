@@ -107,6 +107,8 @@ SVG_PATHS: Dict[str, str] = {
     
     # --- НОВЫЕ ИКОНКИ (ПОЛЬЗОВАТЕЛЬСКИЕ) ---
     "REPORT": '<path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>',
+    "CRM": '<rect x="2" y="3" width="20" height="18" rx="3" ry="3"/><text x="12" y="15.5" font-family="Arial" font-size="8" fill="#FFF" text-anchor="middle" font-weight="bold">CRM</text>',
+    "HOME": '<path d="M12 3L2 12h3v9h6v-6h2v6h6v-9h3L12 3z"/>',
     "TABLE": '<path d="M3 3h18v18H3V3zm2 2v4h4V5H5zm6 0v4h4V5h-4zm6 0v4h4V5h-4zM5 11v4h4v-4H5zm6 0v4h4v-4h-4zm6 0v4h4v-4h-4zM5 17v4h4v-4H5zm6 0v4h4v-4h-4zm6 0v4h4v-4h-4z"/>',
     "LIST": '<path d="M4 6h2v2H4zm0 5h2v2H4zm0 5h2v2H4zm4-10h12v2H8zm0 5h12v2H8zm0 5h12v2H8z"/>',
     "CAMERA": '<path d="M12 12c1.65 0 3-1.35 3-3s-1.35-3-3-3-3 1.35-3 3 1.35 3 3 3zm9-6h-3.17L16 4h-8l-1.83 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-9 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>',
@@ -215,6 +217,8 @@ THEME_KEYS = {
 
     # --- НОВЫЕ ИКОНКИ ---
     "REPORT": "icon_primary",
+    "CRM": "icon_primary",
+    "HOME": "icon_primary",
     "TABLE": "icon_primary",
     "LIST": "icon_primary",
     "CAMERA": "icon_info",
@@ -337,7 +341,7 @@ icons = PysmIcons()
 
 # Категоризация иконок для отображения в диалоге выбора
 ICON_CATEGORIES: Dict[str, List[str]] = {
-    "system":["FOLDER", "FOLDER_OPEN", "FILE", "NEW", "OPEN", "SAVE", "IMPORT", "EXPORT", "PRINT", "SLIDERS", "REFRESH", "SETTINGS", "CONSOLE", "EXIT", "CLOSE"],
+    "system":["FOLDER", "FOLDER_OPEN", "FILE", "HOME", "NEW", "OPEN", "SAVE", "IMPORT", "EXPORT", "PRINT", "SLIDERS", "REFRESH", "SETTINGS", "CONSOLE", "EXIT", "CLOSE"],
     "files":[
         "FILE_PY", "FILE_CODE", "FILE_TXT", "FILE_HTML", "FILE_IMAGE", "FILE_DB", "FILE_ARCHIVE", 
         "FILE_JPG", "FILE_CSV", "FILE_PSD", "FILE_INDD", "FILE_C1", "REPORT", "TABLE", "LIST",
@@ -356,6 +360,6 @@ ICON_CATEGORIES: Dict[str, List[str]] = {
         "SHOOTING_PLANNED", "SHOOTING_CONFIRMED", "SHOOTING_COMPLETED",
         "SHOOTING_CANCELLED",
     ],
-    "pysm":["FOLDER_PY", "FOLDER_VIRTUAL", "INSTANCE_SET", "INSTANCE_ITEM", "STAR", "ROCKET", "LIGHTNING", "WAND", "WRENCH"],
+    "pysm":["FOLDER_PY", "FOLDER_VIRTUAL", "INSTANCE_SET", "INSTANCE_ITEM", "CRM", "STAR", "ROCKET", "LIGHTNING", "WAND", "WRENCH"],
     "attributes":["GENDER_MALE", "GENDER_FEMALE", "EYE_CLOSED", "MOUTH_OPEN"]    
 }

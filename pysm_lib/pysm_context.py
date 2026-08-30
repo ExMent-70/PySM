@@ -735,6 +735,23 @@ class PySMContext:
 
         return resolved_string        
 
+    @classmethod
+    def _resolve_template_from_snapshot(
+        cls,
+        template_string: Optional[str],
+        raw_context_data: Dict[str, Any],
+    ) -> str:
+        """Разрешает шаблон через готовый снимок контекста без его изменения."""
+        context = cls.__new__(cls)
+        context._context_file_path = None
+        context._context_shm_name = None
+        context._context_store = None
+        context._context_store_generation = -1
+        context._context_mode = "memory"
+        context._raw_context_data_cache = raw_context_data
+        context._is_dirty = False
+        return context.resolve_template(template_string)
+
     def resolve_path(self, path_str: str) -> pathlib.Path:
         """Преобразует относительный путь в абсолютный, используя директорию коллекции как базу."""
         input_path = pathlib.Path(path_str)

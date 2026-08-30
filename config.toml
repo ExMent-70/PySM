@@ -1,10 +1,11 @@
 [paths]
-python_interpreter = "../../envs/pysm/Scripts/python.exe"
+python_interpreter = "../../envs/pysm/python.exe"
 additional_env_paths = []
 python_paths = []
 
 [ui]
 last_used_script_set = ""
+last_used_sets_collection_file = ""
 
 [logging]
 log_level = "INFO"
@@ -12,6 +13,29 @@ log_level = "INFO"
 [general]
 language = "ru_RU"
 active_theme_name = "default"
+
+[runtime_context]
+# Runtime context backend.
+# Possible values:
+# - "shared_memory": default runtime exchange through Python SharedMemory.
+# - "file": diagnostic fallback through .context.json.
+backend = "shared_memory"
+shared_memory_min_size_mb = 16
+shared_memory_max_size_mb = 128
+
+# SharedMemory overflow behavior.
+# Possible values:
+# - "fail_current_write": reject the write when payload does not fit the segment.
+shared_memory_overflow_policy = "fail_current_write"
+
+# When PySM writes live runtime context back to .context.json.
+# Possible values:
+# - "after_each_script": checkpoint after every completed script.
+# - "on_save_exit": checkpoint only when the collection is saved or PySM closes with Save.
+checkpoint_policy = "after_each_script"
+
+[workflow_copy]
+reset_context_variables = [ "wf_student_ids_order", "wf_session_name", "wf_portrait_session", "var_claster_run", "var_setup", "sys_location_name", "wf_school_info.Полное название школы", "wf_school_info.Название школы", "wf_school_info.Город",]
 
 [environment_variables]
 NO_ALBUMENTATIONS_UPDATE = "1"

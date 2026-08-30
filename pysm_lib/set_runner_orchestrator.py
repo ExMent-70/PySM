@@ -26,6 +26,7 @@ from .context_shared_memory import (
     encoded_payload_size,
 )
 from .context_store import FileContextStore
+from .pysm_context import PySMContext
 
 from .app_enums import SetRunMode, ScriptRunStatus, AppState
 
@@ -1005,9 +1006,18 @@ class SetRunnerOrchestrator(QObject):
     def _log_script_start_info_silent(self, entry_info: ScriptSetEntryModel):
         self.log_message.emit("EMPTY_LINE", " ")
         if entry_info.description:
-            formatted_description = entry_info.description.replace("\n", "<br>")
+            formatted_description = self._resolve_instance_description(
+                entry_info.description
+            ).replace("\n", "<br>")
             self.log_message.emit("html_block", f"{formatted_description}")
             self.log_message.emit("EMPTY_LINE", "")
+
+    def _resolve_instance_description(self, description: str) -> str:
+        """Подставляет актуальные значения контекста в заметку экземпляра."""
+        return PySMContext._resolve_template_from_snapshot(
+            description,
+            self._context_snapshot_cache,
+        )
 
     def _log_script_start_info(
         self,
@@ -1039,7 +1049,9 @@ class SetRunnerOrchestrator(QObject):
         self.log_message.emit("script_header_block", header_text)
 
         if entry_info.description:
-            formatted_description = entry_info.description.replace("\n", "<br>")
+            formatted_description = self._resolve_instance_description(
+                entry_info.description
+            ).replace("\n", "<br>")
             self.log_message.emit("html_block", f"{indent}  {formatted_description}")
 
         self.log_message.emit("EMPTY_LINE", "")

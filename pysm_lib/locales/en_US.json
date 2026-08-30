@@ -54,8 +54,7 @@
       "param_format": "--{name}: {value}",
       "label_instance_name": "Instance Name:",
 	  "label_link_instance_name": "Link Instance:",	  
-      "label_overridden_params": "Overridden Parameters:"
-      "label_overridden_params": "Переопределенные параметры:",
+      "label_overridden_params": "Overridden Parameters:",
  	  "context_menu_hint": "Use Context menu for Setup"
     }
   },
@@ -202,6 +201,20 @@
     }
   },
   "dialogs": {
+    "collection_copy_save": {
+        "title": "Save New Collection",
+        "question": "Save the new collection?",
+        "save_button": "Save",
+        "cancel_button": "Cancel",
+        "file_dialog_title": "New Collection Name",
+        "missing_root_error": "The wf_psd_path context variable is missing or does not contain a path.",
+        "invalid_root_error": "The wf_psd_path working folder is unavailable or does not exist:\n{path}",
+        "outside_root_error": "The new collection can only be saved inside the working folder:\n{path}",
+        "empty_name_error": "Enter a name for the new collection.",
+        "project_exists_error": "The new collection folder already exists:\n{path}\nEnter a different name.",
+        "create_folder_error": "Could not create the new collection folder:\n{path}\n\n{error}",
+        "save_error": "Could not save the new collection:\n{path}"
+    },
     "instance_editor": {
         "title": "Select Script Instance",
         "none_selected": "(not selected)",
@@ -424,6 +437,9 @@
     "config_saved": "Application configuration saved.",
     "config_save_error": "ERROR: Could not save application configuration.",
 	"collection_new_from_template": "Created a new collection based on the current one.",
+    "context_variables_reset": "Reset context variables:\n{variables}",
+    "collection_copy_save_warning": "<b>BE SURE TO SAVE THE NEW COLLECTION</b>\n\nFor example, to a separate folder inside the current working folder\n<b>{wf_psd_path}</b>",
+    "collection_copy_saved": "New project saved.\n\nProject working folder - {project_dir}\n\nProject file - {project_file}",
     "collection_renamed": "Collection '{old_name}' renamed to '{new_name}'.",
     "collection_props_updated": "Collection properties updated.",
     "collection_saved": "Collection saved to '{path}'",

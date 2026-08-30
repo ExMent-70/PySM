@@ -126,6 +126,22 @@ class InstanceSelectionDialog(QDialog):
         # Парсим текущие выбранные ID
         current_ids = set([x.strip() for x in (current_value or "").split(",") if x.strip()])
 
+        def resolve_instance_name(instance_id: str) -> Optional[str]:
+            for target_set_name, target_entry in script_entries:
+                if target_entry.instance_id != instance_id:
+                    continue
+                try:
+                    target_script_info = get_script_name_func(target_entry.id)
+                except Exception:
+                    target_script_info = None
+                target_name = target_entry.name or (
+                    target_script_info.name if target_script_info else None
+                )
+                return (
+                    f"[{target_set_name}] {target_name}" if target_name else None
+                )
+            return None
+
         sets_map = {}
         first_checked_item: Optional[QTreeWidgetItem] = None
         for set_name, entry in script_entries:
@@ -171,6 +187,7 @@ class InstanceSelectionDialog(QDialog):
                     instance_entry=entry,
                     locale_manager=self.locale_manager,
                     theme_manager=self.theme_manager,
+                    instance_name_resolver=resolve_instance_name,
                 )
                 item.setToolTip(0, tooltip_html)
 
@@ -183,6 +200,7 @@ class InstanceSelectionDialog(QDialog):
                 instance_entry=entry,
                 locale_manager=self.locale_manager,
                 theme_manager=self.theme_manager,
+                instance_name_resolver=resolve_instance_name,
             )
             item.setToolTip(0, tooltip_html)
 
