@@ -4,8 +4,10 @@ Git-обновление portable-установки PySM.
 Скрипт намеренно работает консервативно:
 - обновляет только файлы, которые отслеживаются удаленным репозиторием;
 - не удаляет пользовательские/runtime-файлы вне Git;
-- блокирует обычное обновление, если локальные tracked-изменения пересекаются
-  с файлами, которые должны прийти с GitHub;
+- сохраняет обычные данные PySM (`config.toml` и `script_collections`) даже
+  при их пересечении с файлами, которые должны прийти с GitHub;
+- блокирует обычное обновление при пересечении с неизвестными локальными
+  изменениями tracked-кода;
 - сохраняет машинно-читаемый отчет в JSON, а полный операторский лог в обычный
   текстовый файл.
 
@@ -22,6 +24,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import zipfile
 from datetime import datetime
@@ -79,6 +82,8 @@ LOCAL_STATE_PREVIEW_LIMIT = 25
 DEFAULT_CONSOLE_PREVIEW_LIMIT = 8
 BACKUP_PROGRESS_STEP = 250
 GIT_PATH_CHUNK_SIZE = 100
+USER_STATE_EXACT_PATHS = {"config.toml"}
+USER_STATE_DIRECTORY_PREFIXES = ("script_collections/",)
 GIT_PROGRESS_RE = re.compile(
     r"^(?:remote:\s*)?"
     r"(?P<phase>Counting objects|Compressing objects|Receiving objects|Resolving deltas):\s+"
@@ -356,13 +361,21 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default="plan",
         help="Режим работы: plan показывает план, apply применяет обновление",
     )
-    parser.add_argument("--force", action="store_true", help="Принудительно заменить tracked-файлы версией из remote")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Принудительно заменить tracked-файлы версией из remote после обязательного системного архива",
+    )
     parser.add_argument(
         "--repair_git_state",
         action="store_true",
         help="Синхронизировать HEAD с remote, если нет конфликтов с файлами обновления",
     )
-    parser.add_argument("--no_backup", action="store_true", help="Не создавать ZIP-бэкап перед обновлением")
+    parser.add_argument(
+        "--no_backup",
+        action="store_true",
+        help="Не создавать обычный ZIP-бэкап; обязательный системный архив force сохраняется",
+    )
     parser.add_argument("--show_stat", action="store_true", help="Сохранить git diff --stat в полном логе")
     parser.add_argument("--max_commits", type=int, default=50, help="Максимум коммитов, получаемых для отчета")
     parser.add_argument("--max_files", type=int, default=300, help="Максимум файлов и записей в полном отчете")
@@ -624,6 +637,51 @@ def create_backup(target_dir: Path, logger: UpdateLogger, include_paths: list[st
 
     logger.icon_line("Резервная копия создана.", "OK")
     return backup_file
+
+
+def get_tracked_file_paths(git_path: Path, target_dir: Path) -> list[str]:
+    """Вернуть пути файлов, известных Git в текущем индексе."""
+
+    return split_nul(git_output_raw(git_path, target_dir, ["ls-files", "-z"]))
+
+
+def create_force_system_archive(git_path: Path, target_dir: Path, logger: UpdateLogger) -> Path:
+    """Заархивировать существующие tracked-файлы до разрушительного `force`.
+
+    В отличие от обычного бэкапа, сюда не входят untracked-файлы, логи и
+    пользовательские результаты. Архив нужен, чтобы вручную вернуть именно
+    состояние файлов системы до `git reset --hard`.
+    """
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archive_dir = target_dir / "_backups"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = archive_dir / f"pysm_force_system_{timestamp}.zip"
+
+    tracked_paths = get_tracked_file_paths(git_path, target_dir)
+    files_to_archive = []
+    missing_paths = []
+    for relative_path in tracked_paths:
+        absolute_path = target_dir / relative_path
+        if absolute_path.is_file():
+            files_to_archive.append((absolute_path, Path(relative_path)))
+        else:
+            missing_paths.append(relative_path)
+
+    logger.section("Архив системы перед force", "FILE_ARCHIVE")
+    logger.kv_line("Файл архива", str(archive_path), "FILE_ARCHIVE")
+    logger.kv_line("Tracked-файлов к упаковке", str(len(files_to_archive)), "LIST")
+    if missing_paths:
+        logger.kv_line("Отсутствующих tracked-файлов", str(len(missing_paths)), "WARNING")
+
+    with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for index, (absolute_path, relative_path) in enumerate(files_to_archive, start=1):
+            archive.write(absolute_path, relative_path)
+            if index == len(files_to_archive) or index % BACKUP_PROGRESS_STEP == 0:
+                logger.write(f"  Упаковано системных файлов: {index}/{len(files_to_archive)}")
+
+    logger.icon_line("Архив tracked-файлов перед force создан.", "OK")
+    return archive_path
 
 
 def split_lines(value: str) -> list[str]:
@@ -1013,6 +1071,31 @@ def path_collides_with_added(untracked_path: str, added_paths: set[str]) -> bool
     return False
 
 
+def is_user_state_path(path: str) -> bool:
+    """Определить встроенные пути, которые PySM меняет при обычной работе.
+
+    Это намеренно короткий список. Он защищает настройки приложения и коллекции
+    пользователя, но не маскирует локальные правки Python-кода, тем и ресурсов,
+    для которых обновление должно остановиться и показать конфликт.
+    """
+
+    normalized_path = path.replace("\\", "/").lstrip("/")
+    return normalized_path in USER_STATE_EXACT_PATHS or normalized_path.startswith(USER_STATE_DIRECTORY_PREFIXES)
+
+
+def entry_has_user_state_path(entry: dict) -> bool:
+    """Вернуть true, если все затронутые записью Git пути являются user-state."""
+
+    paths = entry.get("paths", [])
+    return bool(paths) and all(is_user_state_path(path) for path in paths)
+
+
+def entry_intersects_paths(entry: dict, paths: set[str]) -> bool:
+    """Проверить все пути записи, включая обе стороны rename/copy."""
+
+    return any(path in paths for path in entry.get("paths", []))
+
+
 def analyze_local_state(git_path: Path, target_dir: Path, remote_ref: str, plan: dict) -> dict:
     """Классифицировать локальные изменения по риску для updater-а.
 
@@ -1035,6 +1118,9 @@ def analyze_local_state(git_path: Path, target_dir: Path, remote_ref: str, plan:
     conflicts = []
     missing_tracked = []
     missing_tracked_paths = []
+    user_state = []
+    user_state_conflicts = []
+    user_state_conflict_entries = []
     local_outside_update = []
     untracked_collisions = []
     untracked_other = []
@@ -1042,6 +1128,7 @@ def analyze_local_state(git_path: Path, target_dir: Path, remote_ref: str, plan:
     for entry in status_entries:
         xy = entry["xy"]
         path = entry["path"]
+        is_user_state = entry_has_user_state_path(entry)
         if xy == "??":
             # Пользовательские файлы вне Git сохраняются по умолчанию. Блокируем
             # только случай, когда GitHub собирается добавить тот же путь и Git
@@ -1050,6 +1137,16 @@ def analyze_local_state(git_path: Path, target_dir: Path, remote_ref: str, plan:
                 untracked_collisions.append(entry["display"])
             else:
                 untracked_other.append(entry["display"])
+            continue
+
+        # PySM пишет настройки и коллекции непосредственно в working tree. Такие
+        # правки не должны выглядеть как конфликт кода; staged-состояние намеренно
+        # остается блокирующим, потому что его создает пользователь вручную.
+        if is_user_state and xy[0] == " ":
+            user_state.append(entry["display"])
+            if entry_intersects_paths(entry, remote_paths):
+                user_state_conflicts.append(entry["display"])
+                user_state_conflict_entries.append(entry)
             continue
 
         if "D" in xy and remote_blob(git_path, target_dir, remote_ref, path) is not None:
@@ -1071,7 +1168,7 @@ def analyze_local_state(git_path: Path, target_dir: Path, remote_ref: str, plan:
                 already_remote_worktree_dirty += 1
             continue
 
-        if path in remote_paths:
+        if entry_intersects_paths(entry, remote_paths):
             conflicts.append(entry["display"])
         else:
             local_outside_update.append(entry["display"])
@@ -1085,6 +1182,9 @@ def analyze_local_state(git_path: Path, target_dir: Path, remote_ref: str, plan:
         "conflicts": conflicts,
         "missing_tracked": missing_tracked,
         "missing_tracked_paths": missing_tracked_paths,
+        "user_state": user_state,
+        "user_state_conflicts": user_state_conflicts,
+        "user_state_conflict_entries": user_state_conflict_entries,
         "local_outside_update": local_outside_update,
         "untracked_collisions": untracked_collisions,
         "untracked_other": untracked_other,
@@ -1160,6 +1260,15 @@ def write_local_state(
             f"worktree={state['already_remote_worktree_dirty']}"
         )
     write_limited_list(logger, "Отсутствующие файлы из репозитория", state["missing_tracked"], max_items, "WARNING", console_preview_limit)
+    write_limited_list(logger, "Локальные настройки и коллекции", state["user_state"], max_items, "FILE", console_preview_limit)
+    write_limited_list(
+        logger,
+        "Настройки и коллекции, которые будут сохранены при обновлении",
+        state["user_state_conflicts"],
+        max_items,
+        "LOCK",
+        console_preview_limit,
+    )
     write_limited_list(logger, "Локальные изменения вне обновления", state["local_outside_update"], max_items, "FILE", console_preview_limit)
     write_limited_list(logger, "Файлы вне Git", state["untracked_other"], max_items, "ADD", console_preview_limit)
     write_limited_list(logger, "Локальные конфликты с обновлением", state["conflicts"], max_items, "WARNING", console_preview_limit)
@@ -1169,6 +1278,8 @@ def write_local_state(
         logger.icon_line("Есть файлы вне Git, которые мешают обновлению.", "WARNING")
     elif state["conflicts"]:
         logger.icon_line("Есть tracked-конфликты. Обычное обновление заблокировано; force может их перезаписать.", "WARNING")
+    elif state["user_state_conflicts"]:
+        logger.icon_line("Настройки и коллекции будут сохранены автоматически; обновление не заблокировано.", "OK")
     else:
         logger.icon_line("Блокирующих локальных конфликтов не найдено.", "OK")
 
@@ -1211,6 +1322,176 @@ def restore_missing_tracked_files(git_path: Path, target_dir: Path, paths: list[
     logger.write("git update-index --refresh")
     run_git(git_path, target_dir, ["update-index", "--refresh"], check=False)
     logger.icon_line("Отсутствующие tracked-файлы восстановлены.", "OK")
+
+
+def resolve_repo_file_path(target_dir: Path, relative_path: str) -> Path:
+    """Безопасно разрешить относительный путь, полученный из Git."""
+
+    candidate = (target_dir / relative_path).resolve()
+    try:
+        candidate.relative_to(target_dir.resolve())
+    except ValueError as error:
+        raise UpdaterError(f"Git вернул путь вне папки PySM: {relative_path}") from error
+    return candidate
+
+
+def get_user_state_conflict_paths(entries: list[dict]) -> list[str]:
+    """Собрать уникальные user-state пути, пересекающиеся с remote-обновлением."""
+
+    paths = {
+        path
+        for entry in entries
+        for path in entry.get("paths", [])
+        if is_user_state_path(path)
+    }
+    return sorted(paths)
+
+
+def create_user_state_archive(target_dir: Path, logger: UpdateLogger, entries: list[dict]) -> dict | None:
+    """Сохранить локальные настройки и коллекции до временного очистки Git.
+
+    Этот небольшой архив создается только для файлов, которые одновременно
+    изменены пользователем и обновляются на GitHub. Он остается рядом с отчетом
+    как аварийная копия, пока обычный ZIP-бэкап может быть отключен параметром
+    `no_backup`.
+    """
+
+    paths = get_user_state_conflict_paths(entries)
+    if not paths:
+        return None
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archive_path = logger.log_path.parent / f"preserved_user_state_{timestamp}.zip"
+    manifest = []
+
+    logger.section("Сохранение настроек и коллекций", "LOCK")
+    logger.kv_line("Файл сохраненного состояния", str(archive_path), "FILE_ARCHIVE")
+    logger.kv_line("Файлов и удалений", str(len(paths)), "LIST")
+    with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        for index, relative_path in enumerate(paths, start=1):
+            absolute_path = resolve_repo_file_path(target_dir, relative_path)
+            exists = absolute_path.is_file()
+            manifest.append({"path": relative_path, "exists": exists})
+            if exists:
+                archive.write(absolute_path, relative_path)
+            if index == len(paths) or index % BACKUP_PROGRESS_STEP == 0:
+                logger.write(f"  Сохранено пользовательских записей: {index}/{len(paths)}")
+        archive.writestr("_pysm_updater_manifest.json", json.dumps({"paths": manifest}, ensure_ascii=False, indent=2))
+
+    logger.icon_line("Локальные настройки и коллекции сохранены перед обновлением.", "OK")
+    return {"archive_path": archive_path, "manifest": manifest}
+
+
+def temporarily_reset_user_state_paths(
+    git_path: Path,
+    target_dir: Path,
+    archive_info: dict,
+    logger: UpdateLogger,
+):
+    """Вернуть защищенные пути к HEAD, чтобы `git merge --ff-only` мог пройти.
+
+    Архив уже содержит актуальную пользовательскую версию. Изменения в index не
+    поддерживаются этим путем намеренно: такая ситуация не возникает при обычной
+    работе PySM и должна оставаться видимым ручным конфликтом.
+    """
+
+    paths = [entry["path"] for entry in archive_info["manifest"]]
+    logger.icon_line("Временная подготовка сохраненных файлов к Git-обновлению.", "INFO")
+    for chunk in chunked(paths, GIT_PATH_CHUNK_SIZE):
+        logger.write(f"git reset -- <saved user-state files> ({len(chunk)})")
+        run_git(git_path, target_dir, ["reset", "--", *chunk])
+        logger.write(f"git checkout-index -f -- <saved user-state files> ({len(chunk)})")
+        run_git(git_path, target_dir, ["checkout-index", "-f", "--", *chunk])
+
+
+def restore_user_state_archive(target_dir: Path, archive_info: dict, logger: UpdateLogger):
+    """Вернуть пользовательские файлы либо сохраненное локальное удаление."""
+
+    archive_path = Path(archive_info["archive_path"])
+    restored_count = 0
+    with zipfile.ZipFile(archive_path, "r") as archive:
+        for item in archive_info["manifest"]:
+            relative_path = item["path"]
+            absolute_path = resolve_repo_file_path(target_dir, relative_path)
+            if item["exists"]:
+                if absolute_path.exists() and not absolute_path.is_file():
+                    raise UpdaterError(
+                        "Не удалось безопасно вернуть пользовательский файл: "
+                        f"путь занят папкой {relative_path}. Архив сохранен: {archive_path}"
+                    )
+                absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                temporary_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        mode="wb",
+                        prefix=f".{absolute_path.name}.pysm_updater_",
+                        suffix=".tmp",
+                        dir=absolute_path.parent,
+                        delete=False,
+                    ) as destination:
+                        temporary_path = Path(destination.name)
+                        source = archive.open(relative_path)
+                        try:
+                            shutil.copyfileobj(source, destination)
+                        finally:
+                            source.close()
+                    os.replace(temporary_path, absolute_path)
+                finally:
+                    if temporary_path is not None and temporary_path.exists():
+                        temporary_path.unlink()
+            elif absolute_path.is_file() or absolute_path.is_symlink():
+                absolute_path.unlink()
+            elif absolute_path.exists():
+                raise UpdaterError(
+                    "Не удалось безопасно восстановить локальное удаление: "
+                    f"путь занят папкой {relative_path}. Архив сохранен: {archive_path}"
+                )
+            restored_count += 1
+
+    logger.icon_line(f"Локальные настройки и коллекции возвращены: {restored_count}.", "OK")
+
+
+def merge_fast_forward_preserving_user_state(
+    git_path: Path,
+    target_dir: Path,
+    remote_ref: str,
+    local_state: dict,
+    logger: UpdateLogger,
+) -> str | None:
+    """Выполнить fast-forward и вернуть встроенное пользовательское состояние."""
+
+    archive_info = create_user_state_archive(target_dir, logger, local_state["user_state_conflict_entries"])
+    if archive_info:
+        temporarily_reset_user_state_paths(git_path, target_dir, archive_info, logger)
+
+    try:
+        logger.write(f"git merge --ff-only {remote_ref}")
+        merge_result = run_git(git_path, target_dir, ["merge", "--ff-only", remote_ref], check=False)
+        if merge_result.returncode != 0:
+            details = (merge_result.stderr or merge_result.stdout or "").strip()
+            if local_state["already_remote"]:
+                raise UpdaterError(
+                    "Git не смог выполнить fast-forward из-за локальных изменений, хотя часть файлов уже совпадает с remote.\n"
+                    "Если режим plan показывает, что локальных конфликтов с обновлением нет, включите repair_git_state.\n"
+                    f"{details}"
+                )
+            raise UpdaterError(f"Команда завершилась с ошибкой: git merge --ff-only {remote_ref}\n{details}")
+    except Exception as error:
+        if archive_info:
+            try:
+                restore_user_state_archive(target_dir, archive_info, logger)
+            except Exception as restore_error:
+                raise UpdaterError(
+                    f"{error}\n\n"
+                    "Git-обновление не применено, а автоматическое возвращение пользовательских данных не удалось. "
+                    f"Используйте сохраненный архив: {archive_info['archive_path']}\n{restore_error}"
+                ) from restore_error
+        raise
+
+    if archive_info:
+        restore_user_state_archive(target_dir, archive_info, logger)
+        return str(archive_info["archive_path"])
+    return None
 
 
 def repair_git_state(git_path: Path, target_dir: Path, remote_ref: str, logger: UpdateLogger, local_state: dict | None = None):
@@ -1559,6 +1840,10 @@ def main():
 
         logger.section("Применение обновления", "WRENCH")
         if config.force:
+            # Даже при no_backup force обязан оставить отдельный снимок только
+            # tracked-системы: именно эти файлы сейчас будут заменены hard reset.
+            force_system_archive = create_force_system_archive(git_path, target_path, logger)
+            payload["force_system_archive"] = str(force_system_archive)
             force_update(git_path, target_path, remote_ref, logger)
         elif config.repair_git_state:
             if local_state["has_blocking_conflicts"]:
@@ -1568,19 +1853,17 @@ def main():
                 )
             repair_git_state(git_path, target_path, remote_ref, logger, local_state)
         else:
-            # Штатный путь: только fast-forward. Он сохраняет локальные commit и
-            # отказывается работать при разошедшейся истории.
-            logger.write(f"git merge --ff-only {remote_ref}")
-            merge_result = run_git(git_path, target_path, ["merge", "--ff-only", remote_ref], check=False)
-            if merge_result.returncode != 0:
-                details = (merge_result.stderr or merge_result.stdout or "").strip()
-                if local_state["already_remote"]:
-                    raise UpdaterError(
-                        "Git не смог выполнить fast-forward из-за локальных изменений, хотя часть файлов уже совпадает с remote.\n"
-                        "Если режим plan показывает, что локальных конфликтов с обновлением нет, включите repair_git_state.\n"
-                        f"{details}"
-                    )
-                raise UpdaterError(f"Команда завершилась с ошибкой: git merge --ff-only {remote_ref}\n{details}")
+            # Штатный путь сохраняет встроенные пользовательские данные, но
+            # по-прежнему использует только fast-forward и не меняет историю.
+            preserved_user_state_archive = merge_fast_forward_preserving_user_state(
+                git_path,
+                target_path,
+                remote_ref,
+                local_state,
+                logger,
+            )
+            if preserved_user_state_archive:
+                payload["preserved_user_state_archive"] = preserved_user_state_archive
 
         after_commit = git_output(git_path, target_path, ["rev-parse", "--short", "HEAD"])
         payload["after_commit"] = after_commit

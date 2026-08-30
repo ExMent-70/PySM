@@ -1,8 +1,8 @@
 {
-  "description": "Обновляет PySM через portable Git, показывает список коммитов и измененных файлов перед применением.",
+  "description": "Обновляет PySM через portable Git, сохраняет локальные настройки и коллекции, показывает список коммитов и измененных файлов перед применением.",
   "category": "Системные",
   "author": "System",
-  "version": "2.2026.07.16",
+  "version": "2.2026.08.30",
   "command_line_args_meta": {
     "target_dir": {
       "type": "dir_path",
@@ -56,7 +56,7 @@
     },
     "force": {
       "type": "bool",
-      "description": "Принудительно заменить tracked-файлы версией из remote через git reset --hard. Локальные tracked-правки будут потеряны.",
+      "description": "Принудительно заменить tracked-файлы версией из remote через git reset --hard. Перед этим всегда создается отдельный архив tracked-файлов. Локальные tracked-правки будут потеряны.",
       "required": false,
       "default": false
     },
@@ -68,7 +68,7 @@
     },
     "no_backup": {
       "type": "bool",
-      "description": "Не создавать ZIP-бэкап перед применением обновления.",
+      "description": "Не создавать обычный ZIP-бэкап перед применением обновления. На обязательный архив tracked-файлов перед force не влияет.",
       "required": false,
       "default": false
     },
