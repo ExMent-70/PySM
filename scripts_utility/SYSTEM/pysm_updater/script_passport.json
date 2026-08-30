@@ -66,11 +66,11 @@
       "required": false,
       "default": false
     },
-    "no_backup": {
+    "create_backup": {
       "type": "bool",
-      "description": "Не создавать обычный ZIP-бэкап перед применением обновления. На обязательный архив tracked-файлов перед force не влияет.",
+      "description": "Создавать обычный ZIP-бэкап перед применением обновления. Обязательный архив tracked-файлов перед force создается всегда.",
       "required": false,
-      "default": false
+      "default": true
     },
     "show_stat": {
       "type": "bool",

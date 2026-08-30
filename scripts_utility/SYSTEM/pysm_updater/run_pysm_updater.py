@@ -372,9 +372,10 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Синхронизировать HEAD с remote, если нет конфликтов с файлами обновления",
     )
     parser.add_argument(
-        "--no_backup",
-        action="store_true",
-        help="Не создавать обычный ZIP-бэкап; обязательный системный архив force сохраняется",
+        "--create_backup",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Создавать обычный ZIP-бэкап перед обновлением; системный архив force создается всегда",
     )
     parser.add_argument("--show_stat", action="store_true", help="Сохранить git diff --stat в полном логе")
     parser.add_argument("--max_commits", type=int, default=50, help="Максимум коммитов, получаемых для отчета")
@@ -1353,7 +1354,7 @@ def create_user_state_archive(target_dir: Path, logger: UpdateLogger, entries: l
     Этот небольшой архив создается только для файлов, которые одновременно
     изменены пользователем и обновляются на GitHub. Он остается рядом с отчетом
     как аварийная копия, пока обычный ZIP-бэкап может быть отключен параметром
-    `no_backup`.
+    `create_backup`.
     """
 
     paths = get_user_state_conflict_paths(entries)
@@ -1680,7 +1681,7 @@ def main():
                 f"update_mode={config.update_mode}, "
                 f"repair_git_state={bool(config.repair_git_state)}, "
                 f"force={bool(config.force)}, "
-                f"no_backup={bool(config.no_backup)}"
+                f"create_backup={bool(config.create_backup)}"
             ),
             "SLIDERS",
         )
@@ -1830,17 +1831,17 @@ def main():
                 "Автоматическое обновление отменено, чтобы не потерять данные."
             )
 
-        if not config.no_backup:
+        if config.create_backup:
             logger.section("Бэкап", "FILE_ARCHIVE")
             backup_file = create_backup(target_path, logger, plan.get("changed_paths", []))
             payload["backup_file"] = str(backup_file)
         else:
             logger.section("Бэкап", "FILE_ARCHIVE")
-            logger.icon_line("Бэкап отключен параметром no_backup.", "INFO")
+            logger.icon_line("Обычный бэкап отключен параметром create_backup=False.", "INFO")
 
         logger.section("Применение обновления", "WRENCH")
         if config.force:
-            # Даже при no_backup force обязан оставить отдельный снимок только
+            # Даже при create_backup=False force обязан оставить отдельный снимок только
             # tracked-системы: именно эти файлы сейчас будут заменены hard reset.
             force_system_archive = create_force_system_archive(git_path, target_path, logger)
             payload["force_system_archive"] = str(force_system_archive)

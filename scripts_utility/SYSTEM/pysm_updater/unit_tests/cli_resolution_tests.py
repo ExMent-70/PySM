@@ -29,5 +29,24 @@ class UpdateModeArgumentTests(unittest.TestCase):
                 parser.parse_args(["--update_mode", "unknown"])
 
 
+class CreateBackupArgumentTests(unittest.TestCase):
+    def test_backup_is_enabled_by_default(self):
+        config = build_argument_parser().parse_args([])
+
+        self.assertTrue(config.create_backup)
+
+    def test_backup_can_be_disabled_from_the_command_line(self):
+        config = build_argument_parser().parse_args(["--no-create_backup"])
+
+        self.assertFalse(config.create_backup)
+
+    def test_legacy_no_backup_argument_is_rejected(self):
+        parser = build_argument_parser()
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                parser.parse_args(["--no_backup"])
+
+
 if __name__ == "__main__":
     unittest.main()
