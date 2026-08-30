@@ -1,5 +1,5 @@
 [paths]
-python_interpreter = "../../envs/pysm/python.exe"
+python_interpreter = "../../envs/pysm/Scripts/python.exe"
 additional_env_paths = []
 python_paths = []
 
