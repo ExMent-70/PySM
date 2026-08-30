@@ -5,7 +5,7 @@ python_paths = []
 
 [ui]
 last_used_script_set = ""
-last_used_sets_collection_file = ""
+last_used_sets_collection_file = "script_collections/Test_RAW.pysmc"
 
 [logging]
 log_level = "INFO"
