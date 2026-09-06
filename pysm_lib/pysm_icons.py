@@ -18,6 +18,25 @@ except ImportError:
 
 # --- Блок 1: Хранилище путей SVG ---
 SVG_PATHS: Dict[str, str] = {
+    "TEXT_BOLD": '<path d="M6 3h7a5 5 0 0 1 3.5 8.6A5 5 0 0 1 14 21H6V3zm3 3v4h4a2 2 0 0 0 0-4H9zm0 7v5h5a2.5 2.5 0 0 0 0-5H9z"/>',
+    "TEXT_ITALIC": '<path d="M10 3h10v3h-4l-5 12h4v3H5v-3h3l5-12h-3V3z"/>',
+    "TEXT_QUOTE": '<path d="M3 5h8v8H7c0 3-1 4-4 6v-4c1-1 2-2 2-2H3V5zm11 0h8v8h-4c0 3-1 4-4 6v-4c1-1 2-2 2-2h-2V5z"/>',
+    "FILE_PDF": '<path d="M6 2h9l5 5v15H4V4a2 2 0 0 1 2-2zm8 1v5h5z"/><text x="12" y="17" font-family="Arial" font-size="7" fill="#FFF" text-anchor="middle" font-weight="bold">PDF</text>',
+    "FILE_DOC": '<path d="M6 2h9l5 5v15H4V4a2 2 0 0 1 2-2zm8 1v5h5z"/><text x="12" y="17" font-family="Arial" font-size="7" fill="#FFF" text-anchor="middle" font-weight="bold">DOC</text>',
+    "FILE_XLS": '<path d="M6 2h9l5 5v15H4V4a2 2 0 0 1 2-2zm8 1v5h5z"/><text x="12" y="17" font-family="Arial" font-size="7" fill="#FFF" text-anchor="middle" font-weight="bold">XLS</text>',
+    "FILE_VIDEO": '<path d="M4 3h16v18H4zm2 2v2h2V5zm10 0v2h2V5zM6 17v2h2v-2zm10 0v2h2v-2zM9 8v8l7-4z" fill-rule="evenodd"/>',
+    "FILE_AUDIO": '<path d="M9 3v12.2a3.5 3.5 0 1 0 2 3.2V7h7v6.2a3.5 3.5 0 1 0 2 3.2V3z"/>',
+    # --- ОБЩИЕ ДЕЙСТВИЯ CRM И КОММУНИКАЦИИ ---
+    "EDIT": '<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>',
+    "SEARCH": '<path d="M9.5 3a6.5 6.5 0 1 0 4.03 11.6L19.93 21 21 19.93l-6.4-6.4A6.5 6.5 0 0 0 9.5 3zm0 2a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9z"/>',
+    "SYNC": '<path d="M12 4V1L8 5l4 4V6a6 6 0 0 1 6 6c0 1.02-.26 1.98-.71 2.81l1.46 1.46A7.96 7.96 0 0 0 20 12a8 8 0 0 0-8-8zm0 14a6 6 0 0 1-6-6c0-1.02.26-1.98.71-2.81L5.25 7.73A7.96 7.96 0 0 0 4 12a8 8 0 0 0 8 8v3l4-4-4-4v3z"/>',
+    "CALENDAR": '<path fill-rule="evenodd" d="M7 1h2v3h6V1h2v3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3V1zm-3 9v10h16V10H4zm3 2h4v4H7v-4z"/>',
+    "MESSAGE": '<path fill-rule="evenodd" d="M4 3h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7l-5 4V5a2 2 0 0 1 2-2zm2 4v2h12V7H6zm0 4v2h12v-2H6zm0 4v2h8v-2H6z"/>',
+    "SEND": '<path d="M2 3v7l14 2-14 2v7l20-9L2 3z"/>',
+    "LINK": '<path d="M3.9 12A3.1 3.1 0 0 1 7 8.9h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8v2zm9-6h-4v1.9h4a3.1 3.1 0 0 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z"/>',
+    "COPY": '<path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12V1z"/><path fill-rule="evenodd" d="M8 5h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 2v14h12V7H8z"/>',
+    "CHEVRON_LEFT": '<path d="M16.4 3.3 7.7 12l8.7 8.7-1.9 1.9L3.9 12 14.5 1.4z"/>',
+    "CHEVRON_RIGHT": '<path d="m7.6 3.3 8.7 8.7-8.7 8.7 1.9 1.9L20.1 12 9.5 1.4z"/>',
     # --- БАЗОВЫЕ ---
     "FOLDER": '<path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>',
     "FOLDER_OPEN": '<path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>',
@@ -168,6 +187,13 @@ SVG_PATHS: Dict[str, str] = {
 
 # Маппинг имен методов на ключи цветов в theme.toml
 THEME_KEYS = {
+    "TEXT_BOLD": "icon_primary", "TEXT_ITALIC": "icon_primary", "TEXT_QUOTE": "icon_primary",
+    "FILE_PDF": "icon_danger", "FILE_DOC": "icon_info", "FILE_XLS": "icon_success",
+    "FILE_VIDEO": "icon_info", "FILE_AUDIO": "icon_info",
+    "EDIT": "icon_primary", "SEARCH": "icon_info", "SYNC": "icon_info",
+    "CALENDAR": "icon_info", "MESSAGE": "icon_primary", "SEND": "icon_info",
+    "LINK": "icon_primary", "COPY": "icon_primary",
+    "CHEVRON_LEFT": "icon_primary", "CHEVRON_RIGHT": "icon_primary",
     # Actions
     "NEW": "icon_primary", "OPEN": "icon_folder", "SAVE": "icon_primary",
     "IMPORT": "icon_success", "EXPORT": "icon_info", "PRINT": "icon_primary",
@@ -343,12 +369,16 @@ icons = PysmIcons()
 ICON_CATEGORIES: Dict[str, List[str]] = {
     "system":["FOLDER", "FOLDER_OPEN", "FILE", "HOME", "NEW", "OPEN", "SAVE", "IMPORT", "EXPORT", "PRINT", "SLIDERS", "REFRESH", "SETTINGS", "CONSOLE", "EXIT", "CLOSE"],
     "files":[
+        "FILE_PDF", "FILE_DOC", "FILE_XLS", "FILE_VIDEO", "FILE_AUDIO",
         "FILE_PY", "FILE_CODE", "FILE_TXT", "FILE_HTML", "FILE_IMAGE", "FILE_DB", "FILE_ARCHIVE", 
         "FILE_JPG", "FILE_CSV", "FILE_PSD", "FILE_INDD", "FILE_C1", "REPORT", "TABLE", "LIST",
         "FILE_XMP", "PHOTO_PORTRAIT", "PHOTO_GROUP", "PHOTO_NATURE",
         "FILE_RAW", "FILE_MASK"  # <--- Добавлены сюда
     ],
     "actions":[
+        "EDIT", "SEARCH", "SYNC", "CALENDAR", "MESSAGE", "SEND", "LINK", "COPY",
+        "TEXT_BOLD", "TEXT_ITALIC", "TEXT_QUOTE",
+        "CHEVRON_LEFT", "CHEVRON_RIGHT",
         "PLAY", "STOP", "NEXT", "SELECT_FILES", "COPY_JPG", "COPY_CSV", "COPY_PSD", "APP_PHOTOSHOP", "CAMERA", "ADD", "DELETE",
         "APP_C1", "COPY_C1", "APP_INDD", "COPY_INDD", "APP_XMP", "COPY_XMP",
         "PHOTO_PORTRAIT_EDIT", "PHOTO_GROUP_EDIT", "PHOTO_NATURE_EDIT",

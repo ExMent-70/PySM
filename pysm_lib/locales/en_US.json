@@ -211,7 +211,7 @@
         "invalid_root_error": "The wf_psd_path working folder is unavailable or does not exist:\n{path}",
         "outside_root_error": "The new collection can only be saved inside the working folder:\n{path}",
         "empty_name_error": "Enter a name for the new collection.",
-        "project_exists_error": "The new collection folder already exists:\n{path}\nEnter a different name.",
+        "project_exists_error": "The new collection file already exists:\n{path}\nEnter a different name.",
         "create_folder_error": "Could not create the new collection folder:\n{path}\n\n{error}",
         "save_error": "Could not save the new collection:\n{path}"
     },

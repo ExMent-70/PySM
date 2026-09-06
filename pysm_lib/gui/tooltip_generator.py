@@ -85,9 +85,12 @@ def _generate_header_script_html(
 
 # --- 2. БЛОК: Функция _generate_base_script_html (ИЗМЕНЕНА) ---
 def _generate_base_script_html(
-    script_info: ScriptInfoModel, locale_manager: LocaleManager
+    script_info: ScriptInfoModel,
+    locale_manager: LocaleManager,
+    *,
+    wrap_argument_descriptions: bool = False,
 ) -> str:
-    """Генерирует основную HTML-информацию о скрипте."""
+    """Генерирует HTML; встроенный просмотр может разрешить перенос аргументов."""
     parts = []
     if script_info.is_raw:
         parts.append(
@@ -115,10 +118,12 @@ def _generate_base_script_html(
             f"<div style='margin-top:10px; {{theme.tooltip_script_args_block}}'><b>{locale_manager.get('tooltips.instance.params_header')}</b>"
         ]
         arg_list_parts = []
+        argument_white_space = "normal" if wrap_argument_descriptions else "nowrap"
         for name, meta in script_info.command_line_args_meta.items():
             desc = _truncate_tooltip_argument_value(meta.description or "...")
             arg_list_parts.append(
-                f"<div style='white-space: nowrap;'><b>--{name}:</b> {desc}</div>"
+                f"<div style='white-space: {argument_white_space};'>"
+                f"<b>--{name}:</b> {desc}</div>"
             )
 
         arg_parts.append(

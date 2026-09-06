@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QFileDialog, QTabWidget, QStyle, QApplication, QToolBox, QInputDialog,
     QSplitter, QCheckBox,
 )
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QTextOption
 
 from ...models import (
     ScriptInfoModel, ScriptArgMetaDetailModel, ScriptSetEntryValueEnabled, ScriptSetEntryModel,
@@ -23,6 +23,7 @@ from ...app_constants import APPLICATION_ROOT_DIR
 from ..widgets.parameter_editor_widget import ParameterEditorWidget
 from ..tooltip_generator import _generate_base_script_html
 from ...app_enums import EditMode
+from .markdown_help_dialog import MarkdownHelpDialog
 
 
 class ScriptPropertiesDialog(QDialog):
@@ -138,7 +139,20 @@ class ScriptPropertiesDialog(QDialog):
         self.details_toolbox = QToolBox()
         script_description_widget = QTextEdit()
         script_description_widget.setReadOnly(True)
-        script_description_widget.setHtml(_generate_base_script_html(self.script_info_model, self.locale_manager))
+        script_description_widget.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        script_description_widget.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        text_option = script_description_widget.document().defaultTextOption()
+        text_option.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+        script_description_widget.document().setDefaultTextOption(text_option)
+        script_description_widget.setHtml(
+            _generate_base_script_html(
+                self.script_info_model,
+                self.locale_manager,
+                wrap_argument_descriptions=True,
+            )
+        )
         self.details_toolbox.addItem(script_description_widget, self.locale_manager.get("dialogs.script_properties.base_script_description_label"))
         self.instance_description_edit = QTextEdit()
         self.details_toolbox.addItem(self.instance_description_edit, self.locale_manager.get("dialogs.script_properties.instance_description_label"))
@@ -232,20 +246,12 @@ class ScriptPropertiesDialog(QDialog):
     def _on_help_clicked(self):
         script_folder = pathlib.Path(self.script_info_model.folder_abs_path)
         manual_file = script_folder / "manual.md"
-        if not manual_file.is_file():
-            QMessageBox.information(self, "Help", f"Help file (manual.md) not found in script folder:\n{script_folder}")
-            return
-        try:
-            with open(manual_file, "r", encoding="utf-8") as f: content = f.read()
-            help_dialog = QDialog(self); help_dialog.setWindowTitle(f"Help for: {self.script_info_model.name}")
-            help_dialog.setMinimumSize(700, 500); layout = QVBoxLayout(help_dialog)
-            text_edit = QTextEdit(); text_edit.setReadOnly(True); text_edit.setMarkdown(content)
-            layout.addWidget(text_edit)
-            button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-            button_box.accepted.connect(help_dialog.accept); button_box.rejected.connect(help_dialog.reject)
-            layout.addWidget(button_box); help_dialog.exec()
-        except Exception as e:
-            QMessageBox.critical(self, "Error Reading Help", f"Could not read manual.md file:\n{e}")
+        help_dialog = MarkdownHelpDialog(
+            manual_file,
+            title=f"Руководство: {self.script_info_model.name}",
+            parent=self,
+        )
+        help_dialog.exec()
 
     @Slot()
     def _on_arg_selection_changed(self):

@@ -624,6 +624,9 @@ class AppController(QObject):
             raise ValueError("empty_project_name")
 
         project_dir = resolved_root / project_name
+        # Существующая папка не должна перенаправлять сохранение через junction/symlink.
+        if project_dir.resolve(strict=False) != project_dir:
+            raise ValueError("outside_working_root")
         project_file = project_dir / f"{project_name}{COLLECTION_EXTENSION}"
         return project_name, project_dir, project_file
 
@@ -671,10 +674,10 @@ class AppController(QObject):
                 self._show_collection_copy_save_error(error_key, path=working_root)
                 continue
 
-            if project_dir.exists():
+            if os.path.lexists(project_file):
                 self._show_collection_copy_save_error(
                     "dialogs.collection_copy_save.project_exists_error",
-                    path=project_dir,
+                    path=project_file,
                 )
                 continue
 
@@ -711,8 +714,20 @@ class AppController(QObject):
             return False
         project_name, project_dir, project_file = target
 
+        if project_dir.resolve(strict=False) != project_dir:
+            self._show_collection_copy_save_error(
+                "dialogs.collection_copy_save.outside_root_error", path=working_root,
+            )
+            return False
+
+        created_directory = False
         try:
-            project_dir.mkdir(parents=False, exist_ok=False)
+            try:
+                project_dir.mkdir(parents=False, exist_ok=False)
+                created_directory = True
+            except FileExistsError:
+                if not project_dir.is_dir():
+                    raise
         except OSError as error:
             self._show_collection_copy_save_error(
                 "dialogs.collection_copy_save.create_folder_error",
@@ -721,36 +736,31 @@ class AppController(QObject):
             )
             return False
 
-        previous_context = {
-            name: variable.model_copy(deep=True)
-            for name, variable in context_data.items()
-        }
-        previous_collection_name = (
-            self.set_manager.current_collection_model.collection_name
-        )
-        updated_context = {
-            name: variable.model_copy(deep=True)
-            for name, variable in context_data.items()
-        }
-        session_variable = updated_context.get("wf_session_name")
-        if session_variable is None:
-            updated_context["wf_session_name"] = ContextVariableModel(
-                type="string",
-                value=project_name,
+        try:
+            updated_context = {
+                name: variable.model_copy(deep=True)
+                for name, variable in context_data.items()
+            }
+            session_variable = updated_context.get("wf_session_name")
+            if session_variable is None:
+                updated_context["wf_session_name"] = ContextVariableModel(
+                    type="string", value=project_name,
+                )
+            else:
+                session_variable.value = project_name
+            self.update_collection_context(updated_context)
+            saved = self.save_current_collection_requested_by_gui(
+                project_file, new_copy=True,
             )
-        else:
-            session_variable.value = project_name
-        self.update_collection_context(updated_context)
+        finally:
+            # Удаляем только созданную этой командой папку и только если она пуста.
+            if created_directory and self.set_manager.current_collection_file_path is None:
+                try:
+                    project_dir.rmdir()
+                except OSError:
+                    pass
 
-        if not self.save_current_collection_requested_by_gui(project_file):
-            self.update_collection_context(previous_context)
-            self.set_manager.current_collection_model.collection_name = (
-                previous_collection_name
-            )
-            try:
-                project_dir.rmdir()
-            except OSError:
-                pass
+        if not saved:
             self._show_collection_copy_save_error(
                 "dialogs.collection_copy_save.save_error",
                 path=project_file,
@@ -821,6 +831,7 @@ class AppController(QObject):
         )
 
     def new_collection_from_template_requested_by_gui(self):
+        """Оставляет активной сохранённую копию либо восстанавливает исходный процесс."""
         restore_point = _CollectionCopyRestorePoint(
             collection_model=(
                 self.set_manager.current_collection_model.model_copy(deep=True)
@@ -830,6 +841,29 @@ class AppController(QObject):
             selected_set_node_id=self.selected_set_node_id,
             is_dirty=self.set_manager.is_dirty,
         )
+        saved = False
+        try:
+            saved = self._create_and_save_collection_copy()
+        except Exception:
+            # Ошибка обновления интерфейса после записи не отменяет сохранённую копию.
+            saved = (
+                self.set_manager.current_collection_file_path is not None
+                and self.set_manager.current_collection_file_path
+                != restore_point.manager_file_path
+                and not self.set_manager.is_dirty
+            )
+            logger.exception("Не удалось завершить создание копии рабочего процесса")
+            if not saved:
+                self._show_collection_copy_save_error(
+                    "dialogs.collection_copy_save.save_error",
+                    path=self.current_collection_file_path or "",
+                )
+        finally:
+            if not saved:
+                self._restore_collection_after_copy_cancel(restore_point)
+
+    def _create_and_save_collection_copy(self) -> bool:
+        """Создаёт копию и обязательно предлагает сохранить её, даже без сброса."""
         self._update_suggested_save_dir()
         self.config_manager.reload_workflow_copy_config()
         self.set_manager.create_collection_from_current(
@@ -842,7 +876,6 @@ class AppController(QObject):
         self.log_message_to_console.emit(
             "runner_info", self.locale_manager.get("user_actions.collection_new_from_template")
         )
-        save_warning = None
         if self.set_manager.last_reset_context_variables:
             self.log_message_to_console.emit(
                 "runner_info",
@@ -856,23 +889,23 @@ class AppController(QObject):
             )
             self.log_message_to_console.emit("EMPTY_LINE", "")
 
-            context_snapshot = {
-                name: variable.model_dump(mode="python")
-                for name, variable in (
-                    self.set_manager.current_collection_model.context_data.items()
-                )
-            }
-            save_warning = self.locale_manager.get(
-                "user_actions.collection_copy_save_warning"
+        context_snapshot = {
+            name: variable.model_dump(mode="python")
+            for name, variable in (
+                self.set_manager.current_collection_model.context_data.items()
             )
-            save_warning = PySMContext._resolve_template_from_snapshot(
-                save_warning,
-                context_snapshot,
-            )
-            self.log_message_to_console.emit(
-                "runner_info",
-                save_warning,
-            )
+        }
+        save_warning = self.locale_manager.get(
+            "user_actions.collection_copy_save_warning"
+        )
+        save_warning = PySMContext._resolve_template_from_snapshot(
+            save_warning,
+            context_snapshot,
+        )
+        self.log_message_to_console.emit(
+            "runner_info",
+            save_warning,
+        )
 
         self.config_manager.last_used_sets_collection_file = ""
         self.set_active_script_set_node(None)
@@ -883,16 +916,14 @@ class AppController(QObject):
         self.status_message_updated.emit(
             self.locale_manager.get("app_controller.status_new_collection")
         )
-        if save_warning:
-            if self._confirm_new_collection_save(save_warning):
-                self._save_new_collection_in_context_root()
-            else:
-                self._restore_collection_after_copy_cancel(restore_point)
+        if self._confirm_new_collection_save(save_warning):
+            return self._save_new_collection_in_context_root()
+        return False
     # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 
     def save_current_collection_requested_by_gui(
-        self, target_file_path: Optional[pathlib.Path]
+        self, target_file_path: Optional[pathlib.Path], *, new_copy: bool = False
     ) -> bool:
 
         if self.current_orchestrator and getattr(
@@ -900,7 +931,7 @@ class AppController(QObject):
         ):
             self.current_orchestrator.sync_runtime_context_for_save()
 
-        if self.set_manager.save_collection_to_file(target_file_path):
+        if self.set_manager.save_collection_to_file(target_file_path, new_copy=new_copy):
             self.current_collection_file_path = (
                 self.set_manager.current_collection_file_path
             )

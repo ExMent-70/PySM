@@ -4,6 +4,7 @@ import pathlib
 import json
 import logging
 import os
+import tempfile
 import time
 import uuid
 from typing import Any, List, Optional, Dict, Tuple, Union
@@ -408,7 +409,79 @@ class SetManager:
             raise e
 
 
-    def save_collection_to_file(self, file_path: Optional[pathlib.Path] = None) -> bool:
+    def _write_collection_copy(
+        self, target_path: pathlib.Path, collection_data: dict, context_data: dict
+    ) -> None:
+        """Публикует новую пару файлов с откатом, не перезаписывая чужой .pysmc."""
+        staging_dir = pathlib.Path(
+            tempfile.mkdtemp(prefix=".pysm-copy-", dir=target_path.parent)
+        )
+        staged_collection = staging_dir / "collection.json"
+        staged_context = staging_dir / "context.json"
+        context_backup = staging_dir / "previous-context.json"
+        context_path = self._get_context_file_path(target_path)
+        reserved = False
+        context_installed = False
+        context_backed_up = False
+        try:
+            self._atomic_write_json(staged_collection, collection_data)
+            if context_data:
+                self._atomic_write_json(staged_context, context_data)
+
+            # Эксклюзивное создание защищает и от появления файла после диалога.
+            with target_path.open("xb"):
+                pass
+            reserved = True
+            if os.path.lexists(context_path):
+                if not context_path.is_file():
+                    raise OSError(f"Context path is not a file: {context_path}")
+                os.replace(context_path, context_backup)
+                context_backed_up = True
+            if context_data:
+                os.replace(staged_context, context_path)
+                context_installed = True
+            os.replace(staged_collection, target_path)
+        except Exception:
+            # При невозможности отката резервную копию оставляем на диске.
+            try:
+                if context_backed_up:
+                    os.replace(context_backup, context_path)
+                    context_backed_up = False
+                elif context_installed:
+                    context_path.unlink()
+            finally:
+                if reserved:
+                    target_path.unlink()
+            raise
+        else:
+            context_backed_up = False
+        finally:
+            try:
+                temporary_files = list(staging_dir.iterdir())
+            except OSError:
+                temporary_files = []
+                logger.warning("Не удалось прочитать служебную папку: %s", staging_dir)
+            for temporary in temporary_files:
+                if temporary == context_backup and context_backed_up:
+                    logger.error(
+                        "Не удалось восстановить контекст; резервная копия: %s", temporary,
+                    )
+                    continue
+                try:
+                    temporary.unlink()
+                except OSError:
+                    logger.warning(
+                        "Не удалось удалить временный файл %s", temporary, exc_info=True,
+                    )
+            try:
+                staging_dir.rmdir()
+            except OSError:
+                logger.warning("Сохранена служебная папка копирования: %s", staging_dir)
+
+    def save_collection_to_file(
+        self, file_path: Optional[pathlib.Path] = None, *, new_copy: bool = False
+    ) -> bool:
+        """Сохраняет процесс; new_copy запрещает перезапись .pysmc и включает откат пары."""
         target_path = file_path or self.current_collection_file_path
         if not target_path:
             # Невозможно сохранить, если путь не указан и не был определен ранее
@@ -438,9 +511,10 @@ class SetManager:
 
             # --- НАЧАЛО ИЗМЕНЕНИЙ ВНУТРИ БЛОКА ---
             # 1. Атомарно сохраняем основной файл коллекции
-            self._atomic_write_json(
-                target_path, collection_copy_for_save.model_dump(mode="json")
-            )
+            if not new_copy:
+                self._atomic_write_json(
+                    target_path, collection_copy_for_save.model_dump(mode="json")
+                )
 
             # 2. Готовим данные контекста и атомарно сохраняем/удаляем файл контекста
             context_file_path = self._get_context_file_path(target_path)
@@ -449,7 +523,13 @@ class SetManager:
                 for k, v in self.current_collection_model.context_data.items()
             }
 
-            if context_data_to_save:
+            if new_copy:
+                self._write_collection_copy(
+                    target_path,
+                    collection_copy_for_save.model_dump(mode="json"),
+                    context_data_to_save,
+                )
+            elif context_data_to_save:
                 # Если в контексте есть данные, атомарно записываем их
                 logger.info(
                     locale_manager.get(

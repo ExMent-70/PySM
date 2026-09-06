@@ -215,7 +215,7 @@ class _WorkflowBuilder:
 
 def _render_general(builder: _WorkflowBuilder, snapshot: ProjectResourceSnapshot) -> None:
     context = snapshot.context
-    builder.header("1. Подготовка заказа")
+    builder.header("1. Подготовка проекта")
     if context.project_path is not None:
         builder.stage(
             "Рабочая папка для файлов PSD/INDD создана."
@@ -224,7 +224,7 @@ def _render_general(builder: _WorkflowBuilder, snapshot: ProjectResourceSnapshot
             snapshot.project_exists,
             path=context.project_path,
             path_exists=snapshot.project_exists,
-            resource_caption="Папка заказа",
+            resource_caption="Папка проекта",
             resource_icon="FOLDER",
         )
     if context.capture_one_path is not None:
