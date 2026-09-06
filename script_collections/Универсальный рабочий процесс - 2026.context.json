@@ -1,0 +1,929 @@
+{
+  "sys_log_level": {
+    "type": "string",
+    "value": "INFO",
+    "description": null,
+    "read_only": true,
+    "choices": null
+  },
+  "enhancer_settings": {
+    "type": "json",
+    "value": {
+      "brightness": 1.03,
+      "contrast": 1.0,
+      "color": 1.09,
+      "sharpness": 1.2,
+      "temperature": 2.0,
+      "tint": -7.0,
+      "black_point": 30.0,
+      "white_point": -25.0,
+      "wm_stripe_alpha": 55.0,
+      "wm_mask_fill": 51.0,
+      "wm_pad_w": 0.1,
+      "wm_pad_h": 0.2,
+      "wm_text": "Оронгой - 4 класс",
+      "wm_text_alpha": 150.0,
+      "export_dpi": 300,
+      "export_quality": 95,
+      "export_watermarks": true,
+      "export_keep_ratio": true
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_school_info": {
+    "type": "json",
+    "value": {
+      "Полное название школы": "Баргузинская средняя общеобразовательная школа №27",
+      "Название школы": "Баргузинская СОШ №27",
+      "Год": "2027",
+      "Класс": "В",
+      "Параллель": 9,
+      "Город": "Баргузин"
+    },
+    "description": "Структурированная информация о школе и классе. Используются при верстке альбомов",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_psd_path": {
+    "type": "dir_path",
+    "value": "E:\\YandexDisk\\ФОТОСЕССИИ\\СЕЗОН_2027",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_photo_session": {
+    "type": "string",
+    "value": "SCHOOL",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_source_file_path": {
+    "type": "dir_path",
+    "value": "G:/2027-Фото для тестов/9 класс/RAW",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_portrait_session": {
+    "type": "string",
+    "value": "SCHOOL",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "win_state": {
+    "type": "json",
+    "value": {
+      "idsgn_catalog": {
+        "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAAAygAAAJMAAAZ0AAAEFgAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+        "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+        "window_mode": "maximized",
+        "splitters": {
+          "main": "AAAA/wAAAAEAAAACAAACgAAAAQQB/////wEAAAACAA==",
+          "top": "AAAA/wAAAAEAAAADAAABNQAABI8AAAGoAf////8BAAAAAQA="
+        },
+        "template_sort_mode": "name",
+        "dialogs": {
+          "tag_catalog_dialog": {
+            "geometry": "AdnQywADAAAAAAKFAAAAtgAABScAAAO3AAAChQAAANUAAAUnAAADtwAAAAAAAAAAB4AAAAKFAAAA1QAABScAAAO3",
+            "splitters": {},
+            "headers": {
+              "tags": "AAAA/wAAAAAAAAABAAAAAQAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAn8AAAADAAEBAAAAAAABAAAAAgAAAGT/////AAAAhAAAAAAAAAADAAABCQAAAAEAAAADAAAANwAAAAEAAAADAAABPwAAAAEAAAABAAAD6AAAAAAAAAAAAAAAAAAAAAAAAAAAAQ=="
+            }
+          },
+          "tag_edit_dialog": {
+            "geometry": "AdnQywADAAAAAALmAAABfgAABLEAAALcAAAC5gAAAZ0AAASxAAAC3AAAAAAAAAAAB4AAAALmAAABnQAABLEAAALc",
+            "splitters": {},
+            "headers": {}
+          },
+          "snippet_catalog_dialog": {
+            "geometry": "AdnQywADAAAAAADNAAAAXAAABpsAAAQXAAAAzQAAAHsAAAabAAAEFwAAAAAAAAAAB4AAAADNAAAAewAABpsAAAQX",
+            "splitters": {
+              "top": "AAAA/wAAAAEAAAADAAABIQAAA1wAAAEyAf////8BAAAAAQA="
+            },
+            "headers": {}
+          },
+          "snippet_card_dialog": {
+            "geometry": "AdnQywADAAAAAAEKAAAA1QAABk8AAAObAAABCgAAAPQAAAZPAAADmwAAAAAAAAAAB4AAAAEKAAAA9AAABk8AAAOb",
+            "splitters": {
+              "main": "AAAA/wAAAAEAAAACAAACbwAAArwB/////wEAAAABAA=="
+            },
+            "headers": {}
+          },
+          "snippet_picker_dialog": {
+            "geometry": "AdnQywADAAAAAACDAAAAKAAABwMAAAQ8AAAAgwAAAEcAAAcDAAAEPAAAAAAAAAAAB4AAAACDAAAARwAABwMAAAQ8",
+            "splitters": {
+              "top": "AAAA/wAAAAEAAAADAAABJgAAA78AAAF8Af////8BAAAAAQA="
+            },
+            "headers": {}
+          },
+          "template_dialog": {
+            "geometry": "AdnQywADAAAAAACkAAAAEwAABi4AAARuAAAApAAAADIAAAYuAAAEbgAAAAAAAAAAB4AAAACkAAAAMgAABi4AAARu",
+            "splitters": {
+              "main": "AAAA/wAAAAEAAAACAAAB+wAAA3UB/////wEAAAABAA==",
+              "mapping": "AAAA/wAAAAEAAAACAAACJwAAAaMB/////wEAAAACAA=="
+            },
+            "headers": {
+              "placeholders": "AAAA/wAAAAAAAAABAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAA08AAAAIAAEBAAAAAAABAAAAAAAAAGT/////AAAAhAAAAAAAAAAIAAAALAAAAAEAAAAAAAAATgAAAAEAAAAAAAAAnwAAAAEAAAAAAAAAdgAAAAEAAAABAAAAngAAAAEAAAAAAAAAWgAAAAEAAAAAAAAAWgAAAAEAAAAAAAAAbgAAAAEAAAAAAAAD6AAAAAAAAAAAAAAAAAAAAAAAAAAAAQ==",
+              "snippets": "AAAA/wAAAAAAAAABAAAAAQAAAAUAAAAAAAAAAAAAAAAAAAAAAAAAA08AAAAFAAEBAAAAAAABAAAAAAAAAGT/////AAAAhAAAAAAAAAAFAAAASAAAAAEAAAAAAAAAJQAAAAEAAAAAAAAAjQAAAAEAAAAAAAAArgAAAAEAAAAAAAABpwAAAAEAAAABAAAD6AAAAAAAAAAAAAAAAAAAAAAAAAAAAQ==",
+              "mode_options": "AAAA/wAAAAAAAAABAAAAAQAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAA0sAAAADAAEBAAAAAAABAAAAAAAAAGT/////AAAAhAAAAAAAAAADAAAA8AAAAAEAAAAAAAAAWgAAAAEAAAAAAAACAQAAAAEAAAABAAAD6AAAAAAAAAAAAAAAAAAAAAAAAAAAAQ=="
+            }
+          },
+          "tag_selector_dialog": {
+            "geometry": "AdnQywADAAAAAALMAAABHAAABHkAAANCAAACzAAAATsAAAR5AAADQgAAAAAAAAAAB4AAAALMAAABOwAABHkAAANC",
+            "splitters": {},
+            "headers": {}
+          }
+        }
+      },
+      "claster_editor": {
+        "matches": {
+          "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAABSgAAADMAAAY1AAAEmgAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+          "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+          "window_mode": "maximized",
+          "splitters": {
+            "main": "AAAA/wAAAAEAAAADAAACeAAAA10AAAGPAf////8BAAAAAQA="
+          }
+        },
+        "location": {
+          "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAAA5gAAAKUAAAaZAAAEKAAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+          "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+          "window_mode": "maximized",
+          "splitters": {
+            "main": "AAAA/wAAAAEAAAADAAACeQAAA2AAAAGLAf////8BAAAAAQA="
+          }
+        },
+        "face": {
+          "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAAA5gAAAKUAAAaZAAAEKAAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+          "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+          "window_mode": "maximized",
+          "splitters": {
+            "main": "AAAA/wAAAAEAAAADAAABtwAABC8AAAF+Af////8BAAAAAQA="
+          }
+        },
+        "cleaning": {
+          "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAAA5gAAAKUAAAaZAAAEKAAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+          "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+          "window_mode": "maximized",
+          "splitters": {
+            "main": "AAAA/wAAAAEAAAACAAABswAABbYB/////wEAAAABAA=="
+          }
+        }
+      },
+      "photo_selection_apply": {
+        "geometry": "AdnQywADAAAAAADIAAAACgAABsIAAAQ8AAAAyAAAACkAAAbCAAAEPAAAAAAAAAAAB4AAAADIAAAAKQAABsIAAAQ8",
+        "window_state": "AAAA/wAAAAD9AAAAAAAABfsAAAQUAAAABAAAAAQAAAAIAAAACPwAAAAA",
+        "splitters": {
+          "main": "AAAA/wAAAAEAAAACAAADqQAAAjsB/////wEAAAABAA==",
+          "right": "AAAA/wAAAAEAAAACAAABWAAAAY0B/////wEAAAACAA=="
+        },
+        "active_tab": 1
+      },
+      "photo_selection": {
+        "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAAAqwAAAJ0AAAaXAAADtwAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+        "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARxAAAABAAAAAQAAAAIAAAACPwAAAAA",
+        "window_mode": "maximized",
+        "splitters": {
+          "main": "AAAA/wAAAAEAAAACAAAEIAAAA0kB/////wEAAAABAA==",
+          "right": "AAAA/wAAAAEAAAACAAAB+wAAAiMB/////wEAAAACAA=="
+        },
+        "active_tab": 0
+      },
+      "rmbg_configurator": {
+        "schema_version": 1,
+        "windows": {
+          "configurator": {
+            "geometry": "AdnQywADAAAAAALhAAABIAAABYgAAAPdAAAC4QAAAT8AAAWIAAAD3QAAAAAAAAAAB4AAAALhAAABPwAABYgAAAPd",
+            "window_mode": "normal"
+          },
+          "template_manager": {
+            "geometry": "AdnQywADAAAAAAFJAAAAowAABYQAAAO5AAABSQAAAMIAAAWEAAADuQAAAAAAAAAAB4AAAAFJAAAAwgAABYQAAAO5",
+            "window_mode": "normal",
+            "splitters": {
+              "main": "AAAA/wAAAAEAAAACAAABVAAAAy0B/////wEAAAABAA=="
+            }
+          },
+          "detailed_comparison": {
+            "geometry": "AdnQywADAAAAAAFAAAAAXAAABgMAAAPWAAABQAAAAHsAAAYDAAAD1gAAAAAAAAAAB4AAAAFAAAAAewAABgMAAAPW",
+            "window_mode": "normal"
+          },
+          "multi_set_overview": {
+            "geometry": "AdnQywADAAAAAAExAAAAYQAABhIAAAPRAAABMQAAAIAAAAYSAAAD0QAAAAAAAAAAB4AAAAExAAAAgAAABhIAAAPR",
+            "window_mode": "normal"
+          },
+          "test_mask_manager": {
+            "geometry": "AdnQywADAAAAAAFyAAAA5wAABX8AAAOtAAABcgAAAQYAAAV/AAADrQAAAAAAAAAAB4AAAAFyAAABBgAABX8AAAOt",
+            "window_mode": "normal",
+            "splitters": {
+              "main": "AAAA/wAAAAEAAAACAAACLgAAAcUB/////wEAAAABAA=="
+            }
+          },
+          "create_test_session": {
+            "geometry": "AdnQywADAAAAAAIBAAABOAAABUMAAAL6AAACAQAAAVcAAAVDAAAC+gAAAAAAAAAAB4AAAAIBAAABVwAABUMAAAL6",
+            "window_mode": "normal"
+          },
+          "single_set_viewer": {
+            "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAABSQAAALcAAAWUAAAD6gAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+            "window_mode": "maximized"
+          }
+        }
+      },
+      "project_crm": {
+        "schema_version": 1,
+        "windows": {
+          "main": {
+            "geometry": "AdnQywADAAAAAAAA////+AAAB38AAASHAAABggAAACAAAAYbAAAEhgAAAAACAAAAB4AAAAAAAAAAFwAAB38AAASH",
+            "window_state": "AAAA/wAAAAD9AAAAAAAAB4AAAARbAAAABAAAAAQAAAAIAAAACPwAAAAA",
+            "window_mode": "maximized",
+            "splitters": {
+              "ProjectCrmMessagesSplitter": "AAAA/wAAAAEAAAACAAABpAAAA4QB/////wEAAAABAA==",
+              "ProjectCrmMessageDetailsSplitter": "AAAA/wAAAAEAAAACAAABsAAAAhcA/////wEAAAACAA==",
+              "ProjectCrmFinanceSplitter": "AAAA/wAAAAEAAAACAAAAYgAAAGIB/////wEAAAACAA==",
+              "ProjectCrmOrderWorkspaceSplitter": "AAAA/wAAAAEAAAACAAAFNQAAAiAB/////wEAAAABAA=="
+            },
+            "project_table_header": "AAAA/wAAAAAAAAABAAAAAQAAAAQBAAAAAAAAAAAAAAAAAAAAAAAABTMAAAAOAAEBAAAAAAABAAAACAAAAGT/////AAAAhAAAAAAAAAAOAAAAbQAAAAEAAAAAAAAAYQAAAAEAAAAAAAAAdQAAAAEAAAADAAAAhAAAAAEAAAAAAAAANgAAAAEAAAADAAAAfwAAAAEAAAAAAAAAUQAAAAEAAAADAAAAPQAAAAEAAAADAAAAUwAAAAEAAAADAAAAPQAAAAEAAAADAAAASgAAAAEAAAADAAAAPQAAAAEAAAADAAAAfAAAAAEAAAABAAAAlgAAAAEAAAAAAAAD6AAAAAAAAAAAAAAAAAAAAAAAAAAAAQ==",
+            "project_table_header_version": 6
+          },
+          "ProjectCrmCustomerDialog": {
+            "geometry": "AdnQywADAAAAAAKeAAABLQAABM0AAANeAAACngAAAUwAAATNAAADXgAAAAAAAAAAB4AAAAKeAAABTAAABM0AAANe",
+            "window_mode": "normal"
+          },
+          "ProjectCrmMaxMessageTestDialog": {
+            "geometry": "AdnQywADAAAAAAIhAAAA7AAABX8AAAPEAAACIQAAAQsAAAV/AAADxAAAAAAAAAAAB4AAAAIhAAABCwAABX8AAAPE",
+            "window_mode": "normal"
+          },
+          "ProjectCrmFinancialOperationDialog": {
+            "geometry": "AdnQywADAAAAAALLAAABkQAABKAAAAMTAAACywAAAbAAAASgAAADEwAAAAAAAAAAB4AAAALLAAABsAAABKAAAAMT",
+            "window_mode": "normal"
+          },
+          "ExternalCalendarsDialog": {
+            "geometry": "AdnQywADAAAAAAIcAAABUAAABbIAAAMcAAACHAAAAW8AAAWyAAADHAAAAAAAAAAAB4AAAAIcAAABbwAABbIAAAMc",
+            "window_mode": "normal"
+          },
+          "ProjectCrmShootingDialog": {
+            "geometry": "AdnQywADAAAAAALGAAABUAAABKUAAANeAAACxgAAAW8AAASlAAADXgAAAAAAAAAAB4AAAALGAAABbwAABKUAAANe",
+            "window_mode": "normal"
+          },
+          "ProjectCrmMaxConnectionDialog": {
+            "geometry": "AdnQywADAAAAAACMAAABZwAAAxwAAALtAAAAjAAAAYYAAAMcAAAC7QAAAAAAAAAAB4AAAACMAAABhgAAAxwAAALt",
+            "window_mode": "normal"
+          },
+          "ProjectCrmMessageTemplateDialog": {
+            "geometry": "AdnQywADAAAAAAFQAAAASwAABZcAAAPRAAABUAAAAGoAAAWXAAAD0QAAAAAAAAAAB4AAAAFQAAAAagAABZcAAAPR",
+            "window_mode": "normal",
+            "splitters": {
+              "ProjectCrmMessageTemplateSplitter": "AAAA/wAAAAEAAAACAAABIAAAA1QB/////wEAAAABAA=="
+            },
+            "collapsed_template_categories": []
+          },
+          "ProjectCrmDeletedProjectsDialog": {
+            "geometry": "AdnQywADAAAAAAIyAAABcwAABTkAAAL5AAACMgAAAZIAAAU5AAAC+QAAAAAAAAAAB4AAAAIyAAABkgAABTkAAAL5",
+            "window_mode": "normal"
+          },
+          "ProjectCrmMaxLinkDialog": {
+            "geometry": "AdnQywADAAAAAALxAAABwAAABNAAAAKIAAAC8QAAAd8AAATQAAACiAAAAAAAAAAAB4AAAALxAAAB3wAABNAAAAKI",
+            "window_mode": "normal"
+          },
+          "ProjectCrmTemplatePickerDialog": {
+            "geometry": "AdnQywADAAAAAAKqAAABDwAABJ0AAAOPAAACqgAAAS4AAASdAAADjwAAAAAAAAAAB4AAAAKqAAABLgAABJ0AAAOP",
+            "window_mode": "normal",
+            "collapsed_template_categories": []
+          },
+          "CalendarHelpDialog": {
+            "geometry": "AdnQywADAAAAAAJXAAAA2QAABWIAAAOBAAACVwAAAPgAAAViAAADgQAAAAAAAAAAB4AAAAJXAAAA+AAABWIAAAOB",
+            "window_mode": "normal"
+          }
+        }
+      }
+    },
+    "description": "Auto-created by script via structured set",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_indsgn_template": {
+    "type": "json",
+    "value": {
+      "default": {
+        "id": "a9a2f50c-b66c-4a25-8d9e-65e36ff5cdfa",
+        "name": "Альбомный разворот (4 фотографии)",
+        "category": "Альбомы 21х30/Дизайн \"Чёрный бархат\"",
+        "template_path": "templates/01-Черный_бархат/01-Разворот-4.idml",
+        "tags": [
+          "41a05847-99cf-41c2-9c43-85a45b2388a5",
+          "bba938ff-6fb2-4f8a-8f83-ffd29b7f8919",
+          "fed464a9-d204-4df7-ac23-2150c4206db9",
+          "6dbe67aa-99e3-4906-a6fa-aba541e4de34",
+          "7ea849ca-223b-4eb0-a03a-14d17478eb36"
+        ],
+        "active_master_spread": "u15a",
+        "masters": {
+          "u15a": {
+            "graphic_tags": [
+              "group_photo_01",
+              "group_photo_02",
+              "group_photo_03",
+              "group_photo_v_01"
+            ]
+          }
+        },
+        "layers": [
+          {
+            "uid": "ubc",
+            "name": "Разметка разворота",
+            "visible": true,
+            "locked": false
+          },
+          {
+            "uid": "u10d",
+            "name": "Фон",
+            "visible": true,
+            "locked": false
+          },
+          {
+            "uid": "u112",
+            "name": "Оформление под фото",
+            "visible": true,
+            "locked": false
+          },
+          {
+            "uid": "u117",
+            "name": "Фото1",
+            "visible": true,
+            "locked": false
+          },
+          {
+            "uid": "u11c",
+            "name": "Оформление над фото",
+            "visible": true,
+            "locked": false
+          },
+          {
+            "uid": "u121",
+            "name": "Техт",
+            "visible": true,
+            "locked": false
+          },
+          {
+            "uid": "u126",
+            "name": "Плейсхолдеры",
+            "visible": true,
+            "locked": false
+          },
+          {
+            "uid": "u12b",
+            "name": "Описание",
+            "visible": false,
+            "locked": false
+          }
+        ],
+        "snippets": [],
+        "placeholder_map": {
+          "group_photo_01": "group_photo_01",
+          "group_photo_02": "group_photo_02",
+          "group_photo_03": "group_photo_03",
+          "group_photo_v_01": "group_photo_v_01"
+        },
+        "override_labels": [
+          "group_photo_v_01"
+        ],
+        "override_text_labels": [
+          "child_fullname"
+        ],
+        "generation_mode": "sheet",
+        "positioning": {
+          "default": {},
+          "by_prefix": {},
+          "by_label": {
+            "group_photo_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_02": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_03": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_v_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            }
+          }
+        },
+        "mode_options": {},
+        "tag_template": [],
+        "tag_snippet": []
+      },
+      "auto_cover": {
+        "id": "af13d540-09af-47f2-93e5-877c8739713d",
+        "name": "Персональная обложка (до 8 страниц)",
+        "category": "9-11 класс/Черный бархат",
+        "template_path": "templates/01-Черный_бархат/01-Персональная обложка.idml",
+        "active_master_spread": "u17a",
+        "masters": {
+          "u17a": {
+            "graphic_tags": [
+              "group_photo_01",
+              "portrait"
+            ]
+          }
+        },
+        "placeholder_map": {
+          "group_photo_01": "group_photo_all_02",
+          "portrait": "portrait"
+        },
+        "override_labels": [
+          "portrait"
+        ],
+        "override_text_labels": [
+          "child_fullname"
+        ],
+        "generation_mode": "sheet",
+        "positioning": {
+          "default": {},
+          "by_prefix": {},
+          "by_label": {
+            "group_photo_01": {
+              "eye_line": 0.19,
+              "face_scale": 0.18
+            },
+            "portrait": {
+              "eye_line": 0.19,
+              "face_scale": 0.17
+            }
+          }
+        },
+        "mode_options": {}
+      },
+      "auto_vignette": {
+        "id": "9eeaf04b-ce0b-44ce-9c70-de4dda07f0e7",
+        "name": "Виньетка с цитатами",
+        "category": "9-11 класс/Черный бархат",
+        "template_path": "templates/01-Черный_бархат/01-Виньетка.idml",
+        "active_master_spread": "u1f1",
+        "masters": {
+          "u1f1": {
+            "graphic_tags": [
+              "portrait_0",
+              "portrait_1",
+              "portrait_10",
+              "portrait_11",
+              "portrait_12",
+              "portrait_13",
+              "portrait_14",
+              "portrait_15",
+              "portrait_16",
+              "portrait_17",
+              "portrait_18",
+              "portrait_19",
+              "portrait_2",
+              "portrait_20",
+              "portrait_21",
+              "portrait_22",
+              "portrait_23",
+              "portrait_24",
+              "portrait_25",
+              "portrait_3",
+              "portrait_4",
+              "portrait_5",
+              "portrait_6",
+              "portrait_7",
+              "portrait_8",
+              "portrait_9",
+              "teacher_0"
+            ]
+          }
+        },
+        "placeholder_map": {
+          "portrait_0": "portrait",
+          "portrait_1": "portrait",
+          "portrait_10": "portrait",
+          "portrait_11": "portrait",
+          "portrait_12": "portrait",
+          "portrait_13": "portrait",
+          "portrait_14": "portrait",
+          "portrait_15": "portrait",
+          "portrait_16": "portrait",
+          "portrait_17": "portrait",
+          "portrait_18": "portrait",
+          "portrait_19": "portrait",
+          "portrait_2": "portrait",
+          "portrait_20": "portrait",
+          "portrait_21": "portrait",
+          "portrait_22": "portrait",
+          "portrait_23": "portrait",
+          "portrait_24": "portrait",
+          "portrait_25": "portrait",
+          "portrait_3": "portrait",
+          "portrait_4": "portrait",
+          "portrait_5": "portrait",
+          "portrait_6": "portrait",
+          "portrait_7": "portrait",
+          "portrait_8": "portrait",
+          "portrait_9": "portrait",
+          "teacher_0": "portrait"
+        },
+        "override_labels": [],
+        "override_text_labels": [],
+        "generation_mode": "vignette",
+        "positioning": {
+          "default": {},
+          "by_prefix": {
+            "portrait_": {
+              "eye_line": 0.29,
+              "face_scale": 0.34
+            }
+          },
+          "by_label": {
+            "teacher_0": {
+              "eye_line": 0.2,
+              "face_scale": 0.24
+            }
+          }
+        },
+        "mode_options": {}
+      },
+      "auto_group": {
+        "id": "62117ed4-c171-4743-a82b-20100dd0e769",
+        "name": "Альбомный разворот (3 фотографии)",
+        "category": "9-11 класс/Черный бархат",
+        "template_path": "templates/01-Черный_бархат/01-Разворот-3.idml",
+        "active_master_spread": "u15a",
+        "masters": {
+          "u15a": {
+            "graphic_tags": [
+              "group_photo_01",
+              "group_photo_02",
+              "group_photo_all_01"
+            ]
+          }
+        },
+        "placeholder_map": {
+          "group_photo_01": "group_photo_table",
+          "group_photo_02": "group_photo_down",
+          "group_photo_all_01": "group_photo_all_01"
+        },
+        "override_labels": [
+          "group_photo_01",
+          "group_photo_02"
+        ],
+        "override_text_labels": [
+          "child_fullname"
+        ],
+        "generation_mode": "sheet",
+        "positioning": {
+          "default": {
+            "eye_line": 0.3,
+            "face_scale": 0.2
+          },
+          "by_prefix": {},
+          "by_label": {
+            "group_photo_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_02": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_all_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            }
+          }
+        },
+        "mode_options": {}
+      },
+      "auto_graf": {
+        "id": "a9a2f50c-b66c-4a25-8d9e-65e36ff5cdfa",
+        "name": "Альбомный разворот (4 фотографии)",
+        "category": "9-11 класс/Черный бархат",
+        "template_path": "templates/01-Черный_бархат/01-Разворот-4.idml",
+        "active_master_spread": "u15b",
+        "masters": {
+          "u15b": {
+            "graphic_tags": [
+              "group_photo_01",
+              "group_photo_02",
+              "group_photo_03",
+              "group_photo_v_01"
+            ]
+          }
+        },
+        "placeholder_map": {
+          "group_photo_01": "group_photo_01",
+          "group_photo_02": "group_photo_02",
+          "group_photo_03": "group_photo_03",
+          "group_photo_v_01": "group_photo_v_01"
+        },
+        "override_labels": [
+          "group_photo_v_01"
+        ],
+        "override_text_labels": [
+          "child_fullname"
+        ],
+        "generation_mode": "sheet",
+        "positioning": {
+          "default": {},
+          "by_prefix": {},
+          "by_label": {
+            "group_photo_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_02": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_03": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            },
+            "group_photo_v_01": {
+              "eye_line": 0.0,
+              "face_scale": 0.0
+            }
+          }
+        },
+        "mode_options": {}
+      }
+    },
+    "description": "Конфигурация шаблонов InDesign для автоматической верстки альбомов",
+    "read_only": false,
+    "choices": null
+  },
+  "var_claster_run": {
+    "type": "json",
+    "value": {
+      "SCHOOL": {
+        "cleaning": "yes",
+        "face": "yes",
+        "location": "yes",
+        "matches": "yes"
+      }
+    },
+    "description": "Auto-created by script via structured set",
+    "read_only": false,
+    "choices": null
+  },
+  "dlg_msg_user_var": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_school_info__schema": {
+    "type": "json",
+    "value": {
+      "version": 1,
+      "title": "wf_school_info",
+      "fields": {
+        "Полное название школы": {
+          "label": "Полное название школы",
+          "description": "",
+          "widget": "string",
+          "icon": "FILE_TXT"
+        },
+        "Название школы": {
+          "label": "Название школы",
+          "description": "",
+          "widget": "string",
+          "icon": "FILE_TXT"
+        },
+        "Год": {
+          "label": "Год",
+          "description": "",
+          "widget": "string",
+          "icon": "FILE_TXT"
+        },
+        "Класс": {
+          "label": "Класс",
+          "description": "",
+          "widget": "string",
+          "icon": "FILE_TXT"
+        },
+        "Параллель": {
+          "label": "Параллель",
+          "description": "",
+          "widget": "int",
+          "icon": "SLIDERS"
+        },
+        "Город": {
+          "label": "Город",
+          "description": "",
+          "widget": "string",
+          "icon": "FILE_TXT"
+        }
+      }
+    },
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "dlg_go_var": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_raw_multi_folder": {
+    "type": "string",
+    "value": "no",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_idsgn_catalog": {
+    "type": "file_path",
+    "value": "E:\\YandexDisk\\ФОТОСЕССИИ\\_ШАБЛОНЫ_\\catalog.template",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_student_ids_order": {
+    "type": "json",
+    "value": {
+      "SCHOOL_ids_order": [
+        "HHC8-S024",
+        "HHC8-S039",
+        "HHC8-S028",
+        "HHC8-S032",
+        "HHC8-S033",
+        "HHC8-S035",
+        "HHC8-S040",
+        "HHC8-S038",
+        "HHC8-S027",
+        "HHC8-S036",
+        "HHC8-S041",
+        "HHC8-S031",
+        "HHC8-S042",
+        "HHC8-S043",
+        "HHC8-S044",
+        "HHC8-S025",
+        "HHC8-S045",
+        "HHC8-S037",
+        "HHC8-S030",
+        "HHC8-S026",
+        "HHC8-S034",
+        "HHC8-S046",
+        "HHC8-S029",
+        "HHC8-S047"
+      ]
+    },
+    "description": "Список учеников в порядке съемки",
+    "read_only": false,
+    "choices": null
+  },
+  "sys_location_name": {
+    "type": "json",
+    "value": {
+      "SCHOOL": {
+        "portrait": "IMG_888164.jpg",
+        "group_photo_table": "IMG_889057.jpg",
+        "group_photo_down": "IMG_889284.jpg",
+        "group_photo_all_01": "IMG_889432.jpg",
+        "group_photo_10": "IMG_889493.jpg",
+        "group_photo_all_02": "IMG_889501.jpg",
+        "group_photo_01": "IMG_889602.jpg",
+        "group_photo_02": "IMG_889642.jpg",
+        "group_photo_03": "IMG_889672.jpg",
+        "group_photo_v_01": "IMG_889714.jpg",
+        "portrait_A6": "",
+        "portrait_A5": "",
+        "portrait_A4": ""
+      }
+    },
+    "description": "Auto-created by script via structured set",
+    "read_only": false,
+    "choices": null
+  },
+  "var_enter_session_name": {
+    "type": "string",
+    "value": "cancel",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_session_name": {
+    "type": "string",
+    "value": "Test_RAW",
+    "description": "Текущая фотосъемка. Все материалы съемки сохраняются в папке с этим именем",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_session_path": {
+    "type": "dir_path",
+    "value": "G:\\2027_Capture_One_Session",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_setup": {
+    "type": "json",
+    "value": {
+      "local": "yes",
+      "global": "no",
+      "claster": "no"
+    },
+    "description": "Переменная-флаг, сигнализирующая о настройке окружения",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_rmbg_settings": {
+    "type": "json",
+    "value": {
+      "default": {
+        "schema_version": 1,
+        "profile_name": "Универсальный HQ",
+        "task": {
+          "type": "background_removal",
+          "preset": "general_hq"
+        },
+        "model": {
+          "selection": "auto",
+          "name": null,
+          "model_dir": "_BIN/models/RMBG",
+          "process_resolution": 0,
+          "device": "auto",
+          "precision": "auto",
+          "unload_after_run": true
+        },
+        "segmentation": {
+          "prompt": "",
+          "threshold": 0.35,
+          "merge_instances": true,
+          "max_segments": 0
+        },
+        "mask": {
+          "sensitivity": 1.0,
+          "blur": 0,
+          "offset": 0,
+          "feather": 0,
+          "fill_holes": true,
+          "max_hole_area": 4096,
+          "remove_small_regions": true,
+          "min_region_area": 64,
+          "invert": false,
+          "refinement": "auto",
+          "sdmatte_variant": "sdmatte",
+          "sdmatte_resolution": 1024,
+          "sdmatte_transparent_object": true,
+          "sdmatte_constraint": 0.9
+        },
+        "output": {
+          "save_cutout": true,
+          "save_mask": true,
+          "save_composite": false,
+          "background_mode": "solid",
+          "background_color": "#FFFFFF",
+          "background_image": "",
+          "background_fit": "cover",
+          "background_position": "center",
+          "image_suffix": "_rmbg",
+          "mask_suffix": "_mask",
+          "composite_suffix": "_composite",
+          "image_format": "png",
+          "png_compress_level": 3,
+          "jpeg_quality": 95
+        },
+        "performance": {
+          "batch_size": 1,
+          "io_workers": 4,
+          "max_loaded_models": 1,
+          "allow_cpu_fallback": false
+        }
+      }
+    },
+    "description": "Настройки для скрипта удаления фона",
+    "read_only": false,
+    "choices": null
+  },
+  "var_need_session_name": {
+    "type": "string",
+    "value": "cancel",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "wf_database_path": {
+    "type": "dir_path",
+    "value": "E:\\YandexDisk\\ФОТОСЕССИИ\\_DB_ORDERS_",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  },
+  "var_run_script": {
+    "type": "string",
+    "value": "cancel",
+    "description": "Auto-created by script",
+    "read_only": false,
+    "choices": null
+  }
+}
