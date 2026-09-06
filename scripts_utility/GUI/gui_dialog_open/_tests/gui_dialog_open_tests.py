@@ -199,6 +199,48 @@ class InitialDirectoryTests(unittest.TestCase):
         self.assertEqual(initial_dir, dialog_open._normalized_absolute_path(temp_dir))
         self.assertFalse(configured)
 
+    def test_template_in_previous_directory_is_resolved_from_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app_root = Path(temp_dir)
+            selected_dir = (
+                app_root
+                / "script_collections"
+                / "DEMO_WORKFLOW"
+                / "2027_RAW"
+            )
+            selected_dir.mkdir(parents=True)
+            stored_value = (
+                r"{pysm_sys_info.app_root_dir}"
+                r"\script_collections\DEMO_WORKFLOW\2027_RAW"
+            )
+            config = SimpleNamespace(
+                dlg_open_initial_dir="",
+                dlg_open_var="selected_path",
+                dlg_open_result_mode="full_path",
+            )
+            previous_value = SimpleNamespace(exists=True, value=stored_value)
+            context = mock.Mock()
+            context.resolve_template.return_value = str(selected_dir)
+            context.resolve_path.return_value = selected_dir
+
+            with (
+                mock.patch.object(dialog_open, "pysm_context", context),
+                mock.patch.object(
+                    dialog_open,
+                    "read_context_value",
+                    return_value=previous_value,
+                ),
+            ):
+                initial_dir, configured = dialog_open._determine_initial_directory(config)
+
+        self.assertEqual(
+            initial_dir,
+            dialog_open._normalized_absolute_path(str(selected_dir)),
+        )
+        self.assertFalse(configured)
+        context.resolve_template.assert_called_once_with(stored_value)
+        context.resolve_path.assert_called_once_with(str(selected_dir))
+
     def test_name_mode_uses_collection_dir_instead_of_result_variable(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             base_dir = Path(temp_dir)

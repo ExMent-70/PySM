@@ -1,0 +1,102 @@
+{
+  "description": "Генерирует фотоальбомы в формате IDML. Полный состав, порядок и персональные данные берёт из *.list; персональные фотографии выбирает по шестизначным номерам из photo_assignments.json. Общие мастер-рамки по-прежнему читают папки напрямую. Поддерживает режимы: sheet, photo, vignette, personal_vignette, multipage_vignette и multipage_personal_vignette. До генерации проверяет вместимость рамок и корректность текстовых override, чтобы люди и персональные значения не терялись молча. В multipage_personal_vignette отсутствие персональных рамок, portrait_N или teacher_N не блокирует создание применимых общих и персональных разворотов. Сборочная константа DEMO_MAX_SPREADS позволяет ограничить число создаваемых разворотов демонстрационной версии.\n\nШаблон и его конфигурация загружаются из переменной контекста, заданной параметром <b>idsgn_template_var</b>.",
+  "category": "InDesign",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "v2.2026.09.06",
+  "command_line_args_meta": {
+    "idsgn_template_var": {
+      "type": "str",
+      "description": "Имя переменной контекста, содержащей объект шаблона: путь, мастер-страницу, карту плейсхолдеров и режим. Поддерживает dot-notation, например wf_template_name.sheet1.",
+      "required": true,
+      "default": "wf_indsgn_template.default"
+    },
+    "photo_assignments_file": {
+      "type": "file_path",
+      "description": "Обязательный photo_assignments.json со списками разрешённых шестизначных номеров по student_id.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/photo_assignments.json"
+    },
+    "student_list_file": {
+      "type": "file_path",
+      "description": "Основной файл *.list, определяющий полный состав, порядок, ФИО, роли и анкетные данные.",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list"
+    },
+    "source_photos_dir": {
+      "type": "dir_path",
+      "description": "Корневая папка, в которой находятся подпапки с фотографиями.",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}"
+    },
+    "output_file": {
+      "type": "file_path",
+      "description": "Путь для сохранения итогового IDML-файла. Если не указан, путь генерируется автоматически.",
+      "required": false
+    },
+    "idsgn_global_vars": {
+      "type": "str",
+      "description": "Имя переменной контекста с глобальными текстами: школа, класс, год и т.д.",
+      "required": false,
+      "default": "wf_school_info"
+    },
+    "idsgn_snippets_catalog": {
+      "type": "file_path",
+      "description": "Путь к каталогу IDMS-сниппетов. Если не указан, используется snippets_catalog.json рядом с catalog.json.",
+      "required": false,
+      "default": ""
+    },
+    "copy_snippet_previews": {
+      "type": "bool",
+      "description": "Диагностический режим: копировать превью использованных IDMS-сниппетов в папку SnippetPreviews рядом с итоговым IDML.",
+      "required": false,
+      "default": false
+    },
+    "generation_mode": {
+      "type": "choice",
+      "description": "Принудительный режим генерации. Если выбран auto, режим берётся из настроек шаблона.",
+      "required": false,
+      "choices": [
+        "auto",
+        "sheet",
+        "photo",
+        "vignette",
+        "personal_vignette",
+        "multipage_vignette",
+        "multipage_personal_vignette"
+      ]
+    },
+    "placeholder_image": {
+      "type": "file_path",
+      "description": "Путь к изображению-заглушке, которое используется, если фото не найдено.",
+      "required": false,
+      "default": "{wf_psd_path}/_БАЗА_/ШАБЛОНЫ/placeholder.png"
+    },
+    "magic_word": {
+      "type": "str",
+      "description": "Слово для приоритетного выбора фото, если найдено несколько вариантов.",
+      "required": false,
+      "default": "База"
+    },
+    "validate": {
+      "type": "bool",
+      "description": "Запустить проверку без генерации файла, включая сгруппированные исправимые проблемы IDMS и диагностику ссылок после нормализации.",
+      "required": false,
+      "default": false
+    },
+    "log_sections": {
+      "type": "list",
+      "description": "Разделы лога: general, validation, resources, plan, text, images, positioning, thumbnails. Значения default/all/none задают типовые наборы.",
+      "required": false,
+      "default": [
+        "general",
+        "validation",
+        "resources",
+        "plan",
+        "text",
+        "images",
+        "positioning",
+        "thumbnails"
+      ]
+    }
+  }
+}

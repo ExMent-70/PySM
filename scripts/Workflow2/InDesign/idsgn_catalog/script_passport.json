@@ -1,0 +1,38 @@
+{
+  "description": "GUI скрипт для создания, редактирования каталога шаблонов InDesign и их настройки. Поддерживает передачу одного активного мастера для обычных режимов и полного набора мастер-страниц для multipage_vignette и multipage_personal_vignette.\n\nСкрипт позволяет выбрать и выполнить конфигурирование шаблона InDesign для его использования в скрипте автоматической верстки. Конфигурация выбранного шаблона сохраняется в переменной контекста, заданной параметром <b>idsgn_template_var</b>.",
+  "category": "InDesign",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "v2.2026.09.06",
+  "command_line_args_meta": {
+    "idsgn_catalog": {
+      "type": "file_path",
+      "description": "Путь к файлу каталога (catalog.json). Если файл не существует, он будет создан. Ресурсы (превью и шаблоны) должны находиться во вложенных папках относительно этого файла.",
+      "required": false,
+      "default": "{wf_idsgn_catalog}"
+    },
+    "idsgn_snippets_catalog": {
+      "type": "file_path",
+      "description": "Путь к каталогу IDMS-сниппетов. Если не указан, используется snippets_catalog.json рядом с catalog.json.",
+      "required": false,
+      "default": ""
+    },
+    "idsgn_template_var": {
+      "type": "string",
+      "description": "Имя переменной контекста PySM, в которую будет сохранён объект шаблона InDesign (путь к файлу шаблона, карта плейсхолдеров, режим работы и т.д.). Поддерживает dot-notation, например wf_template_name.sheet1.",
+      "required": false,
+      "default": "wf_indsgn_template.default"
+    },
+    "idsgn_msg": {
+      "type": "string",
+      "description": "Сообщение, которое будет отображаться в заголовке окна, предоставляя дополнительный контекст для пользователя.",
+      "required": false,
+      "default": "Каталогизатор шаблонов InDesign"
+    },
+    "idsgn_win_state_var": {
+      "type": "string",
+      "description": "Имя переменной контекста для сохранения состояния окна, сплиттеров и режима сортировки шаблонов. Поддерживает dot-notation, например win_state.idsgn_catalog.",
+      "required": false,
+      "default": "win_state.idsgn_catalog"
+    }
+  }
+}

@@ -176,6 +176,14 @@ def _normalized_absolute_path(path: str) -> str:
     return os.path.normpath(os.path.abspath(path))
 
 
+def _resolve_stored_context_path(path: str) -> str:
+    """Разрешает шаблоны и относительный путь из сохранённого значения контекста."""
+
+    resolved_template = pysm_context.resolve_template(path)
+    resolved_path = pysm_context.resolve_path(resolved_template)
+    return _normalized_absolute_path(str(resolved_path))
+
+
 def _is_selection_allowed(candidate: str, root: str, limit_mode: str) -> bool:
     """Проверяет выбранный путь по режиму, с учётом ссылок и junction."""
 
@@ -211,11 +219,14 @@ def _determine_initial_directory(config: argparse.Namespace) -> tuple[str, bool]
     if config.dlg_open_result_mode == "full_path":
         existing_path = read_context_value(pysm_context, config.dlg_open_var)
         existing_path_str = existing_path.value if existing_path.exists else None
-        if isinstance(existing_path_str, str) and os.path.exists(existing_path_str):
-            if os.path.isfile(existing_path_str):
-                return _normalized_absolute_path(os.path.dirname(existing_path_str)), False
-            if os.path.isdir(existing_path_str):
-                return _normalized_absolute_path(existing_path_str), False
+        if isinstance(existing_path_str, str) and existing_path_str.strip():
+            resolved_existing_path = _resolve_stored_context_path(existing_path_str)
+            if os.path.isfile(resolved_existing_path):
+                return _normalized_absolute_path(
+                    os.path.dirname(resolved_existing_path)
+                ), False
+            if os.path.isdir(resolved_existing_path):
+                return resolved_existing_path, False
 
     collection_dir_value = read_context_value(pysm_context, "pysm_info.collection_dir")
     collection_dir = collection_dir_value.value if collection_dir_value.exists else None
