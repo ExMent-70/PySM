@@ -1,4 +1,6 @@
-"""Show HTML in the PySM console, a modal dialog, both, or nowhere."""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Show an HTML choice dialog and route PySM execution by the result."""
 
 from __future__ import annotations
 
@@ -8,6 +10,7 @@ import logging
 import sys
 from argparse import Namespace
 from pathlib import Path
+from typing import Any
 
 
 GUI_SCRIPTS_DIR = Path(__file__).resolve().parent.parent
@@ -32,8 +35,10 @@ except ImportError as import_error:
     theme_api = None
     ConfigResolver = None
     InputProcessor = None
-    def format_success(var_name: str, value) -> str:
+
+    def format_success(var_name: str, value: Any) -> str:
         return f"✅ <b>{var_name}</b> = <i>{value}</i>"
+
     def format_error(message: str) -> str:
         return f"❌ ОШИБКА: {message}"
 
@@ -55,20 +60,18 @@ except ImportError:
     sys.exit(1)
 
 
-OUTPUT_CONSOLE = "console"
 OUTPUT_DIALOG = "dialog"
 OUTPUT_CONSOLE_DIALOG = "console_dialog"
-OUTPUT_NONE = "none"
-DIALOG_OUTPUT_MODES = {OUTPUT_DIALOG, OUTPUT_CONSOLE_DIALOG}
-CONSOLE_OUTPUT_MODES = {OUTPUT_CONSOLE, OUTPUT_CONSOLE_DIALOG}
+CONSOLE_OUTPUT_MODES = {OUTPUT_CONSOLE_DIALOG}
+DIALOG_TYPES = ("yes_no", "yes_no_cancel")
 
 
 def get_config() -> Namespace:
     """Resolve command-line and PySM collection-context parameters."""
     parser = argparse.ArgumentParser(
         description=(
-            "Выводит HTML-текст или HTML-файл в консоль PySM, "
-            "диалоговое окно, одновременно в оба места либо не выводит."
+            "Показывает HTML-диалог и выбирает следующий скрипт "
+            "по ответу Yes или No."
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
@@ -86,14 +89,9 @@ def get_config() -> Namespace:
     parser.add_argument(
         "--html_output",
         type=str,
-        choices=[
-            OUTPUT_CONSOLE,
-            OUTPUT_DIALOG,
-            OUTPUT_CONSOLE_DIALOG,
-            OUTPUT_NONE,
-        ],
+        choices=[OUTPUT_DIALOG, OUTPUT_CONSOLE_DIALOG],
         default=OUTPUT_CONSOLE_DIALOG,
-        help="Куда выводить HTML-контент; none завершает скрипт без вывода.",
+        help="Показывать HTML только в диалоге или также в консоли PySM.",
     )
     parser.add_argument(
         "--html_align",
@@ -124,23 +122,20 @@ def get_config() -> Namespace:
         "--dlg_msg_var",
         type=str,
         default="dlg_go_var",
-        help=(
-            "Переменная Контекста Коллекции для результата диалога. "
-            "Поддерживается точечная нотация."
-        ),
+        help="Переменная Контекста Коллекции для результата диалога.",
     )
     parser.add_argument(
         "--dlg_msg_type",
         type=str,
-        choices=["ok", "yes_no", "yes_no_cancel"],
+        choices=DIALOG_TYPES,
         default="yes_no",
-        help="Набор кнопок диалогового окна.",
+        help="Набор кнопок: yes_no или yes_no_cancel.",
     )
     parser.add_argument(
         "--dlg_msg_text_ok",
         type=str,
         default="Продолжить",
-        help="Пользовательская подпись утвердительной кнопки OK или Yes.",
+        help="Пользовательская подпись кнопки Yes.",
     )
     parser.add_argument(
         "--dlg_msg_text_no",
@@ -172,6 +167,18 @@ def get_config() -> Namespace:
         default=500,
         help="Начальная высота диалогового окна в пикселях.",
     )
+    parser.add_argument(
+        "--instance-id-yes",
+        type=str,
+        required=True,
+        help="ID экземпляра скрипта для перехода после выбора Yes.",
+    )
+    parser.add_argument(
+        "--instance-id-no",
+        type=str,
+        required=True,
+        help="ID экземпляра скрипта для перехода после выбора No.",
+    )
 
     if IS_MANAGED_RUN:
         resolver = ConfigResolver(parser, force_path_args=["html_file"])
@@ -180,19 +187,35 @@ def get_config() -> Namespace:
     return parser.parse_args()
 
 
-def validate_config(config: Namespace) -> None:
-    """Reject values that cannot be expressed safely by the UI."""
+def ensure_required_text(value: Any, field_name: str) -> str:
+    """Return a stripped required value or raise a configuration error."""
+    normalized = "" if value is None else str(value).strip()
+    if not normalized:
+        raise ValueError(f"Параметр '{field_name}' не задан.")
+    return normalized
+
+
+def validate_config(config: Namespace) -> tuple[str, str]:
+    """Validate dialog values and return normalized branch targets."""
     validate_html_layout(
         align=config.html_align,
         margin=config.html_margin,
         padding=config.html_padding,
     )
-    if config.html_output in DIALOG_OUTPUT_MODES and not config.dlg_msg_var:
-        raise ValueError("Для вывода в диалог нужно указать dlg_msg_var.")
+    ensure_required_text(config.dlg_msg_var, "dlg_msg_var")
+    instance_id_yes = ensure_required_text(
+        config.instance_id_yes,
+        "instance-id-yes",
+    )
+    instance_id_no = ensure_required_text(
+        config.instance_id_no,
+        "instance-id-no",
+    )
+    return instance_id_yes, instance_id_no
 
 
 def save_dialog_choice(config: Namespace, result: str) -> None:
-    """Persist a dialog result in the Collection Context."""
+    """Persist the dialog result in the Collection Context."""
     processor = InputProcessor(config, pysm_context, IS_MANAGED_RUN)
     processor.process(
         raw_value=result,
@@ -205,34 +228,39 @@ def log_dialog_choice(config: Namespace, result: str) -> None:
     """Report the saved choice without interpreting user-controlled HTML."""
     safe_result = html.escape(result.upper())
     safe_var_name = html.escape(config.dlg_msg_var)
-    message = "<b>Выбор пользователя сохранён:</b>"
-
-    logger.info(message)
+    logger.info("<b>Выбор пользователя сохранён:</b>")
     logger.info(format_success(safe_var_name, safe_result))
 
 
-def determine_exit_code(dialog_type: str, result: str) -> int:
-    """Map a user choice to the PySM chain-control exit code."""
-    if result in {"ok", "yes"}:
-        return 0
-    if result == "no" and dialog_type == "yes_no_cancel":
-        return 0
-    return 1
+def branch_target(
+    result: str,
+    instance_id_yes: str,
+    instance_id_no: str,
+) -> tuple[str, str] | None:
+    """Return the selected branch name and target for Yes or No."""
+    if result == "yes":
+        return "YES", instance_id_yes
+    if result == "no":
+        return "NO", instance_id_no
+    return None
+
+
+def log_selected_branch(branch_name: str, target_id: str) -> None:
+    """Report the branch selected by the dialog result."""
+    logger.info("<b>Выбрана ветка:</b> %s", html.escape(branch_name))
+    logger.info("Следующий instance_id: <i>%s</i>", html.escape(target_id))
 
 
 def main() -> int:
-    """Run the configured output flow and return its process exit code."""
+    """Show the dialog, save its result, and configure the next script."""
     config = get_config()
-
-    if config.html_output == OUTPUT_NONE:
-        return 0
 
     if not IS_MANAGED_RUN or pysm_context is None:
         logger.error(format_error("Скрипт предназначен для запуска в среде PySM."))
         return 1
 
     try:
-        validate_config(config)
+        instance_id_yes, instance_id_no = validate_config(config)
         blocks, base_dir = load_html_sources(
             config.html_content,
             config.html_file,
@@ -257,9 +285,6 @@ def main() -> int:
                 padding=config.html_padding,
             )
 
-        if config.html_output == OUTPUT_CONSOLE:
-            return 0
-
         result = show_html_message_dialog(
             theme_api=theme_api,
             title=config.dlg_msg_title,
@@ -279,7 +304,21 @@ def main() -> int:
         if config.html_output in CONSOLE_OUTPUT_MODES:
             log_dialog_choice(config, result)
 
-        return determine_exit_code(config.dlg_msg_type, result)
+        selected_branch = branch_target(
+            result,
+            instance_id_yes,
+            instance_id_no,
+        )
+        if selected_branch is None:
+            return 1
+
+        branch_name, target_id = selected_branch
+        pysm_context.set_next_script(target_id)
+
+        if config.html_output in CONSOLE_OUTPUT_MODES:
+            log_selected_branch(branch_name, target_id)
+
+        return 0
     except Exception as error:
         logger.error(format_error(str(error)))
         return 1

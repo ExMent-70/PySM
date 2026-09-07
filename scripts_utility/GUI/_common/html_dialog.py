@@ -3,11 +3,22 @@
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from PySide6.QtCore import QUrl
-from PySide6.QtWidgets import QFrame, QSizePolicy, QTextBrowser, QWidget
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtWidgets import (
+    QAbstractButton,
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QFrame,
+    QSizePolicy,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 HTML_ALIGNMENTS = ("left", "center", "right")
@@ -28,6 +39,41 @@ def normalize_html_line_breaks(value: str) -> str:
     """Apply the same line-break conversion as ``pysm_context.log_html``."""
     normalized = value.replace("\r\n", "\n").replace("\r", "\n")
     return normalized.replace("\n", "<br>")
+
+
+def load_html_sources(
+    html_content: Optional[str],
+    html_file: Optional[str],
+) -> tuple[list[str], Optional[Path]]:
+    """Load non-empty inline and UTF-8 file sources in display order."""
+    blocks: list[str] = []
+    base_dir: Optional[Path] = None
+
+    if html_content and html_content.strip():
+        blocks.append(html_content)
+
+    if html_file:
+        file_path = Path(html_file)
+        if not file_path.is_file():
+            raise ValueError(f"HTML-файл не найден: {file_path}")
+
+        try:
+            file_content = file_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as error:
+            raise ValueError(
+                f"Не удалось прочитать HTML-файл '{file_path}': {error}"
+            ) from error
+
+        if file_content.strip():
+            blocks.append(file_content)
+            base_dir = file_path.resolve().parent
+
+    if not blocks:
+        raise ValueError(
+            "Необходимо указать непустой html_content или непустой html_file."
+        )
+
+    return blocks, base_dir
 
 
 def _theme_style_string(theme_api: Any, style_name: Optional[str]) -> str:
@@ -143,3 +189,126 @@ def create_html_browser(
 
     browser.setHtml(html_document)
     return browser
+
+
+class HtmlMessageDialog(QDialog):
+    """Resizable HTML dialog with stable standard-button result names."""
+
+    BUTTONS = {
+        "ok": QDialogButtonBox.StandardButton.Ok,
+        "yes_no": (
+            QDialogButtonBox.StandardButton.Yes
+            | QDialogButtonBox.StandardButton.No
+        ),
+        "yes_no_cancel": (
+            QDialogButtonBox.StandardButton.Yes
+            | QDialogButtonBox.StandardButton.No
+            | QDialogButtonBox.StandardButton.Cancel
+        ),
+    }
+    RESULT_NAMES = {
+        QDialogButtonBox.StandardButton.Ok: "ok",
+        QDialogButtonBox.StandardButton.Yes: "yes",
+        QDialogButtonBox.StandardButton.No: "no",
+        QDialogButtonBox.StandardButton.Cancel: "cancel",
+    }
+
+    def __init__(
+        self,
+        *,
+        title: str,
+        html_document: str,
+        dialog_type: str,
+        width: int,
+        height: int,
+        base_dir: Optional[Path] = None,
+        button_texts: Optional[dict[str, str]] = None,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self.choice = "unknown"
+        self.setWindowTitle(title)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        self.resize(width, height)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(
+            create_html_browser(
+                parent=self,
+                html_document=html_document,
+                base_dir=base_dir,
+            )
+        )
+
+        self.button_box = QDialogButtonBox(self.BUTTONS[dialog_type], self)
+        self.button_box.clicked.connect(self._handle_button)
+        self._apply_custom_button_texts(button_texts or {})
+        layout.addWidget(self.button_box)
+
+        default_button = (
+            QDialogButtonBox.StandardButton.Ok
+            if dialog_type == "ok"
+            else QDialogButtonBox.StandardButton.Yes
+        )
+        button = self.button_box.button(default_button)
+        if button is not None:
+            button.setDefault(True)
+            button.setFocus()
+
+    def _apply_custom_button_texts(self, button_texts: dict[str, str]) -> None:
+        """Replace labels without changing standard-button semantics."""
+        affirmative_text = button_texts.get("ok")
+        if affirmative_text:
+            for standard_button in (
+                QDialogButtonBox.StandardButton.Ok,
+                QDialogButtonBox.StandardButton.Yes,
+            ):
+                button = self.button_box.button(standard_button)
+                if button is not None:
+                    button.setText(affirmative_text)
+
+        standard_buttons = {
+            "no": QDialogButtonBox.StandardButton.No,
+            "cancel": QDialogButtonBox.StandardButton.Cancel,
+        }
+        for result_name, standard_button in standard_buttons.items():
+            custom_text = button_texts.get(result_name)
+            button = self.button_box.button(standard_button)
+            if custom_text and button is not None:
+                button.setText(custom_text)
+
+    def _handle_button(self, button: QAbstractButton) -> None:
+        standard_button = self.button_box.standardButton(button)
+        self.choice = self.RESULT_NAMES.get(standard_button, "unknown")
+        if self.choice in {"ok", "yes"}:
+            self.accept()
+        else:
+            self.reject()
+
+
+def show_html_message_dialog(
+    *,
+    theme_api: Any,
+    title: str,
+    html_document: str,
+    dialog_type: str,
+    width: int,
+    height: int,
+    base_dir: Optional[Path] = None,
+    button_texts: Optional[dict[str, str]] = None,
+) -> str:
+    """Show a themed modal HTML dialog and return its stable result name."""
+    app = QApplication.instance() or QApplication(sys.argv)
+    theme_api.apply_theme_to_app(app)
+
+    dialog = HtmlMessageDialog(
+        title=title,
+        html_document=html_document,
+        dialog_type=dialog_type,
+        width=width,
+        height=height,
+        base_dir=base_dir,
+        button_texts=button_texts,
+    )
+    dialog.exec()
+    return dialog.choice
