@@ -137,7 +137,7 @@ class SessionIoTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "не содержит обязательный student_id"):
                 io_services.load_session(path)
 
-    def test_context_order_contains_only_ids_in_shoot_order(self) -> None:
+    def test_partially_filled_shoot_order_contains_only_ordered_ids(self) -> None:
         without_order = Student(
             student_id="A7K3-S003", surname="Сидоров", name="Сидор"
         )
@@ -147,6 +147,23 @@ class SessionIoTests(unittest.TestCase):
         )
 
         self.assertEqual(["A7K3-S002", "A7K3-S001"], student_ids)
+
+    def test_empty_shoot_order_column_falls_back_to_current_list_order(self) -> None:
+        students = [
+            Student(student_id="A7K3-S003", surname="Сидоров", name="Сидор"),
+            Student(student_id="A7K3-S001", surname="Иванов", name="Иван"),
+            Student(student_id="A7K3-S002", surname="Петров", name="Пётр"),
+        ]
+
+        student_ids = io_services.build_student_ids_order(
+            students,
+            StudentIdAllocator("A7K3", 4),
+        )
+
+        self.assertEqual(
+            ["A7K3-S003", "A7K3-S001", "A7K3-S002"],
+            student_ids,
+        )
 
     def test_context_key_uses_photo_session(self) -> None:
         self.assertEqual(
@@ -179,6 +196,34 @@ class SessionIoTests(unittest.TestCase):
         self.assertEqual(["A7K3-S002", "A7K3-S001"], student_ids)
         self.assertEqual({key: student_ids}, context.values)
         self.assertEqual([True], context.commits)
+
+    def test_context_writer_saves_list_order_when_shoot_order_is_empty(self) -> None:
+        class FakeContext:
+            def __init__(self) -> None:
+                self.values = {}
+
+            def set_structured(self, key, value, commit=False):
+                self.values[key] = value
+
+            def get_structured(self, key, default=None):
+                return self.values.get(key, default)
+
+        students = [
+            Student(student_id="A7K3-S002", surname="Петров", name="Пётр"),
+            Student(student_id="A7K3-S001", surname="Иванов", name="Иван"),
+        ]
+        context = FakeContext()
+
+        key, student_ids = io_services.save_student_ids_order_to_context(
+            context,
+            "Main",
+            students,
+            StudentIdAllocator("A7K3", 3),
+        )
+
+        self.assertEqual("wf_student_ids_order.Main_ids_order", key)
+        self.assertEqual(["A7K3-S002", "A7K3-S001"], student_ids)
+        self.assertEqual(student_ids, context.values[key])
 
     def test_csv_contains_student_id_column(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

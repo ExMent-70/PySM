@@ -489,12 +489,18 @@ def build_student_ids_order(
     students: List[Student],
     allocator: StudentIdAllocator,
 ) -> List[str]:
-    """Возвращает проверенные student_id в порядке съёмки."""
+    """Возвращает проверенные student_id в порядке съёмки или строк списка."""
 
     allocator.validate_students(students)
+    students_with_shoot_order = [
+        student for student in students if student.shoot_order is not None
+    ]
+    if not students_with_shoot_order:
+        return [student.student_id for student in students]
+
     sorted_students = sorted(
-        [s for s in students if s.shoot_order is not None], 
-        key=lambda s: s.shoot_order
+        students_with_shoot_order,
+        key=lambda student: student.shoot_order,
     )
     return [student.student_id for student in sorted_students]
 
