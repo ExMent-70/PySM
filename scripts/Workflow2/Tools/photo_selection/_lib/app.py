@@ -194,8 +194,8 @@ class PhotoSelectionWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, Expo
         for title, handler in (
             ("Обновить список", self.refresh_async),
             ("Копировать выбранные файлы", self.copy_files),
-            ("Создать список", self.build_assignments_file),
-            ("Копировать и создать список", self.copy_and_build),
+            ("Создать план вёрстки", self.build_assignments_file),
+            ("Копировать файлы и создать план вёрстки", self.copy_and_build),
         ):
             button = QPushButton(title)
             button.clicked.connect(handler)

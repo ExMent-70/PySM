@@ -42,6 +42,11 @@ table_background_base = "color: #202020;"
 # Исправлено: текст сделан белым для читаемости
 table_status_found = "color: #ffffff; background-color: #27ae60;"
 table_status_not_found = "color: #ffffff; background-color: #c0392b;"
+project_crm_paid_cell = "background-color: #243729;"
+project_crm_debt_cell = "background-color: #432326;"
+project_crm_shooting_planned_cell = "background-color: #243a46;"
+project_crm_shooting_confirmed_cell = "background-color: #463d20;"
+project_crm_calendar_past_date = "background-color: #303030;"
 
 tooltip_arg_value = "color: #00C7BD;"
 tooltip_instance_args_block = "background-color: rgba(0, 162, 154, 0.1); border-left: 3px solid #00A29A; padding: 5px; color: #E0E0E0;"

@@ -46,6 +46,11 @@ table_background_alternate = "color: #f7f7f7;"
 table_status_found = "color: #ffffff; background-color: #218838;"
 # Исправлено: текст сделан белым (был красным на красном фоне)
 table_status_not_found = "color: #ffffff; background-color: #c0392b;"
+project_crm_paid_cell = "background-color: #d4edda;"
+project_crm_debt_cell = "background-color: #f8d7da;"
+project_crm_shooting_planned_cell = "background-color: #d9edf7;"
+project_crm_shooting_confirmed_cell = "background-color: #fff3cd;"
+project_crm_calendar_past_date = "background-color: #e7e7e7;"
 
 tooltip_arg_value = "color: #0078d7;"
 tooltip_instance_args_block = "background-color: #f8f9fa; border-left: 3px solid #0078d7; padding: 5px;"
