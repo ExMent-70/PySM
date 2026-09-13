@@ -146,12 +146,14 @@ class DataManagerTests(unittest.TestCase):
 
             self.assertEqual(manager.student_name("A7K3-S001"), "Иванов Иван")
 
-    def test_location_mode_requires_roster(self):
+    def test_non_cleaning_modes_require_roster(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
-            with self.assertRaisesRegex(ValueError, "Для всех режимов"):
-                ClusterDataManager(root, mode="location")
+            for mode in ("face", "location", "matches"):
+                with self.subTest(mode=mode):
+                    with self.assertRaisesRegex(ValueError, f"Для режима {mode}"):
+                        ClusterDataManager(root, mode=mode)
 
     def test_location_mode_rejects_missing_explicit_roster(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -163,6 +165,26 @@ class DataManagerTests(unittest.TestCase):
                     mode="location",
                     student_list_file=root / "missing.list",
                 )
+
+    def test_cleaning_mode_does_not_require_roster(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            manager = ClusterDataManager(root, mode="cleaning")
+
+            self.assertIsNone(manager.student_roster)
+
+    def test_cleaning_mode_ignores_missing_explicit_roster(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            manager = ClusterDataManager(
+                root,
+                mode="cleaning",
+                student_list_file=root / "missing.list",
+            )
+
+            self.assertIsNone(manager.student_roster)
 
     def test_unassigned_portrait_cluster_blocks_final_save(self):
         with tempfile.TemporaryDirectory() as tmp:

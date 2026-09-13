@@ -10,16 +10,28 @@
       "required": true,
       "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
     },
+    "ce_working_img_dir": {
+      "type": "dir_path",
+      "description": "Папка с рабочими изображениями. Если не указана, используется ce_working_dir/JPG",
+      "required": false,
+      "default": ""
+    },
     "ce_reference_dir": {
       "type": "dir_path",
       "description": "Папка с эталонами (для matches)",
       "required": false,
       "default": ""
     },
+    "ce_reference_img_dir": {
+      "type": "dir_path",
+      "description": "Папка с эталонными изображениями. Если не указана, используется ce_reference_dir/JPG",
+      "required": false,
+      "default": ""
+    },
     "ce_student_list_file": {
       "type": "file_path",
-      "description": "Файл *.list — обязательный источник фамилии и имени ученика во всех режимах",
-      "required": true,
+      "description": "Файл *.list — источник фамилии и имени ученика. Обязателен для face, location и matches; в cleaning не используется",
+      "required": false,
       "default": "{wf_psd_path}/{wf_session_name}/{wf_session_name}.list"
     },
     "ce_export_dir": {

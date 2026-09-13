@@ -50,14 +50,16 @@ class StudentRoster:
         return student.display_name
 
 
-def normalize_student_id(value: Any, expected_list_id: str) -> str:
+def normalize_student_id(value: Any, expected_list_id: str | None = None) -> str:
+    """Нормализует ID и при наличии списка проверяет его принадлежность."""
+
     student_id = str(value or "").strip().upper()
     match = STUDENT_ID_PATTERN.fullmatch(student_id)
     if not match:
         raise ValueError(
             f"student_id {student_id or '<пусто>'} должен иметь формат A7K3-S001."
         )
-    if match.group("list_id") != expected_list_id:
+    if expected_list_id is not None and match.group("list_id") != expected_list_id:
         raise ValueError(
             f"student_id {student_id} относится к списку {match.group('list_id')}, "
             f"ожидался {expected_list_id}."

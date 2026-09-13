@@ -1,0 +1,43 @@
+{
+  "description": "Внедряет внешние XMP-метаданные в JPG/JPEG без повторного сжатия изображения. Сохраняет встроенные поля, отсутствующие во внешнем XMP, выполняет общую предварительную проверку и атомарно заменяет только проверенные файлы.",
+  "category": "Метаданные",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2.2026.09.13",
+  "command_line_args_meta": {
+    "image_dir": {
+      "type": "dir_path",
+      "description": "Папка с JPG/JPEG и соответствующими XMP-файлами.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG"
+    },
+    "recursive": {
+      "type": "bool",
+      "description": "Искать JPG/JPEG во вложенных папках.",
+      "required": false,
+      "default": false
+    },
+    "xmp_source": {
+      "type": "choice",
+      "description": "Где искать одноимённый XMP-файл.",
+      "required": false,
+      "default": "auto",
+      "choices": [
+        "auto",
+        "alongside",
+        "subfolder"
+      ]
+    },
+    "backup_originals": {
+      "type": "bool",
+      "description": "Перед первой записью сохранять исходный JPEG с тем же именем в подпапке backup.",
+      "required": false,
+      "default": true
+    },
+    "dry_run": {
+      "type": "bool",
+      "description": "Проверить все пары и показать итог без изменения JPG.",
+      "required": false,
+      "default": false
+    }
+  }
+}

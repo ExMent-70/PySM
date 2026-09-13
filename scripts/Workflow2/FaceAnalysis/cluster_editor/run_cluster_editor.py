@@ -108,13 +108,21 @@ def _export_folder_name(display_name: str, stable_id: object, fallback: str) -> 
     return _safe_folder_name(f"{display_name} [{stable_id}]", fallback)
 
 
+def _resolve_images_dir(data_dir: Path, override_dir: Optional[Path]) -> Path:
+    """Return the image folder for an analysis directory or explicit override."""
+
+    return override_dir if override_dir else data_dir / "JPG"
+
+
 class MainWindow(QMainWindow):
     _GALLERY_PROGRESS_MAX = 1000
     _GALLERY_BUILD_PROGRESS_MAX = 200
     
     def __init__(self, working_dir: Path, reference_dir: Optional[Path], mode: str,
                  num_workers: int, export_dir: str, win_state_var_name: str,
-                 student_list_file: Optional[Path] = None):
+                 student_list_file: Optional[Path] = None,
+                 working_img_dir: Optional[Path] = None,
+                 reference_img_dir: Optional[Path] = None):
         super().__init__()
         self.mode = mode
         self.num_workers = num_workers
@@ -124,9 +132,17 @@ class MainWindow(QMainWindow):
         self.win_state_var_name = win_state_var_name
 
         self.reference_dir = reference_dir if reference_dir else working_dir
+        self.working_img_dir_override = working_img_dir
+        self.reference_img_dir_override = reference_img_dir
         
-        self.working_images_dir = self.working_dir / "JPG"
-        self.reference_images_dir = self.reference_dir / "JPG"
+        self.working_images_dir = _resolve_images_dir(
+            self.working_dir,
+            self.working_img_dir_override,
+        )
+        self.reference_images_dir = _resolve_images_dir(
+            self.reference_dir,
+            self.reference_img_dir_override,
+        )
         
         self.session_name = working_dir.parent.parent.name 
         self.photo_session = working_dir.name.replace("Analysis_", "")
@@ -265,7 +281,10 @@ class MainWindow(QMainWindow):
         self._cancel_cluster_cover_requests()
         self.data_manager = candidate
         self.working_dir = new_working_dir
-        self.working_images_dir = self.working_dir / "JPG"
+        self.working_images_dir = _resolve_images_dir(
+            self.working_dir,
+            self.working_img_dir_override,
+        )
         self.session_name = self.working_dir.parent.parent.name
         self.photo_session = self.working_dir.name.replace("Analysis_", "")
         if not self._export_base_is_explicit:
@@ -290,8 +309,15 @@ class MainWindow(QMainWindow):
         p1 = self.working_images_dir / filename
         if p1.exists(): return p1
         
-        # 2. Если режим matches и reference_dir отличается, проверяем там
-        if self.mode == 'matches' and self.reference_dir != self.working_dir:
+        # 2. В matches проверяем reference-папку, если она отличается
+        # от рабочей или была явно задана папка reference-изображений.
+        if (
+            self.mode == 'matches'
+            and (
+                self.reference_dir != self.working_dir
+                or self.reference_img_dir_override is not None
+            )
+        ):
             p2 = self.reference_images_dir / filename
             if p2.exists(): return p2
         return p1
@@ -1782,10 +1808,12 @@ def get_config() -> argparse.Namespace:
     p = "ce_"
     parser.add_argument(f"--{p}working_dir", type=str, required=True, help="Папка с данными")
     parser.add_argument(f"--{p}reference_dir", type=str, default=None, help="Папка с эталонами (для matches)")
+    parser.add_argument(f"--{p}working_img_dir", type=str, default=None, help="Папка с рабочими изображениями")
+    parser.add_argument(f"--{p}reference_img_dir", type=str, default=None, help="Папка с эталонными изображениями")
     parser.add_argument(
         f"--{p}student_list_file",
         type=str,
-        required=True,
+        default=None,
         help="Файл *.list — источник ФИО",
     )
     parser.add_argument(f"--{p}export_dir", type=str, default=None, help="Папка для экспорта фотографий с водяными знаками")
@@ -1814,6 +1842,10 @@ if __name__ == "__main__":
         w_dir = Path(getattr(cli_config, f"{arg_prefix}working_dir"))
         r_dir_str = getattr(cli_config, f"{arg_prefix}reference_dir")
         r_dir = Path(r_dir_str) if r_dir_str else None
+        w_img_dir_str = getattr(cli_config, f"{arg_prefix}working_img_dir", None)
+        w_img_dir = Path(w_img_dir_str) if w_img_dir_str else None
+        r_img_dir_str = getattr(cli_config, f"{arg_prefix}reference_img_dir", None)
+        r_img_dir = Path(r_img_dir_str) if r_img_dir_str else None
         e_dir_str = getattr(cli_config, f"{arg_prefix}export_dir")  
         win_var = getattr(cli_config, f"{arg_prefix}win_state_var_name", "")        
         list_file_str = getattr(cli_config, f"{arg_prefix}student_list_file", None)
@@ -1825,7 +1857,15 @@ if __name__ == "__main__":
         num_workers = max(1, cli_config.all_threads or (os.cpu_count() or 8))
 
         window = MainWindow(
-            w_dir, r_dir, cli_config.mode, num_workers, e_dir_str, win_var, list_file
+            w_dir,
+            r_dir,
+            cli_config.mode,
+            num_workers,
+            e_dir_str,
+            win_var,
+            list_file,
+            w_img_dir,
+            r_img_dir,
         )
         window.show()
      

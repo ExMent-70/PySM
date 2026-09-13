@@ -3,13 +3,13 @@
 import logging
 import os
 import pathlib
-import shutil
 import xml.etree.ElementTree as ET
 from tempfile import NamedTemporaryFile
 from typing import List, Optional, Dict, Union
 
 # Настройка логгера для модуля
 logger = logging.getLogger(__name__)
+XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace"
 
 # Глобальные пространства имен XMP
 NAMESPACES = {
@@ -20,7 +20,13 @@ NAMESPACES = {
     "xmpRights": "http://ns.adobe.com/xap/1.0/rights/",
     "lightroom": "http://ns.adobe.com/lightroom/1.0/",
     "Iptc4xmpCore": "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/",
-    "GettyImagesGIFT": "http://ns.gettyimages.com/gift/1.0/",
+    "GettyImagesGIFT": "http://xmp.gettyimages.com/gift/1.0/",
+}
+
+# Старые XMP PySM использовали URI, который ExifTool считал неизвестным tmp0.
+# При следующем обновлении такого файла переносим свойство в корректный namespace.
+LEGACY_NAMESPACE_URIS = {
+    "GettyImagesGIFT": ("http://ns.gettyimages.com/gift/1.0/",),
 }
 
 # Регистрация пространств имен в ET, чтобы при сохранении теги выглядели красиво (dc:subject, а не ns0:subject)
@@ -52,7 +58,11 @@ class XmpEditor:
     Обеспечивает загрузку, создание, модификацию полей и безопасное сохранение.
     """
 
-    def __init__(self, file_path: Union[str, pathlib.Path], template_content: Optional[str] = None):
+    def __init__(
+        self,
+        file_path: Union[str, pathlib.Path],
+        template_content: Optional[str] = None,
+    ):
         """
         Инициализация редактора.
 
@@ -61,7 +71,9 @@ class XmpEditor:
                                  Если None, используется DEFAULT_XMP_TEMPLATE.
         """
         self.file_path = pathlib.Path(file_path)
-        self.template_content = template_content if template_content else DEFAULT_XMP_TEMPLATE
+        self.template_content = (
+            template_content if template_content else DEFAULT_XMP_TEMPLATE
+        )
         self.tree: Optional[ET.ElementTree] = None
         self.root: Optional[ET.Element] = None
         self.description: Optional[ET.Element] = None
@@ -100,19 +112,30 @@ class XmpEditor:
             # Аварийный откат к минимальному шаблону, чтобы не падать
             self.tree = ET.ElementTree(ET.fromstring(DEFAULT_XMP_TEMPLATE))
 
-    def _find_or_create_element(self, parent: ET.Element, tag: str, ns_prefix: str) -> Optional[ET.Element]:
+    def _find_or_create_element(
+        self,
+        parent: ET.Element,
+        tag: str,
+        ns_prefix: str,
+    ) -> Optional[ET.Element]:
         """Находит или создает элемент с учетом namespace."""
         ns_uri = NAMESPACES.get(ns_prefix)
         if not ns_uri:
             logger.error(f"Неизвестный префикс пространства имен: {ns_prefix}")
             return None
 
-        # Ищем тег с полным URI
-        full_tag = f"{{{ns_uri}}}{tag}"
         # Для поиска через find (удобнее использовать префиксы, если они зарегистрированы)
         search_path = f"./{ns_prefix}:{tag}"
         
         element = parent.find(search_path, namespaces=NAMESPACES)
+        for legacy_uri in LEGACY_NAMESPACE_URIS.get(ns_prefix, ()):
+            legacy_elements = parent.findall(f"./{{{legacy_uri}}}{tag}")
+            for legacy_element in legacy_elements:
+                if element is None:
+                    legacy_element.tag = ET.QName(ns_uri, tag)
+                    element = legacy_element
+                else:
+                    parent.remove(legacy_element)
         if element is None:
             element = ET.SubElement(parent, ET.QName(ns_uri, tag))
         return element
@@ -137,7 +160,13 @@ class XmpEditor:
         # Для совместимости с XMP спецификацией, если это simple property
         element.text = str(value)
 
-    def set_localized_text(self, ns_prefix: str, tag: str, value: str, lang="x-default"):
+    def set_localized_text(
+        self,
+        ns_prefix: str,
+        tag: str,
+        value: str,
+        lang: str = "x-default",
+    ) -> None:
         """
         Устанавливает значение для полей типа Lang Alt (например, dc:description, dc:title).
         """
@@ -147,6 +176,7 @@ class XmpEditor:
         container = self._find_or_create_element(self.description, tag, ns_prefix)
         if container is None:
             return
+        container.text = None
 
         alt = self._find_or_create_element(container, "Alt", "rdf")
         if alt is None:
@@ -158,7 +188,7 @@ class XmpEditor:
             alt.remove(li)
         
         li = ET.SubElement(alt, ET.QName(NAMESPACES['rdf'], "li"))
-        li.set(f"{{{NAMESPACES['x']}}}lang", lang) # xml:lang часто требует обработки, но x-default стандарт
+        li.set(f"{{{XML_NAMESPACE}}}lang", lang)
         li.text = str(value)
 
     def update_bag(self, ns_prefix: str, tag: str, items: List[str], sort: bool = True, append: bool = False):
@@ -211,44 +241,45 @@ class XmpEditor:
             li.text = item
 
     def save(self) -> bool:
-            """
-            Атомарно сохраняет XMP файл.
-            Создает родительские директории, если они не существуют.
-            """
-            if self.tree is None:
-                return False
+        """Атомарно сохраняет XMP и очищает временный файл при ошибке."""
 
-            try:
-                # Красивое форматирование (отступы)
-                ET.indent(self.tree, space="  ", level=0)
-                
-                xml_string = ET.tostring(self.tree.getroot(), encoding="utf-8", method="xml")
-                if not xml_string.startswith(b"<?xml"):
-                    xml_string = b'<?xml version="1.0" encoding="UTF-8"?>\n' + xml_string
+        if self.tree is None:
+            return False
 
-                # Проверка и создание папки назначения
-                if not self.file_path.parent.exists():
-                    try:
-                        self.file_path.parent.mkdir(parents=True, exist_ok=True)
-                    except Exception as e:
-                        logger.error(f"Не удалось создать директорию {self.file_path.parent}: {e}")
-                        return False
+        temporary_path: pathlib.Path | None = None
+        try:
+            ET.indent(self.tree, space="  ", level=0)
+            xml_string = ET.tostring(
+                self.tree.getroot(),
+                encoding="utf-8",
+                method="xml",
+            )
+            if not xml_string.startswith(b"<?xml"):
+                xml_string = (
+                    b'<?xml version="1.0" encoding="UTF-8"?>\n' + xml_string
+                )
 
-                # Запись во временный файл
-                with NamedTemporaryFile("wb", delete=False, dir=self.file_path.parent, suffix=".xmp~") as tmp:
-                    tmp.write(xml_string)
-                    tmp_path = pathlib.Path(tmp.name)
+            self.file_path.parent.mkdir(parents=True, exist_ok=True)
+            with NamedTemporaryFile(
+                "wb",
+                delete=False,
+                dir=self.file_path.parent,
+                suffix=".xmp~",
+            ) as temporary_file:
+                temporary_file.write(xml_string)
+                temporary_file.flush()
+                os.fsync(temporary_file.fileno())
+                temporary_path = pathlib.Path(temporary_file.name)
 
-                # Атомарная замена
-                if os.name == 'nt':
-                    # Windows не любит атомарную замену, если файл существует, поэтому удаляем целевой
-                    if self.file_path.exists():
-                        os.remove(self.file_path)
-                    os.replace(tmp_path, self.file_path)
-                else:
-                    shutil.move(str(tmp_path), self.file_path)
-                
-                return True
-            except Exception as e:
-                logger.error(f"Ошибка сохранения XMP {self.file_path}: {e}", exc_info=True)
-                return False
+            os.replace(temporary_path, self.file_path)
+            temporary_path = None
+            return True
+        except Exception as error:
+            logger.error(
+                f"Ошибка сохранения XMP {self.file_path}: {error}",
+                exc_info=True,
+            )
+            return False
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)

@@ -132,7 +132,7 @@ def main():
             batch_size=cfg.batch_size,
             cache_mode=config.cache.mode,
         )
-        photo_session = pysm_context.get("ws_photo_session", "SCHOOL")        
+        photo_session = pysm_context.get("wf_photo_session", "SCHOOL")
         pysm_context.set_structured(f"var_claster_run.{photo_session}.location", "yes")
 
     except PipelineError as e:

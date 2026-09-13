@@ -47,19 +47,20 @@ class ClusterDataManager:
             raise
 
         self.student_roster: Optional[StudentRoster] = None
-        if student_list_file is None:
+        if student_list_file is None and self.strategy.mode_name != "cleaning":
             raise ValueError(
-                "Для всех режимов обязателен параметр ce_student_list_file."
+                f"Для режима {self.strategy.mode_name} обязателен параметр ce_student_list_file."
             )
-        self.student_roster = load_student_roster(student_list_file)
+        if student_list_file is not None and self.strategy.mode_name != "cleaning":
+            self.student_roster = load_student_roster(student_list_file)
+            logger.info(
+                "Загружен список учеников %s: list_id=%s, записей=%d",
+                self.student_roster.path,
+                self.student_roster.list_id,
+                len(self.student_roster.students),
+            )
 
         self.strategy.set_student_roster(self.student_roster)
-        logger.info(
-            "Загружен список учеников %s: list_id=%s, записей=%d",
-            self.student_roster.path,
-            self.student_roster.list_id,
-            len(self.student_roster.students),
-        )
 
     def load_data(self) -> tuple[bool, str]:
         """Загружает JSON. Векторы больше не загружаются в память при старте!"""

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -14,7 +15,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import run_cluster_editor
-from run_cluster_editor import MainWindow
+from run_cluster_editor import MainWindow, _resolve_images_dir
 from _lib.data_models import Face
 
 
@@ -82,6 +83,110 @@ class FacePanelOrderTests(unittest.TestCase):
         ordered = MainWindow._ordered_face_panel_entries(window, faces)
 
         self.assertEqual([index for index, _face_obj in ordered], [0, 1, 2])
+
+
+class ImagePathResolutionTests(unittest.TestCase):
+    def test_default_image_dir_uses_jpg_subfolder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            analysis_dir = Path(tmp) / "Analysis_SCHOOL"
+
+            self.assertEqual(
+                _resolve_images_dir(analysis_dir, None),
+                analysis_dir / "JPG",
+            )
+
+    def test_explicit_working_image_dir_overrides_jpg_subfolder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            analysis_dir = root / "Analysis_SCHOOL"
+            explicit_dir = root / "SelectedImages"
+            explicit_dir.mkdir(parents=True)
+            expected_file = explicit_dir / "IMG_000001.jpg"
+            expected_file.write_text("stub", encoding="utf-8")
+            window = MainWindow.__new__(MainWindow)
+            window.mode = "face"
+            window.working_dir = analysis_dir
+            window.reference_dir = analysis_dir
+            window.working_images_dir = explicit_dir
+            window.reference_images_dir = analysis_dir / "JPG"
+
+            self.assertEqual(
+                MainWindow._get_image_path(window, "IMG_000001.jpg"),
+                expected_file,
+            )
+
+    def test_matches_reference_image_dir_is_used_as_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            working_dir = root / "Analysis_Group"
+            reference_dir = root / "Analysis_Portrait"
+            working_images_dir = root / "WorkingImages"
+            reference_images_dir = root / "ReferenceImages"
+            working_images_dir.mkdir(parents=True)
+            reference_images_dir.mkdir(parents=True)
+            reference_file = reference_images_dir / "IMG_000002.jpg"
+            reference_file.write_text("stub", encoding="utf-8")
+            window = MainWindow.__new__(MainWindow)
+            window.mode = "matches"
+            window.working_dir = working_dir
+            window.reference_dir = reference_dir
+            window.working_images_dir = working_images_dir
+            window.reference_images_dir = reference_images_dir
+            window.reference_img_dir_override = reference_images_dir
+
+            self.assertEqual(
+                MainWindow._get_image_path(window, "IMG_000002.jpg"),
+                reference_file,
+            )
+
+    def test_explicit_reference_image_dir_is_used_when_reference_dir_matches_working_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            working_dir = root / "Analysis_Group"
+            working_images_dir = root / "WorkingImages"
+            reference_images_dir = root / "ReferenceImages"
+            working_images_dir.mkdir(parents=True)
+            reference_images_dir.mkdir(parents=True)
+            reference_file = reference_images_dir / "IMG_000004.jpg"
+            reference_file.write_text("stub", encoding="utf-8")
+            window = MainWindow.__new__(MainWindow)
+            window.mode = "matches"
+            window.working_dir = working_dir
+            window.reference_dir = working_dir
+            window.working_images_dir = working_images_dir
+            window.reference_images_dir = reference_images_dir
+            window.reference_img_dir_override = reference_images_dir
+
+            self.assertEqual(
+                MainWindow._get_image_path(window, "IMG_000004.jpg"),
+                reference_file,
+            )
+
+    def test_working_image_dir_has_priority_over_reference_image_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            working_dir = root / "Analysis_Group"
+            reference_dir = root / "Analysis_Portrait"
+            working_images_dir = root / "WorkingImages"
+            reference_images_dir = root / "ReferenceImages"
+            working_images_dir.mkdir(parents=True)
+            reference_images_dir.mkdir(parents=True)
+            working_file = working_images_dir / "IMG_000003.jpg"
+            reference_file = reference_images_dir / "IMG_000003.jpg"
+            working_file.write_text("working", encoding="utf-8")
+            reference_file.write_text("reference", encoding="utf-8")
+            window = MainWindow.__new__(MainWindow)
+            window.mode = "matches"
+            window.working_dir = working_dir
+            window.reference_dir = reference_dir
+            window.working_images_dir = working_images_dir
+            window.reference_images_dir = reference_images_dir
+            window.reference_img_dir_override = reference_images_dir
+
+            self.assertEqual(
+                MainWindow._get_image_path(window, "IMG_000003.jpg"),
+                working_file,
+            )
 
 
 if __name__ == "__main__":

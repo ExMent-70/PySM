@@ -1,4 +1,4 @@
-# run_wf_raw_create_xmp.py
+"""Создание и обновление XMP-файлов по данным анализа Workflow2."""
 
 # 1. БЛОК: Импорты и настройка окружения
 # ==============================================================================
@@ -15,15 +15,22 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-# Настройка путей для импорта локальных модулей
+# Настройка путей для импорта проекта и локальных модулей.
 try:
     current_script_path = pathlib.Path(__file__).resolve()
-    project_root = current_script_path.parent.parent
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
+    script_dir = current_script_path.parent
+    face_analysis_dir = script_dir.parent
+    project_root = script_dir.parents[3]
+    for import_path in (project_root, face_analysis_dir, script_dir):
+        if str(import_path) not in sys.path:
+            sys.path.insert(0, str(import_path))
 
     from _common.xmp_editor import XmpEditor
-    from student_roster import StudentRoster, load_student_roster, normalize_student_id
+    from _lib.student_roster import (
+        StudentRoster,
+        load_student_roster,
+        normalize_student_id,
+    )
 except ImportError as e:
     print(f"КРИТИЧЕСКАЯ ОШИБКА ИМПОРТА: {e}", file=sys.stderr)
     sys.exit(1)
@@ -49,10 +56,22 @@ except ImportError:
         tqdm = TqdmMock
 
 # Настройка логгера
+class _MaxLevelFilter(logging.Filter):
+    """Пропускает в обработчик сообщения не выше заданного уровня."""
+
+    def __init__(self, max_level: int):
+        super().__init__()
+        self.max_level = max_level
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.levelno <= self.max_level
+
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 if not logger.handlers:
     stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.addFilter(_MaxLevelFilter(logging.INFO))
     stdout_handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(stdout_handler)
     
@@ -63,6 +82,8 @@ if not logger.handlers:
 
 # Константы Unified Storage
 PYSM_PREFIX = "PySM_"
+SCRIPT_LOG_TITLE = "СОЗДАНИЕ XMP-ФАЙЛОВ"
+IGNORED_SCAN_DIRECTORIES = frozenset({"backup", "xmp"})
 FACES_JSON_FILENAME = "info_faces.json"
 LANDMARKS_JSON_FILENAME = "info_faces_landmarks.json"
 TEMPLATE_FILENAME = "template.xmp"
@@ -82,6 +103,7 @@ class JsonKeys(str, Enum):
     POSE = "pose"
     CHILD_NAME = "child_name"
     MATCHED_CHILD_NAME = "matched_child_name"
+    TEMP_CHILD_NAME = "temp_child_name"
     STUDENT_ID = "student_id"
     CLUSTER_LABEL = "cluster_label"
     MATCHED_PORTRAIT_CLUSTER_LABEL = "matched_portrait_cluster_label"
@@ -126,9 +148,16 @@ class SubjectCode:
 # 3. БЛОК: Конфигурация и загрузка шаблона
 # ==============================================================================
 def get_config() -> Namespace:
+    """Определяет CLI-параметры и возвращает конфигурацию запуска."""
+
     parser = argparse.ArgumentParser(description="Creates or updates XMP metadata files based on JSON data.")
     
-    parser.add_argument("--all_threads", type=int, default=os.cpu_count() or 4, help="Number of processing threads.")
+    parser.add_argument(
+        "--all_threads",
+        type=int,
+        default=12,
+        help="Number of processing threads.",
+    )
     
     parser.add_argument(
         "--analysis_dir", 
@@ -145,8 +174,12 @@ def get_config() -> Namespace:
     parser.add_argument(
         "--student_list_file",
         type=str,
-        required=True,
-        help="Path to the *.list file used as the only source of student names.",
+        required=False,
+        default=None,
+        help=(
+            "Optional path to the *.list file used as the source of student "
+            "names. Names are omitted when the file is unavailable."
+        ),
     )
 
     parser.add_argument(
@@ -159,7 +192,10 @@ def get_config() -> Namespace:
     parser.add_argument(
         "--scan_folder_mode", 
         action="store_true",
-        help="Рекурсивно сканировать image_dir и сопоставлять файлы с JSON по цифрам в имени."
+        help=(
+            "Рекурсивно сканировать image_dir и сопоставлять файлы с JSON "
+            "по последней группе цифр в основе имени."
+        )
     )
     parser.add_argument(
         "--xmp_subfolder", 
@@ -192,7 +228,7 @@ class MetadataProcessor:
     Преобразует JSON-структуры в списки ключевых слов и атрибутов.
     """
     def __init__(self, template_content: Optional[str], landmark_enable: bool,
-                 student_roster: StudentRoster):
+                 student_roster: Optional[StudentRoster]):
         self.template_content = template_content
         self.landmark_enable = landmark_enable
         self.student_roster = student_roster
@@ -296,7 +332,9 @@ class MetadataProcessor:
 
         location_name = file_data.get(JsonKeys.LOCATION_NAME.value)
         if isinstance(location_name, str) and location_name.strip():
-             editor.set_simple_field("Iptc4xmpCore", "Location", location_name.strip())
+            editor.set_simple_field(
+                "Iptc4xmpCore", "Location", location_name.strip()
+            )
 
         faces = file_data.get(JsonKeys.FACES.value, list())
         if faces and isinstance(faces[0], dict):
@@ -307,7 +345,11 @@ class MetadataProcessor:
             if bbox:
                 editor.set_simple_field("photoshop", "Instructions", self._format_coordinates(JsonKeys.BBOX.value, bbox))
             if pose:
-                editor.set_simple_field("xmpRights", "UsageTerms", self._format_coordinates(JsonKeys.POSE.value, pose))
+                editor.set_localized_text(
+                    "xmpRights",
+                    "UsageTerms",
+                    self._format_coordinates(JsonKeys.POSE.value, pose),
+                )
 
     def _get_base_keywords(self, file_data: Dict[str, Any], photo_type: PhotoType) -> Set[str]:
         """Формирует базовый набор ключевых слов (жанр, локация)."""
@@ -318,14 +360,17 @@ class MetadataProcessor:
         return keywords
 
     def _identify_person(self, face: Dict[str, Any]) -> Tuple[Optional[str], str]:
-        """Возвращает проверенный ``student_id`` и ФИО из единого реестра."""
+        """Возвращает проверенный ``student_id`` и доступное ФИО из реестра."""
 
         raw_student_id = face.get(JsonKeys.STUDENT_ID.value)
         if raw_student_id is None or not str(raw_student_id).strip():
             return None, ""
-        student_id = normalize_student_id(
-            raw_student_id, self.student_roster.list_id
+        expected_list_id = (
+            self.student_roster.list_id if self.student_roster is not None else None
         )
+        student_id = normalize_student_id(raw_student_id, expected_list_id)
+        if self.student_roster is None:
+            return student_id, ""
         return student_id, self.student_roster.name_for(student_id)
 
     def _extract_portrait_keywords(self, face_attributes: Dict[str, Any]) -> Set[str]:
@@ -410,6 +455,12 @@ class MetadataProcessor:
                 face_attributes['person'] = person_identifier
                 keywords.add(f"{PYSM_PREFIX}PERSON_{person_identifier}")
                 persons_found.append(person_identifier)
+
+            raw_temp_child_name = face.get(JsonKeys.TEMP_CHILD_NAME.value)
+            if raw_temp_child_name is not None:
+                temp_child_name = str(raw_temp_child_name).strip()
+                if temp_child_name:
+                    keywords.add(f"{PYSM_PREFIX}{temp_child_name}")
             
             # Разворачиваем вложенные словари (чистая функция, без мутации)
             flat_data = self._flatten_face_data(face)
@@ -475,9 +526,26 @@ class MetadataProcessor:
 # 5. БЛОК: Функция-оркестратор и Хелперы
 # ==============================================================================
 def extract_digits(filename: str) -> str:
-    """Извлекает первую непрерывную группу цифр из имени файла."""
-    match = re.search(r'\d+', filename)
-    return match.group(0) if match else ""
+    """Извлекает последнюю непрерывную группу цифр из основы имени файла."""
+
+    matches = re.findall(r"\d+", pathlib.Path(filename).stem)
+    return matches[-1] if matches else ""
+
+
+def _is_in_ignored_scan_directory(
+    file_path: pathlib.Path,
+    image_folder_path: pathlib.Path,
+) -> bool:
+    """Проверяет, находится ли файл в служебной папке XMP или backup."""
+
+    try:
+        relative_parts = file_path.relative_to(image_folder_path).parts[:-1]
+    except ValueError:
+        return False
+    return any(
+        part.casefold() in IGNORED_SCAN_DIRECTORIES
+        for part in relative_parts
+    )
 
 
 def _has_non_noise_identity_cluster(face: Dict[str, Any]) -> bool:
@@ -499,10 +567,20 @@ def _has_non_noise_identity_cluster(face: Dict[str, Any]) -> bool:
 
 
 def validate_xmp_tasks(tasks: List[Tuple[pathlib.Path, str, Dict[str, Any], str]],
-                       student_roster: StudentRoster) -> None:
+                       student_roster: Optional[StudentRoster]) -> None:
     """Проверяет идентичность всех задач до создания первого XMP."""
 
-    for _xmp_path, json_key, file_data, _image_filename in tasks:
+    output_sources: Dict[str, str] = {}
+    for xmp_path, json_key, file_data, _image_filename in tasks:
+        output_key = os.path.normcase(os.path.abspath(xmp_path))
+        previous_source = output_sources.get(output_key)
+        if previous_source is not None:
+            raise ValueError(
+                f"Один XMP-файл {xmp_path} назначен нескольким источникам: "
+                f"{previous_source!r} и {json_key!r}."
+            )
+        output_sources[output_key] = json_key
+
         faces = file_data.get(JsonKeys.FACES.value, list())
         if not isinstance(faces, list):
             raise ValueError(f"{json_key}: поле faces должно быть массивом.")
@@ -514,10 +592,16 @@ def validate_xmp_tasks(tasks: List[Tuple[pathlib.Path, str, Dict[str, Any], str]
             raw_student_id = face.get(JsonKeys.STUDENT_ID.value)
             if raw_student_id is not None and str(raw_student_id).strip():
                 try:
-                    student_id = normalize_student_id(
-                        raw_student_id, student_roster.list_id
+                    expected_list_id = (
+                        student_roster.list_id
+                        if student_roster is not None
+                        else None
                     )
-                    student_roster.name_for(student_id)
+                    student_id = normalize_student_id(
+                        raw_student_id, expected_list_id
+                    )
+                    if student_roster is not None:
+                        student_roster.name_for(student_id)
                 except ValueError as exc:
                     raise ValueError(
                         f"{json_key}, лицо {face_index}: {exc}"
@@ -547,7 +631,7 @@ def run_xmp_creation(
     landmark_enable: bool,
     scan_folder_mode: bool,
     xmp_subfolder: bool,
-    student_roster: StudentRoster,
+    student_roster: Optional[StudentRoster],
     photo_session: Optional[str] = None,
 ):
     logger.debug(f"ℹ️ Целевая папка (корневая): {image_folder_path}")
@@ -566,12 +650,25 @@ def run_xmp_creation(
         for json_key, file_data in faces_data.items():
             digits = extract_digits(json_key)
             if digits:
+                previous = numeric_index.get(digits)
+                if previous is not None:
+                    raise ValueError(
+                        "Неоднозначный номер кадра "
+                        f"{digits!r} в info_faces.json: "
+                        f"{previous[0]!r} и {json_key!r}."
+                    )
                 numeric_index[digits] = (json_key, file_data)
         
         # 2. Сканируем папку
         valid_extensions = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".psd", ".psb"}
         for file_path in image_folder_path.rglob("*"):
-            if file_path.is_file() and file_path.suffix.lower() in valid_extensions:
+            if (
+                file_path.is_file()
+                and file_path.suffix.lower() in valid_extensions
+                and not _is_in_ignored_scan_directory(
+                    file_path, image_folder_path
+                )
+            ):
                 digits = extract_digits(file_path.name)
                 
                 if digits and digits in numeric_index:
@@ -599,10 +696,16 @@ def run_xmp_creation(
         return
 
     validate_xmp_tasks(tasks, student_roster)
-    logger.info(
-        f"ℹ️ Проверены student_id для <b>{len(tasks)}</b> задач; "
-        f"list_id=<b>{student_roster.list_id}</b>."
-    )
+    if student_roster is None:
+        logger.info(
+            f"ℹ️ Проверен формат student_id для <b>{len(tasks)}</b> задач; "
+            "список учеников не используется."
+        )
+    else:
+        logger.info(
+            f"ℹ️ Проверены student_id для <b>{len(tasks)}</b> задач; "
+            f"list_id=<b>{student_roster.list_id}</b>."
+        )
 
     logger.info(f"ℹ️ Сформировано задач: <b>{len(tasks)}</b>. Обработка в <b>{max_workers}</b> потоках...")
     
@@ -636,19 +739,53 @@ def run_xmp_creation(
                 errors += 1
                 
     if errors > 0:
-        logger.info(f"❌ Ошибок при сохранении XMP-файлов: <b>{errors}</b>\n")
+        raise RuntimeError(
+            f"Ошибок при сохранении XMP-файлов: {errors}."
+        )
     else:
         logger.info("\n")
 
 
 # 6. БЛОК: Точка входа
 # ==============================================================================
+def load_optional_student_roster(
+    raw_path: Optional[str],
+) -> Optional[StudentRoster]:
+    """Загружает список учеников либо сообщает, что ФИО будут пропущены."""
+
+    path_value = str(raw_path or "").strip()
+    if not path_value:
+        logger.warning(
+            "⚠️ Параметр --student_list_file не указан. "
+            "Фамилии и имена учеников не будут записаны в XMP."
+        )
+        return None
+
+    student_list_path = pathlib.Path(path_value)
+    if not student_list_path.is_file():
+        logger.warning(
+            f"⚠️ Файл списка учеников не найден: {student_list_path}. "
+            "Фамилии и имена учеников не будут записаны в XMP."
+        )
+        return None
+
+    student_roster = load_student_roster(student_list_path)
+    logger.info(
+        f"ℹ️ Загружен список учеников: <i>{student_roster.path}</i>, "
+        f"list_id=<b>{student_roster.list_id}</b>, "
+        f"записей=<b>{len(student_roster.students)}</b>."
+    )
+    return student_roster
+
+
 def main():
+    config = get_config()
+    logger.info(f"<b>{SCRIPT_LOG_TITLE}</b><br>")
+
     if not IS_MANAGED_RUN:
         logger.critical("❌ Требуется запуск в среде PySM.")
         sys.exit(1)
 
-    config = get_config()
     template_content = load_template_content(current_script_path)
     
     session_name = pysm_context.get("wf_session_name")
@@ -656,19 +793,13 @@ def main():
     
     analysis_path = pathlib.Path(config.analysis_dir)
     image_folder = pathlib.Path(config.image_dir)
-    student_list_path = pathlib.Path(config.student_list_file)
 
     if not analysis_path.exists():
         logger.error(f"❌ Папка анализа не найдена: {analysis_path}")
         sys.exit(1)
 
     try:
-        student_roster = load_student_roster(student_list_path)
-        logger.info(
-            f"ℹ️ Загружен список учеников: <i>{student_roster.path}</i>, "
-            f"list_id=<b>{student_roster.list_id}</b>, "
-            f"записей=<b>{len(student_roster.students)}</b>."
-        )
+        student_roster = load_optional_student_roster(config.student_list_file)
     except Exception as exc:
         logger.critical(f"❌ Ошибка списка учеников: {exc}")
         sys.exit(1)
@@ -731,8 +862,8 @@ def main():
             student_roster=student_roster,
             photo_session=photo_session,
         )
-    except ValueError as exc:
-        logger.critical(f"❌ Создание XMP остановлено до записи файлов: {exc}")
+    except (ValueError, RuntimeError) as exc:
+        logger.critical(f"❌ Создание XMP остановлено: {exc}")
         sys.exit(1)
 
 if __name__ == "__main__":
