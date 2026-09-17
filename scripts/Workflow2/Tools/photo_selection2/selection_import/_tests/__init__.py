@@ -1,0 +1,1 @@
+"""Photo selection stage package."""

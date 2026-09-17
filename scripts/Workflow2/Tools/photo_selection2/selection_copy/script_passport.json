@@ -1,0 +1,48 @@
+{
+  "description": "Копирование или перемещение выбранных учениками и фотографом файлов по локациям без отдельного окна. Прогресс отображается в главном окне PySM; результат и ошибки — в журнале.",
+  "category": "Редакторы",
+  "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
+  "version": "2.2026.09.17",
+  "command_line_args_meta": {
+    "analysis_dir": {
+      "type": "dir_path",
+      "description": "Папка с photo_selection.json и info_faces.json: выбранные номера и локации фотографий.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
+    },
+    "source_dir": {
+      "type": "dir_path",
+      "description": "Исходная папка с файлами выбранных номеров для копирования или перемещения.",
+      "required": true,
+      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG"
+    },
+    "dest_dir": {
+      "type": "dir_path",
+      "description": "Целевая папка для выбранных RAW или готовых фотографий. Подпапки создаются по локациям.",
+      "required": true,
+      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}"
+    },
+    "mode": {
+      "type": "choice",
+      "description": "copy — копировать, сохраняя оригиналы; move — переместить файлы в назначение.",
+      "required": false,
+      "default": "copy",
+      "choices": ["copy", "move"]
+    },
+    "on_conflict": {
+      "type": "choice",
+      "description": "Если файл существует: skip — пропустить, overwrite — перезаписать, rename — сохранить новый с числовым суффиксом.",
+      "required": false,
+      "default": "skip",
+      "choices": ["skip", "overwrite", "rename"]
+    },
+    "exclude_dirs": {
+      "type": "list",
+      "description": "Имена подпапок, исключаемых при поиске, копировании и перемещении на любой глубине.",
+      "required": false,
+      "default": [
+        "Masks"
+      ]
+    }
+  }
+}
