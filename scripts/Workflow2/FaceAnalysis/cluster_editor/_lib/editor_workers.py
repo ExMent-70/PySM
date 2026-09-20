@@ -28,6 +28,12 @@ TEXT_VERTICAL_ANCHOR_PCT = 0.85
 TEXT_LINE_SPACING = 15 
 
 
+def _watermark_file_number(source_path: Path) -> str:
+    """Return the six-digit photo number printed on exported watermarked images."""
+    file_number_match = re.search(r'(\d{6})$', source_path.stem)
+    return file_number_match.group(1) if file_number_match else "------"
+
+
 class DataLoadWorker(QObject):
     """Load and parse one data manager outside the GUI thread."""
 
@@ -63,8 +69,7 @@ def run_export_task(task_data: Dict[str, Any]) -> str:
         source_path_obj = Path(source_path)
         output_path_obj = Path(output_path)
         
-        file_number_match = re.search(r'(\d{4})$', source_path_obj.stem)
-        file_number = file_number_match.group(1) if file_number_match else "----"
+        file_number = _watermark_file_number(source_path_obj)
 
         output_path_obj.parent.mkdir(parents=True, exist_ok=True)
 

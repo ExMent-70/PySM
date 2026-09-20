@@ -26,7 +26,7 @@ if str(FACE_ANALYSIS_ROOT) not in sys.path:
     sys.path.insert(0, str(FACE_ANALYSIS_ROOT))
 
 from _lib import editor_workers
-from _lib.editor_workers import ExportWorker, run_export_task
+from _lib.editor_workers import ExportWorker, _watermark_file_number, run_export_task
 from _lib.export_controller import ExportController
 from run_cluster_editor import _export_folder_name, _safe_export_path
 
@@ -136,6 +136,10 @@ class ExportControllerTests(unittest.TestCase):
         self.assertFalse(controller.is_running)
 
 class ExportOutputTests(unittest.TestCase):
+    def test_watermark_uses_six_digit_photo_number(self) -> None:
+        self.assertEqual(_watermark_file_number(Path("IMG_889714.jpg")), "889714")
+        self.assertEqual(_watermark_file_number(Path("IMG_9714.jpg")), "------")
+
     def test_atomic_export_leaves_no_temporary_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
