@@ -968,6 +968,75 @@ class AppController(QObject):
             return True
         return False
 
+    def export_current_collection_requested_by_gui(
+        self, target_file_path: pathlib.Path
+    ) -> bool:
+        """Экспортирует только .pysmc без изменения активного процесса."""
+        if self._is_active_collection_file(target_file_path, context=False):
+            self._show_active_file_export_error(target_file_path)
+            return False
+        if not self.set_manager.export_collection_to_file(target_file_path):
+            QMessageBox.warning(
+                self.get_main_window(),
+                self.locale_manager.get("general.error_title"),
+                self.locale_manager.get(
+                    "main_window.file_dialog.export_error", path=target_file_path
+                ),
+            )
+            return False
+        self.log_message_to_console.emit(
+            "runner_info",
+            self.locale_manager.get(
+                "user_actions.collection_file_exported", path=target_file_path
+            ),
+        )
+        return True
+
+    def export_current_context_requested_by_gui(
+        self, target_file_path: pathlib.Path
+    ) -> bool:
+        """Экспортирует только .context.json без изменения активного процесса."""
+        if self._is_active_collection_file(target_file_path, context=True):
+            self._show_active_file_export_error(target_file_path)
+            return False
+        if not self.set_manager.export_context_to_file(target_file_path):
+            QMessageBox.warning(
+                self.get_main_window(),
+                self.locale_manager.get("general.error_title"),
+                self.locale_manager.get(
+                    "main_window.file_dialog.export_error", path=target_file_path
+                ),
+            )
+            return False
+        self.log_message_to_console.emit(
+            "runner_info",
+            self.locale_manager.get(
+                "user_actions.context_file_exported", path=target_file_path
+            ),
+        )
+        return True
+
+    def _is_active_collection_file(
+        self, target_file_path: pathlib.Path, *, context: bool
+    ) -> bool:
+        """Проверяет, не указывает ли экспорт на один из файлов активного процесса."""
+        active_path = self.current_collection_file_path
+        if active_path is None:
+            return False
+        if context:
+            active_path = self.set_manager._get_context_file_path(active_path)
+        return target_file_path.resolve(strict=False) == active_path.resolve(strict=False)
+
+    def _show_active_file_export_error(self, target_file_path: pathlib.Path) -> None:
+        QMessageBox.warning(
+            self.get_main_window(),
+            self.locale_manager.get("general.error_title"),
+            self.locale_manager.get(
+                "main_window.file_dialog.export_active_file_error",
+                path=target_file_path,
+            ),
+        )
+
     @Slot(str)
     def set_collection_run_mode(self, mode_id: str):
         # --- НАЧАЛО ИЗМЕНЕНИЙ ---

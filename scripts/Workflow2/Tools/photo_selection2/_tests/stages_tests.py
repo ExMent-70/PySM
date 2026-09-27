@@ -198,6 +198,68 @@ class StageTests(unittest.TestCase):
         self.assertEqual(code, 0, output.getvalue() + errors.getvalue())
         return output.getvalue()
 
+    def test_analysis_export_variants_copy_and_move(self):
+        """Numbered export variants must not block either transfer mode."""
+        variant = "IMG_901256_1.jpg"
+        self.info[variant] = dict(self.info["IMG_901256.jpg"], filename=variant)
+        write_json(self.analysis / "info_faces.json", self.info)
+        originals = [self.file("IMG_901256.jpg", b"base"), self.file(variant, b"variant")]
+        before = self.selection.read_bytes()
+        self.copy_now()
+        self.assertTrue(all(path.exists() for path in originals))
+        for path in originals:
+            self.assertEqual((self.dest / "portrait" / path.name).read_bytes(), path.read_bytes())
+        config = self.copy_config()
+        config.mode = "move"
+        config.on_conflict = "overwrite"
+        self.copy_now(config)
+        self.assertTrue(all(not path.exists() for path in originals))
+        self.assertEqual(self.selection.read_bytes(), before)
+
+    def test_analysis_variants_merge_recognition_for_assignments(self):
+        """Photographer assignments retain recognition from each export variant."""
+        variant = "PH_IMG_901256_1.jpg"
+        self.info[variant] = dict(self.info["IMG_901256.jpg"], filename=variant,
+                                 faces=[{"student_id": "A7K3-S002"}])
+        write_json(self.analysis / "info_faces.json", self.info)
+        self.file(variant)
+        self.copy_now()
+        result = core.build_assignments(**self.inputs())
+        self.assertFalse(result.has_errors, result.issues)
+        self.assertEqual(result.assignments["A7K3-S001"], ["901256"])
+        self.assertEqual(result.assignments["A7K3-S002"], ["901256"])
+
+    def test_analysis_variant_names_and_order(self):
+        """Extensions, PH_, numeric suffixes and input order preserve identity."""
+        names = ["IMG_901256.jpg", "IMG_901256_1.jpg", "img_901256_2.JPEG",
+                 "PH_IMG_901256 (1).psd", "ph_IMG_901256.NEF"]
+        for ordered in (names, list(reversed(names))):
+            with self.subTest(order=ordered):
+                issues = []
+                records = core._build_records({name: {"filename": name, "location_name": "portrait"}
+                                               for name in ordered}, issues)
+                self.assertEqual(issues, [])
+                self.assertEqual(list(records), ["901256"])
+
+    def test_analysis_conflicting_frames_still_block_transfer(self):
+        """Different frame names or locations must never silently pick a folder."""
+        source = self.file("IMG_901256.jpg")
+        for name, location in (("OTHER_901256.jpg", "portrait"),
+                               ("IMG_901256_1.jpg", "group_photo_01")):
+            with self.subTest(name=name, location=location):
+                info = dict(self.info)
+                info[name] = {"filename": name, "location_name": location}
+                write_json(self.analysis / "info_faces.json", info)
+                config = self.copy_config()
+                config.mode = "move"
+                output = io.StringIO()
+                with redirect_stdout(output), redirect_stderr(io.StringIO()):
+                    self.assertEqual(copy_runner.run_copy(config), 1)
+                self.assertIn("IMG_901256.jpg", output.getvalue())
+                self.assertIn(name, output.getvalue())
+                self.assertTrue(source.exists())
+                self.assertEqual(snapshot(self.dest), {})
+
     def test_import_manual_click_without_analysis_or_photo_paths(self):
         self.selection.unlink()
         (self.analysis / "info_faces.json").unlink()

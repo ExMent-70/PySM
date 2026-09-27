@@ -1,8 +1,8 @@
 {
-  "description": "Копирование или перемещение выбранных учениками и фотографом файлов по локациям без отдельного окна. Прогресс отображается в главном окне PySM; результат и ошибки — в журнале.",
+  "description": "Копирование/перемещение выбранных клиентом и/или фотографом фотографий с автоматической группировкой по папкам локаций/сюжетов.",
   "category": "Редакторы",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.09.17",
+  "version": "2.2026.09.27",
   "command_line_args_meta": {
     "analysis_dir": {
       "type": "dir_path",
@@ -27,14 +27,21 @@
       "description": "copy — копировать, сохраняя оригиналы; move — переместить файлы в назначение.",
       "required": false,
       "default": "copy",
-      "choices": ["copy", "move"]
+      "choices": [
+        "copy",
+        "move"
+      ]
     },
     "on_conflict": {
       "type": "choice",
       "description": "Если файл существует: skip — пропустить, overwrite — перезаписать, rename — сохранить новый с числовым суффиксом.",
       "required": false,
       "default": "skip",
-      "choices": ["skip", "overwrite", "rename"]
+      "choices": [
+        "skip",
+        "overwrite",
+        "rename"
+      ]
     },
     "exclude_dirs": {
       "type": "list",

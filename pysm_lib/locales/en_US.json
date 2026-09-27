@@ -70,6 +70,8 @@
       "open_collection": "Open Collection...",
       "save_collection": "Save Collection",
       "save_collection_as": "Save As...",
+      "export_collection": "Save .pysmc As...",
+      "export_context": "Save .context As...",
       "save_collection_tooltip": "Save the current collection",
       "collection_passport": "Collection Passport...",
       "refresh_scripts": "Refresh Scripts List",
@@ -89,7 +91,12 @@
     "file_dialog": {
       "open_title": "Open Collection",
       "save_as_title": "Save Collection As...",
-      "filter": "PySM Collections (*{extension})"
+      "export_collection_title": "Save .pysmc As...",
+      "export_context_title": "Save .context As...",
+      "filter": "PySM Collections (*{extension})",
+      "context_filter": "Collection Context (*.context.json)",
+      "export_error": "Could not export file:\n{path}",
+      "export_active_file_error": "Export cannot overwrite the active collection file:\n{path}"
     }
   },
   "available_scripts_widget": {
@@ -443,6 +450,8 @@
     "collection_renamed": "Collection '{old_name}' renamed to '{new_name}'.",
     "collection_props_updated": "Collection properties updated.",
     "collection_saved": "Collection saved to '{path}'",
+    "collection_file_exported": "Collection file exported to '{path}'",
+    "context_file_exported": "Context file exported to '{path}'",
     "folder_created": "Folder '{name}' added to collection.",
     "set_created": "Set '{name}' added to collection.",
     "node_deleted": "Node '{name}' deleted from collection.",

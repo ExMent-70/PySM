@@ -25,6 +25,7 @@ from PySide6.QtGui import QAction
 from ..app_controller import AppController
 from ..app_constants import (
     COLLECTION_EXTENSION,
+    COLLECTION_CONTEXT_EXTENSION,
     COLLECTION_FILE_TYPE_NAME,
     APPLICATION_VER,
 )
@@ -145,6 +146,13 @@ class MainWindow(QMainWindow):
             )
             self.action_save_collection_as = save_menu.addAction(
                 self.locale_manager.get("main_window.toolbar.save_collection_as")
+            )
+            save_menu.addSeparator()
+            self.action_export_collection = save_menu.addAction(
+                self.locale_manager.get("main_window.toolbar.export_collection")
+            )
+            self.action_export_context = save_menu.addAction(
+                self.locale_manager.get("main_window.toolbar.export_context")
             )
             self.save_button.setMenu(save_menu)
             self.toolbar.addWidget(self.save_button)
@@ -274,6 +282,8 @@ class MainWindow(QMainWindow):
         self.action_open_collection.triggered.connect(self._on_open_collection)
         self.action_save_collection.triggered.connect(self._on_save_collection)
         self.action_save_collection_as.triggered.connect(self._on_save_collection_as)
+        self.action_export_collection.triggered.connect(self._on_export_collection)
+        self.action_export_context.triggered.connect(self._on_export_context)
         self.action_collection_passport.triggered.connect(
             self._on_collection_passport_clicked
         )
@@ -504,6 +514,63 @@ class MainWindow(QMainWindow):
                 pathlib.Path(file_path)
             )
         return False
+
+    def _collection_export_start_dir(self) -> pathlib.Path:
+        """Возвращает начальную папку диалога экспорта без изменения состояния."""
+        if self.controller.current_collection_file_path:
+            return self.controller.current_collection_file_path.parent
+        if (
+            self.controller.suggested_save_dir
+            and self.controller.suggested_save_dir.is_dir()
+        ):
+            return self.controller.suggested_save_dir
+        return self.controller.set_manager.default_sets_root_dir
+
+    @staticmethod
+    def _with_required_suffix(file_path: str, suffix: str) -> pathlib.Path:
+        """Добавляет обязательное составное расширение, если его не добавил Qt."""
+        path = pathlib.Path(file_path)
+        if not path.name.lower().endswith(suffix.lower()):
+            path = pathlib.Path(f"{path}{suffix}")
+        return path
+
+    @Slot()
+    def _on_export_collection(self) -> bool:
+        suggested_name = (
+            f"{self.controller.set_manager.current_collection_model.collection_name}"
+            f"{COLLECTION_EXTENSION}"
+        )
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            self.locale_manager.get("main_window.file_dialog.export_collection_title"),
+            str(self._collection_export_start_dir() / suggested_name),
+            self.locale_manager.get(
+                "main_window.file_dialog.filter", extension=COLLECTION_EXTENSION
+            ),
+        )
+        if not file_path:
+            return False
+        target_path = self._with_required_suffix(file_path, COLLECTION_EXTENSION)
+        return self.controller.export_current_collection_requested_by_gui(target_path)
+
+    @Slot()
+    def _on_export_context(self) -> bool:
+        suggested_name = (
+            f"{self.controller.set_manager.current_collection_model.collection_name}"
+            f"{COLLECTION_CONTEXT_EXTENSION}"
+        )
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            self.locale_manager.get("main_window.file_dialog.export_context_title"),
+            str(self._collection_export_start_dir() / suggested_name),
+            self.locale_manager.get("main_window.file_dialog.context_filter"),
+        )
+        if not file_path:
+            return False
+        target_path = self._with_required_suffix(
+            file_path, COLLECTION_CONTEXT_EXTENSION
+        )
+        return self.controller.export_current_context_requested_by_gui(target_path)
 
     def closeEvent(self, event):
         if self._check_unsaved_changes():

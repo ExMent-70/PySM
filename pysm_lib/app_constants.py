@@ -13,10 +13,11 @@ def get_application_root() -> pathlib.Path:
         # Если запускается как .py скрипт
         return pathlib.Path(__file__).parent.parent.resolve()
 
-APPLICATION_VER = "v2.2026.09.08"
+APPLICATION_VER = "v2.2026.09.27"
 APPLICATION_ROOT_DIR = get_application_root()
 # === Блок 1.1: Константы для файлов (НОВЫЙ) ===
 COLLECTION_EXTENSION = ".pysmc"
+COLLECTION_CONTEXT_EXTENSION = ".context.json"
 COLLECTION_FILE_TYPE_NAME = "PySM Collection"
 COLLECTION_DEFAULT_FOLDER = APPLICATION_ROOT_DIR / "script_collections"
 

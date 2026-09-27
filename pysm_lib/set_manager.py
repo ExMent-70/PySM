@@ -563,6 +563,47 @@ class SetManager:
             )
             return False
 
+    def export_collection_to_file(self, target_path: pathlib.Path) -> bool:
+        """Экспортирует текущую модель в .pysmc, не меняя активный процесс."""
+        collection_to_export = self.current_collection_model.model_copy(deep=True)
+        for root in collection_to_export.script_roots:
+            root.path = to_relative_if_possible(root.path, base_dir=target_path.parent)
+
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            self._atomic_write_json(
+                target_path,
+                collection_to_export.model_dump(mode="json"),
+            )
+            return True
+        except Exception as error:
+            logger.error(
+                "Failed to export collection to '%s': %s",
+                target_path,
+                error,
+                exc_info=True,
+            )
+            return False
+
+    def export_context_to_file(self, target_path: pathlib.Path) -> bool:
+        """Экспортирует текущий контекст, не меняя активный процесс."""
+        context_to_export = {
+            name: variable.model_dump(mode="json")
+            for name, variable in self.current_collection_model.context_data.items()
+        }
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            self._atomic_write_json(target_path, context_to_export)
+            return True
+        except Exception as error:
+            logger.error(
+                "Failed to export context to '%s': %s",
+                target_path,
+                error,
+                exc_info=True,
+            )
+            return False
+
     def update_collection_context(self, new_context: Dict[str, ContextVariableModel]):
         if self.current_collection_model.context_data != new_context:
             self.current_collection_model.context_data = new_context

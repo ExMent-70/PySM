@@ -70,6 +70,8 @@
       "open_collection": "Открыть рабочий процесс...",
       "save_collection": "Сохранить рабочий процесс",
 	  "save_collection_as": "Сохранить как...",
+	  "export_collection": "Сохранить .pysmc как...",
+	  "export_context": "Сохранить .context как...",
 	  "save_collection_tooltip": "Сохранить активный рабочий процесс",
       "collection_passport": "Параметры рабочего процесса...",
       "refresh_scripts": "Обновить список скриптов",
@@ -89,7 +91,12 @@
     "file_dialog": {
       "open_title": "Открыть рабочий процесс",
       "save_as_title": "Сохранить рабочий процесс как...",
-      "filter": "Рабочий процесс PySM (*{extension})"
+      "export_collection_title": "Сохранить .pysmc как...",
+      "export_context_title": "Сохранить .context как...",
+      "filter": "Рабочий процесс PySM (*{extension})",
+      "context_filter": "Контекст рабочего процесса (*.context.json)",
+      "export_error": "Не удалось экспортировать файл:\n{path}",
+      "export_active_file_error": "Экспорт не может перезаписывать файл активного рабочего процесса:\n{path}"
     }
   },
   "available_scripts_widget": {
@@ -441,6 +448,8 @@
     "collection_renamed": "Рабочий процесс '{old_name}' переименована в '{new_name}'.",
     "collection_props_updated": "Свойства рабочего процесса обновлены.",
 	"collection_saved": "Рабочий процесс сохранена в '{path}'",
+	"collection_file_exported": "Файл рабочего процесса экспортирован в '{path}'",
+	"context_file_exported": "Файл контекста экспортирован в '{path}'",
     "folder_created": "В рабочий процесс добавлена папка '{name}'.",
     "set_created": "В рабочий процесс добавлен набор '{name}'.",
     "node_deleted": "Из текущего рабочего процесса удален узел '{name}'.",

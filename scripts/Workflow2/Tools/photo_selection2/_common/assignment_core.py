@@ -175,9 +175,19 @@ def load_roster(path: Path) -> tuple[str, set[str]]:
     return list_id, ids
 
 
+def _analysis_frame_key(filename: str, number: str) -> str:
+    """Match export variants while preserving the rest of the frame name."""
+    stem = str(PureWindowsPath(filename).with_suffix("")).casefold()
+    stem = stem.removeprefix(PHOTOGRAPHER_PREFIX.casefold())
+    # Strip only numeric copy suffixes immediately following this photo number.
+    # Names of unrelated frames sharing six digits must remain distinct.
+    return re.sub(rf"(?<={re.escape(number)})(?:_\d+| \(\d+\))+$", "", stem)
+
+
 def _build_records(
     info_faces: dict[str, Any], issues: list[Issue]
 ) -> dict[str, PhotoRecord]:
+    """Merge metadata for variants of one frame, rejecting ambiguous routing."""
     records: dict[str, PhotoRecord] = {}
     for key, raw in info_faces.items():
         if not isinstance(raw, dict):
@@ -192,19 +202,25 @@ def _build_records(
             ))
             continue
         number = numbers[0]
-        if number in records and records[number].analysis_filename != filename:
-            issues.append(Issue(
-                "error",
-                "duplicate_number",
-                f"Номер {number} относится к нескольким кадрам.",
-                number,
-            ))
-            continue
-        record = PhotoRecord(
-            number=number,
-            analysis_filename=filename,
-            location=_validated_location(raw.get("location_name"), filename, issues),
-        )
+        location = _validated_location(raw.get("location_name"), filename, issues)
+        record = records.get(number)
+        if record is not None:
+            if (
+                _analysis_frame_key(record.analysis_filename, number)
+                != _analysis_frame_key(filename, number)
+                or record.location.casefold() != location.casefold()
+            ):
+                issues.append(Issue(
+                    "error",
+                    "duplicate_number",
+                    f"Номер {number}: конфликт записей info_faces.json — "
+                    f"{record.analysis_filename!r} (локация {record.location!r}) и "
+                    f"{filename!r} (локация {location!r}).",
+                    number,
+                ))
+                continue
+        else:
+            record = PhotoRecord(number, filename, location)
         faces = raw.get("faces", [])
         if isinstance(faces, list):
             for face in faces:
