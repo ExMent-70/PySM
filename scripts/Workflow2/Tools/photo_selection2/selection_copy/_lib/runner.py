@@ -72,6 +72,8 @@ def run_copy(config: Namespace) -> int:
     selection_path = Path(config.analysis_dir) / "photo_selection.json"
     try:
         selection_signature = file_signature(selection_path)
+        if selection_signature is None:
+            print("photo_selection.json отсутствует: учитывается только выбор фотографа (PH_).", flush=True)
         with tqdm(total=0, desc="Проверка выбранных фотографий", unit="file"):
             result = _calculate(config)
         if file_signature(selection_path) != selection_signature:
@@ -80,8 +82,16 @@ def run_copy(config: Namespace) -> int:
             _print_issues(result)
             return 1
 
+        # Prepare the destination even when the validated selection is empty.
+        # Do this before transferring files so creation failures preserve sources.
+        dest_dir = Path(config.dest_dir)
+        try:
+            dest_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise OSError(f"Не удалось создать целевую папку {dest_dir}: {exc}") from exc
+
         summary = copy_selected_files(
-            result, Path(config.source_dir), Path(config.dest_dir),
+            result, Path(config.source_dir), dest_dir,
             mode=config.mode,
             on_conflict=config.on_conflict,
             progress_factory=tqdm,

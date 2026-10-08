@@ -758,6 +758,130 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertEqual(progress[-1], {"type": "progress", "current": 0, "total": 0, "text": ""})
         return result, progress
 
+    def test_headless_photographer_only_without_selection(self):
+        """A photographer can transfer known frames before clients import choices."""
+        self.selection.unlink()
+        self.file("nested/ph_IMG_901270.jpg", b"photo")
+        self.file("nested/IMG_901270.xmp", b"metadata")
+        unselected = self.file("IMG_901256.jpg", b"not selected")
+        excluded = self.file("Masks/PH_IMG_901256.png", b"mask")
+        unknown = self.file("PH_IMG_901299.jpg", b"not analyzed")
+        before = snapshot(self.analysis)
+        for mode, conflict in (("copy", "skip"), ("move", "overwrite")):
+            with self.subTest(mode=mode):
+                result, progress = self.copy_subprocess("--mode", mode, "--on_conflict", conflict)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("photo_selection.json отсутствует", result.stdout)
+                self.assertEqual({p["current"] for p in progress if p["total"] == 2}, {0, 1, 2})
+                self.assertEqual(snapshot(self.dest), {
+                    "group_photo_01\\nested\\ph_IMG_901270.jpg": hashlib.sha256(b"photo").hexdigest(),
+                    "group_photo_01\\nested\\IMG_901270.xmp": hashlib.sha256(b"metadata").hexdigest(),
+                })
+                self.assertEqual((self.source / "nested/ph_IMG_901270.jpg").exists(), mode == "copy")
+                self.assertEqual((self.source / "nested/IMG_901270.xmp").exists(), mode == "copy")
+                self.assertTrue(all(path.exists() for path in (unselected, excluded, unknown)))
+                self.assertEqual(snapshot(self.analysis), before)
+                self.assertFalse(self.selection.exists())
+
+    def test_headless_no_selection_and_no_photographer_is_noop(self):
+        self.selection.unlink()
+        source = self.file("IMG_901256.jpg")
+        result, _ = self.copy_subprocess("--mode", "move")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Нет исходных файлов для перемещения", result.stdout)
+        self.assertTrue(source.exists())
+        self.assertEqual(snapshot(self.dest), {})
+        self.assertFalse(self.selection.exists())
+
+    def test_headless_missing_destination_created_without_selected_files(self):
+        """An empty transfer still prepares the requested destination directory."""
+        self.selection.unlink()
+        source = self.file("IMG_901256.jpg")
+        self.dest = self.root / "new album/photos/STREET"
+        result, _ = self.copy_subprocess("--mode", "move")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(self.dest.is_dir())
+        self.assertNotIn("Папка не найдена", result.stdout)
+        self.assertTrue(source.exists())
+        self.assertEqual(snapshot(self.dest), {})
+
+    def test_headless_missing_destination_transfers_photographer_files(self):
+        """Both modes create every missing parent and the location folder."""
+        self.selection.unlink()
+        source = self.file("PH_IMG_901270.psd", b"photo")
+        for mode in ("copy", "move"):
+            with self.subTest(mode=mode):
+                self.dest = self.root / mode / "new album/photos/STREET"
+                result, _ = self.copy_subprocess("--mode", mode)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual((self.dest / "group_photo_01" / source.name).read_bytes(), b"photo")
+                self.assertEqual(source.exists(), mode == "copy")
+                self.assertNotIn("Папка не найдена", result.stdout)
+
+    def test_headless_destination_creation_failure_prevents_transfer(self):
+        self.selection.unlink()
+        source = self.file("PH_IMG_901270.psd")
+        self.dest = self.root / "blocked/photos"
+        self.dest.parent.write_bytes(b"existing file")
+        with patch.object(copy_runner, "copy_selected_files") as transfer, \
+             redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()) as errors:
+            self.assertEqual(copy_runner.run_copy(self.copy_config()), 1)
+        transfer.assert_not_called()
+        self.assertIn("Не удалось создать целевую папку", errors.getvalue())
+        self.assertTrue(source.exists())
+        self.assertEqual(self.dest.parent.read_bytes(), b"existing file")
+
+    def test_headless_invalid_input_does_not_create_destination(self):
+        self.dest = self.root / "new album/photos/STREET"
+        self.selection.write_text("{broken", encoding="utf-8")
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.assertEqual(copy_runner.run_copy(self.copy_config()), 1)
+        self.assertFalse(self.dest.parent.exists())
+
+    def test_headless_photographer_in_destination_without_selection(self):
+        self.selection.unlink()
+        self.file("IMG_901270.xmp", b"settings")
+        target = self.dest / "group_photo_01/PH_IMG_901270.jpg"
+        target.parent.mkdir()
+        target.write_bytes(b"existing photo")
+        self.copy_now()
+        self.assertEqual((target.parent / "IMG_901270.xmp").read_bytes(), b"settings")
+        self.assertEqual(target.read_bytes(), b"existing photo")
+        self.assertFalse(self.selection.exists())
+
+    def test_headless_bad_selection_is_not_photographer_only(self):
+        """Only absence is optional, not invalid JSON or a directory at its path."""
+        source = self.file("PH_IMG_901270.jpg")
+        self.selection.write_text("{broken", encoding="utf-8")
+        for kind in ("invalid_json", "directory"):
+            with self.subTest(kind=kind):
+                if kind == "directory":
+                    self.selection.unlink()
+                    self.selection.mkdir()
+                result, _ = self.copy_subprocess("--mode", "move")
+                self.assertEqual(result.returncode, 1)
+                self.assertTrue(source.exists())
+                self.assertEqual(snapshot(self.dest), {})
+
+    def test_headless_selection_created_during_scan_prevents_copy(self):
+        """A first client save during scanning must invalidate the prepared list."""
+        self.selection.unlink()
+        self.file("PH_IMG_901270.jpg")
+        calculate = copy_runner._calculate
+
+        def create_selection(config):
+            result = calculate(config)
+            save_document(self.selection, self.document)
+            return result
+
+        with patch.object(copy_runner, "_calculate", side_effect=create_selection), \
+             patch.object(copy_runner, "copy_selected_files") as copy, \
+             redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()) as errors:
+            self.assertEqual(copy_runner.run_copy(self.copy_config()), 1)
+        self.assertIn("Выбор изменён во время проверки", errors.getvalue())
+        self.assertTrue(self.selection.is_file())
+        copy.assert_not_called()
+
     def test_headless_copy_entrypoint_progress_and_json_preservation(self):
         self.file("IMG_901256.CR3")
         self.file("IMG_901256.xmp")

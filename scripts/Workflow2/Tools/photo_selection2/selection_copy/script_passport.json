@@ -2,11 +2,11 @@
   "description": "Копирование/перемещение выбранных клиентом и/или фотографом фотографий с автоматической группировкой по папкам локаций/сюжетов.",
   "category": "Редакторы",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.09.27",
+  "version": "2.2026.10.08",
   "command_line_args_meta": {
     "analysis_dir": {
       "type": "dir_path",
-      "description": "Папка с photo_selection.json и info_faces.json: выбранные номера и локации фотографий.",
+      "description": "Папка с обязательным info_faces.json и необязательным photo_selection.json. Без клиентского выбора обрабатываются номера файлов PH_.",
       "required": true,
       "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
     },
@@ -18,7 +18,7 @@
     },
     "dest_dir": {
       "type": "dir_path",
-      "description": "Целевая папка для выбранных RAW или готовых фотографий. Подпапки создаются по локациям.",
+      "description": "Целевая папка для выбранных RAW или готовых фотографий. Создаётся автоматически вместе с родительскими папками даже при пустом выборе. Подпапки создаются по локациям.",
       "required": true,
       "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}"
     },

@@ -72,15 +72,24 @@ def build_copy_selection(
 ) -> BuildResult:
     """Reuse original file discovery and location checks for the copying stage.
 
-    Only photo_selection.json and info_faces.json are read. Assignment-specific
-    data, including the roster and optional matches file, is not required.
+    info_faces.json is required; photo_selection.json is read when present.
+    Without client choices, file discovery still finds photographer selections.
+    Assignment-specific data, including the roster and matches, is not required.
     """
     issues: list[Issue] = []
     records = _build_records(
         _load_object(analysis_dir / "info_faces.json", "info_faces.json"), issues
     )
-    selection = _load_object(analysis_dir / "photo_selection.json", "photo_selection.json")
-    _merge_copy_selection(selection, records, issues)
+    selection_path = analysis_dir / "photo_selection.json"
+    selection: dict[str, Any] = {}
+    try:
+        selection_path.stat()
+    except FileNotFoundError:
+        # Only absence is optional: unreadable or malformed choices must fail.
+        pass
+    else:
+        selection = _load_object(selection_path, "photo_selection.json")
+        _merge_copy_selection(selection, records, issues)
     _scan_files(source_dir, records, issues, destination=False, exclude_dirs=exclude_dirs)
     _scan_files(dest_dir, records, issues, destination=True, exclude_dirs=exclude_dirs)
     for record in records.values():

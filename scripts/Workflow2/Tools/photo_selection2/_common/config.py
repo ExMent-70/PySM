@@ -23,7 +23,7 @@ def make_parser(stage: str) -> argparse.ArgumentParser:
     if stage != "selection_copy":
         parser.add_argument("--student_list_file", required=True, help="Общий список учеников *.list.")
     analysis_help = (
-        "Папка с photo_selection.json и info_faces.json."
+        "Папка с info_faces.json и необязательным photo_selection.json (без него — только выбор PH_)."
         if stage == "selection_copy"
         else "Папка с photo_selection.json и результатами анализа."
     )
