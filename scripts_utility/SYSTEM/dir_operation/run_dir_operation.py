@@ -26,13 +26,13 @@ def get_config() -> Namespace:
     Определяет аргументы и возвращает полностью обработанную конфигурацию.
     """
     parser = argparse.ArgumentParser(
-        description="Копирует или перемещает файлы/папки, поддерживая многопоточность и шаблоны путей.",
+        description="Копирует, перемещает файлы/папки или безвозвратно удаляет исходную папку целиком.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     # Аргументы остаются без изменений
     parser.add_argument("-s", "--do_source_dir", type=str, help="Исходная директория. Может содержать шаблоны вида {var}.")
     parser.add_argument("-d", "--do_dest_dir", type=str, help="Директория назначения. Может содержать шаблоны вида {var}.")
-    parser.add_argument("-m", "--do_mode", type=str, choices=["copy", "move"], default="copy", help="Режим работы: 'copy' или 'move'.")
+    parser.add_argument("-m", "--do_mode", type=str, choices=["copy", "move", "delete"], default="copy", help="Режим работы: copy, move или delete (удаление всей исходной папки).")
     parser.add_argument("-c", "--do_on_conflict", type=str, choices=["skip", "overwrite", "rename"], default="skip", help="Действие при конфликте имен.")
     parser.add_argument("-t", "--all_threads", type=int, default=os.cpu_count() or 4, help="Количество потоков для выполнения.")
     parser.add_argument("--do_copy_base_folder", action=argparse.BooleanOptionalAction, default=False, help="Копировать корневую папку источника в папку назначения.")
@@ -61,7 +61,7 @@ def main():
     config = get_config()
 
     # Валидация, специфичная для логики этого скрипта
-    if not config.do_source_dir or not config.do_dest_dir:
+    if not config.do_source_dir or (config.do_mode != "delete" and not config.do_dest_dir):
         print("❌ Исходный и/или целевой каталог(и) не найдены. Проверьте аргументы командной строки или переменные контекста")
         sys.exit(1)
 
