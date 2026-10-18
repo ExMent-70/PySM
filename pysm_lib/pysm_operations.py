@@ -178,7 +178,7 @@ def _scan_batch_rename_directory(directory: pathlib.Path) -> set[str]:
 # ==============================================================================
 def perform_directory_operation(
     source_dir_str: str,
-    dest_dir_str: str,
+    dest_dir_str: str | None,
     mode: str,
     on_conflict: str,
     threads: int,
@@ -186,7 +186,10 @@ def perform_directory_operation(
     include_patterns: list[str],
 ) -> int:
     """
-    Выполняет многопоточную операцию (копирование/перемещение) с директорией.
+    Копирует, перемещает содержимое или удаляет исходную директорию целиком.
+
+    В режиме delete папка удаляется безвозвратно вместе со всем содержимым.
+    Параметры назначения, фильтров, конфликтов и потоков игнорируются.
 
     :return: 0 при успехе, 1 при наличии ошибок.
     """
@@ -199,6 +202,32 @@ def perform_directory_operation(
     icon_ok = icons.OK()
     icon_folder = icons.FOLDER()
     icon_warning = icons.WARNING()
+
+    if mode == "delete":
+        print("<b>УДАЛЕНИЕ ПАПКИ</b>")
+        try:
+            if not source_dir_str or not source_dir_str.strip():
+                raise ValueError("Путь удаляемой папки не задан.")
+            source_dir = pathlib.Path(source_dir_str)
+            resolved_source = source_dir.resolve()
+            if resolved_source == resolved_source.parent:
+                raise ValueError("Удаление корня диска или сетевого ресурса запрещено.")
+            # Не позволяем удалить цель ссылки вместо явно указанной папки.
+            attributes = getattr(source_dir.lstat(), "st_file_attributes", 0)
+            if source_dir.is_symlink() or attributes & 0x400:
+                raise ValueError("Удаление папки-ссылки или точки соединения запрещено.")
+            if not source_dir.is_dir():
+                raise NotADirectoryError(f"Исходная папка не найдена: {source_dir}")
+            shutil.rmtree(source_dir)
+        except Exception as error:
+            pysm_context.log_html(
+                f'<div style="{name_style}">{icon_error} Ошибка удаления папки: {error}</div>'
+            )
+            return 1
+        pysm_context.log_html(
+            f'<div style="{name_style}">{icon_ok} Папка удалена: {source_dir}</div>'
+        )
+        return 0
 
     if mode == "move":
         action_desc = "<b>ПЕРЕМЕЩЕНИЕ ФАЙЛОВ И ПАПОК</b>"

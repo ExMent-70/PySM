@@ -27,9 +27,9 @@
         "%prefix%%index%%suffix%%ext%",
         "%index%%ext%",
         "RAW_%index%%ext%",
-        "{wf_session_name}_%index%%ext%",
-        "{wf_session_name}_%prefix%%index%%ext%",
-        "{wf_session_name}_RAW_%index%%ext%",
+        "{wf_session_name}_{wf_photo_session}_%index%%ext%",
+        "{wf_session_name}_{wf_photo_session}_%prefix%%index%%ext%",
+        "{wf_session_name}_{wf_photo_session}_RAW_%index%%ext%",
         "%index%_%stem%%ext%"
       ]
     },

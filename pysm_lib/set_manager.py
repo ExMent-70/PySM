@@ -566,6 +566,7 @@ class SetManager:
     def export_collection_to_file(self, target_path: pathlib.Path) -> bool:
         """Экспортирует текущую модель в .pysmc, не меняя активный процесс."""
         collection_to_export = self.current_collection_model.model_copy(deep=True)
+        collection_to_export.collection_name = target_path.stem
         for root in collection_to_export.script_roots:
             root.path = to_relative_if_possible(root.path, base_dir=target_path.parent)
 

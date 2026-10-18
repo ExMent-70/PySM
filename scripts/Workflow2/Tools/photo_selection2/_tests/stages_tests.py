@@ -387,6 +387,60 @@ class StageTests(unittest.TestCase):
         self.assertFalse(outcome.assignment_saved)
         self.assertEqual(before, [(p.read_bytes(), file_signature(p)) for p in (self.selection, self.assignment)])
 
+    def test_capture_one_uuid_sidecar_copy_move_and_assignment_scan(self):
+        """The reported UUID collision must follow the RAW frame, not UUID digits."""
+        raw_name = "ШколаТур_9_271787.cr3"
+        sidecar_name = raw_name + ".[cc5f63dc-cd60-416e-9c7f-271955d3cadf].cot"
+        self.info = {
+            "IMG_271787.jpg": {"filename": "IMG_271787.jpg", "location_name": "portrait",
+                               "faces": [{"student_id": "A7K3-S001"}]},
+            "IMG_271955.jpg": {"filename": "IMG_271955.jpg", "location_name": "group_photo_01"},
+        }
+        write_json(self.analysis / "info_faces.json", self.info)
+        self.document.apply("A7K3-S001", ["271787"], source="manual")
+        save_document(self.selection, self.document)
+        raw = self.file(raw_name, b"raw")
+        sidecar = self.file("CaptureOne/Cache/Thumbnails/" + sidecar_name, b"thumbnail")
+        other = self.file("IMG_271955.cr3", b"not selected")
+        before = snapshot(self.analysis)
+        for mode, conflict in (("copy", "skip"), ("copy", "rename"), ("move", "overwrite")):
+            with self.subTest(mode=mode, conflict=conflict):
+                result, _ = self.copy_subprocess("--mode", mode, "--on_conflict", conflict)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                target = self.dest / "portrait/CaptureOne/Cache/Thumbnails" / sidecar_name
+                self.assertEqual(target.read_bytes(), b"thumbnail")
+                if conflict == "rename":
+                    self.assertEqual(target.with_name(target.stem + " (1).cot").read_bytes(), b"thumbnail")
+                self.assertEqual(raw.exists(), mode == "copy")
+                self.assertEqual(sidecar.exists(), mode == "copy")
+                self.assertTrue(other.exists())
+                plan = core.build_assignments(**self.inputs())
+                self.assertFalse(plan.has_errors, plan.issues)
+                self.assertIn(target, plan.records["271787"].destination_files)
+                self.assertEqual(plan.records["271955"].destination_files, [])
+                self.assertEqual(plan.assignments["A7K3-S001"], ["271787"])
+                self.assertEqual(snapshot(self.analysis), before)
+
+    def test_capture_one_uuid_alone_does_not_select_unrelated_file(self):
+        """Even a sole known number in a UUID is not a photo number."""
+        source = self.file("IMG_999999.cr3.[CC5F63DC-CD60-416E-9C7F-901256D3CADF].cot")
+        self.copy_now()
+        self.assertTrue(source.exists())
+        self.assertEqual(snapshot(self.dest), {})
+
+    def test_capture_one_uuid_keeps_real_filename_ambiguity(self):
+        """Only complete UUID suffixes are ignored, not arbitrary bracketed numbers."""
+        names = (
+            "IMG_901256_901270.cr3.[cc5f63dc-cd60-416e-9c7f-271955d3cadf].cot",
+            "IMG_901256.cr3.[901270].cot",
+        )
+        for name in names:
+            with self.subTest(name=name):
+                source = self.file(name)
+                result = copy_runner._calculate(self.copy_config())
+                self.assertIn("ambiguous_filename", {issue.code for issue in result.issues})
+                source.unlink()
+
     def test_copy_idempotence_conflict_and_same_source(self):
         source = self.file("IMG_901256.CR3")
         self.assertEqual(self.worker("copy").copy_summary.copied, 1)

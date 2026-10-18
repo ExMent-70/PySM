@@ -14,6 +14,10 @@ from typing import Any, Iterable
 
 SCHEMA_VERSION = 1
 PHOTO_NUMBER_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
+CAPTURE_ONE_UUID_SUFFIX_RE = re.compile(
+    r"\.\[[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\](?=(?: \(\d+\))?$)",
+    re.IGNORECASE,
+)
 STUDENT_ID_RE = re.compile(r"^(?P<list_id>[A-HJ-NP-Z2-9]{4})-S\d{3}$")
 PHOTOGRAPHER_PREFIX = "PH_"
 LAYOUT_READY_SUFFIXES = {".jpg", ".jpeg", ".psd"}
@@ -339,6 +343,13 @@ def _merge_selection(
                 ))
 
 
+def _photo_file_stem(path: Path) -> str:
+    """Ignore Capture One UUID metadata when matching a physical file to a frame."""
+    # Example: frame_271787.cr3.[uuid].cot, optionally renamed to ...[uuid] (1).cot.
+    # Preserve the actual path and all digits outside the complete UUID suffix.
+    return CAPTURE_ONE_UUID_SUFFIX_RE.sub("", path.stem)
+
+
 def _scan_files(
     root: Path,
     records: dict[str, PhotoRecord],
@@ -363,7 +374,8 @@ def _scan_files(
             continue
 
         record = None
-        raw_numbers = extract_photo_numbers(path.stem)
+        photo_stem = _photo_file_stem(path)
+        raw_numbers = extract_photo_numbers(photo_stem)
         numbers = [number for number in raw_numbers if number in known]
         if len(numbers) > 1:
             issues.append(Issue(
@@ -375,7 +387,7 @@ def _scan_files(
         if len(numbers) == 1:
             record = records[numbers[0]]
         else:
-            record = records_by_stem.get(path.stem.casefold())
+            record = records_by_stem.get(photo_stem.casefold())
 
         # Capture One exports selected-by-photographer files into source_dir
         # during the second RAW pass. The same prefix is also recognized in an

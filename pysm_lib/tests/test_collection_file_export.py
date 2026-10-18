@@ -58,7 +58,7 @@ class CollectionFileExportTests(unittest.TestCase):
         self.assertTrue(self.manager.export_collection_to_file(target))
 
         exported = json.loads(target.read_text(encoding="utf-8"))
-        self.assertEqual(exported["collection_name"], "Active")
+        self.assertEqual(exported["collection_name"], "Transferred")
         self.assertEqual(exported["description"], "Unsaved description")
         self.assertEqual(exported["script_roots"][0]["path"], "scripts")
         self.assertNotIn("context_data", exported)
