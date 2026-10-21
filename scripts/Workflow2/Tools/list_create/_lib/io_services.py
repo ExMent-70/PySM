@@ -25,7 +25,7 @@ except ImportError:
 # -------------------------------------------------------------------------
 
 # Версия шаблона. При изменении структуры шаблона нужно увеличивать это число.
-TEMPLATE_VERSION = "2.1"
+TEMPLATE_VERSION = "2.2"
 
 # Имя файла шаблона для AI
 AI_PROMPT_TEMPLATE_FILENAME = "ai_prompt_template.txt"
@@ -343,7 +343,8 @@ DEFAULT_HTML_TEMPLATE = f"""<!-- VERSION: {TEMPLATE_VERSION} -->
         </div>
     </div>
 </body>
-</html>"""
+</html>
+"""
 
 
 def ensure_template_exists(directory: pathlib.Path) -> pathlib.Path:

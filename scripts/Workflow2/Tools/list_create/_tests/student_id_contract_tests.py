@@ -234,6 +234,29 @@ class SessionIoTests(unittest.TestCase):
         self.assertTrue(content.startswith("student_id;shoot_order"))
         self.assertIn("A7K3-S001", content)
 
+    def test_old_html_template_is_updated_for_current_contract_year(self) -> None:
+        old_template = io_services.DEFAULT_HTML_TEMPLATE.replace(
+            "VERSION: 2.2",
+            "VERSION: 2.1",
+        ).replace("-26/27", "-25/26")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            template_dir = Path(temp_dir)
+            template_path = template_dir / "_list_template.html"
+            template_path.write_text(old_template, encoding="utf-8")
+
+            io_services.ensure_template_exists(template_dir)
+
+            updated_template = template_path.read_text(encoding="utf-8")
+            backup_template = (
+                template_dir / "_list_template.old.html"
+            ).read_text(encoding="utf-8")
+
+        self.assertIn("<!-- VERSION: 2.2 -->", updated_template)
+        self.assertIn("-26/27", updated_template)
+        self.assertIn("<!-- VERSION: 2.1 -->", backup_template)
+        self.assertIn("-25/26", backup_template)
+
 
 class AiEnrichmentTests(unittest.TestCase):
     def setUp(self) -> None:

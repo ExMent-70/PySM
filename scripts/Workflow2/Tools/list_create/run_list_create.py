@@ -594,11 +594,44 @@ class ClassListEditor(QMainWindow):
         except IOError as e:
             print(f"Ошибка сохранения рангов: {e}", file=sys.stderr)
 
+    def _ask_existing_list_import_action(self) -> Optional[bool]:
+        """Запрашивает добавление, замену либо отмену импорта."""
+
+        message_box = QMessageBox(self)
+        message_box.setIcon(QMessageBox.Icon.Question)
+        message_box.setWindowTitle("Импорт фамилий")
+        message_box.setText(
+            "В списке уже есть записи. Что сделать с распознанными фамилиями?"
+        )
+        append_button = message_box.addButton(
+            "Добавить в список",
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        replace_button = message_box.addButton(
+            "Заменить список",
+            QMessageBox.ButtonRole.DestructiveRole,
+        )
+        message_box.addButton(
+            "Отмена",
+            QMessageBox.ButtonRole.RejectRole,
+        )
+        message_box.setDefaultButton(append_button)
+        message_box.exec()
+
+        clicked_button = message_box.clickedButton()
+        if clicked_button is append_button:
+            return True
+        if clicked_button is replace_button:
+            return False
+        return None
+
     def _process_raw_list(self) -> None:
+        append_to_existing = False
         if self.table_model.rowCount() > 0:
-             if QMessageBox.question(self, "Подтверждение", "Заменить текущий список?", 
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.No:
-                 return
+            append_choice = self._ask_existing_list_import_action()
+            if append_choice is None:
+                return
+            append_to_existing = append_choice
 
         self.statusBar().showMessage("Анализ...")
         raw_text = self.raw_list_input.toPlainText()
@@ -618,7 +651,10 @@ class ClassListEditor(QMainWindow):
         for s in students:
             s.service_type = s_type
             s.service_cost = cost
-        
+
+        if append_to_existing:
+            students = [*self.table_model.get_all_data(), *students]
+
         self.table_model.update_data(students)
         # НОВОЕ: Сортируем базу и проставляем номера п/п
         self.table_model.sort_and_renumber()
@@ -1118,6 +1154,35 @@ class ClassListEditor(QMainWindow):
             pysm_context.log_link(url_or_path=str(self.config.wf_dest_dir), text="Открыть папку с файлами")
             print(" ", file=sys.stderr)
 
+    def _ask_unsaved_changes_action(self) -> QMessageBox.StandardButton:
+        """Запрашивает действие при закрытии окна с несохранёнными изменениями."""
+
+        message_box = QMessageBox(self)
+        message_box.setIcon(QMessageBox.Icon.Question)
+        message_box.setWindowTitle("Несохраненные изменения")
+        message_box.setText("Сохранить перед выходом?")
+        message_box.setStandardButtons(
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel
+        )
+
+        save_button = message_box.button(QMessageBox.StandardButton.Save)
+        discard_button = message_box.button(QMessageBox.StandardButton.Discard)
+        cancel_button = message_box.button(QMessageBox.StandardButton.Cancel)
+        save_button.setText("Сохранить")
+        discard_button.setText("Не сохранять")
+        cancel_button.setText("Отмена")
+        message_box.setDefaultButton(save_button)
+        message_box.exec()
+
+        clicked_button = message_box.clickedButton()
+        if clicked_button is save_button:
+            return QMessageBox.StandardButton.Save
+        if clicked_button is discard_button:
+            return QMessageBox.StandardButton.Discard
+        return QMessageBox.StandardButton.Cancel
+
     def closeEvent(self, event: QEvent) -> None:
         if IS_MANAGED_RUN and pysm_context and self.table_model.rowCount() > 0:
             try:
@@ -1134,10 +1199,7 @@ class ClassListEditor(QMainWindow):
             event.accept(); 
             return
             
-        reply = QMessageBox.question(
-            self, "Несохраненные изменения", "Сохранить перед выходом?", 
-            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel
-        )
+        reply = self._ask_unsaved_changes_action()
         if reply == QMessageBox.StandardButton.Save:
             if self._save_list(): 
                 #self.add_link(); 
