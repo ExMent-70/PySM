@@ -86,7 +86,7 @@ class ReportMixin:
         if self.state.assignments_dirty:
             builder.parts.append(
                 f"<p style='color:#a06000; font-family: sans-serif;'>"
-                "<b>Выбор изменён:</b> photo_assignments.json нужно пересоздать.</p>"
+                "<b>Данные требуют проверки:</b> photo_assignments.json нужно пересоздать.</p>"
             )
         builder.parts.append(
             f"<p style='color:{builder.theme.text_main}; font-family: sans-serif;'>"
@@ -106,8 +106,34 @@ class ReportMixin:
                 "<b>Нет JPG/JPEG/PSD в целевой папке для номеров:</b><br>"
                 f"{escape(', '.join(readiness['missing_numbers']))}</p>"
             )
+        builder.parts.append(self._location_report_html(result))
         builder.parts.append(self._issues_html(result))
         return builder.get_html()
+
+    def _location_report_html(self, result: BuildResult) -> str:
+        """Show the exact pending moves, including files outside current selections."""
+        plan = result.location_plan
+        if plan is None:
+            return ""
+        parts = ["<h3>Расположение файлов по локациям</h3>"]
+        summary = self.state.location_repair
+        if summary is not None:
+            parts.append(f"<p>Перемещено файлов: {len(summary.moved)}.</p>")
+        parts.append(f"<p>Несоответствий: {len(plan.moves)}. "
+                     f"Доступно для исправления: {len(plan.executable)}.</p>")
+        if plan.moves:
+            parts.append("<table><tr><th>Сейчас</th><th>Должно быть</th><th>Статус</th></tr>")
+            for move in plan.moves:
+                source = escape(str(move.source.relative_to(plan.root)))
+                target = escape(str(move.target.relative_to(plan.root)))
+                parts.append(
+                    f'<tr><td><a href="{escape(move.source.as_uri(), quote=True)}" '
+                    f'title="{escape(str(move.source), quote=True)}">{source}</a></td>'
+                    f'<td title="{escape(str(move.target), quote=True)}">{target}</td>'
+                    f'<td>{escape(move.conflict or "Переместить")}</td></tr>'
+                )
+            parts.append("</table>")
+        return "".join(parts)
 
     def _completion_log_html(self) -> str:
         """Render the final PySM console report without the launch instruction."""
@@ -145,9 +171,12 @@ class ReportMixin:
         assignment_current = self._assignment_file_matches_result(result)
         checks = [
             (not errors, "Блокирующих ошибок нет"),
+            (result.location_plan is not None and not any(
+                i.severity == "error" for i in result.location_plan.issues
+            ), "Расположение файлов соответствует текущим локациям"),
             (assignment_exists, "photo_assignments.json создан"),
             (
-                assignment_current,
+                assignment_current and not self.state.assignments_dirty,
                 "photo_assignments.json актуален относительно текущих данных",
             ),
             (

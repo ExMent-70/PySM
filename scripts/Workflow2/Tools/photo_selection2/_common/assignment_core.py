@@ -9,7 +9,10 @@ from pathlib import Path
 from pathlib import PureWindowsPath
 import re
 import tempfile
-from typing import Any, Iterable
+from typing import Any, Iterable, TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from .location_service import LocationPlan
 
 
 SCHEMA_VERSION = 1
@@ -64,6 +67,7 @@ class PhotoRecord:
     photographer_selected: bool = False
     source_files: list[Path] = field(default_factory=list)
     destination_files: list[Path] = field(default_factory=list)
+    destination_root: Path | None = None
 
     @property
     def assigned_student_ids(self) -> set[str]:
@@ -79,6 +83,7 @@ class BuildResult:
     records: dict[str, PhotoRecord]
     assignments: dict[str, list[str]]
     issues: list[Issue]
+    location_plan: LocationPlan | None = None
 
     @property
     def has_errors(self) -> bool:
@@ -179,19 +184,10 @@ def load_roster(path: Path) -> tuple[str, set[str]]:
     return list_id, ids
 
 
-def _analysis_frame_key(filename: str, number: str) -> str:
-    """Match export variants while preserving the rest of the frame name."""
-    stem = str(PureWindowsPath(filename).with_suffix("")).casefold()
-    stem = stem.removeprefix(PHOTOGRAPHER_PREFIX.casefold())
-    # Strip only numeric copy suffixes immediately following this photo number.
-    # Names of unrelated frames sharing six digits must remain distinct.
-    return re.sub(rf"(?<={re.escape(number)})(?:_\d+| \(\d+\))+$", "", stem)
-
-
 def _build_records(
     info_faces: dict[str, Any], issues: list[Issue]
 ) -> dict[str, PhotoRecord]:
-    """Merge metadata for variants of one frame, rejecting ambiguous routing."""
+    """Merge by six-digit number and location, ignoring other filename parts."""
     records: dict[str, PhotoRecord] = {}
     for key, raw in info_faces.items():
         if not isinstance(raw, dict):
@@ -209,11 +205,7 @@ def _build_records(
         location = _validated_location(raw.get("location_name"), filename, issues)
         record = records.get(number)
         if record is not None:
-            if (
-                _analysis_frame_key(record.analysis_filename, number)
-                != _analysis_frame_key(filename, number)
-                or record.location.casefold() != location.casefold()
-            ):
+            if record.location.casefold() != location.casefold():
                 issues.append(Issue(
                     "error",
                     "duplicate_number",
@@ -357,6 +349,7 @@ def _scan_files(
     *,
     destination: bool,
     exclude_dirs: Iterable[str] = (),
+    paths: Iterable[Path] | None = None,
 ) -> None:
     if not root.is_dir():
         issues.append(Issue("warning", "directory_missing", f"Папка не найдена: {root}"))
@@ -366,10 +359,10 @@ def _scan_files(
         Path(record.analysis_filename).stem.casefold(): record
         for record in records.values()
     }
-    for path in root.rglob("*"):
+    for path in root.rglob("*") if paths is None else paths:
         if not path.is_file():
             continue
-        relative = path.relative_to(root)
+        relative = path.absolute().relative_to(root.absolute())
         if is_excluded_relative_path(relative, exclude_dirs):
             continue
 
@@ -421,6 +414,9 @@ def build_assignments(
     dest_dir: Path,
     exclude_dirs: Iterable[str] = (),
 ) -> BuildResult:
+    from .location_service import plan_locations
+
+    location_plan = plan_locations(dest_dir, analysis_dir / "info_faces.json", exclude_dirs)
     issues: list[Issue] = []
     list_id, roster_ids = load_roster(student_list_file)
     records = _build_records(
@@ -447,9 +443,12 @@ def build_assignments(
     selection = _load_object(analysis_dir / "photo_selection.json", "photo_selection.json")
     _merge_selection(selection, list_id, roster_ids, records, issues)
     _scan_files(source_dir, records, issues, destination=False, exclude_dirs=exclude_dirs)
-    _scan_files(dest_dir, records, issues, destination=True, exclude_dirs=exclude_dirs)
+    _scan_files(dest_dir, records, issues, destination=True, exclude_dirs=exclude_dirs,
+                paths=(path for path, _ in location_plan.inventory))
+    issues.extend(issue for issue in location_plan.issues if issue not in issues)
 
     for record in records.values():
+        record.destination_root = dest_dir.absolute()
         if record.selected_student_ids and not record.source_files and not record.destination_files:
             issues.append(Issue(
                 "warning",
@@ -468,23 +467,6 @@ def build_assignments(
                 f"У кадра {record.number} нет префикса фотографа и персонального выбора.",
                 record.number,
             ))
-        for path in record.destination_files:
-            try:
-                relative = path.relative_to(dest_dir)
-            except ValueError:
-                continue
-            actual_location = relative.parts[0] if len(relative.parts) > 1 else ""
-            if (
-                actual_location
-                and actual_location.casefold() != record.location.casefold()
-            ):
-                issues.append(Issue(
-                    "warning",
-                    "location_folder_mismatch",
-                    f"Кадр {record.number}: папка {actual_location!r} не совпадает с "
-                    f"location_name {record.location!r}.",
-                    record.number,
-                ))
         if record.photographer_selected and not record.recognized_student_ids:
             issues.append(Issue(
                 "warning",
@@ -510,7 +492,7 @@ def build_assignments(
         )
         if numbers:
             assignments[student_id] = numbers
-    return BuildResult(list_id, records, assignments, issues)
+    return BuildResult(list_id, records, assignments, issues, location_plan)
 
 
 def index_records_by_student_location(
@@ -527,7 +509,12 @@ def index_records_by_student_location(
     return index
 
 
-def save_assignments(path: Path, result: BuildResult) -> None:
+def save_assignments(
+    path: Path, result: BuildResult, *, inputs_current: Callable[[], bool] = lambda: True,
+) -> None:
+    """Publish atomically only while the audited inputs and destination remain current."""
+    from .location_service import assert_plan_current
+
     publish_errors = publishability_issues(result)
     if result.has_errors:
         raise ValueError(
@@ -535,8 +522,7 @@ def save_assignments(path: Path, result: BuildResult) -> None:
         )
     if publish_errors:
         raise ValueError(
-            "Назначения не записаны: часть назначенных фотографий отсутствует "
-            "в целевой папке."
+            f"Назначения не записаны: {publish_errors[0].message}"
         )
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
@@ -551,6 +537,10 @@ def save_assignments(path: Path, result: BuildResult) -> None:
             json.dump(result.assignment_payload(), stream, ensure_ascii=False, indent=2)
             stream.flush()
             os.fsync(stream.fileno())
+        if result.location_plan is not None:
+            assert_plan_current(result.location_plan)
+        if not inputs_current():
+            raise ValueError("Исходные данные изменились. Назначения не записаны.")
         os.replace(temp_path, path)
     except Exception:
         temp_path.unlink(missing_ok=True)
@@ -561,13 +551,23 @@ def has_layout_ready_destination_file(record: PhotoRecord) -> bool:
     """Return True when a destination contains an album-layout image file."""
     return any(
         path.suffix.casefold() in LAYOUT_READY_SUFFIXES
+        and path.is_file()
+        and (record.destination_root is None or (
+            path.absolute().is_relative_to(record.destination_root)
+            and len(path.absolute().relative_to(record.destination_root).parts) > 1
+            and path.absolute().relative_to(record.destination_root).parts[0].casefold()
+            == record.location.casefold()
+        ))
         for path in record.destination_files
     )
 
 
 def publishability_issues(result: BuildResult) -> list[Issue]:
     """Return errors that make photo_assignments.json unsafe to publish."""
-    issues: list[Issue] = []
+    if result.location_plan is None:
+        issues = [Issue("error", "location_check_required", "Проверка локаций не выполнена.")]
+    else:
+        issues = [issue for issue in result.location_plan.issues if issue.severity == "error"]
     checked_numbers = {
         number
         for numbers in result.assignments.values()

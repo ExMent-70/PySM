@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from types import ModuleType
 import unittest
@@ -147,6 +148,8 @@ class StageTests(unittest.TestCase):
         while not predicate() and time.monotonic() < deadline:
             self.app.processEvents()
             QTest.qWait(10)
+            # Yield Python's GIL as well as Qt events to filesystem-heavy workers.
+            time.sleep(0.001)
         self.assertTrue(predicate(), "Background operation did not complete")
 
     def open_window(self, cls, config=None):
@@ -198,6 +201,168 @@ class StageTests(unittest.TestCase):
         self.assertEqual(code, 0, output.getvalue() + errors.getvalue())
         return output.getvalue()
 
+    def test_retouch_location_repair_then_publish_with_empty_source(self):
+        """Full move/retouch/reclassify workflow preserves bytes and both inputs."""
+        self.file("PH_IMG_901256.psd", b"original PSD")
+        config = self.copy_config()
+        config.mode = "move"
+        self.copy_now(config)
+        source = self.dest / "portrait/PH_IMG_901256.psd"
+        source.write_bytes(b"retouched layers")
+        selection_bytes = self.selection.read_bytes()
+        self.info["IMG_901256.jpg"]["location_name"] = "new_portrait"
+        write_json(self.analysis / "info_faces.json", self.info)
+        analysis_bytes = (self.analysis / "info_faces.json").read_bytes()
+        window = self.open_window(AssignmentsWindow)
+        self.assertTrue(window.repair_button.isEnabled())
+        self.assertTrue(source.exists(), "Opening the window must not move files")
+        self.click(window, window.ACTION_TITLE)
+        self.assertFalse(self.assignment.exists())
+        self.click(window, "Исправить расположение файлов")
+        self.assertFalse(source.exists())
+        self.assertEqual((self.dest / "new_portrait/PH_IMG_901256.psd").read_bytes(), b"retouched layers")
+        self.assertFalse(window.repair_button.isEnabled())
+        self.assertFalse(self.assignment.exists(), "Repair must not implicitly publish")
+        self.assertFalse(window._album_readiness(window.state.build_result)["ready"])
+        self.click(window, window.ACTION_TITLE)
+        self.assertTrue(window._album_readiness(window.state.build_result)["ready"])
+        self.assertEqual(self.selection.read_bytes(), selection_bytes)
+        self.assertEqual((self.analysis / "info_faces.json").read_bytes(), analysis_bytes)
+        self.assertFalse(any(self.source.rglob("*")))
+
+    def test_unselected_wrong_location_blocks_even_with_valid_selected_file(self):
+        self.image(self.dest / "portrait/IMG_901256.jpg")
+        self.image(self.dest / "old/IMG_901270.jpg")
+        self.assignment.write_bytes(b"previous assignments")
+        result = self.worker("build")
+        self.assertFalse(result.assignment_saved)
+        self.assertEqual(self.assignment.read_bytes(), b"previous assignments")
+        self.assertTrue(core.has_layout_ready_destination_file(result.result.records["901256"]))
+        self.assertFalse(core.has_layout_ready_destination_file(result.result.records["901270"]))
+
+    def test_root_destination_file_requires_repair(self):
+        self.image(self.dest / "IMG_901256.jpg")
+        result = self.worker("build")
+        self.assertFalse(result.assignment_saved)
+        self.assertFalse(core.has_layout_ready_destination_file(result.result.records["901256"]))
+        self.assertEqual(len(result.result.location_plan.executable), 1)
+
+    def test_repair_rejects_stale_displayed_plan_and_refreshes_paths(self):
+        self.image(self.dest / "old/IMG_901256.jpg")
+        window = self.open_window(AssignmentsWindow)
+        self.info["IMG_901256.jpg"]["location_name"] = "new_portrait"
+        write_json(self.analysis / "info_faces.json", self.info)
+        self.click(window, "Исправить расположение файлов")
+        self.assertTrue((self.dest / "old/IMG_901256.jpg").exists())
+        self.assertIn("new_portrait", window.report.toPlainText())
+        self.assertTrue(window.repair_button.isEnabled())
+        self.click(window, "Исправить расположение файлов")
+        self.assertTrue((self.dest / "new_portrait/IMG_901256.jpg").exists())
+
+    def test_changed_client_selection_prevents_repair_until_refreshed(self):
+        self.image(self.dest / "old/IMG_901256.jpg")
+        window = self.open_window(AssignmentsWindow)
+        self.document.apply("A7K3-S002", ["901270"], source="manual")
+        save_document(self.selection, self.document)
+        self.click(window, "Исправить расположение файлов")
+        self.wait(lambda: window._worker is None and not window._refresh_pending)
+        self.assertTrue((self.dest / "old/IMG_901256.jpg").exists())
+        self.assertFalse((self.dest / "portrait/IMG_901256.jpg").exists())
+
+    def test_save_revalidates_analysis_and_destination_before_publication(self):
+        self.image(self.dest / "portrait/IMG_901256.jpg")
+        result = core.build_assignments(**self.inputs())
+        self.assignment.write_bytes(b"previous assignments")
+        self.info["IMG_901256.jpg"]["location_name"] = "changed"
+        write_json(self.analysis / "info_faces.json", self.info)
+        with self.assertRaises(ValueError):
+            core.save_assignments(self.assignment, result)
+        self.assertEqual(self.assignment.read_bytes(), b"previous assignments")
+
+        self.info["IMG_901256.jpg"]["location_name"] = "portrait"
+        write_json(self.analysis / "info_faces.json", self.info)
+        result = core.build_assignments(**self.inputs())
+        self.image(self.dest / "old/IMG_901270.jpg")
+        with self.assertRaises(ValueError):
+            core.save_assignments(self.assignment, result)
+        self.assertEqual(self.assignment.read_bytes(), b"previous assignments")
+
+    def test_save_cannot_bypass_location_audit(self):
+        self.image(self.dest / "portrait/IMG_901256.jpg")
+        result = core.build_assignments(**self.inputs())
+        result.location_plan = None
+        with self.assertRaisesRegex(ValueError, "Проверка локаций"):
+            core.save_assignments(self.assignment, result)
+        self.assertFalse(self.assignment.exists())
+
+    def test_analysis_change_during_json_write_preserves_previous_plan(self):
+        self.image(self.dest / "portrait/IMG_901256.jpg")
+        result = core.build_assignments(**self.inputs())
+        self.assignment.write_bytes(b"previous plan")
+        dump = core.json.dump
+
+        def change_analysis_during_write(*args, **kwargs):
+            dump(*args, **kwargs)
+            self.info["IMG_901256.jpg"]["location_name"] = "changed"
+            write_json(self.analysis / "info_faces.json", self.info)
+
+        with patch.object(core.json, "dump", side_effect=change_analysis_during_write):
+            with self.assertRaises(ValueError):
+                core.save_assignments(self.assignment, result)
+        self.assertEqual(self.assignment.read_bytes(), b"previous plan")
+        self.assertFalse(list(self.analysis.glob("*.tmp")))
+
+    def test_location_uses_actual_metadata_not_unknown_client_selection(self):
+        self.document.apply("A7K3-S001", ["999999"], source="manual")
+        save_document(self.selection, self.document)
+        self.image(self.dest / "old/IMG_999999.jpg")
+        result = core.build_assignments(**self.inputs())
+        self.assertFalse(result.location_plan.moves)
+        self.assertTrue(any(i.code == "location_unknown_number" for i in result.issues))
+
+    def test_repair_conflicts_and_partial_success_are_visible_in_gui(self):
+        self.image(self.dest / "portrait/IMG_901256.jpg")
+        self.image(self.dest / "old/IMG_901256.jpg")
+        self.image(self.dest / "old/IMG_901270.jpg")
+        window = self.open_window(AssignmentsWindow)
+        self.assertIn("Путь назначения уже занят", window.report.toPlainText())
+        self.click(window, "Исправить расположение файлов")
+        self.assertTrue((self.dest / "old/IMG_901256.jpg").exists())
+        self.assertTrue((self.dest / "group_photo_01/IMG_901270.jpg").exists())
+        self.assertIn("Перемещено файлов: 1", window.report.toPlainText())
+        self.assertFalse(window.repair_button.isEnabled())
+        self.click(window, window.ACTION_TITLE)
+        self.assertFalse(self.assignment.exists())
+
+    def test_repair_preserves_selected_photo_and_defers_close_while_busy(self):
+        self.image(self.dest / "old/IMG_901256.jpg")
+        window = self.open_window(AssignmentsWindow)
+        window.photo_table.setCurrentItem(window.photo_table.topLevelItem(0))
+        selected = window._selection_key(window.photo_table.currentItem())
+        entered, release = threading.Event(), threading.Event()
+        repair = workers.repair_locations
+
+        def delayed(*args, **kwargs):
+            entered.set()
+            if not release.wait(5):
+                raise RuntimeError("Test did not release worker")
+            return repair(*args, **kwargs)
+
+        with patch.object(workers, "repair_locations", side_effect=delayed):
+            window._start_operation("repair")
+            try:
+                self.wait(entered.is_set)
+                self.assertFalse(window.assignment_buttons.isEnabled())
+                window.close()
+                self.assertTrue(window.isVisible())
+            finally:
+                release.set()
+            self.wait(lambda: window._worker is None)
+        self.assertEqual(selected, window._selection_key(window.photo_table.currentItem()))
+        file_item = window.photo_table.currentItem().child(0)
+        self.assertEqual(window._target_path_for_item(file_item), self.dest / "portrait/IMG_901256.jpg")
+        self.assertIn("Перемещено файлов: 1", window.report.toPlainText())
+
     def test_analysis_export_variants_copy_and_move(self):
         """Numbered export variants must not block either transfer mode."""
         variant = "IMG_901256_1.jpg"
@@ -230,9 +395,11 @@ class StageTests(unittest.TestCase):
         self.assertEqual(result.assignments["A7K3-S002"], ["901256"])
 
     def test_analysis_variant_names_and_order(self):
-        """Extensions, PH_, numeric suffixes and input order preserve identity."""
+        """Only the six-digit number and location define metadata identity."""
         names = ["IMG_901256.jpg", "IMG_901256_1.jpg", "img_901256_2.JPEG",
-                 "PH_IMG_901256 (1).psd", "ph_IMG_901256.NEF"]
+                 "PH_IMG_901256 (1).psd", "ph_IMG_901256.NEF",
+                 "IMG_901256База.jpg", "IMG_901256Донор.jpg", "IMG_901256бБаза.jpg",
+                 "ДругоеИмя_901256произвольнаяПометка.jpg"]
         for ordered in (names, list(reversed(names))):
             with self.subTest(order=ordered):
                 issues = []
@@ -241,10 +408,10 @@ class StageTests(unittest.TestCase):
                 self.assertEqual(issues, [])
                 self.assertEqual(list(records), ["901256"])
 
-    def test_analysis_conflicting_frames_still_block_transfer(self):
-        """Different frame names or locations must never silently pick a folder."""
+    def test_analysis_conflicting_locations_still_block_transfer(self):
+        """One number with different locations must never silently pick a folder."""
         source = self.file("IMG_901256.jpg")
-        for name, location in (("OTHER_901256.jpg", "portrait"),
+        for name, location in (("OTHER_901256.jpg", "group_photo_01"),
                                ("IMG_901256_1.jpg", "group_photo_01")):
             with self.subTest(name=name, location=location):
                 info = dict(self.info)
@@ -259,6 +426,54 @@ class StageTests(unittest.TestCase):
                 self.assertIn(name, output.getvalue())
                 self.assertTrue(source.exists())
                 self.assertEqual(snapshot(self.dest), {})
+
+    def test_number_and_location_merge_copy_and_publish_plan(self):
+        """Arbitrary names of one frame retain files and merge recognized students."""
+        names = ("IMG_901256.jpg", "IMG_901256База.jpg", "IMG_901256бБаза.jpg",
+                 "PH_ДругойПрефикс_901256Донор.jpg")
+        for index, name in enumerate(names):
+            self.info[name] = {
+                "filename": name,
+                "location_name": "PORTRAIT" if index % 2 else "portrait",
+                "faces": [{"student_id": "A7K3-S001" if index % 2 else "A7K3-S002"}],
+            }
+            self.file(name, str(index).encode())
+        write_json(self.analysis / "info_faces.json", self.info)
+        before = snapshot(self.analysis)
+        self.copy_now()
+        self.assertEqual(snapshot(self.analysis), before)
+        for index, name in enumerate(names):
+            self.assertEqual((self.dest / "portrait" / name).read_bytes(), str(index).encode())
+        outcome = self.worker("build")
+        self.assertTrue(outcome.assignment_saved)
+        payload = json.loads(self.assignment.read_text(encoding="utf-8"))
+        self.assertEqual(payload["assignments"], {
+            "A7K3-S001": ["901256"], "A7K3-S002": ["901256"],
+        })
+
+    def test_text_variants_ph_prefix_without_client_selection(self):
+        """PH_ remains a physical-file selection marker after merging arbitrary names."""
+        self.selection.unlink()
+        photographer_name = "ph_Произвольное_901256бБаза.jpg"
+        self.info[photographer_name] = dict(self.info["IMG_901256.jpg"], filename=photographer_name)
+        self.info["IMG_901256Донор.jpg"] = dict(self.info["IMG_901256.jpg"], filename="IMG_901256Донор.jpg")
+        write_json(self.analysis / "info_faces.json", self.info)
+        self.file("IMG_901256.jpg")
+        self.file("IMG_901256Донор.jpg")
+        self.copy_now()
+        self.assertEqual(snapshot(self.dest), {}, "Metadata PH_ alone must not select files")
+
+        photographer = self.file(photographer_name)
+        self.copy_now()
+        self.assertEqual({p.name for p in (self.dest / "portrait").iterdir()}, {
+            "IMG_901256.jpg", "IMG_901256Донор.jpg", photographer_name,
+        })
+        photographer.unlink()
+        result = copy_runner._calculate(self.copy_config())
+        self.assertFalse(result.has_errors, result.issues)
+        self.assertTrue(result.records["901256"].photographer_selected,
+                        "PH_ in the destination must still mark this frame")
+        self.assertFalse(self.selection.exists())
 
     def test_import_manual_click_without_analysis_or_photo_paths(self):
         self.selection.unlink()

@@ -1,8 +1,8 @@
 {
-  "description": "Просмотр персональных назначений и создание photo_assignments.json после копирования готовых изображений.",
+  "description": "Проверка и исправление расположения готовых фотографий по локациям, просмотр назначений и создание photo_assignments.json.",
   "category": "Редакторы",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.10.17",
+  "version": "2.2026.10.22",
   "command_line_args_meta": {
     "student_list_file": {
       "type": "file_path",
@@ -18,7 +18,7 @@
     },
     "source_dir": {
       "type": "dir_path",
-      "description": "Исходная папка с изображениями для поиска и копирования выбранных номеров.",
+      "description": "Исходная папка для поиска номеров и выбора фотографа. Может быть пустой после перемещения файлов.",
       "required": true,
       "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/JPG"
     },

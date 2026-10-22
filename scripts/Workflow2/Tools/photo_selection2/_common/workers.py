@@ -12,6 +12,7 @@ from .copy_service import CopySummary, copy_selected_files
 from .signatures import SelectionSignature, file_signature
 from .roster import load_roster
 from .storage import load_document
+from .location_service import LocationPlan, LocationRepair, analysis_version, repair_locations
 from .assignment_core import (
     BuildResult,
     build_assignments,
@@ -26,7 +27,7 @@ except ImportError:
     tqdm = None
 
 
-Operation = Literal["refresh", "copy", "build"]
+Operation = Literal["refresh", "copy", "build", "repair"]
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class BuildRequest:
     selection_signature: SelectionSignature
     session_name: str
     photo_session: str
+    location_plan: LocationPlan | None = None
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,8 @@ class OperationOutcome:
     assignment_saved: bool = False
     selection_signature: SelectionSignature = None
     preview_by_stem: dict[str, Path] | None = None
+    analysis_signature: str = ""
+    location_repair: LocationRepair | None = None
 
 
 class PhotoSelectionOperationWorker(QThread):
@@ -65,10 +69,12 @@ class PhotoSelectionOperationWorker(QThread):
 
     def __init__(self, request: BuildRequest, operation: Operation, parent=None):
         super().__init__(parent)
-        if operation not in {"refresh", "copy", "build"}:
+        if operation not in {"refresh", "copy", "build", "repair"}:
             raise ValueError(f"Неизвестная операция: {operation}")
         self.request = request
         self.operation = operation
+        self.analysis_signature = analysis_version(request.analysis_dir / "info_faces.json")
+        self.location_repair = None
 
     def _build(self) -> BuildResult:
         """Retain the original calculation and validate the requested session."""
@@ -89,6 +95,11 @@ class PhotoSelectionOperationWorker(QThread):
     def _selection_is_current(self) -> bool:
         selection_path = self.request.analysis_dir / "photo_selection.json"
         return file_signature(selection_path) == self.request.selection_signature
+
+    def _inputs_are_current(self) -> bool:
+        return (self._selection_is_current() and analysis_version(
+            self.request.analysis_dir / "info_faces.json"
+        ) == self.analysis_signature)
 
     def _preview_index(self) -> dict[str, Path]:
         """Build a deterministic JPG index off the GUI thread."""
@@ -121,6 +132,8 @@ class PhotoSelectionOperationWorker(QThread):
             saved,
             self.request.selection_signature,
             self._preview_index() if include_preview else {},
+            self.analysis_signature,
+            self.location_repair,
         )
 
     def run(self) -> None:
@@ -128,8 +141,24 @@ class PhotoSelectionOperationWorker(QThread):
         try:
             self.stageChanged.emit("Сканирование исходной и целевой папок…")
             result = self._build()
-            if not self._selection_is_current():
+            if not self._inputs_are_current():
                 self.completed.emit(self._outcome(result, include_preview=False))
+                return
+            if self.operation == "repair":
+                plan = self.request.location_plan
+                if plan is None:
+                    raise ValueError("Сначала выполните проверку расположения файлов.")
+                structural_errors = [i for i in result.issues
+                                     if i.severity == "error" and i.code != "location_mismatch"]
+                if not structural_errors:
+                    self.location_repair = repair_locations(
+                        plan, inputs_current=self._inputs_are_current,
+                        progress=lambda done, total: self.stageChanged.emit(
+                            f"Исправление расположения файлов: {done} из {total}…"),
+                    )
+                    result = self._build()
+                    result.issues.extend(self.location_repair.issues)
+                self.completed.emit(self._outcome(result))
                 return
             if result.has_errors:
                 self.completed.emit(self._outcome(result))
@@ -148,7 +177,7 @@ class PhotoSelectionOperationWorker(QThread):
                 if any(issue.severity == "error" for issue in summary.issues):
                     self.completed.emit(self._outcome(result, summary))
                     return
-                if not self._selection_is_current():
+                if not self._inputs_are_current():
                     self.completed.emit(
                         self._outcome(result, summary, include_preview=False)
                     )
@@ -158,7 +187,7 @@ class PhotoSelectionOperationWorker(QThread):
 
             saved = False
             if self.operation == "build" and not result.has_errors:
-                if not self._selection_is_current():
+                if not self._inputs_are_current():
                     self.completed.emit(
                         self._outcome(result, summary, include_preview=False)
                     )
@@ -168,9 +197,14 @@ class PhotoSelectionOperationWorker(QThread):
                     self.completed.emit(self._outcome(result, summary))
                     return
                 self.stageChanged.emit("Создание photo_assignments.json…")
-                save_assignments(self.request.assignment_path, result)
+                save_assignments(self.request.assignment_path, result,
+                                 inputs_current=self._inputs_are_current)
                 saved = True
 
             self.completed.emit(self._outcome(result, summary, saved))
         except Exception as exc:
-            self.failed.emit(str(exc))
+            message = str(exc)
+            if self.location_repair is not None:
+                message = (f"Перемещено файлов: {len(self.location_repair.moved)}. "
+                           f"Повторная проверка не завершена: {message}")
+            self.failed.emit(message)

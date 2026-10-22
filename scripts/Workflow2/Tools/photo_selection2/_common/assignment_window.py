@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from html import escape
+from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer, QUrl
@@ -13,13 +14,14 @@ from PySide6.QtWidgets import (
 )
 
 from .assignment_core import normalize_exclude_dirs
-from .constants import ITEM_NUMBER_ROLE, ITEM_PATHS_ROLE
+from .constants import ITEM_NUMBER_ROLE, ITEM_PATHS_ROLE, ITEM_STUDENT_ROLE, ITEM_LOCATION_ROLE
 from .image_pipeline import PhotoSelectionImagePipeline
 from .models import PhotoSelectionSessionState
 from .roster import load_roster
 from .ui_widgets import ImagePreviewLabel
 from .workers import BuildRequest, OperationOutcome, PhotoSelectionOperationWorker
 from .signatures import file_signature
+from .location_service import analysis_version
 from .assignment_views import AssignmentViewsMixin
 from .export_service import ExportMixin
 from .preview_service import PreviewMixin
@@ -28,7 +30,7 @@ from .window_base import WindowBase
 
 
 class AssignmentWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, ExportMixin, WindowBase):
-    """Read-only views with exactly one permitted mutating operation."""
+    """Review assignments, explicitly repair locations and publish the plan."""
     OPERATION = "build"
     ACTION_TITLE = "Создать план вёрстки"
     WINDOW_STATE_VAR = "win_state.photo_selection04_assignments"
@@ -42,6 +44,7 @@ class AssignmentWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, ExportMi
         self.state = PhotoSelectionSessionState()
         self._worker = None
         self._refresh_pending = False
+        self._displayed_selection_signature = None
         self._base_report_html = ""
         self._preview_by_stem = {}
         self._final_log_emitted = False
@@ -84,6 +87,10 @@ class AssignmentWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, ExportMi
             button = QPushButton(title)
             button.clicked.connect(handler)
             buttons.addWidget(button)
+        self.repair_button = QPushButton("Исправить расположение файлов")
+        self.repair_button.clicked.connect(lambda: self._start_operation("repair"))
+        self.repair_button.setEnabled(False)
+        buttons.addWidget(self.repair_button)
         buttons.addStretch()
         layout.addWidget(self.assignment_buttons)
         self._restore_window_state()
@@ -92,13 +99,21 @@ class AssignmentWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, ExportMi
     def _set_busy(self, busy):
         self.view_tabs.setEnabled(not busy)
         self.assignment_buttons.setEnabled(not busy)
+        result = self.state.build_result
+        repairable = bool(result and result.location_plan and result.location_plan.executable)
+        structural_errors = bool(result and any(
+            i.severity == "error" and i.code not in {
+                "location_mismatch", "location_move_failed", "location_repair_stopped"
+            } for i in result.issues
+        ))
+        self.repair_button.setEnabled(not busy and repairable and not structural_errors)
 
     def perform_operation(self):
         self._start_operation(self.OPERATION)
 
     def _start_operation(self, operation):
         """Reload inputs and prevent calls to another stage's operation."""
-        if operation not in {"refresh", self.OPERATION}:
+        if operation not in {"refresh", "repair", self.OPERATION}:
             raise ValueError("Эта операция недоступна в данном скрипте.")
         if self._worker is not None and self._worker.isRunning():
             if operation == "refresh":
@@ -107,12 +122,16 @@ class AssignmentWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, ExportMi
         try:
             self.roster = load_roster(Path(self.config.student_list_file))
             request = self._operation_request()
+            if operation == "repair":
+                request = replace(request, selection_signature=self._displayed_selection_signature)
+            worker = PhotoSelectionOperationWorker(request, operation, self)
         except Exception as exc:
             self._operation_error(str(exc))
             return
         self.state.copy_summary = None
+        if operation != "refresh":
+            self.state.location_repair = None
         self._set_busy(True)
-        worker = PhotoSelectionOperationWorker(request, operation, self)
         self._worker = worker
         worker.stageChanged.connect(self._show_worker_stage)
         worker.completed.connect(self._operation_completed)
@@ -198,6 +217,8 @@ class AssignmentWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, ExportMi
             selection_signature=file_signature(self.selection_path),
             session_name=self.config.session_name,
             photo_session=self.config.photo_session,
+            location_plan=(self.state.build_result.location_plan
+                           if self.state.build_result is not None else None),
         )
 
     def _show_worker_stage(self, message: str) -> None:
@@ -218,30 +239,58 @@ class AssignmentWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, ExportMi
         QMessageBox.critical(self, "Обработка фотографий", message)
 
     def _operation_completed(self, outcome: OperationOutcome) -> None:
-        if outcome.selection_signature != file_signature(self.selection_path):
+        if outcome.location_repair is not None:
+            self.state.location_repair = outcome.location_repair
+        try:
+            analysis_current = outcome.analysis_signature == analysis_version(
+                Path(self.config.analysis_dir) / "info_faces.json")
+        except OSError:
+            analysis_current = False
+        if outcome.selection_signature != file_signature(self.selection_path) or not analysis_current:
             self.state.assignments_dirty = True
             self._refresh_pending = True
             self.report.setHtml(
                 self._message_header_html()
-                + "<h3>Выбор изменён</h3>"
+                + "<h3>Исходные данные изменены</h3>"
                 + "<p>Устаревший результат фоновой операции отброшен. "
                 + "После завершения будет выполнен новый пересчёт.</p>"
             )
             return
+        relocated = {str(move.source): str(move.target)
+                     for move in outcome.location_repair.moved} if outcome.location_repair else {}
+        selected = [self._selection_key(table.currentItem(), relocated)
+                    for table in (self.photo_table, self.student_location_table)]
         self.state.build_result = outcome.result
+        self._displayed_selection_signature = outcome.selection_signature
         self._preview_by_stem = dict(outcome.preview_by_stem or {})
         if outcome.copy_summary is not None:
             self.state.copy_summary = outcome.copy_summary
         if outcome.assignment_saved:
             self.state.assignments_dirty = False
         elif outcome.operation == "refresh" and self.OPERATION == "build":
-            self.state.assignments_dirty = not self._assignment_file_matches_result(
+            self.state.assignments_dirty = self.state.assignments_dirty or not self._assignment_file_matches_result(
                 outcome.result
             )
-        elif outcome.operation == "copy":
+        elif outcome.operation in {"copy", "repair"}:
             self.state.assignments_dirty = True
+        self.preview.show_message("Выберите фотографию для предпросмотра")
         self._render_assignment_views()
+        for table, key in zip((self.photo_table, self.student_location_table), selected):
+            self._restore_selection(table, key)
+        active_table = self.view_tabs.currentWidget()
+        if active_table.currentItem() is not None:
+            self._on_assignment_item_changed(active_table.currentItem(), None)
         if outcome.operation == "refresh":
+            return
+        if outcome.operation == "repair":
+            count = len(outcome.location_repair.moved) if outcome.location_repair else 0
+            message = f"Перемещено файлов: {count}."
+            if outcome.result.has_errors:
+                message += "\nОстались ошибки или конфликты. Подробности в отчёте."
+                QMessageBox.warning(self, "Расположение файлов", message)
+            else:
+                message += "\nТеперь можно создать план вёрстки."
+                QMessageBox.information(self, "Расположение файлов", message)
             return
         if outcome.result.has_errors:
             QMessageBox.warning(
@@ -258,6 +307,44 @@ class AssignmentWindow(ReportMixin, AssignmentViewsMixin, PreviewMixin, ExportMi
         if outcome.assignment_saved:
             message += f"\nФайл создан:\n{self.assignment_path}"
         QMessageBox.information(self, "Обработка фотографий", message)
+
+    @staticmethod
+    def _selection_key(item, relocated=None):
+        """Identify a selected row independently of row order and renamed locations."""
+        if item is None:
+            return None
+        relocated = relocated or {}
+        paths = tuple(relocated.get(str(path), str(path))
+                      for path in (item.data(0, ITEM_PATHS_ROLE) or []))
+        number = str(item.data(0, ITEM_NUMBER_ROLE) or "")
+        student = ""
+        ancestor = item
+        while ancestor is not None:
+            student = student or str(ancestor.data(0, ITEM_STUDENT_ROLE) or "")
+            number = number or str(ancestor.data(0, ITEM_NUMBER_ROLE) or "")
+            ancestor = ancestor.parent()
+        location = str(item.data(0, ITEM_LOCATION_ROLE) or "") if not number else ""
+        return student, number, location, paths
+
+    def _restore_selection(self, table, key):
+        """Restore a surviving row without refreshing the inactive tab's report."""
+        if key is None:
+            return
+        pending = [table.topLevelItem(i) for i in range(table.topLevelItemCount())]
+        while pending:
+            item = pending.pop()
+            if self._selection_key(item) == key:
+                previous = table.blockSignals(True)
+                try:
+                    table.setCurrentItem(item)
+                    parent = item.parent()
+                    while parent is not None:
+                        parent.setExpanded(True)
+                        parent = parent.parent()
+                finally:
+                    table.blockSignals(previous)
+                return
+            pending.extend(item.child(i) for i in range(item.childCount()))
 
     def _operation_finished(self) -> None:
         worker = self._worker
