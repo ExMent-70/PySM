@@ -1,8 +1,8 @@
 {
-  "description": "Генерирует фотоальбомы в формате IDML. Полный состав, порядок и персональные данные берёт из *.list; персональные фотографии выбирает по шестизначным номерам из photo_assignments.json. Общие мастер-рамки по-прежнему читают папки напрямую. Поддерживает режимы: sheet, photo, vignette, personal_vignette, multipage_vignette и multipage_personal_vignette. До генерации проверяет вместимость рамок и корректность текстовых override, чтобы люди и персональные значения не терялись молча. В multipage_personal_vignette отсутствие персональных рамок, portrait_N или teacher_N не блокирует создание применимых общих и персональных разворотов. Сборочная константа DEMO_MAX_SPREADS позволяет ограничить число создаваемых разворотов демонстрационной версии.\n\nШаблон и его конфигурация загружаются из переменной контекста, заданной параметром <b>idsgn_template_var</b>.",
+  "description": "Генерирует фотоальбомы в формате IDML. Полный состав, порядок и персональные данные берёт из *.list; персональные фотографии выбирает по шестизначным номерам из photo_assignments.json. В рабочем логе вставки фотографий отображается полный источник фотосессия/локация между меткой рамки и именем файла. Все графические источники используют назначения schema_version=2: пользователь → локация → номера; фотографии лежат в плоской папке фотосессии. Поддерживает режимы: sheet, photo, vignette, personal_vignette, multipage_vignette и multipage_personal_vignette. До генерации проверяет вместимость рамок и корректность текстовых override, чтобы люди и персональные значения не терялись молча. В multipage_personal_vignette отсутствие персональных рамок, portrait_N или teacher_N не блокирует создание применимых общих и персональных разворотов. Сборочная константа DEMO_MAX_SPREADS позволяет ограничить число создаваемых разворотов демонстрационной версии.\n\nШаблон и его конфигурация загружаются из переменной контекста, заданной параметром <b>idsgn_template_var</b>.\n\nИсточники фотографий задаются явно как фотосессия/локация. Один шаблон может использовать SCHOOL и STREET одновременно; старые назначения без фотосессии требуют переназначения.",
   "category": "InDesign",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "v2.2026.09.06",
+  "version": "v2.2026.10.23",
   "command_line_args_meta": {
     "idsgn_template_var": {
       "type": "str",
@@ -10,11 +10,11 @@
       "required": true,
       "default": "wf_indsgn_template.default"
     },
-    "photo_assignments_file": {
-      "type": "file_path",
-      "description": "Обязательный photo_assignments.json со списками разрешённых шестизначных номеров по student_id.",
+    "photo_assignments_root": {
+      "type": "dir_path",
+      "description": "Корень Output с Analysis_<фотосессия>/photo_assignments.json схемы 2; нужен и для персонального заполнения, и для мастера.",
       "required": true,
-      "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}/photo_assignments.json"
+      "default": "{wf_session_path}/{wf_session_name}/Output"
     },
     "student_list_file": {
       "type": "file_path",
@@ -24,9 +24,9 @@
     },
     "source_photos_dir": {
       "type": "dir_path",
-      "description": "Корневая папка, в которой находятся подпапки с фотографиями.",
+      "description": "Общий корень Фото с плоскими папками фотосессий. SCHOOL/portrait — логическая локация из JSON; файлы находятся в Фото/SCHOOL.",
       "required": true,
-      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото/{wf_photo_session}"
+      "default": "{wf_psd_path}/{wf_session_name}/Альбом/Фото"
     },
     "output_file": {
       "type": "file_path",
