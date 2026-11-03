@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 import csv
 from html import escape
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -17,6 +18,7 @@ from .assignment_core import (
     index_records_by_student_location,
     is_excluded_relative_path,
 )
+from .roster import StudentRecord
 
 
 @contextmanager
@@ -59,7 +61,7 @@ def _atomic_text_writer(
 class ExportMixin:
     def _layout_file_matrix(
         self,
-    ) -> tuple[list[str], list[tuple[str, dict[str, list[str]]]]]:
+    ) -> tuple[list[str], list[tuple[StudentRecord, dict[str, list[str]]]]]:
         result = self.state.build_result
         if result is None:
             return [], []
@@ -101,14 +103,14 @@ class ExportMixin:
                     else:
                         values.add(record.number)
                 files_by_location[location] = sorted(values, key=str.casefold)
-            students.append((student.display_name, files_by_location))
+            students.append((student, files_by_location))
         return locations, students
 
     def _student_location_html(self) -> str:
         locations, students = self._layout_file_matrix()
         headers = "".join(f"<th>{escape(location)}</th>" for location in locations)
         rows = []
-        for full_name, files_by_location in students:
+        for student, files_by_location in students:
             cells = []
             for location in locations:
                 files = files_by_location[location]
@@ -118,7 +120,7 @@ class ExportMixin:
                 else:
                     cells.append('<td class="missing">—</td>')
             rows.append(
-                f"<tr><th class=\"student\">{escape(full_name)}</th>"
+                f"<tr><th class=\"student\">{escape(student.display_name)}</th>"
                 f"{''.join(cells)}</tr>"
             )
         return (
@@ -172,6 +174,11 @@ class ExportMixin:
         if not output_path.suffix:
             output_path = output_path.with_suffix(".csv")
         locations, students = self._layout_file_matrix()
+        info_columns = list(dict.fromkeys(
+            key for student in self.roster.students
+            if isinstance((info := student.raw_data.get("info")), dict)
+            for key in info
+        ))
         try:
             with _atomic_text_writer(
                 output_path,
@@ -179,15 +186,25 @@ class ExportMixin:
                 newline="",
             ) as stream:
                 writer = csv.writer(stream, delimiter=";")
-                writer.writerow(["ФИО", *locations])
-                for full_name, files_by_location in students:
+                writer.writerow(["Фамилия", "Имя", "Отчество", *(f"@{location}" for location in locations), *info_columns])
+                for student, files_by_location in students:
+                    info = student.raw_data.get("info")
+                    info = info if isinstance(info, dict) else {}
                     writer.writerow(
                         [
-                            full_name,
-                            *("\n".join(files_by_location[location]) for location in locations),
+                            student.surname, student.name, student.patronymic,
+                            *(", ".join(files_by_location[location]) for location in locations),
+                            *(self._csv_info_value(info.get(key)) for key in info_columns),
                         ]
                     )
         except OSError as exc:
             QMessageBox.critical(self, "Сохранение CSV", f"Не удалось сохранить файл:\n{exc}")
             return
         QMessageBox.information(self, "Сохранение CSV", f"Таблица сохранена:\n{output_path}")
+
+    @staticmethod
+    def _csv_info_value(value) -> str:
+        """Preserve text and represent non-string JSON values without losing structure."""
+        if value is None:
+            return ""
+        return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)

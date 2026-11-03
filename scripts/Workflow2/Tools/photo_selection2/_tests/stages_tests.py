@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from argparse import Namespace
 from contextlib import ExitStack, redirect_stdout, redirect_stderr
+import csv
 import hashlib
+from html.parser import HTMLParser
 import importlib
 import io
 import json
@@ -32,10 +34,10 @@ SUITE = ROOT / "scripts/Workflow2/Tools/photo_selection2"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts/Workflow2/Tools"))
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QPoint, Qt, QTimer, QUrl
 from PySide6.QtGui import QImage, QColor
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QDialog, QMessageBox, QPlainTextEdit, QPushButton
+from PySide6.QtWidgets import QApplication, QDialog, QHBoxLayout, QHeaderView, QMessageBox, QPlainTextEdit, QPushButton
 
 from photo_selection2._common import assignment_core as core
 from photo_selection2._common import copy_service, workers, window_base
@@ -46,6 +48,7 @@ from photo_selection2._common.domain import SelectionDocument, ImportEntry
 from photo_selection2._common.roster import load_roster
 from photo_selection2._common.storage import load_document, save_document
 from photo_selection2._common.signatures import file_signature
+from photo_selection2._common.student_location_table import PHOTOS_ROLE, StudentLocationTable
 from photo_selection2.selection_import._lib.app import ImportWindow
 from photo_selection2.selection_copy._lib import runner as copy_runner
 from photo_selection2.selection_assignments._lib.app import AssignmentsWindow
@@ -125,7 +128,7 @@ class StageTests(unittest.TestCase):
     def config(self, **overrides):
         values = dict(student_list_file=str(self.list_file), analysis_dir=str(self.analysis),
                       source_dir=str(self.source), dest_dir=str(self.dest), session_name="Класс",
-                      photo_session="SCHOOL", exclude_dirs="Masks", on_conflict="skip", mode="copy", title="Проверка Photo Selection 04",
+                      photo_session="SCHOOL", exclude_dirs="Masks", on_conflict="skip", mode="copy", layout="flat", title="Проверка Photo Selection 04",
                       message="<p>Инструкция оператора</p>")
         values.update(overrides)
         return Namespace(**values)
@@ -201,76 +204,9 @@ class StageTests(unittest.TestCase):
         self.assertEqual(code, 0, output.getvalue() + errors.getvalue())
         return output.getvalue()
 
-    def test_retouch_location_repair_then_publish_with_empty_source(self):
-        """Full move/retouch/reclassify workflow preserves bytes and both inputs."""
-        self.file("PH_IMG_901256.psd", b"original PSD")
-        config = self.copy_config()
-        config.mode = "move"
-        self.copy_now(config)
-        source = self.dest / "portrait/PH_IMG_901256.psd"
-        source.write_bytes(b"retouched layers")
-        selection_bytes = self.selection.read_bytes()
-        self.info["IMG_901256.jpg"]["location_name"] = "new_portrait"
-        write_json(self.analysis / "info_faces.json", self.info)
-        analysis_bytes = (self.analysis / "info_faces.json").read_bytes()
-        window = self.open_window(AssignmentsWindow)
-        self.assertTrue(window.repair_button.isEnabled())
-        self.assertTrue(source.exists(), "Opening the window must not move files")
-        self.click(window, window.ACTION_TITLE)
-        self.assertFalse(self.assignment.exists())
-        self.click(window, "Исправить расположение файлов")
-        self.assertFalse(source.exists())
-        self.assertEqual((self.dest / "new_portrait/PH_IMG_901256.psd").read_bytes(), b"retouched layers")
-        self.assertFalse(window.repair_button.isEnabled())
-        self.assertFalse(self.assignment.exists(), "Repair must not implicitly publish")
-        self.assertFalse(window._album_readiness(window.state.build_result)["ready"])
-        self.click(window, window.ACTION_TITLE)
-        self.assertTrue(window._album_readiness(window.state.build_result)["ready"])
-        self.assertEqual(self.selection.read_bytes(), selection_bytes)
-        self.assertEqual((self.analysis / "info_faces.json").read_bytes(), analysis_bytes)
-        self.assertFalse(any(self.source.rglob("*")))
-
-    def test_unselected_wrong_location_blocks_even_with_valid_selected_file(self):
-        self.image(self.dest / "portrait/IMG_901256.jpg")
-        self.image(self.dest / "old/IMG_901270.jpg")
-        self.assignment.write_bytes(b"previous assignments")
-        result = self.worker("build")
-        self.assertFalse(result.assignment_saved)
-        self.assertEqual(self.assignment.read_bytes(), b"previous assignments")
-        self.assertTrue(core.has_layout_ready_destination_file(result.result.records["901256"]))
-        self.assertFalse(core.has_layout_ready_destination_file(result.result.records["901270"]))
-
-    def test_root_destination_file_requires_repair(self):
-        self.image(self.dest / "IMG_901256.jpg")
-        result = self.worker("build")
-        self.assertFalse(result.assignment_saved)
-        self.assertFalse(core.has_layout_ready_destination_file(result.result.records["901256"]))
-        self.assertEqual(len(result.result.location_plan.executable), 1)
-
-    def test_repair_rejects_stale_displayed_plan_and_refreshes_paths(self):
-        self.image(self.dest / "old/IMG_901256.jpg")
-        window = self.open_window(AssignmentsWindow)
-        self.info["IMG_901256.jpg"]["location_name"] = "new_portrait"
-        write_json(self.analysis / "info_faces.json", self.info)
-        self.click(window, "Исправить расположение файлов")
-        self.assertTrue((self.dest / "old/IMG_901256.jpg").exists())
-        self.assertIn("new_portrait", window.report.toPlainText())
-        self.assertTrue(window.repair_button.isEnabled())
-        self.click(window, "Исправить расположение файлов")
-        self.assertTrue((self.dest / "new_portrait/IMG_901256.jpg").exists())
-
-    def test_changed_client_selection_prevents_repair_until_refreshed(self):
-        self.image(self.dest / "old/IMG_901256.jpg")
-        window = self.open_window(AssignmentsWindow)
-        self.document.apply("A7K3-S002", ["901270"], source="manual")
-        save_document(self.selection, self.document)
-        self.click(window, "Исправить расположение файлов")
-        self.wait(lambda: window._worker is None and not window._refresh_pending)
-        self.assertTrue((self.dest / "old/IMG_901256.jpg").exists())
-        self.assertFalse((self.dest / "portrait/IMG_901256.jpg").exists())
 
     def test_save_revalidates_analysis_and_destination_before_publication(self):
-        self.image(self.dest / "portrait/IMG_901256.jpg")
+        self.image(self.dest / "IMG_901256.jpg")
         result = core.build_assignments(**self.inputs())
         self.assignment.write_bytes(b"previous assignments")
         self.info["IMG_901256.jpg"]["location_name"] = "changed"
@@ -282,21 +218,21 @@ class StageTests(unittest.TestCase):
         self.info["IMG_901256.jpg"]["location_name"] = "portrait"
         write_json(self.analysis / "info_faces.json", self.info)
         result = core.build_assignments(**self.inputs())
-        self.image(self.dest / "old/IMG_901270.jpg")
+        self.image(self.dest / "IMG_901270.jpg")
         with self.assertRaises(ValueError):
             core.save_assignments(self.assignment, result)
         self.assertEqual(self.assignment.read_bytes(), b"previous assignments")
 
-    def test_save_cannot_bypass_location_audit(self):
-        self.image(self.dest / "portrait/IMG_901256.jpg")
+    def test_save_cannot_bypass_destination_inventory(self):
+        self.image(self.dest / "IMG_901256.jpg")
         result = core.build_assignments(**self.inputs())
-        result.location_plan = None
-        with self.assertRaisesRegex(ValueError, "Проверка локаций"):
+        result.destination_inventory = None
+        with self.assertRaisesRegex(ValueError, "Проверка целевых файлов"):
             core.save_assignments(self.assignment, result)
         self.assertFalse(self.assignment.exists())
 
     def test_analysis_change_during_json_write_preserves_previous_plan(self):
-        self.image(self.dest / "portrait/IMG_901256.jpg")
+        self.image(self.dest / "IMG_901256.jpg")
         result = core.build_assignments(**self.inputs())
         self.assignment.write_bytes(b"previous plan")
         dump = core.json.dump
@@ -317,51 +253,9 @@ class StageTests(unittest.TestCase):
         save_document(self.selection, self.document)
         self.image(self.dest / "old/IMG_999999.jpg")
         result = core.build_assignments(**self.inputs())
-        self.assertFalse(result.location_plan.moves)
-        self.assertTrue(any(i.code == "location_unknown_number" for i in result.issues))
+        self.assertEqual(result.records["999999"].location, "unknown")
+        self.assertEqual(result.assignment_payload()["assignments"]["A7K3-S001"]["unknown"], ["999999"])
 
-    def test_repair_conflicts_and_partial_success_are_visible_in_gui(self):
-        self.image(self.dest / "portrait/IMG_901256.jpg")
-        self.image(self.dest / "old/IMG_901256.jpg")
-        self.image(self.dest / "old/IMG_901270.jpg")
-        window = self.open_window(AssignmentsWindow)
-        self.assertIn("Путь назначения уже занят", window.report.toPlainText())
-        self.click(window, "Исправить расположение файлов")
-        self.assertTrue((self.dest / "old/IMG_901256.jpg").exists())
-        self.assertTrue((self.dest / "group_photo_01/IMG_901270.jpg").exists())
-        self.assertIn("Перемещено файлов: 1", window.report.toPlainText())
-        self.assertFalse(window.repair_button.isEnabled())
-        self.click(window, window.ACTION_TITLE)
-        self.assertFalse(self.assignment.exists())
-
-    def test_repair_preserves_selected_photo_and_defers_close_while_busy(self):
-        self.image(self.dest / "old/IMG_901256.jpg")
-        window = self.open_window(AssignmentsWindow)
-        window.photo_table.setCurrentItem(window.photo_table.topLevelItem(0))
-        selected = window._selection_key(window.photo_table.currentItem())
-        entered, release = threading.Event(), threading.Event()
-        repair = workers.repair_locations
-
-        def delayed(*args, **kwargs):
-            entered.set()
-            if not release.wait(5):
-                raise RuntimeError("Test did not release worker")
-            return repair(*args, **kwargs)
-
-        with patch.object(workers, "repair_locations", side_effect=delayed):
-            window._start_operation("repair")
-            try:
-                self.wait(entered.is_set)
-                self.assertFalse(window.assignment_buttons.isEnabled())
-                window.close()
-                self.assertTrue(window.isVisible())
-            finally:
-                release.set()
-            self.wait(lambda: window._worker is None)
-        self.assertEqual(selected, window._selection_key(window.photo_table.currentItem()))
-        file_item = window.photo_table.currentItem().child(0)
-        self.assertEqual(window._target_path_for_item(file_item), self.dest / "portrait/IMG_901256.jpg")
-        self.assertIn("Перемещено файлов: 1", window.report.toPlainText())
 
     def test_analysis_export_variants_copy_and_move(self):
         """Numbered export variants must not block either transfer mode."""
@@ -373,7 +267,7 @@ class StageTests(unittest.TestCase):
         self.copy_now()
         self.assertTrue(all(path.exists() for path in originals))
         for path in originals:
-            self.assertEqual((self.dest / "portrait" / path.name).read_bytes(), path.read_bytes())
+            self.assertEqual((self.dest / path.name).read_bytes(), path.read_bytes())
         config = self.copy_config()
         config.mode = "move"
         config.on_conflict = "overwrite"
@@ -443,12 +337,12 @@ class StageTests(unittest.TestCase):
         self.copy_now()
         self.assertEqual(snapshot(self.analysis), before)
         for index, name in enumerate(names):
-            self.assertEqual((self.dest / "portrait" / name).read_bytes(), str(index).encode())
+            self.assertEqual((self.dest / name).read_bytes(), str(index).encode())
         outcome = self.worker("build")
         self.assertTrue(outcome.assignment_saved)
         payload = json.loads(self.assignment.read_text(encoding="utf-8"))
         self.assertEqual(payload["assignments"], {
-            "A7K3-S001": ["901256"], "A7K3-S002": ["901256"],
+            "A7K3-S001": {"portrait": ["901256"]}, "A7K3-S002": {"portrait": ["901256"]},
         })
 
     def test_text_variants_ph_prefix_without_client_selection(self):
@@ -465,7 +359,7 @@ class StageTests(unittest.TestCase):
 
         photographer = self.file(photographer_name)
         self.copy_now()
-        self.assertEqual({p.name for p in (self.dest / "portrait").iterdir()}, {
+        self.assertEqual({p.name for p in self.dest.iterdir()}, {
             "IMG_901256.jpg", "IMG_901256Донор.jpg", photographer_name,
         })
         photographer.unlink()
@@ -575,18 +469,18 @@ class StageTests(unittest.TestCase):
         self.assertIn("другим окном", self.messages[-1])
 
     def test_copy_matches_original_with_raw_sidecars_and_photographer(self):
-        for name in ["IMG_901256.CR3", "IMG_901256.xmp", "CaptureOne/Settings/IMG_901256.CR3.cos", "portrait/IMG_901256.jpg", "ph_IMG_901270.psd", "Masks/IMG_901256.png", "nested/Masks/IMG_901270.jpg"]:
+        for name in ["IMG_901256.CR3", "IMG_901256.xmp", "CaptureOne/Settings/IMG_901256.CR3.cos", "IMG_901256.jpg", "ph_IMG_901270.psd", "Masks/IMG_901256.png", "nested/Masks/IMG_901270.jpg"]:
             self.file(name)
         new_result = core.build_assignments(**self.inputs())
         old_result = original_core.build_assignments(**self.inputs())
-        self.assertEqual(new_result.assignment_payload(), old_result.assignment_payload())
+        self.assertEqual(new_result.assignments, old_result.assignments)
         self.assertEqual([vars(i) for i in new_result.issues], [vars(i) for i in old_result.issues])
         other_dest = self.root / "old-dest"
         old_summary = original_copy.copy_selected_files(old_result, self.source, other_dest)
         copy_result = copy_runner._calculate(self.copy_config())
         self.assertFalse(copy_result.has_errors)
         self.assertEqual(copy_result.assignments, {})
-        new_summary = copy_service.copy_selected_files(copy_result, self.source, self.dest)
+        new_summary = copy_service.copy_selected_files(copy_result, self.source, self.dest, layout="by_location")
         self.assertEqual((new_summary.copied, new_summary.skipped), (old_summary.copied, old_summary.skipped))
         self.assertEqual(snapshot(self.dest), snapshot(other_dest))
         self.assertTrue((self.dest / "portrait/CaptureOne/Settings/IMG_901256.CR3.cos").is_file())
@@ -622,7 +516,7 @@ class StageTests(unittest.TestCase):
             with self.subTest(mode=mode, conflict=conflict):
                 result, _ = self.copy_subprocess("--mode", mode, "--on_conflict", conflict)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                target = self.dest / "portrait/CaptureOne/Cache/Thumbnails" / sidecar_name
+                target = self.dest / "CaptureOne/Cache/Thumbnails" / sidecar_name
                 self.assertEqual(target.read_bytes(), b"thumbnail")
                 if conflict == "rename":
                     self.assertEqual(target.with_name(target.stem + " (1).cot").read_bytes(), b"thumbnail")
@@ -631,7 +525,8 @@ class StageTests(unittest.TestCase):
                 self.assertTrue(other.exists())
                 plan = core.build_assignments(**self.inputs())
                 self.assertFalse(plan.has_errors, plan.issues)
-                self.assertIn(target, plan.records["271787"].destination_files)
+                self.assertNotIn(target, plan.records["271787"].destination_files)
+                self.assertIn(self.dest / raw_name, plan.records["271787"].destination_files)
                 self.assertEqual(plan.records["271955"].destination_files, [])
                 self.assertEqual(plan.assignments["A7K3-S001"], ["271787"])
                 self.assertEqual(snapshot(self.analysis), before)
@@ -664,17 +559,17 @@ class StageTests(unittest.TestCase):
         outcome = self.worker("copy")
         self.assertFalse(outcome.result.has_errors)
         self.assertEqual(outcome.copy_summary.skipped, 1)
-        self.assertEqual((self.dest / "portrait/IMG_901256.CR3").read_bytes(), b"raw")
+        self.assertEqual((self.dest / "IMG_901256.CR3").read_bytes(), b"raw")
         same = self.worker("copy", source_dir=self.dest, dest_dir=self.dest)
         self.assertEqual(same.copy_summary.skipped, 1)
 
     def test_ph_prefix_already_in_destination_marks_source_frame(self):
         self.file("IMG_901270.psd")
-        self.image(self.dest / "group_photo_01/PH_IMG_901270.jpg")
+        self.image(self.dest / "PH_IMG_901270.jpg")
         self.copy_now()
-        self.assertTrue((self.dest / "group_photo_01/IMG_901270.psd").is_file())
+        self.assertTrue((self.dest / "IMG_901270.psd").is_file())
         outcome = self.worker("copy")
-        self.assertTrue((self.dest / "group_photo_01/IMG_901270.psd").is_file())
+        self.assertTrue((self.dest / "IMG_901270.psd").is_file())
         self.assertEqual(outcome.result.assignments["A7K3-S002"], ["901270"])
 
     def test_unknown_location_and_unsafe_location(self):
@@ -682,7 +577,7 @@ class StageTests(unittest.TestCase):
         write_json(self.analysis / "info_faces.json", self.info)
         self.file("IMG_901256.CR3")
         self.worker("copy")
-        self.assertTrue((self.dest / "unknown/IMG_901256.CR3").exists())
+        self.assertTrue((self.dest / "IMG_901256.CR3").exists())
         self.info["IMG_901256.jpg"]["location_name"] = "../outside"
         write_json(self.analysis / "info_faces.json", self.info)
         before = snapshot(self.dest)
@@ -708,16 +603,16 @@ class StageTests(unittest.TestCase):
         self.assertIn("assignment_layout_file_missing", {i.code for i in outcome.result.issues})
 
     def test_build_does_not_copy_or_edit_selection(self):
-        self.image(self.dest / "portrait/IMG_901256.jpg")
+        self.image(self.dest / "IMG_901256.jpg")
         before = (self.selection.read_bytes(), file_signature(self.selection))
         with patch.object(workers, "copy_selected_files", side_effect=AssertionError("Build copied files")):
             outcome = self.worker("build")
         self.assertTrue(outcome.assignment_saved)
         self.assertEqual(before, (self.selection.read_bytes(), file_signature(self.selection)))
-        self.assertEqual(json.loads(self.assignment.read_text()), original_core.build_assignments(**self.inputs()).assignment_payload())
+        self.assertEqual(json.loads(self.assignment.read_text()), {"schema_version": 2, "list_id": "A7K3", "assignments": {"A7K3-S001": {"portrait": ["901256"]}}})
 
     def test_worker_drops_selection_changed_during_scan(self):
-        self.image(self.dest / "portrait/IMG_901256.jpg")
+        self.image(self.dest / "IMG_901256.jpg")
         original = workers.PhotoSelectionOperationWorker._build
 
         def mutate(worker):
@@ -732,7 +627,7 @@ class StageTests(unittest.TestCase):
         self.assertFalse(self.assignment.exists())
 
     def test_atomic_assignment_failure_preserves_previous_json(self):
-        self.image(self.dest / "portrait/IMG_901256.jpg")
+        self.image(self.dest / "IMG_901256.jpg")
         result = core.build_assignments(**self.inputs())
         self.assignment.write_bytes(b"old json")
         with patch.object(core.os, "replace", side_effect=OSError("test failure")):
@@ -752,31 +647,60 @@ class StageTests(unittest.TestCase):
 
         export = self.root / "Output/Альбом/Фото/SCHOOL"
         album = self.root / "Альбом/Фото/SCHOOL"
-        self.image(export / "portrait/IMG_901256.jpg")
+        self.image(export / "IMG_901256.jpg")
         self.image(export / "group_photo_01/PH_IMG_901270.jpg", "tan")
         self.image(self.analysis / "JPG/IMG_901256.jpg")
         self.copy_now(self.config(source_dir=str(export), dest_dir=str(album)))
         plan = self.open_window(AssignmentsWindow, self.config(source_dir=str(export), dest_dir=str(album)))
         self.click(plan, "Создать план вёрстки")
         self.assertEqual(json.loads(self.assignment.read_text())["assignments"], {
-            "A7K3-S001": ["901256", "901270"], "A7K3-S002": ["901270"]})
+            "A7K3-S001": {"portrait": ["901256"], "group_photo_01": ["901270"]}, "A7K3-S002": {"group_photo_01": ["901270"]}})
         self.assertTrue(plan._album_readiness(plan.state.build_result)["ready"])
         self.assertEqual(before_selection, (self.selection.read_bytes(), file_signature(self.selection)))
         self.assertEqual(plan.view_tabs.count(), 2)
         for window in (plan,):
             self.assertFalse(hasattr(window, "edit_selected_numbers"))
             self.assertFalse(hasattr(window, "_save_document"))
-            menu = window._assignment_context_menu(window.student_location_table, window.student_location_table.topLevelItem(0))
+            menu = window._assignment_context_menu(window.student_location_table, window.student_location_table.item(0, 0))
             self.assertFalse(any("Изменить" in a.text() or "Очистить" in a.text() for a in menu.actions()))
             menu.deleteLater()
         with self.assertRaises(ValueError):
             plan._start_operation("copy")
-        # The existing generator accepts the unchanged schema.
+        # The generator reads the published location-based schema.
         generator = ROOT / "scripts/Workflow2/InDesign/idsgn_spread_generator"
         sys.path.insert(0, str(generator))
         from common.data import load_children_data
         children = load_children_data(self.list_file, self.assignment)
         self.assertTrue(children)
+
+    def test_assignment_gui_refresh_and_publication_never_move_flat_photos(self):
+        photo = self.dest / "IMG_901256.jpg"
+        self.image(photo)
+        files_before = snapshot(self.dest)
+        selection_before = self.selection.read_bytes()
+        plan = self.open_window(AssignmentsWindow)
+        buttons = {button.text() for button in plan.assignment_buttons.findChildren(QPushButton)}
+        self.assertEqual(buttons, {"Обновить список", "Создать план вёрстки"})
+        self.assertTrue(plan.left_panel.isAncestorOf(plan.view_tabs))
+        self.assertTrue(plan.left_panel.isAncestorOf(plan.personal_legend))
+        for widget in (plan.report, plan.preview, plan.assignment_buttons):
+            self.assertTrue(plan.right_panel.isAncestorOf(widget))
+        for button in plan.assignment_buttons.findChildren(QPushButton):
+            self.assertFalse(button.icon().isNull())
+        self.assertIsInstance(plan.assignment_buttons.layout(), QHBoxLayout)
+        plan.photo_table.setCurrentItem(plan.photo_table.topLevelItem(0))
+        selected = plan._selection_key(plan.photo_table.currentItem())
+
+        self.info["IMG_901256.jpg"]["location_name"] = "new_location"
+        write_json(self.analysis / "info_faces.json", self.info)
+        self.click(plan, "Обновить список")
+        self.assertEqual(plan._selection_key(plan.photo_table.currentItem()), selected)
+        self.click(plan, "Создать план вёрстки")
+
+        self.assertEqual(json.loads(self.assignment.read_text(encoding="utf-8"))["assignments"],
+                         {"A7K3-S001": {"new_location": ["901256"]}})
+        self.assertEqual(snapshot(self.dest), files_before)
+        self.assertEqual(self.selection.read_bytes(), selection_before)
 
     def test_gui_jpg_refresh_after_reimport_and_report_export(self):
         self.image(self.source / "IMG_901256.jpg")
@@ -817,14 +741,266 @@ class StageTests(unittest.TestCase):
                          pos=plan.view_tabs.tabBar().tabRect(1).center())
         self.assertEqual(plan.view_tabs.currentIndex(), 1)
         menu = plan._assignment_context_menu(plan.student_location_table, None)
-        next(action for action in menu.actions() if action.text() == "Развернуть все").trigger()
-        student = plan.student_location_table.topLevelItem(0)
-        self.assertTrue(student.isExpanded())
+        self.assertTrue(any(action.text() == "Сохранить как HTML" for action in menu.actions()))
+        student = plan.student_location_table.item(0, 0)
+        self.assertEqual(plan.student_location_table.rowCount(), len(self.roster.students))
         plan.student_location_table.setCurrentItem(student)
         self.wait(lambda: plan.preview.pixmap() is not None and not plan.preview.pixmap().isNull())
         if artifacts:
             self.assertTrue(plan.grab().save(str(folder / "assignments_students.png")))
         menu.deleteLater()
+
+    def personal_matrix(self):
+        """Create two photos in one location plus photographer and missing-file cases."""
+        self.info["IMG_901257.jpg"] = dict(self.info["IMG_901256.jpg"], filename="IMG_901257.jpg")
+        write_json(self.analysis / "info_faces.json", self.info)
+        self.document.apply("A7K3-S001", ["901256", "901257", "901270"], source="manual")
+        save_document(self.selection, self.document)
+        self.image(self.source / "IMG_901256.jpg")
+        self.image(self.dest / "IMG_901256.jpg")
+        self.image(self.source / "PH_IMG_901270.jpg")
+        for number in ("901256", "901257", "901270"):
+            self.image(self.analysis / f"JPG/IMG_{number}.jpg")
+        window = self.open_window(AssignmentsWindow)
+        window.view_tabs.setCurrentIndex(1)
+        return window
+
+    def test_personal_matrix_rows_locations_icons_and_missing_choices(self):
+        window = self.personal_matrix()
+        table = window.student_location_table
+        self.assertIsInstance(table, StudentLocationTable)
+        self.assertEqual(table.rowCount(), 2)
+        self.assertEqual([table.horizontalHeaderItem(i).text() for i in range(table.columnCount())],
+                         ["ФИО ученика", "group_photo_01", "portrait"])
+        self.assertEqual(table.item(0, 2).text(), "901256\n901257")
+        entries = table.item(0, 2).data(PHOTOS_ROLE)
+        self.assertEqual(entries[0].icon_names, ("PHOTO_PORTRAIT", "FOLDER", "FOLDER_VIRTUAL"))
+        self.assertEqual(entries[1].icon_names, ("PHOTO_PORTRAIT", "WARNING"))
+        group = table.item(0, 1).data(PHOTOS_ROLE)[0]
+        self.assertEqual(group.icon_names, ("PHOTO_PORTRAIT", "CAMERA", "FOLDER"))
+        self.assertIn(str(self.dest / "IMG_901256.jpg"), entries[0].tooltip)
+        self.assertEqual(table.item(1, 2).text(), "—")
+        self.assertIn("Выбор отсутствует", table.item(1, 2).toolTip())
+        self.assertIn("2/2", table.item(0, 0).toolTip())
+        from pysm_lib.pysm_icons import SVG_PATHS, icons
+        for name in {name for item in entries for name in item.icon_names} | set(group.icon_names):
+            self.assertIn(name, SVG_PATHS)
+            self.assertFalse(icons.get_qicon(name, 18).isNull())
+
+    def test_personal_matrix_individual_photo_click_keyboard_and_preview(self):
+        window = self.personal_matrix()
+        table = window.student_location_table
+        item = table.item(0, 2)
+        rect = table.visualItemRect(item)
+        line_height = table.itemDelegate().line_height()
+        point = QPoint(rect.left() + 95, rect.top() + 5 + line_height + line_height // 2)
+        QTest.mouseClick(table.viewport(), Qt.MouseButton.LeftButton, pos=point)
+        self.assertEqual(table.selected_number(), "901257")
+        self.assertEqual(window.preview.image_path, self.analysis / "JPG/IMG_901257.jpg")
+        QTest.keyClick(table, Qt.Key.Key_Up)
+        self.assertEqual(table.selected_number(), "901256")
+        QTest.keyClick(table, Qt.Key.Key_Down)
+        self.assertEqual(table.selected_number(), "901257")
+        self.assertIn("IMG_901257.jpg", window.report.toPlainText())
+
+    def test_personal_matrix_student_and_empty_location_details(self):
+        window = self.personal_matrix()
+        table = window.student_location_table
+        table.setCurrentItem(table.item(0, 0))
+        self.assertIn("Фотографии ученика", window.report.toPlainText())
+        self.assertEqual(window.preview.image_path, self.analysis / "JPG/IMG_901256.jpg")
+        table.setCurrentItem(table.item(1, 2))
+        self.assertIn("Фотографии отсутствуют", window.report.toPlainText())
+        self.assertIsNone(window.preview.image_path)
+
+    def test_personal_matrix_auto_widths_sort_refresh_and_height(self):
+        window = self.personal_matrix()
+        table = window.student_location_table
+        table.setCurrentItem(table.item(0, 2))
+        QTest.keyClick(table, Qt.Key.Key_Down)
+        key = table.selection_key()
+        self.assertEqual(table.horizontalHeader().sectionResizeMode(0), QHeaderView.ResizeMode.Stretch)
+        for column in range(1, table.columnCount()):
+            self.assertEqual(table.horizontalHeader().sectionResizeMode(column), QHeaderView.ResizeMode.ResizeToContents)
+        location_widths = [table.columnWidth(column) for column in range(1, table.columnCount())]
+        name_width = table.columnWidth(0)
+        window.resize(window.width() + 300, window.height())
+        self.app.processEvents()
+        self.assertGreater(table.columnWidth(0), name_width)
+        self.assertEqual([table.columnWidth(column) for column in range(1, table.columnCount())], location_widths)
+        table.sortItems(0, Qt.SortOrder.DescendingOrder)
+        self.app.processEvents()
+        self.assertEqual(table.selection_key(), key)
+        self.assertGreaterEqual(table.rowHeight(table.currentRow()), 2 * table.itemDelegate().line_height() + 10)
+        self.click(window, "Обновить список")
+        self.assertEqual(table.selection_key(), key)
+        self.assertEqual([table.columnWidth(column) for column in range(1, table.columnCount())], location_widths)
+        self.assertEqual(window.preview.image_path, self.analysis / "JPG/IMG_901257.jpg")
+
+    def test_personal_matrix_context_menu_keeps_all_physical_variants(self):
+        window = self.personal_matrix()
+        table = window.student_location_table
+        table.setCurrentItem(table.item(0, 2))
+        menu = window._assignment_context_menu(table, table.currentItem())
+        names = {action.text() for action in menu.actions()}
+        self.assertTrue({"Сохранить как HTML", "Сохранить как CSV", "Открыть файл",
+                         "Открыть папку с файлом", "Сведения об ученике", "Сведения о локации"} <= names)
+        files = next(action.menu() for action in menu.actions() if action.text() == "Все файлы кадра")
+        self.assertEqual({action.text() for action in files.actions()},
+                         {str(self.source / "IMG_901256.jpg"), str(self.dest / "IMG_901256.jpg")})
+        with patch.object(window, "_reveal_file") as reveal:
+            next(action for action in menu.actions() if action.text() == "Открыть папку с файлом").trigger()
+            reveal.assert_called_once_with(self.dest / "IMG_901256.jpg")
+        next(action for action in menu.actions() if action.text() == "Сведения о локации").trigger()
+        self.assertIn("Фотографии ученика", window.report.toPlainText())
+        menu.deleteLater()
+
+    def test_unknown_selection_warning_links_each_destination_file_and_folder(self):
+        class Links(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.urls = []
+
+            def handle_starttag(self, tag, attrs):
+                href = dict(attrs).get("href", "")
+                if tag == "a" and href.startswith("pysm:"):
+                    self.urls.append(href)
+
+        files = [self.dest / "IMG_901270.psd", self.dest / "Вариант & 901270.jpg"]
+        for path in files:
+            path.write_bytes(b"test")
+        window = self.open_window(AssignmentsWindow)
+        result = window.state.build_result
+        self.assertTrue(any(issue.code == "unknown_selection_source" and issue.photo_number == "901270"
+                            for issue in result.issues))
+        parser = Links()
+        parser.feed(window._issues_html(result))
+        self.assertEqual(len(parser.urls), 4)
+        with patch.object(window, "_reveal_file") as reveal, \
+             patch.object(window_base.QDesktopServices, "openUrl") as open_url:
+            for url in parser.urls:
+                window._open_report_link(QUrl(url))
+        self.assertCountEqual([call.args[0] for call in reveal.call_args_list], files)
+        self.assertCountEqual([Path(call.args[0].toLocalFile()) for call in open_url.call_args_list], files)
+
+    def test_readiness_report_counts_assigned_numbers_and_extra_physical_images(self):
+        for name in ("IMG_901256.jpg", "IMG_901256.psd", "IMG_901270.jpg",
+                     "unknown_123456.jpeg", "без номера.JPG", "IMG_901256.xmp"):
+            (self.dest / name).write_bytes(b"test")
+        window = self.open_window(AssignmentsWindow)
+        self.click(window, "Создать план вёрстки")
+        result = window.state.build_result
+        self.assertTrue(window._album_readiness(result)["ready"])
+        self.assertEqual({path.name for path in window._extra_destination_files(result)},
+                         {"IMG_901270.jpg", "unknown_123456.jpeg", "без номера.JPG"})
+        html = window._completion_report_html(result)
+        for text in ("Назначено уникальных номеров:</b> 1", "в целевой папке:</b> 1",
+                     "Всего файлов JPG/JPEG/PSD в целевой папке:</b> 5",
+                     "Дополнительных файлов без назначения:</b> 3",
+                     "unknown_123456.jpeg", "без номера.JPG"):
+            self.assertIn(text, html)
+        self.assertNotIn("Количество отобранных фотографий совпадает", html)
+        (self.dest / "IMG_901256.jpg").unlink()
+        (self.dest / "IMG_901256.psd").unlink()
+        self.click(window, "Обновить список")
+        readiness = window._album_readiness(window.state.build_result)
+        self.assertFalse(readiness["ready"])
+        self.assertEqual(readiness["missing_numbers"], ["901256"])
+
+    def test_personal_context_menu_uses_active_theme_including_submenus(self):
+        from pysm_lib.theme_manager import ThemeManager
+
+        window = self.personal_matrix()
+        table = window.student_location_table
+        table.setCurrentItem(table.item(0, 2))
+        original_style = self.app.styleSheet()
+        try:
+            manager = ThemeManager()
+            for theme, background, foreground in (
+                ("default", "#ffffff", "#000000"),
+                ("dark", "#252526", "#d4d4d4"),
+            ):
+                with self.subTest(theme=theme):
+                    manager.set_active_theme(theme)
+                    self.app.setStyleSheet(manager.get_active_theme_qss())
+                    menu = window._assignment_context_menu(table, table.currentItem())
+                    submenu = next(action.menu() for action in menu.actions()
+                                   if action.text() == "Все файлы кадра")
+                    file_menu = submenu.actions()[0].menu()
+                    for popup in (menu, submenu, file_menu):
+                        popup.popup(window.mapToGlobal(QPoint(20, 20)))
+                        self.app.processEvents()
+                        self.assertEqual(popup.palette().color(popup.backgroundRole()).name(), background)
+                        self.assertEqual(popup.palette().color(popup.foregroundRole()).name(), foreground)
+                        image = popup.grab().toImage()
+                        self.assertEqual(image.pixelColor(10, image.height() - 10).name(), background)
+                        popup.close()
+                    menu.deleteLater()
+        finally:
+            self.app.setStyleSheet(original_style)
+
+    def test_personal_matrix_is_read_only_and_preserves_exports_and_assignments(self):
+        window = self.personal_matrix()
+        before = (snapshot(self.source), snapshot(self.dest), self.selection.read_bytes(),
+                  (self.analysis / "info_faces.json").read_bytes(), window.state.build_result.assignment_payload(),
+                  window._student_location_html(), window._layout_file_matrix())
+        table = window.student_location_table
+        table.setCurrentItem(table.item(0, 2))
+        QTest.keyClick(table, Qt.Key.Key_F2)
+        QTest.keyClicks(table, "123456")
+        self.click(window, "Обновить список")
+        after = (snapshot(self.source), snapshot(self.dest), self.selection.read_bytes(),
+                 (self.analysis / "info_faces.json").read_bytes(), window.state.build_result.assignment_payload(),
+                 window._student_location_html(), window._layout_file_matrix())
+        self.assertEqual(before, after)
+        self.assertFalse(self.assignment.exists())
+
+    def test_csv_export_keeps_multiple_files_on_one_student_line(self):
+        from PySide6.QtWidgets import QFileDialog
+
+        window = self.personal_matrix()
+        locations = ["portrait", "group"]
+        students = [(window.roster.students[0], {"portrait": ["фото;1.psd", 'фото"2.psd'], "group": []}),
+                    (window.roster.students[1], {"portrait": ["фото3.psd"], "group": ["группа.psd"]})]
+        output = self.root / "photo.csv"
+        with patch.object(window, "_layout_file_matrix", return_value=(locations, students)), \
+             patch.object(QFileDialog, "getSaveFileName", return_value=(str(output), "")):
+            window._save_student_location_csv()
+        raw = output.read_bytes()
+        self.assertTrue(raw.startswith(b"\xef\xbb\xbf"))
+        text = raw.decode("utf-8-sig")
+        self.assertEqual(len(text.splitlines()), 3)
+        with output.open(encoding="utf-8-sig", newline="") as stream:
+            rows = list(csv.reader(stream, delimiter=";"))
+        self.assertEqual(rows, [["Фамилия", "Имя", "Отчество", "@portrait", "@group"],
+                                ["Иванова", "Анна", "", 'фото;1.psd, фото"2.psd', ""],
+                                ["Петров", "Иван", "", "фото3.psd", "группа.psd"]])
+
+    def test_csv_exports_student_info_for_duplicate_names_without_mixing_photos(self):
+        from PySide6.QtWidgets import QFileDialog
+
+        data = json.loads(self.list_file.read_text(encoding="utf-8"))
+        first, second = data["students"]
+        first.update(patronymic="Ивановна", info={"Цитата": "Привет;\nмир", "Хобби": "Музыка"})
+        second.update(surname="Иванова", name="Анна", patronymic="Ивановна",
+                      info={"Цитата": 'Текст "в кавычках"', "Другое": 0})
+        write_json(self.list_file, data)
+        self.image(self.dest / "IMG_901256.jpg")
+        window = self.open_window(AssignmentsWindow)
+        output = self.root / "photo.csv"
+        with patch.object(QFileDialog, "getSaveFileName", return_value=(str(output), "")):
+            window._save_student_location_csv()
+        with output.open(encoding="utf-8-sig", newline="") as stream:
+            reader = csv.DictReader(stream, delimiter=";")
+            rows = list(reader)
+        self.assertEqual(reader.fieldnames, ["Фамилия", "Имя", "Отчество", "@group_photo_01", "@portrait",
+                                             "Цитата", "Хобби", "Другое"])
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([row["Цитата"] for row in rows], ["Привет;\nмир", 'Текст "в кавычках"'])
+        self.assertEqual([row["Хобби"] for row in rows], ["Музыка", ""])
+        self.assertEqual([row["Другое"] for row in rows], ["", "0"])
+        self.assertEqual([row["Отчество"] for row in rows], ["Ивановна", "Ивановна"])
+        self.assertEqual([row["@portrait"] for row in rows], ["IMG_901256.jpg", ""])
 
     def test_full_entrypoint_event_loops(self):
         before = (self.selection.read_bytes(), file_signature(self.selection))
@@ -872,7 +1048,7 @@ class StageTests(unittest.TestCase):
         write_json(self.analysis / "matches_portrait_to_group.json", {})
         result = core.build_assignments(**self.inputs())
         old = original_core.build_assignments(**self.inputs())
-        self.assertEqual(result.assignment_payload(), old.assignment_payload())
+        self.assertEqual(result.assignments, old.assignments)
         self.assertEqual([vars(i) for i in result.issues], [vars(i) for i in old.issues])
 
     def test_partial_copy_failure_preserves_successes_and_cleans_temporary_file(self):
@@ -890,7 +1066,7 @@ class StageTests(unittest.TestCase):
             outcome = copy_service.copy_selected_files(result, self.source, self.dest)
         self.assertEqual(outcome.copied, 1)
         self.assertIn("copy_failed", {i.code for i in outcome.issues})
-        self.assertTrue((self.dest / "portrait/IMG_901256.CR3").exists())
+        self.assertTrue((self.dest / "IMG_901256.CR3").exists())
         self.assertFalse(list(self.dest.rglob("*.tmp")))
 
     def test_cli_passports_and_independent_entrypoints(self):
@@ -951,7 +1127,7 @@ class StageTests(unittest.TestCase):
                 self.assertIn("</b>", result.stdout)
             else:
                 self.assertIn("Скопировано: 1.", result.stdout)
-                self.assertEqual((self.dest / "portrait/IMG_901256.CR3").read_bytes(), b"raw")
+                self.assertEqual((self.dest / "IMG_901256.CR3").read_bytes(), b"raw")
 
     def test_import_resource_report_is_returned_once_and_reports_unsaved_changes(self):
         window = self.open_window(ImportWindow)
@@ -976,7 +1152,7 @@ class StageTests(unittest.TestCase):
              redirect_stdout(output), redirect_stderr(errors):
             self.assertEqual(copy_runner.run_copy(config), 0)
         self.assertFalse(source.exists())
-        self.assertEqual((self.dest / "portrait/IMG_901256.CR3").read_bytes(), b"raw")
+        self.assertEqual((self.dest / "IMG_901256.CR3").read_bytes(), b"raw")
         self.assertIn("Перемещение завершено", output.getvalue())
         self.assertIn("Предупреждение", errors.getvalue())
 
@@ -1043,8 +1219,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
                 self.assertIn("photo_selection.json отсутствует", result.stdout)
                 self.assertEqual({p["current"] for p in progress if p["total"] == 2}, {0, 1, 2})
                 self.assertEqual(snapshot(self.dest), {
-                    "group_photo_01\\nested\\ph_IMG_901270.jpg": hashlib.sha256(b"photo").hexdigest(),
-                    "group_photo_01\\nested\\IMG_901270.xmp": hashlib.sha256(b"metadata").hexdigest(),
+                    "ph_IMG_901270.jpg": hashlib.sha256(b"photo").hexdigest(),
+                    "IMG_901270.xmp": hashlib.sha256(b"metadata").hexdigest(),
                 })
                 self.assertEqual((self.source / "nested/ph_IMG_901270.jpg").exists(), mode == "copy")
                 self.assertEqual((self.source / "nested/IMG_901270.xmp").exists(), mode == "copy")
@@ -1083,7 +1259,7 @@ runpy.run_path(sys.argv[0], run_name='__main__')
                 self.dest = self.root / mode / "new album/photos/STREET"
                 result, _ = self.copy_subprocess("--mode", mode)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual((self.dest / "group_photo_01" / source.name).read_bytes(), b"photo")
+                self.assertEqual((self.dest / source.name).read_bytes(), b"photo")
                 self.assertEqual(source.exists(), mode == "copy")
                 self.assertNotIn("Папка не найдена", result.stdout)
 
@@ -1110,8 +1286,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
     def test_headless_photographer_in_destination_without_selection(self):
         self.selection.unlink()
         self.file("IMG_901270.xmp", b"settings")
-        target = self.dest / "group_photo_01/PH_IMG_901270.jpg"
-        target.parent.mkdir()
+        target = self.dest / "PH_IMG_901270.jpg"
+        target.parent.mkdir(exist_ok=True)
         target.write_bytes(b"existing photo")
         self.copy_now()
         self.assertEqual((target.parent / "IMG_901270.xmp").read_bytes(), b"settings")
@@ -1169,8 +1345,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
     def test_headless_default_skip_preserves_existing_file_and_closes_progress(self):
         self.file("IMG_901256.CR3")
         self.file("IMG_901256.xmp", b"sidecar")
-        target = self.dest / "portrait/IMG_901256.CR3"
-        target.parent.mkdir()
+        target = self.dest / "IMG_901256.CR3"
+        target.parent.mkdir(exist_ok=True)
         target.write_bytes(b"RAW")
         result, _ = self.copy_subprocess()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -1181,8 +1357,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
 
     def test_headless_overwrite_replaces_existing_bytes(self):
         self.file("IMG_901256.CR3", b"new")
-        target = self.dest / "portrait/IMG_901256.CR3"
-        target.parent.mkdir()
+        target = self.dest / "IMG_901256.CR3"
+        target.parent.mkdir(exist_ok=True)
         target.write_bytes(b"old")
         before = snapshot(self.analysis)
         result, progress = self.copy_subprocess("--on_conflict", "overwrite")
@@ -1197,9 +1373,9 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertFalse(list(self.dest.rglob("*.tmp")))
 
     def test_headless_rename_uses_first_available_suffix_and_repeats(self):
-        self.file("portrait/IMG_901256.jpg", b"same")
-        target = self.dest / "portrait/IMG_901256.jpg"
-        target.parent.mkdir()
+        self.file("IMG_901256.jpg", b"same")
+        target = self.dest / "IMG_901256.jpg"
+        target.parent.mkdir(exist_ok=True)
         target.write_bytes(b"same")
         target.with_name("IMG_901256 (1).jpg").write_bytes(b"keep one")
         target.with_name("IMG_901256 (3).jpg").write_bytes(b"keep three")
@@ -1218,8 +1394,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
     def test_overwrite_failure_preserves_old_file_and_other_copies(self):
         self.file("IMG_901256.CR3", b"new raw")
         self.file("IMG_901256.xmp", b"new xmp")
-        target = self.dest / "portrait/IMG_901256.CR3"
-        target.parent.mkdir()
+        target = self.dest / "IMG_901256.CR3"
+        target.parent.mkdir(exist_ok=True)
         target.write_bytes(b"old raw")
         original_copy2 = copy_service.shutil.copy2
 
@@ -1240,8 +1416,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
 
     def test_overwrite_publish_failure_preserves_old_file(self):
         self.file("IMG_901256.CR3", b"new")
-        target = self.dest / "portrait/IMG_901256.CR3"
-        target.parent.mkdir()
+        target = self.dest / "IMG_901256.CR3"
+        target.parent.mkdir(exist_ok=True)
         target.write_bytes(b"old")
         config = self.copy_config()
         config.on_conflict = "overwrite"
@@ -1252,7 +1428,7 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertFalse(list(self.dest.rglob("*.tmp")))
 
     def test_same_physical_file_is_skipped_in_every_mode(self):
-        self.file("portrait/IMG_901256.CR3")
+        self.file("IMG_901256.CR3")
         for mode in ("copy", "move"):
             for conflict in ("skip", "overwrite", "rename"):
                 config = self.copy_config()
@@ -1272,7 +1448,7 @@ runpy.run_path(sys.argv[0], run_name='__main__')
             config = self.copy_config()
             config.dest_dir = str(self.root / f"race-{mode}")
             config.on_conflict = mode
-            target = Path(config.dest_dir) / "portrait/IMG_901256.CR3"
+            target = Path(config.dest_dir) / "IMG_901256.CR3"
             raced = False
 
             def publish_after_race(temporary, destination):
@@ -1309,14 +1485,14 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         result, _ = self.copy_subprocess()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Скопировано: 3. Пропущено: 0.", result.stdout)
-        self.assertTrue((self.dest / "portrait/IMG_901256.CR3").is_file())
-        self.assertTrue((self.dest / "unknown/IMG_001234.CR3").is_file())
-        self.assertTrue((self.dest / "group_photo_01/nested/PH_IMG_901270.psd").is_file())
+        self.assertTrue((self.dest / "IMG_901256.CR3").is_file())
+        self.assertTrue((self.dest / "IMG_001234.CR3").is_file())
+        self.assertTrue((self.dest / "PH_IMG_901270.psd").is_file())
         self.assertEqual(snapshot(self.analysis), before)
 
     def test_copy_cli_exposes_only_copy_inputs(self):
         config = self.copy_config()
-        self.assertEqual(set(vars(config)), {"analysis_dir", "source_dir", "dest_dir", "exclude_dirs", "on_conflict", "mode"})
+        self.assertEqual(set(vars(config)), {"analysis_dir", "source_dir", "dest_dir", "exclude_dirs", "on_conflict", "mode", "layout"})
         self.assertEqual(config.exclude_dirs, "Masks")
         self.assertEqual(config.on_conflict, "skip")
         self.assertEqual(config.mode, "copy")
@@ -1337,8 +1513,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
                     "--dest_dir", str(self.dest), f"--{name}", "unused",
                 ])
 
-    def test_headless_move_preserves_structure_json_and_excluded_files(self):
-        names = ["portrait/IMG_901256.CR3", "CaptureOne/Settings/IMG_901256.CR3.cos",
+    def test_headless_move_flattens_paths_and_preserves_json_and_excluded_files(self):
+        names = ["IMG_901256.CR3", "CaptureOne/Settings/IMG_901256.CR3.cos",
                  "IMG_901256.xmp", "exports/PH_IMG_901270.jpg"]
         for name in names:
             self.file(name, name.encode())
@@ -1351,8 +1527,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertTrue(any(p["current"] == p["total"] == 4 for p in progress))
         for name in names:
             self.assertFalse((self.source / name).exists())
-        for relative in ["portrait/IMG_901256.CR3", "portrait/CaptureOne/Settings/IMG_901256.CR3.cos",
-                         "portrait/IMG_901256.xmp", "group_photo_01/exports/PH_IMG_901270.jpg"]:
+        for relative in ["IMG_901256.CR3", "CaptureOne/Settings/IMG_901256.CR3.cos",
+                         "IMG_901256.xmp", "PH_IMG_901270.jpg"]:
             self.assertTrue((self.dest / relative).is_file())
         self.assertEqual((self.source / "nested/Masks/IMG_901256.png").read_bytes(), b"excluded")
         self.assertTrue((self.source / "IMG_999999.jpg").is_file())
@@ -1362,8 +1538,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertIn("Нет исходных файлов для перемещения", result.stdout)
 
     def test_headless_move_conflict_policies(self):
-        target = self.dest / "portrait/IMG_901256.CR3"
-        target.parent.mkdir()
+        target = self.dest / "IMG_901256.CR3"
+        target.parent.mkdir(exist_ok=True)
         for conflict in ("skip", "overwrite", "rename"):
             with self.subTest(conflict=conflict):
                 source = self.file("IMG_901256.CR3", b"new")
@@ -1385,8 +1561,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
 
     def test_move_write_and_publish_failures_preserve_original(self):
         source = self.file("IMG_901256.CR3", b"new")
-        target = self.dest / "portrait/IMG_901256.CR3"
-        target.parent.mkdir()
+        target = self.dest / "IMG_901256.CR3"
+        target.parent.mkdir(exist_ok=True)
         target.write_bytes(b"old")
         config = self.copy_config()
         config.mode, config.on_conflict = "move", "overwrite"
@@ -1414,8 +1590,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         with patch.object(Path, "unlink", refuse_original), redirect_stdout(output), redirect_stderr(io.StringIO()):
             self.assertEqual(copy_runner.run_copy(config), 1)
         self.assertEqual(source.read_bytes(), b"raw")
-        self.assertEqual((self.dest / "portrait/IMG_901256.CR3").read_bytes(), b"raw")
-        self.assertEqual((self.dest / "portrait/IMG_901256.xmp").read_bytes(), b"xmp")
+        self.assertEqual((self.dest / "IMG_901256.CR3").read_bytes(), b"raw")
+        self.assertEqual((self.dest / "IMG_901256.xmp").read_bytes(), b"xmp")
         self.assertFalse(sidecar.exists())
         self.assertIn("Перемещено: 1. Пропущено: 0.", output.getvalue())
         self.assertIn("Скопировано без удаления оригинала: 1.", output.getvalue())
@@ -1436,7 +1612,7 @@ runpy.run_path(sys.argv[0], run_name='__main__')
              redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             self.assertEqual(copy_runner.run_copy(config), 1)
         self.assertEqual(source.read_bytes(), b"updated original")
-        self.assertEqual((self.dest / "portrait/IMG_901256.CR3").read_bytes(), b"original")
+        self.assertEqual((self.dest / "IMG_901256.CR3").read_bytes(), b"original")
 
     def test_headless_invalid_selection_blocks_copy(self):
         self.file("IMG_901256.CR3")

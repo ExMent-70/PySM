@@ -1,11 +1,11 @@
-"""Review, destination location repair and publication of photo assignments."""
+"""Review and publication of photo assignments grouped by logical location."""
 
 from ..._common.assignment_window import AssignmentWindow
 from ..._common.window_base import run_window
 
 
 class AssignmentsWindow(AssignmentWindow):
-    """Publish assignments and explicitly reconcile destination locations."""
+    """Publish assignments without changing destination files."""
 
     OPERATION = "build"
     ACTION_TITLE = "Создать план вёрстки"

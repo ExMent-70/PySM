@@ -1,4 +1,4 @@
-"""Safe materialization of selected physical files into location folders."""
+"""Safe copying and moving with flat or location-based destination paths."""
 
 from __future__ import annotations
 
@@ -68,26 +68,33 @@ def _publish_copy(temp_path: Path, target: Path, on_conflict: str) -> bool:
         candidate = target.with_name(f"{target.stem} ({suffix}){target.suffix}")
 
 
+def _flat_relative_path(relative: Path) -> Path:
+    """Flatten photo folders while keeping Capture One's companion-file tree."""
+    for index, part in enumerate(relative.parts[:-1]):
+        if part.casefold() == "captureone":
+            return Path(*relative.parts[index:])
+    return Path(relative.name)
+
+
 def copy_selected_files(
     result: BuildResult,
     source_dir: Path,
     dest_dir: Path,
     *,
+    layout: str = "flat",
     mode: str = "copy",
     on_conflict: str = "skip",
     progress_factory: ProgressFactory | None = None,
 ) -> CopySummary:
-    """Copy student and photographer exports into metadata-defined locations.
+    """Transfer selected files using an independent placement and conflict policy.
 
-    The first RAW pass copies student-selected originals. During the second
-    pass, ``source_dir`` contains Capture One exports, including ``PH_`` files
-    selected by the photographer. If Capture One has already created the
-    location folder, that first relative component is not duplicated.
-
-    Existing names follow on_conflict without content comparison. Copies are
-    staged before publication; the same physical source and target is skipped.
-    Move removes the original only after publication, including across volumes.
+    Flat placement keeps photo filenames and the CaptureOne companion subtree.
+    Location placement preserves the existing relative structure, without
+    duplicating its first location folder.
+    Copies are staged; move removes an unchanged source only after publication.
     """
+    if layout not in {"flat", "by_location"}:
+        raise ValueError(f"Неизвестное размещение layout: {layout!r}")
     if mode not in {"copy", "move"}:
         raise ValueError(f"Неизвестный режим mode: {mode!r}")
     if on_conflict not in {"skip", "overwrite", "rename"}:
@@ -115,7 +122,10 @@ def copy_selected_files(
         for record in result.records.values():
             if not record.selected_student_ids and not record.photographer_selected:
                 continue
-            location_dir = (destination_root / (record.location or "unknown")).resolve()
+            location_dir = (
+                (destination_root / (record.location or "unknown")).resolve()
+                if layout == "by_location" else destination_root
+            )
             try:
                 location_dir.relative_to(destination_root)
             except ValueError:
@@ -133,12 +143,16 @@ def copy_selected_files(
                     relative = source.relative_to(source_dir)
                     relative_parts = relative.parts
                     if (
-                        len(relative_parts) > 1
+                        layout == "by_location"
+                        and len(relative_parts) > 1
                         and relative_parts[0].casefold()
                         == (record.location or "unknown").casefold()
                     ):
                         relative = Path(*relative_parts[1:])
-                    target = location_dir / relative
+                    target = (
+                        location_dir / relative if layout == "by_location"
+                        else destination_root / _flat_relative_path(relative)
+                    )
                     if progress is not None:
                         progress.set_description(f"{operation}: {source.name}")
 

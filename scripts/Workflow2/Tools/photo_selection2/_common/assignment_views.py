@@ -111,113 +111,12 @@ class AssignmentViewsMixin:
             self.photo_table.collapseAll()
             self.photo_table.setUpdatesEnabled(True)
 
-    def _render_student_location_table(
-        self,
-        result: BuildResult,
-        file_entries: dict[str, list[tuple[Path, str, list[Path]]]],
-    ) -> None:
-        locations = self._known_locations(result)
-        record_index = index_records_by_student_location(result)
-        table = self.student_location_table
-        table.setUpdatesEnabled(False)
-        table.setSortingEnabled(False)
-        try:
-            table.clear()
-            warning_brush = self._warning_brush()
-            for student in sorted(self.roster.students, key=lambda item: item.display_name.casefold()):
-                records_by_location = {
-                    location: record_index.get((student.student_id, location), [])
-                    for location in locations
-                }
-                selected_location_count = sum(
-                    bool(records) for records in records_by_location.values()
-                )
-                status = f"{selected_location_count}/{len(locations)}"
-                student_item = QTreeWidgetItem(
-                    table,
-                    (student.display_name, status, "", "", ""),
-                )
-                student_item.setData(0, ITEM_STUDENT_ROLE, student.student_id)
-                student_item.setToolTip(0, student.display_name)
-                student_item.setToolTip(
-                    1,
-                    f"Выбрано локаций: {selected_location_count} из {len(locations)}",
-                )
-                student_item.setTextAlignment(1, Qt.AlignmentFlag.AlignCenter)
-                if pysm_icons:
-                    try:
-                        student_item.setIcon(
-                            0,
-                            pysm_icons.get_qicon(
-                                "PHOTO_PORTRAIT_EDIT", 20, color="Green"
-                            ),
-                        )
-                    except Exception:
-                        logger.debug("Не удалось создать иконку ученика", exc_info=True)
-                for location in locations:
-                    records = records_by_location[location]
-                    if not records:
-                        location_item = QTreeWidgetItem(
-                            student_item,
-                            ("", "", location, "Выбор отсутствует", ""),
-                        )
-                        location_item.setData(
-                            0, ITEM_STUDENT_ROLE, student.student_id
-                        )
-                        location_item.setData(0, ITEM_LOCATION_ROLE, location)
-                        self._mark_missing_selection(location_item, warning_brush)
-                        continue
-                    location_item = QTreeWidgetItem(
-                        student_item,
-                        ("", "", location, f"Выбрано: {len(records)}", ""),
-                    )
-                    location_item.setData(0, ITEM_STUDENT_ROLE, student.student_id)
-                    location_item.setData(0, ITEM_LOCATION_ROLE, location)
-                    for record in records:
-                        files = file_entries.get(record.number, [])
-                        values = (
-                            record.number,
-                            "",
-                            "",
-                            "",
-                            f"{len(files)} файл(ов)" if files else "—",
-                        )
-                        photo_item = QTreeWidgetItem(location_item, values)
-                        photo_item.setData(0, ITEM_NUMBER_ROLE, record.number)
-                        for column, value in enumerate(values):
-                            photo_item.setToolTip(column, value)
-                        self._set_source_indicator(photo_item, 3, record)
-                        if pysm_icons:
-                            try:
-                                photo_item.setIcon(
-                                    4, pysm_icons.get_qicon("FOLDER", 20)
-                                )
-                            except Exception:
-                                logger.debug(
-                                    "Не удалось создать иконку папки",
-                                    exc_info=True,
-                                )
-                        for relative, origin, physical_paths in files:
-                            file_item = QTreeWidgetItem(
-                                photo_item,
-                                ("", "", "", origin, str(relative)),
-                            )
-                            file_item.setData(
-                                0,
-                                ITEM_PATHS_ROLE,
-                                [str(path) for path in physical_paths],
-                            )
-                            self._set_file_origin_indicator(file_item, 3, origin)
-                            file_item.setToolTip(
-                                4,
-                                "\n".join(str(path) for path in physical_paths),
-                            )
-                            self._set_file_icon(file_item, relative, column=4)
-        finally:
-            table.setSortingEnabled(True)
-            table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
-            table.collapseAll()
-            table.setUpdatesEnabled(True)
+    def _render_student_location_table(self, result, file_entries):
+        """Render the unchanged assignment index in the personal matrix."""
+        self.student_location_table.populate_records(
+            self._known_locations(result), self.roster.students,
+            index_records_by_student_location(result), file_entries,
+        )
 
     def _known_locations(self, result: BuildResult) -> list[str]:
         return sorted(
@@ -270,18 +169,13 @@ class AssignmentViewsMixin:
                 relative = Path(path.name)
             if is_excluded_relative_path(relative, exclude_dirs):
                 continue
-            if (
-                len(relative.parts) > 1
-                and relative.parts[0].casefold() == record.location.casefold()
-            ):
-                relative = Path(*relative.parts[1:])
-            add(path, relative, "папка локации")
+            add(path, relative, "целевая папка")
 
         result = []
         for entry in grouped.values():
             origins = entry["origins"]
             origin = (
-                "исходник + папка локации"
+                "исходник + целевая папка"
                 if len(origins) > 1
                 else next(iter(origins))
             )
@@ -343,9 +237,9 @@ class AssignmentViewsMixin:
         if "исходник" in origin:
             icon_names.append("FOLDER")
             hints.append("Файл расположен в исходной папке")
-        if "папка локации" in origin:
+        if "целевая папка" in origin:
             icon_names.append("FOLDER_VIRTUAL")
-            hints.append("Файл расположен в папке локации")
+            hints.append("Файл расположен в целевой папке")
         item.setText(column, "" if icon_names else "—")
         item.setToolTip(column, "\n".join(hints))
         if not pysm_icons or not icon_names:

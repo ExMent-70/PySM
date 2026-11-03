@@ -7,7 +7,7 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSplitter,
-    QLineEdit, QMenu, QListWidget, QSlider, QTextEdit, QProgressBar, QSpinBox,
+    QLineEdit, QMenu, QListWidget, QSlider, QTextEdit, QProgressBar, QSpinBox, QDoubleSpinBox,
 )
 from PySide6.QtCore import Qt
 
@@ -224,6 +224,20 @@ class EditorUIBuilder:
             window._on_selected_photos_toggled
         )
         row1.addWidget(window.btn_filter_selected_photos)
+        if window.mode == "matches":
+            from .similar_faces_controller import DEFAULT_SIMILARITY_DISTANCE
+
+            row1.addWidget(QLabel("Порог сходства:"))
+            window.spin_similarity_distance = QDoubleSpinBox()
+            window.spin_similarity_distance.setRange(0.0, 2.0)
+            window.spin_similarity_distance.setDecimals(2)
+            window.spin_similarity_distance.setSingleStep(0.01)
+            window.spin_similarity_distance.setValue(DEFAULT_SIMILARITY_DISTANCE)
+            window.spin_similarity_distance.setToolTip(
+                "Максимальное косинусное расстояние при поиске похожих неопознанных лиц. "
+                "Меньше значение — строже отбор. Это настройка поиска, а не фильтр галереи."
+            )
+            row1.addWidget(window.spin_similarity_distance)
         row1.addStretch()
         
         filter_layout.addLayout(row1)

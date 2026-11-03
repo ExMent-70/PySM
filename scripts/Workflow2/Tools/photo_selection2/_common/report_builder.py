@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .assignment_core import (
     BuildResult,
+    LAYOUT_READY_SUFFIXES,
     PHOTOGRAPHER_PREFIX,
     PhotoRecord,
     has_layout_ready_destination_file,
@@ -22,13 +23,46 @@ class ReportMixin:
 
     def _issues_html(self, result: BuildResult) -> str:
         """Show all diagnostics, including warnings that do not block copying."""
-        if not result.issues:
+        extra_files = self._extra_destination_files(result)
+        if not result.issues and not extra_files:
             return ""
         builder = DashboardBuilder(icon_size=18)
         builder.add_header_boxed("Ошибки и предупреждения")
         for issue in result.issues:
             color = builder.theme.error if issue.severity == "error" else builder.theme.text_sub
-            builder.parts.append(f"<p style='color:{color}'>{escape(issue.message)}</p>")
+            details = ""
+            if issue.code == "unknown_selection_source":
+                record = result.records.get(issue.photo_number)
+                if record:
+                    links = []
+                    for path in sorted(set(record.destination_files), key=lambda p: str(p).casefold()):
+                        try:
+                            label = str(path.relative_to(Path(self.config.dest_dir)))
+                        except ValueError:
+                            label = str(path)
+                        file_link = self._report_action_link(path, "open-file", escape(label))
+                        folder_link = self._report_action_link(path, "reveal-file", "Открыть папку")
+                        links.append(f"{file_link} &nbsp;({folder_link})")
+                    if links:
+                        details = "<br>" + "<br>".join(links)
+            builder.parts.append(f"<p style='color:{color}'>{escape(issue.message)}{details}</p>")
+        covered = {
+            path for issue in result.issues if issue.code == "unknown_selection_source"
+            if (record := result.records.get(issue.photo_number)) is not None
+            for path in record.destination_files
+        }
+        unlisted_extra_files = [path for path in extra_files or () if path not in covered]
+        if unlisted_extra_files:
+            links = []
+            for path in unlisted_extra_files:
+                name = self._report_action_link(path, "open-file", escape(path.name))
+                folder = self._report_action_link(path, "reveal-file", "Открыть папку")
+                links.append(f"{name} &nbsp;({folder})")
+            builder.parts.append(
+                f"<p style='color:{builder.theme.text_sub}'>"
+                "Дополнительные JPG/JPEG/PSD без назначения (не влияют на готовность):<br>"
+                + "<br>".join(links) + "</p>"
+            )
         return builder.get_html()
 
     def _message_header_html(self) -> str:
@@ -43,6 +77,10 @@ class ReportMixin:
         readiness = self._album_readiness(result)
         selected_numbers = self._selected_assignment_numbers(result)
         ready_numbers = self._layout_ready_assignment_numbers(result)
+        destination_files = self._destination_image_files(result)
+        extra_files = self._extra_destination_files(result)
+        total_text = str(len(destination_files)) if destination_files is not None else "не проверено"
+        extra_text = str(len(extra_files)) if extra_files is not None else "не проверено"
         builder = DashboardBuilder(icon_size=22)
         if include_user_message and self.user_message_html:
             builder.parts.append(self.user_message_html)
@@ -69,8 +107,10 @@ class ReportMixin:
             f"<p style='color:{builder.theme.text_main}; font-family: sans-serif;'>"
             f"<b>Префикс фотографа:</b> {escape(PHOTOGRAPHER_PREFIX)}<br>"
             f"<b>Назначено учеников:</b> {len(result.assignments)}<br>"
-            f"<b>Отобрано фотографий для верстки:</b> {len(selected_numbers)}<br>"
-            f"<b>Фотографий в целевой папке:</b> {len(ready_numbers)}</p>"
+            f"<b>Назначено уникальных номеров:</b> {len(selected_numbers)}<br>"
+            f"<b>Из них с JPG/JPEG/PSD в целевой папке:</b> {len(ready_numbers)}<br>"
+            f"<b>Всего файлов JPG/JPEG/PSD в целевой папке:</b> {total_text}<br>"
+            f"<b>Дополнительных файлов без назначения:</b> {extra_text}</p>"
         )
         if self.state.copy_summary is not None:
             builder.parts.append(
@@ -106,34 +146,8 @@ class ReportMixin:
                 "<b>Нет JPG/JPEG/PSD в целевой папке для номеров:</b><br>"
                 f"{escape(', '.join(readiness['missing_numbers']))}</p>"
             )
-        builder.parts.append(self._location_report_html(result))
         builder.parts.append(self._issues_html(result))
         return builder.get_html()
-
-    def _location_report_html(self, result: BuildResult) -> str:
-        """Show the exact pending moves, including files outside current selections."""
-        plan = result.location_plan
-        if plan is None:
-            return ""
-        parts = ["<h3>Расположение файлов по локациям</h3>"]
-        summary = self.state.location_repair
-        if summary is not None:
-            parts.append(f"<p>Перемещено файлов: {len(summary.moved)}.</p>")
-        parts.append(f"<p>Несоответствий: {len(plan.moves)}. "
-                     f"Доступно для исправления: {len(plan.executable)}.</p>")
-        if plan.moves:
-            parts.append("<table><tr><th>Сейчас</th><th>Должно быть</th><th>Статус</th></tr>")
-            for move in plan.moves:
-                source = escape(str(move.source.relative_to(plan.root)))
-                target = escape(str(move.target.relative_to(plan.root)))
-                parts.append(
-                    f'<tr><td><a href="{escape(move.source.as_uri(), quote=True)}" '
-                    f'title="{escape(str(move.source), quote=True)}">{source}</a></td>'
-                    f'<td title="{escape(str(move.target), quote=True)}">{target}</td>'
-                    f'<td>{escape(move.conflict or "Переместить")}</td></tr>'
-                )
-            parts.append("</table>")
-        return "".join(parts)
 
     def _completion_log_html(self) -> str:
         """Render the final PySM console report without the launch instruction."""
@@ -171,9 +185,9 @@ class ReportMixin:
         assignment_current = self._assignment_file_matches_result(result)
         checks = [
             (not errors, "Блокирующих ошибок нет"),
-            (result.location_plan is not None and not any(
-                i.severity == "error" for i in result.location_plan.issues
-            ), "Расположение файлов соответствует текущим локациям"),
+            (result.destination_inventory is not None and not any(
+                i.severity == "error" for i in result.destination_inventory.issues
+            ), "Целевые файлы проверены"),
             (assignment_exists, "photo_assignments.json создан"),
             (
                 assignment_current and not self.state.assignments_dirty,
@@ -182,10 +196,6 @@ class ReportMixin:
             (
                 not missing_numbers,
                 "Для всех назначенных номеров есть JPG/JPEG/PSD в целевой папке",
-            ),
-            (
-                len(selected_numbers) == len(ready_numbers),
-                "Количество отобранных фотографий совпадает с количеством готовых фотографий в целевой папке",
             ),
         ]
         return {
@@ -220,6 +230,26 @@ class ReportMixin:
                 and has_layout_ready_destination_file(record)
             )
         }
+
+    @staticmethod
+    def _destination_image_files(result: BuildResult) -> set[Path] | None:
+        """Count physical layout files from a successfully inspected flat destination."""
+        inventory = result.destination_inventory
+        if inventory is None or any(issue.code == "destination_scan_error" for issue in inventory.issues):
+            return None
+        return {path for path, _ in inventory.inventory if path.suffix.casefold() in LAYOUT_READY_SUFFIXES}
+
+    def _extra_destination_files(self, result: BuildResult) -> list[Path] | None:
+        """Return layout files that were not associated with any assigned number."""
+        files = self._destination_image_files(result)
+        if files is None:
+            return None
+        assigned_files = {
+            path for number in self._selected_assignment_numbers(result)
+            if (record := result.records.get(number)) is not None
+            for path in record.destination_files
+        }
+        return sorted(files - assigned_files, key=lambda path: str(path).casefold())
 
     @staticmethod
     def _readiness_icon_html(passed: bool, size: int = 18) -> str:
@@ -261,7 +291,7 @@ class ReportMixin:
             records = record_index.get((student_id, location_name), [])
             location_node = ResourceNode(
                 location_name,
-                Path(self.config.dest_dir) / location_name,
+                Path(self.config.dest_dir),
                 "folder",
                 is_critical=False,
             )

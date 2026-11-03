@@ -68,6 +68,7 @@ def run_copy(config: Namespace) -> int:
     moving = config.mode == "move"
     operation = "Перемещение" if moving else "Копирование"
     print(f"<b>{operation.upper()} ВЫБРАННЫХ ФОТОГРАФИЙ</b><br>", flush=True)
+    print(f"Размещение файлов: {config.layout}", flush=True)
     print(f"При совпадении имён: {config.on_conflict}", flush=True)
     selection_path = Path(config.analysis_dir) / "photo_selection.json"
     try:
@@ -92,6 +93,7 @@ def run_copy(config: Namespace) -> int:
 
         summary = copy_selected_files(
             result, Path(config.source_dir), dest_dir,
+            layout=config.layout,
             mode=config.mode,
             on_conflict=config.on_conflict,
             progress_factory=tqdm,

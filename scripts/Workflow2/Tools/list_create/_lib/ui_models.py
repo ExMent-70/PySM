@@ -9,13 +9,13 @@ import re
 from typing import List, Dict, Any, Optional
 
 from PySide6.QtCore import (
-    Qt, QAbstractTableModel, QModelIndex, QEvent, Signal, QTimer, QSortFilterProxyModel
+    Qt, QAbstractTableModel, QModelIndex, QPersistentModelIndex, QEvent, Signal, QTimer, QSortFilterProxyModel
 )
 from PySide6.QtGui import (
     QBrush, QColor
 )
 from PySide6.QtWidgets import (
-    QStyledItemDelegate, QComboBox, QLineEdit, QAbstractItemDelegate, QMessageBox
+    QApplication, QStyledItemDelegate, QComboBox, QLineEdit, QAbstractItemDelegate, QMessageBox
 )
 
 from .domain import Student, ExtraService
@@ -178,7 +178,8 @@ class StudentTableModel(QAbstractTableModel):
         row = index.row()
         col = index.column()
         student = self._data[row]
-        
+
+        previous_data = student.to_dict()
         try:
             # Фиксированные колонки
             if col == self.COL_SHOOT_ORDER:
@@ -221,7 +222,6 @@ class StudentTableModel(QAbstractTableModel):
                 if (cost := self.services.get(new_service_name)) is not None:
                     student.service_type = new_service_name
                     student.service_cost = cost
-                    self.dataChanged.emit(index, self.index(row, self.COL_TOTAL), [role])
                 else:
                     return False
 
@@ -243,7 +243,10 @@ class StudentTableModel(QAbstractTableModel):
         except (ValueError, TypeError, ValidationError) as e:
             raise ValidationError(str(e)) from e
 
-        self.dataChanged.emit(index, index, [role])
+        if student.to_dict() == previous_data:
+            return True
+        end_index = self.index(row, self.COL_TOTAL) if col == self.COL_SERVICE else index
+        self.dataChanged.emit(index, end_index, [role])
         return True
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
@@ -294,10 +297,12 @@ class StudentTableModel(QAbstractTableModel):
     def swap_name_surname(self, row: int) -> bool:
         if 0 <= row < len(self._data):
             s = self._data[row]
+            previous_data = s.to_dict()
             s.name, s.surname = s.surname, s.name
             s.color1, s.color2 = s.color2, s.color1
             s.color1_fg, s.color2_fg = s.color2_fg, s.color1_fg
-            self.dataChanged.emit(self.index(row, self.COL_SURNAME), self.index(row, self.COL_NAME))
+            if s.to_dict() != previous_data:
+                self.dataChanged.emit(self.index(row, self.COL_SURNAME), self.index(row, self.COL_NAME))
             return True
         return False
 
@@ -361,6 +366,9 @@ class EnterKeyDelegate(QStyledItemDelegate):
         # ИЗМЕНЕНО: Сортируем списки для комбобоксов
         self.services = sorted(services) if services else[]
         self.ranks = sorted(ranks) if ranks else[]
+        self._active_editor = None
+        self._active_index = QPersistentModelIndex()
+        self._committing = False
 
 # --- ИЗМЕНЕННЫЙ БЛОК: ui_models.py (Метод createEditor в EnterKeyDelegate) ---
     def createEditor(self, parent, option, index):
@@ -381,30 +389,71 @@ class EnterKeyDelegate(QStyledItemDelegate):
             editor = QLineEdit(parent)
         
         editor.installEventFilter(self)
+        self._active_editor = editor
+        self._active_index = QPersistentModelIndex(index)
         return editor
+
+    def destroyEditor(self, editor, index):
+        if editor is self._active_editor:
+            self._active_editor = None
+            self._active_index = QPersistentModelIndex()
+        super().destroyEditor(editor, index)
+
+    def finish_editing(self) -> bool:
+        """Передаёт последнюю правку в модель перед сохранением или закрытием."""
+        editor = self._active_editor
+        if editor is None or not self._active_index.isValid():
+            return True
+        index = QModelIndex(self._active_index)
+        if not self.setModelData(editor, index.model(), index):
+            editor.setFocus()
+            return False
+        self.closeEditor.emit(editor, QAbstractItemDelegate.EndEditHint.NoHint)
+        return True
 
     def setEditorData(self, editor, index):
         val = index.model().data(index, Qt.EditRole)
         if isinstance(editor, QComboBox):
+            # Сохранённый ранг/услуга может отсутствовать в изменённом справочнике.
+            if editor.findText(str(val)) < 0:
+                editor.addItem(str(val))
             editor.setCurrentText(str(val))
         elif isinstance(editor, QLineEdit):
             editor.setText(str(val))
 
     def setModelData(self, editor, model, index):
+        if self._committing:
+            return False
         view = self.parent()
         value = editor.currentText() if isinstance(editor, QComboBox) else editor.text()
         
+        self._committing = True
         try:
-            model.setData(index, value, Qt.EditRole)
+            return model.setData(index, value, Qt.EditRole)
         except ValidationError as e:
             QMessageBox.warning(view, "Ошибка валидации", str(e))
-            QTimer.singleShot(0, lambda: view.edit(index))
+            return False
+        finally:
+            self._committing = False
 
     def eventFilter(self, editor, event):
+        # Диалог валидации не должен закрывать редактор с неверным значением.
+        if event.type() == QEvent.Type.FocusOut and self._committing:
+            return True
+        if event.type() == QEvent.Type.FocusOut and editor is self._active_editor:
+            focus = QApplication.focusWidget()
+            if QApplication.activePopupWidget() is None and not (
+                focus is not None and editor.isAncestorOf(focus)
+            ):
+                if not self.finish_editing():
+                    QTimer.singleShot(0, editor.setFocus)
+                return True
         if event.type() == QEvent.Type.KeyPress:
             key = event.key()
             if key in (Qt.Key_Return, Qt.Key_Enter, Qt.Key_Up, Qt.Key_Down):
-                self.commitData.emit(editor)
+                idx = self.parent().currentIndex()
+                if not self.setModelData(editor, idx.model(), idx):
+                    return True
                 self.closeEditor.emit(editor, QAbstractItemDelegate.EndEditHint.NoHint)
                 if key in (Qt.Key_Up, Qt.Key_Down):
                     view = self.parent()

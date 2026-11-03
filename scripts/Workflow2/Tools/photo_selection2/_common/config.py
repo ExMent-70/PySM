@@ -33,9 +33,13 @@ def make_parser(stage: str) -> argparse.ArgumentParser:
         parser.add_argument("--photo_session", required=True, help="Текущая фотосессия.")
     if stage != "selection_import":
         parser.add_argument("--source_dir", required=True, help="Корень исходных файлов.")
-        parser.add_argument("--dest_dir", required=True, help="Корень целевых папок локаций.")
+        parser.add_argument("--dest_dir", required=True, help="Целевая папка выбранных файлов.")
         parser.add_argument("--exclude_dirs", default="Masks", help="Исключаемые имена папок, через запятую.")
     if stage == "selection_copy":
+        parser.add_argument(
+            "--layout", choices=("flat", "by_location"), default="flat",
+            help="flat — фотографии в корне, дерево CaptureOne сохраняется; by_location — раскладка по локациям.",
+        )
         parser.add_argument(
             "--mode", choices=("copy", "move"), default="copy",
             help="copy — копировать с сохранением оригиналов; move — переместить файлы.",

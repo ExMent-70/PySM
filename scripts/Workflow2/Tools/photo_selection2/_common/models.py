@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from .assignment_core import BuildResult
 from .copy_service import CopySummary
-from .location_service import LocationRepair
 
 
 @dataclass
@@ -16,4 +15,3 @@ class PhotoSelectionSessionState:
     assignments_dirty: bool = False
     build_result: BuildResult | None = None
     copy_summary: CopySummary | None = None
-    location_repair: LocationRepair | None = None

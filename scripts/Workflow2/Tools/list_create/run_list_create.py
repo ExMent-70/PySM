@@ -106,6 +106,7 @@ class ClassListEditor(QMainWindow):
         self.config = config
         self._is_dirty: bool = False
         self._is_loading: bool = False
+        self._current_list_path: Optional[pathlib.Path] = None
         self._class_name: str = ""
         self._import_panel_width = 300
         self.id_allocator = StudentIdAllocator()
@@ -194,12 +195,16 @@ class ClassListEditor(QMainWindow):
         self._is_loading = False
 
     def _set_class_name(self, class_name: str) -> None:
-        """Store the class name and reflect it in the window title."""
+        """Отображает название класса и текущую фотосессию в заголовке."""
 
         self._class_name = str(class_name).strip()
         title = self.WINDOW_TITLE
         if self._class_name:
             title = f"{title}: {self._class_name}"
+        if IS_MANAGED_RUN and pysm_context is not None:
+            photo_session = str(pysm_context.get("wf_photo_session", "") or "").strip()
+            if photo_session:
+                title = f"{title} — Фотосессия: {photo_session}"
         self.setWindowTitle(title)
 
 # --- ИЗМЕНЕННЫЙ БЛОК: run_list_create.py (Внутри класса ClassListEditor) ---
@@ -494,6 +499,7 @@ class ClassListEditor(QMainWindow):
         self.table_model.dataChanged.connect(self._on_data_changed)
         self.table_model.rowsInserted.connect(self._update_summary_info)
         self.table_model.rowsRemoved.connect(self._update_summary_info)
+        self.table_model.rowsRemoved.connect(self._on_rows_removed)
 
         
         # НОВОЕ: Настраиваем Прокси-модель
@@ -667,7 +673,10 @@ class ClassListEditor(QMainWindow):
         s_type = self.service_type_combo.currentText()
         cost = self.SERVICES.get(s_type, 0)
         self.service_cost_label.setText(f"{cost} руб.")
-        if not self._is_loading and self.table_model.rowCount() > 0:
+        if not self._is_loading and any(
+            s.service_type != s_type or s.service_cost != cost
+            for s in self.table_model.get_all_data()
+        ):
             self._is_dirty = True
             self.table_model.update_all_services(s_type, cost)
 
@@ -738,6 +747,8 @@ class ClassListEditor(QMainWindow):
         dialog = ExtraServicesDialog(student.extra_services, self.SERVICES, self)
         if dialog.exec():
             new_extras = dialog.get_data()
+            if new_extras == student.extra_services:
+                return
             self.table_model.update_extras(source_row, new_extras)
             self._is_dirty = True
             self._update_summary_info()
@@ -758,6 +769,10 @@ class ClassListEditor(QMainWindow):
         dialog = StudentInfoEditorDialog(students, source_row, self.INFO_COLUMNS, self)
         if dialog.exec():
             changes = dialog.get_changes()
+            changes = {
+                row: info for row, info in changes.items()
+                if students[row].info != info
+            }
             if changes:
                 self.table_model.update_info_bulk(changes)
                 self._is_dirty = True
@@ -807,6 +822,8 @@ class ClassListEditor(QMainWindow):
         dialog = InfoSchemaEditorDialog(self.INFO_COLUMNS, self)
         if dialog.exec():
             new_cols, rename_map = dialog.get_result()
+            if new_cols == self.INFO_COLUMNS and not rename_map:
+                return
             
             # Обновляем данные студентов (переименование ключей)
             students = self.table_model.get_all_data()
@@ -891,7 +908,12 @@ class ClassListEditor(QMainWindow):
 
         updates, unresolved = result.value
         students_by_id = {student.student_id: student for student in students}
+        changed = False
         for student_id, new_info in updates.items():
+            changed = changed or any(
+                students_by_id[student_id].info.get(key) != value
+                for key, value in new_info.items()
+            )
             students_by_id[student_id].info.update(new_info)
 
         message = f"Успешно обновлено учеников: {len(updates)}"
@@ -910,7 +932,7 @@ class ClassListEditor(QMainWindow):
         QMessageBox.information(self, "Результат AI", message)
 
         self.table_model.layoutChanged.emit()
-        self._is_dirty = True
+        self._is_dirty = self._is_dirty or changed
 
 
 
@@ -920,9 +942,31 @@ class ClassListEditor(QMainWindow):
         self._is_dirty = True
         self._update_summary_info()
 
+    def _on_rows_removed(self, *args: Any) -> None:
+        """Удаление строк изменяет документ, включая удаление последней строки."""
+        if not self._is_loading:
+            self._is_dirty = True
+
+    def _finish_table_editing(self) -> bool:
+        """Проверяет и завершает ввод в активной ячейке."""
+        return self.processed_table.itemDelegate().finish_editing()
+
+    def _confirm_document_replacement(self) -> bool:
+        """Защищает текущие правки перед загрузкой другого списка."""
+        if not self._finish_table_editing():
+            return False
+        if not self._is_dirty:
+            return True
+        reply = self._ask_unsaved_changes_action("Сохранить изменения перед загрузкой списка?")
+        if reply == QMessageBox.StandardButton.Save:
+            return self._save_list()
+        return reply == QMessageBox.StandardButton.Discard
+
     # --- I/O ---
 
     def _get_default_filepath(self, ext: str) -> Optional[pathlib.Path]:
+        if self._current_list_path is not None:
+            return self._current_list_path.with_suffix(f".{ext}")
         if self.config.wf_dest_dir:
             dir_path = pathlib.Path(self.config.wf_dest_dir)
             return dir_path / f"{dir_path.name}.{ext}"
@@ -938,12 +982,16 @@ class ClassListEditor(QMainWindow):
             self._load_from_file(pathlib.Path(path_str))
 
     def _load_from_file(self, path: pathlib.Path) -> None:
+        if not self._confirm_document_replacement():
+            return
+        was_loading = self._is_loading
         try:
             metadata, students = io_services.load_session(path)
             loaded_allocator = StudentIdAllocator(
                 metadata["list_id"], metadata["next_student_number"]
             )
             
+            self._is_loading = True
             self._set_class_name(metadata["class_name"])
             self.service_type_combo.setCurrentText(metadata["service_type"])
             
@@ -971,13 +1019,18 @@ class ClassListEditor(QMainWindow):
             self._setup_table_headers()
 
             self.config.wf_dest_dir = str(path.parent)
+            self._current_list_path = path
             self.statusBar().showMessage(f"Загружено: {path.name}", 5000)
             self._is_dirty = False
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось прочитать файл:\n{e}")
+        finally:
+            self._is_loading = was_loading
 
 
     def _save_list(self, save_as: bool = False) -> bool:
+        if not self._finish_table_editing():
+            return False
         path = self._get_default_filepath('list') if not save_as else None
         if not path:
             default_name = self._class_name or "Список класса"
@@ -985,40 +1038,49 @@ class ClassListEditor(QMainWindow):
             path_str, _ = QFileDialog.getSaveFileName(self, "Сохранить как...", default_path, "Списки (*.list)")
             if not path_str: return False
             path = pathlib.Path(path_str)
-            self.config.wf_dest_dir = str(path.parent)
 
-        self._set_class_name(path.stem)
         try:
             io_services.save_session(
                 path, 
-                self._class_name,
+                path.stem,
                 self.service_type_combo.currentText(),
                 self.table_model.get_all_data(),
                 self.INFO_COLUMNS, # Сохраняем схему
                 self.id_allocator,
             )
             self.statusBar().showMessage(f"Сохранено: {path.name}", 5000)
-            self._is_dirty = False
+            self.config.wf_dest_dir = str(path.parent)
+            self._current_list_path = path
+            self._set_class_name(path.stem)
 
-            self._save_student_ids_order()
+            # Файл списка уже записан; сбои связанных результатов допускают повтор.
+            complete = True
+            if IS_MANAGED_RUN and pysm_context is not None:
+                complete = self._save_student_ids_order()
 
             for fmt in self.config.wf_autosave_formats:
-                if fmt == "html": self._save_html(save_as=False)
-                elif fmt == "csv": self._save_csv(save_as=False)
-            return True
+                if fmt == "html":
+                    complete = bool(self._save_html(save_as=False)) and complete
+                elif fmt == "csv":
+                    complete = self._save_csv(save_as=False) and complete
+            self._is_dirty = not complete
+            if not complete:
+                self.statusBar().showMessage("Список записан, но сохранение связанных данных не завершено.")
+            return complete
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить:\n{e}")
             return False
 
-    def _save_csv(self, save_as: bool = True) -> None:
-        if self.table_model.rowCount() == 0: return
+    def _save_csv(self, save_as: bool = True) -> bool:
+        if not self._finish_table_editing():
+            return False
         path_str = None
         if save_as:
             default = str(self._get_default_filepath('csv') or '')
             path_str, _ = QFileDialog.getSaveFileName(self, "Сохранить CSV...", default, "CSV (*.csv)")
         else:
             if path_obj := self._get_default_filepath('csv'): path_str = str(path_obj)
-        if not path_str: return
+        if not path_str: return False
         
         try:
             io_services.export_to_csv(
@@ -1027,10 +1089,14 @@ class ClassListEditor(QMainWindow):
                 self.INFO_COLUMNS
             )
             self.statusBar().showMessage(f"CSV сохранен: {pathlib.Path(path_str).name}", 5000)
+            return True
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить CSV:\n{e}")
+            return False
 
     def _save_html(self, save_as: bool = False, extended_mode: bool = None) -> Optional[pathlib.Path]:
+            if not self._finish_table_editing():
+                return None
             try:
                 path = self._get_default_filepath('html') if not save_as else None
                 if not path:
@@ -1062,7 +1128,7 @@ class ClassListEditor(QMainWindow):
     def _save_student_ids_order(self) -> bool:
         """Сохраняет порядок student_id текущей фотосессии в контекст PySM."""
 
-        if self.table_model.rowCount() == 0:
+        if not self._finish_table_editing():
             return False
         if not IS_MANAGED_RUN or pysm_context is None:
             QMessageBox.warning(
@@ -1154,13 +1220,13 @@ class ClassListEditor(QMainWindow):
             pysm_context.log_link(url_or_path=str(self.config.wf_dest_dir), text="Открыть папку с файлами")
             print(" ", file=sys.stderr)
 
-    def _ask_unsaved_changes_action(self) -> QMessageBox.StandardButton:
+    def _ask_unsaved_changes_action(self, text: str = "Сохранить перед выходом?") -> QMessageBox.StandardButton:
         """Запрашивает действие при закрытии окна с несохранёнными изменениями."""
 
         message_box = QMessageBox(self)
         message_box.setIcon(QMessageBox.Icon.Question)
         message_box.setWindowTitle("Несохраненные изменения")
-        message_box.setText("Сохранить перед выходом?")
+        message_box.setText(text)
         message_box.setStandardButtons(
             QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
@@ -1184,15 +1250,9 @@ class ClassListEditor(QMainWindow):
         return QMessageBox.StandardButton.Cancel
 
     def closeEvent(self, event: QEvent) -> None:
-        if IS_MANAGED_RUN and pysm_context and self.table_model.rowCount() > 0:
-            try:
-                context_key = io_services.build_student_ids_order_context_key(
-                    pysm_context.get("wf_photo_session", "")
-                )
-                if pysm_context.get_structured(context_key, default=None) is None:
-                    self._save_student_ids_order()
-            except ValueError:
-                self._save_student_ids_order()
+        if not self._finish_table_editing():
+            event.ignore()
+            return
 
         if not self._is_dirty:
             #self.add_link()

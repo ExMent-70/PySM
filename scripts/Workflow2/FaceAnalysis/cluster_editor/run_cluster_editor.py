@@ -63,7 +63,7 @@ try:
         ClusterItemDelegate,
         ImageItemDelegate,
     )
-    from _lib.editor_dialogs import EnhanceSettingsDialog, FaceSelectorDialog
+    from _lib.editor_dialogs import EnhanceSettingsDialog, FaceSelectorDialog, ask_save_changes
     from _lib.data_manager import ClusterDataManager
     from _lib.editor_ui import EditorUIBuilder
     from _lib.editor_filters import GalleryFilterManager
@@ -74,6 +74,7 @@ try:
     )
     from _lib.image_requests import face_thumbnail_request, normalized_face_crop
     from _lib.image_pipeline import ImagePipelineController
+    from _lib.similar_faces_controller import SimilarFacesController
 
 except ImportError as e:
     print(f"Критическая ошибка импорта внутренних модулей: {e}", file=sys.stderr)
@@ -157,6 +158,7 @@ class MainWindow(QMainWindow):
         self.data_load_thread = None
         self.data_load_worker = None
         self._pending_session_switch = None
+        self.similar_faces_controller = SimilarFacesController(self)
 
         # 1. Инициализация Data Manager (здесь же создается Strategy)
         self.data_manager = ClusterDataManager(
@@ -234,6 +236,8 @@ class MainWindow(QMainWindow):
     def begin_working_session_switch(self, new_json_path: Path) -> tuple[bool, str]:
         """Validate another matches session off the GUI thread before adoption."""
 
+        if self.similar_faces_controller.busy:
+            return False, "Завершите или отмените поиск и проверку похожих лиц."
         if self.data_load_thread is not None and self.data_load_thread.isRunning():
             return False, "Уже выполняется загрузка данных."
         new_working_dir = new_json_path.parent
@@ -277,6 +281,7 @@ class MainWindow(QMainWindow):
     ) -> None:
         new_working_dir = new_json_path.parent
 
+        self.similar_faces_controller.reset_session()
         self._stop_loader()
         self._cancel_cluster_cover_requests()
         self.data_manager = candidate
@@ -564,6 +569,8 @@ class MainWindow(QMainWindow):
         """
         Основная логика обработки перемещения (вынесена из _handle_drop).
         """
+        if self.similar_faces_controller.busy:
+            return
         target_data = self._get_cluster_item_data_by_id(target_id)
         target_display_name = target_data["name"] if target_data else ""
         target_name = target_display_name
@@ -705,6 +712,9 @@ class MainWindow(QMainWindow):
             if self.mode == 'matches' and self.active_cluster_id == target_id:
                 # ИЗМЕНЕНО: Добавлен preserve_state
                 self._render_gallery(target_id, preserve_state=True)
+
+            if self.mode == "matches":
+                self.similar_faces_controller.start(target_id, face_selection)
 
 
     def _save_changes(self, silent=False):
@@ -1749,6 +1759,10 @@ class MainWindow(QMainWindow):
             logger.error(f"Ошибка при формировании финального отчета: {exc}")
 
     def closeEvent(self, event):
+        if self.similar_faces_controller.busy:
+            self.similar_faces_controller.cancel_search()
+            event.ignore()
+            return
         if self.data_load_thread is not None and self.data_load_thread.isRunning():
             QMessageBox.information(
                 self,
@@ -1772,8 +1786,7 @@ class MainWindow(QMainWindow):
 
         # Стандартная обработка несохраненных изменений
         if self.data_manager.has_changes():
-            reply = QMessageBox.question(self, "Выход", "Сохранить изменения перед выходом?", 
-                                         QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel)
+            reply = ask_save_changes(self, "Выход", "Сохранить изменения перед выходом?")
             if reply == QMessageBox.StandardButton.Save:
                 if self._save_changes(silent=True):
                     self._finalize_close(event)

@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QGraphicsView,
     QGraphicsScene, QGraphicsPixmapItem, QPushButton, QSlider, QFrame, QComboBox, QDialogButtonBox,
     QListWidget, QListWidgetItem, QSpinBox, QDoubleSpinBox, QCheckBox, QGroupBox, QFormLayout,
-    QToolBox, QLineEdit, QWidget, QScrollArea
+    QToolBox, QLineEdit, QWidget, QScrollArea, QMessageBox
 )
 from PySide6.QtGui import QImage, QPixmap, QPainter, QTransform, QWheelEvent, QMouseEvent
 from PySide6.QtCore import (
@@ -52,6 +52,29 @@ except ImportError:
     apply_color_corrections, create_watermark_layer = None, None
 
 logger = logging.getLogger(__name__)
+
+
+def ask_save_changes(parent, title: str, text: str) -> int:
+    """Ask about unsaved changes with explicit Russian standard-button labels."""
+
+    dialog = QMessageBox(parent)
+    dialog.setIcon(QMessageBox.Icon.Question)
+    dialog.setWindowTitle(title)
+    dialog.setText(text)
+    dialog.setStandardButtons(
+        QMessageBox.StandardButton.Save
+        | QMessageBox.StandardButton.Discard
+        | QMessageBox.StandardButton.Cancel
+    )
+    dialog.button(QMessageBox.StandardButton.Save).setText("Сохранить")
+    dialog.button(QMessageBox.StandardButton.Discard).setText("Не сохранять")
+    dialog.button(QMessageBox.StandardButton.Cancel).setText("Отмена")
+    dialog.setDefaultButton(QMessageBox.StandardButton.Save)
+    dialog.setEscapeButton(QMessageBox.StandardButton.Cancel)
+    try:
+        return dialog.exec()
+    finally:
+        dialog.deleteLater()
 
 
 # --- ВСПОМОГАТЕЛЬНЫЕ КЛАССЫ ---
@@ -703,6 +726,10 @@ class RenameDialog(QDialog):
     def get_selected_name(self) -> str: return self.combo_box.currentText().strip()
 
 class FaceSelectorDialog(QDialog):
+    """Select a face; search review always requires an explicit confirmation."""
+
+    FINISH_REVIEW = 2
+
     def __init__(
         self,
         image_path: Path,
@@ -712,6 +739,7 @@ class FaceSelectorDialog(QDialog):
         *,
         image_cache: QtImageCache,
         image_loader: AsyncImageLoader,
+        review_distances: Optional[List[float]] = None,
     ):
         super().__init__(parent)
         self.image_path = image_path
@@ -720,6 +748,7 @@ class FaceSelectorDialog(QDialog):
         self.image_loader = image_loader
         self._image_channels = set()
         self.selected_index = -1
+        self.review_distances = review_distances
         self.setWindowTitle("Выбор лица")
         self.setMinimumSize(600, 400)
         self.layout = QVBoxLayout(self)
@@ -741,16 +770,29 @@ class FaceSelectorDialog(QDialog):
         self.list_widget.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.layout.addWidget(self.list_widget)
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        if review_distances is not None:
+            btn_box.button(QDialogButtonBox.Ok).setText("Назначить")
+            btn_box.button(QDialogButtonBox.Ok).setEnabled(False)
+            btn_box.button(QDialogButtonBox.Cancel).setText("Пропустить фото")
+            finish = btn_box.addButton("Завершить проверку", QDialogButtonBox.ButtonRole.ActionRole)
+            finish.clicked.connect(lambda: self.done(self.FINISH_REVIEW))
+            self.list_widget.itemSelectionChanged.connect(
+                lambda: btn_box.button(QDialogButtonBox.Ok).setEnabled(bool(self.list_widget.selectedItems()))
+            )
         btn_box.accepted.connect(self._on_accept)
         btn_box.rejected.connect(self.reject)
         self.layout.addWidget(btn_box)
         self.image_loader.imageReady.connect(self._on_image_ready)
         self._load_faces()
+        if review_distances is not None and self.list_widget.count():
+            self.list_widget.setCurrentRow(0)
 
     def _load_faces(self):
         source_size = self.image_cache.source_size(self.image_path)
         for i, face in enumerate(self.faces):
             item = QListWidgetItem(f"Лицо #{i + 1}")
+            if self.review_distances is not None:
+                item.setText(f"Лицо #{i + 1}\nРасстояние: {self.review_distances[i]:.3f}")
             item.setData(Qt.ItemDataRole.UserRole, i)
             self.list_widget.addItem(item)
             request = face_thumbnail_request(
@@ -807,6 +849,8 @@ class FaceSelectorDialog(QDialog):
             self.selected_index = item.data(Qt.ItemDataRole.UserRole)
             self.accept()
         else:
+            if self.review_distances is not None:
+                return
             if self.list_widget.count() > 0:
                 self.selected_index = 0
                 self.accept()

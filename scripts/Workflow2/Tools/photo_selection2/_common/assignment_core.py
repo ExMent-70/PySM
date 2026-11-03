@@ -12,10 +12,11 @@ import tempfile
 from typing import Any, Iterable, TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from .location_service import LocationPlan
+    from .destination_inventory import DestinationInventory
 
 
 SCHEMA_VERSION = 1
+ASSIGNMENTS_SCHEMA_VERSION = 2
 PHOTO_NUMBER_RE = re.compile(r"(?<!\d)(\d{6})(?!\d)")
 CAPTURE_ONE_UUID_SUFFIX_RE = re.compile(
     r"\.\[[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\](?=(?: \(\d+\))?$)",
@@ -79,21 +80,38 @@ class PhotoRecord:
 
 @dataclass
 class BuildResult:
+    """Calculated assignments and the destination snapshot needed to publish them."""
+
     list_id: str
     records: dict[str, PhotoRecord]
     assignments: dict[str, list[str]]
     issues: list[Issue]
-    location_plan: LocationPlan | None = None
+    destination_inventory: DestinationInventory | None = None
 
     @property
     def has_errors(self) -> bool:
         return any(issue.severity == "error" for issue in self.issues)
 
     def assignment_payload(self) -> dict[str, Any]:
+        """Group ordered assignments by logical location without storing paths."""
+        locations = {}
+        for record in self.records.values():
+            locations.setdefault(record.location.casefold(), record.location)
+        grouped: dict[str, dict[str, list[str]]] = {}
+        for student_id, numbers in self.assignments.items():
+            by_location: dict[str, list[str]] = {}
+            for number in numbers:
+                record = self.records[number]
+                location = locations[record.location.casefold()]
+                values = by_location.setdefault(location, [])
+                if number not in values:
+                    values.append(number)
+            if by_location:
+                grouped[student_id] = by_location
         return {
-            "schema_version": SCHEMA_VERSION,
+            "schema_version": ASSIGNMENTS_SCHEMA_VERSION,
             "list_id": self.list_id,
-            "assignments": self.assignments,
+            "assignments": grouped,
         }
 
 
@@ -414,9 +432,12 @@ def build_assignments(
     dest_dir: Path,
     exclude_dirs: Iterable[str] = (),
 ) -> BuildResult:
-    from .location_service import plan_locations
+    """Combine client and PH_ choices with logical locations and flat ready files."""
+    from .destination_inventory import scan_destination
 
-    location_plan = plan_locations(dest_dir, analysis_dir / "info_faces.json", exclude_dirs)
+    destination_inventory = scan_destination(
+        dest_dir, analysis_dir / "info_faces.json", exclude_dirs,
+    )
     issues: list[Issue] = []
     list_id, roster_ids = load_roster(student_list_file)
     records = _build_records(
@@ -443,9 +464,11 @@ def build_assignments(
     selection = _load_object(analysis_dir / "photo_selection.json", "photo_selection.json")
     _merge_selection(selection, list_id, roster_ids, records, issues)
     _scan_files(source_dir, records, issues, destination=False, exclude_dirs=exclude_dirs)
-    _scan_files(dest_dir, records, issues, destination=True, exclude_dirs=exclude_dirs,
-                paths=(path for path, _ in location_plan.inventory))
-    issues.extend(issue for issue in location_plan.issues if issue not in issues)
+    _scan_files(
+        dest_dir, records, issues, destination=True, exclude_dirs=exclude_dirs,
+        paths=(path for path, _ in destination_inventory.inventory),
+    )
+    issues.extend(issue for issue in destination_inventory.issues if issue not in issues)
 
     for record in records.values():
         record.destination_root = dest_dir.absolute()
@@ -492,7 +515,7 @@ def build_assignments(
         )
         if numbers:
             assignments[student_id] = numbers
-    return BuildResult(list_id, records, assignments, issues, location_plan)
+    return BuildResult(list_id, records, assignments, issues, destination_inventory)
 
 
 def index_records_by_student_location(
@@ -513,7 +536,7 @@ def save_assignments(
     path: Path, result: BuildResult, *, inputs_current: Callable[[], bool] = lambda: True,
 ) -> None:
     """Publish atomically only while the audited inputs and destination remain current."""
-    from .location_service import assert_plan_current
+    from .destination_inventory import assert_inventory_current
 
     publish_errors = publishability_issues(result)
     if result.has_errors:
@@ -537,8 +560,8 @@ def save_assignments(
             json.dump(result.assignment_payload(), stream, ensure_ascii=False, indent=2)
             stream.flush()
             os.fsync(stream.fileno())
-        if result.location_plan is not None:
-            assert_plan_current(result.location_plan)
+        if result.destination_inventory is not None:
+            assert_inventory_current(result.destination_inventory)
         if not inputs_current():
             raise ValueError("Исходные данные изменились. Назначения не записаны.")
         os.replace(temp_path, path)
@@ -552,22 +575,18 @@ def has_layout_ready_destination_file(record: PhotoRecord) -> bool:
     return any(
         path.suffix.casefold() in LAYOUT_READY_SUFFIXES
         and path.is_file()
-        and (record.destination_root is None or (
-            path.absolute().is_relative_to(record.destination_root)
-            and len(path.absolute().relative_to(record.destination_root).parts) > 1
-            and path.absolute().relative_to(record.destination_root).parts[0].casefold()
-            == record.location.casefold()
-        ))
+        and (record.destination_root is None
+             or path.absolute().parent == record.destination_root)
         for path in record.destination_files
     )
 
 
 def publishability_issues(result: BuildResult) -> list[Issue]:
     """Return errors that make photo_assignments.json unsafe to publish."""
-    if result.location_plan is None:
-        issues = [Issue("error", "location_check_required", "Проверка локаций не выполнена.")]
+    if result.destination_inventory is None:
+        issues = [Issue("error", "destination_check_required", "Проверка целевых файлов не выполнена.")]
     else:
-        issues = [issue for issue in result.location_plan.issues if issue.severity == "error"]
+        issues = [issue for issue in result.destination_inventory.issues if issue.severity == "error"]
     checked_numbers = {
         number
         for numbers in result.assignments.values()

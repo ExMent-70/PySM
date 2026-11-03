@@ -1,8 +1,8 @@
 {
-  "description": "Проверка и исправление расположения готовых фотографий по локациям, просмотр назначений и создание photo_assignments.json.",
+  "description": "Просмотр назначений в таблице учеников и логических локаций, проверка готовых файлов в плоской целевой папке и создание photo_assignments.json версии 2. Фотографии не перемещаются.",
   "category": "Редакторы",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.10.22",
+  "version": "2.2026.11.03",
   "command_line_args_meta": {
     "student_list_file": {
       "type": "file_path",

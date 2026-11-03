@@ -68,6 +68,10 @@ AI-диалог формирует промпт из исходного текс
 {"schema_version":1,"list_id":"A7K3","session_name":"9А","photo_session":"SCHOOL","students":{"A7K3-S001":{"selected_numbers":["901256"],"responded":true,"source":"manual"}}}
 ```
 
+Для дальнейшего переноса RAW и готовых изображений `selection_copy` использует
+`--layout flat` по умолчанию. Сохранить прежние подпапки можно через `--layout by_location`.
+Новый план вёрстки хранит назначения по локациям (schema_version=2).
+
 ## Ошибки и повторный запуск
 
 Файл другого списка или фотосессии не открывается как текущий. Если selection-файл

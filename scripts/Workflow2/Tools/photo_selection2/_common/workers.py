@@ -12,7 +12,7 @@ from .copy_service import CopySummary, copy_selected_files
 from .signatures import SelectionSignature, file_signature
 from .roster import load_roster
 from .storage import load_document
-from .location_service import LocationPlan, LocationRepair, analysis_version, repair_locations
+from .destination_inventory import analysis_version
 from .assignment_core import (
     BuildResult,
     build_assignments,
@@ -27,7 +27,7 @@ except ImportError:
     tqdm = None
 
 
-Operation = Literal["refresh", "copy", "build", "repair"]
+Operation = Literal["refresh", "copy", "build"]
 
 
 @dataclass(frozen=True)
@@ -43,7 +43,6 @@ class BuildRequest:
     selection_signature: SelectionSignature
     session_name: str
     photo_session: str
-    location_plan: LocationPlan | None = None
 
 
 @dataclass(frozen=True)
@@ -57,7 +56,6 @@ class OperationOutcome:
     selection_signature: SelectionSignature = None
     preview_by_stem: dict[str, Path] | None = None
     analysis_signature: str = ""
-    location_repair: LocationRepair | None = None
 
 
 class PhotoSelectionOperationWorker(QThread):
@@ -69,12 +67,11 @@ class PhotoSelectionOperationWorker(QThread):
 
     def __init__(self, request: BuildRequest, operation: Operation, parent=None):
         super().__init__(parent)
-        if operation not in {"refresh", "copy", "build", "repair"}:
+        if operation not in {"refresh", "copy", "build"}:
             raise ValueError(f"Неизвестная операция: {operation}")
         self.request = request
         self.operation = operation
         self.analysis_signature = analysis_version(request.analysis_dir / "info_faces.json")
-        self.location_repair = None
 
     def _build(self) -> BuildResult:
         """Retain the original calculation and validate the requested session."""
@@ -133,7 +130,6 @@ class PhotoSelectionOperationWorker(QThread):
             self.request.selection_signature,
             self._preview_index() if include_preview else {},
             self.analysis_signature,
-            self.location_repair,
         )
 
     def run(self) -> None:
@@ -143,22 +139,6 @@ class PhotoSelectionOperationWorker(QThread):
             result = self._build()
             if not self._inputs_are_current():
                 self.completed.emit(self._outcome(result, include_preview=False))
-                return
-            if self.operation == "repair":
-                plan = self.request.location_plan
-                if plan is None:
-                    raise ValueError("Сначала выполните проверку расположения файлов.")
-                structural_errors = [i for i in result.issues
-                                     if i.severity == "error" and i.code != "location_mismatch"]
-                if not structural_errors:
-                    self.location_repair = repair_locations(
-                        plan, inputs_current=self._inputs_are_current,
-                        progress=lambda done, total: self.stageChanged.emit(
-                            f"Исправление расположения файлов: {done} из {total}…"),
-                    )
-                    result = self._build()
-                    result.issues.extend(self.location_repair.issues)
-                self.completed.emit(self._outcome(result))
                 return
             if result.has_errors:
                 self.completed.emit(self._outcome(result))
@@ -204,7 +184,4 @@ class PhotoSelectionOperationWorker(QThread):
             self.completed.emit(self._outcome(result, summary, saved))
         except Exception as exc:
             message = str(exc)
-            if self.location_repair is not None:
-                message = (f"Перемещено файлов: {len(self.location_repair.moved)}. "
-                           f"Повторная проверка не завершена: {message}")
             self.failed.emit(message)

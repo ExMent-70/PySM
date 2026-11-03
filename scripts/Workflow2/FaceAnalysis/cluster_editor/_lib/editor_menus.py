@@ -11,7 +11,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QMenu, QMessageBox, QInputDialog, QFileDialog, QDialog
 from PySide6.QtCore import Qt, QObject, Slot
 
-from .editor_dialogs import RenameDialog, StudentSelectionDialog
+from .editor_dialogs import RenameDialog, StudentSelectionDialog, ask_save_changes
 
 logger = logging.getLogger(__name__)
 
@@ -125,9 +125,10 @@ class EditorMenuManager(QObject):
             )
             return
         if w.data_manager.has_changes():
-            reply = QMessageBox.question(w, "Смена сессии", 
-                                         "Есть несохраненные изменения. Сохранить перед переключением?", 
-                                         QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel)
+            reply = ask_save_changes(
+                w, "Смена сессии",
+                "Есть несохраненные изменения. Сохранить перед переключением?",
+            )
             if reply == QMessageBox.StandardButton.Cancel: return
             if reply == QMessageBox.StandardButton.Save:
                 if not w._save_changes(silent=False):
