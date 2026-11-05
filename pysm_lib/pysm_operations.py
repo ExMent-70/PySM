@@ -9,6 +9,7 @@
 # ==============================================================================
 import concurrent.futures
 import fnmatch
+from html import escape
 import pathlib
 import re
 import shutil
@@ -301,14 +302,16 @@ def perform_directory_operation(
                     is_empty = next(entries, None) is None
                 if is_empty:
                     _recycle_path(directory)
+                    pysm_context.log_html(
+                        f'<div style="{name_style}">{icon_ok} Папка удалена: {escape(str(directory))}</div>'
+                    )
         except Exception as error:
             pysm_context.log_html(
                 f'<div style="{name_style}">{icon_error} Ошибка отправки в корзину: {error}</div>'
             )
             return 1
-        folder_status = "сохранена" if source_dir.exists() else "отправлена в корзину как пустая"
         pysm_context.log_html(
-            f'<div style="{name_style}">{icon_ok} Отправлено в корзину файлов: {len(files)}. Папка {folder_status}: {source_dir}</div>'
+            f'<div style="{name_style}">{icon_ok} Отправлено в корзину файлов: {len(files)}</div>'
         )
         return 0
 
