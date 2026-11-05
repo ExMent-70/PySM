@@ -34,7 +34,7 @@ class DirectoryDeleteTests(unittest.TestCase):
         self.recycle_patch.start()
         self.addCleanup(self.recycle_patch.stop)
         self.logger = patch.object(operations.pysm_context, "log_html")
-        self.logger.start()
+        self.log_html = self.logger.start()
         self.addCleanup(self.logger.stop)
 
     def delete(self, source):
@@ -71,6 +71,57 @@ class DirectoryDeleteTests(unittest.TestCase):
         (source / "nested" / "file.jpg").write_text("test")
         self.assertEqual(self.delete(source), 0)
         self.assertFalse(source.exists())
+
+    def test_logs_every_removed_directory_on_its_own_line(self):
+        source = self.root / "source"
+        nested = source / "nested & more"
+        leaf = nested / "leaf"
+        leaf.mkdir(parents=True)
+        (leaf / "file.jpg").write_text("test")
+
+        self.assertEqual(self.delete(source), 0)
+
+        folder_logs = [call.args[0] for call in self.log_html.call_args_list
+                       if "Папка удалена:" in call.args[0]]
+        self.assertEqual(3, len(folder_logs))
+        for log, directory in zip(folder_logs, (leaf, nested, source)):
+            self.assertIn(str(directory).replace("&", "&amp;"), log)
+            self.assertEqual(1, log.count("Папка удалена:"))
+            self.assertTrue(log.startswith("<div "))
+            self.assertTrue(log.endswith("</div>"))
+
+    def test_does_not_log_preserved_directories(self):
+        source = self.root / "source"
+        source.mkdir()
+        (source / "keep.txt").write_text("test")
+        (source / "remove.jpg").write_text("test")
+
+        self.assertEqual(self.delete(source), 0)
+
+        messages = [call.args[0] for call in self.log_html.call_args_list]
+        self.assertTrue(any("Отправлено в корзину файлов: 1" in msg for msg in messages))
+        self.assertFalse(any("Папка удалена:" in msg or "Папка сохранена:" in msg
+                             for msg in messages))
+
+    def test_logs_already_removed_directories_if_later_removal_fails(self):
+        source = self.root / "source"
+        nested = source / "nested"
+        nested.mkdir(parents=True)
+        recycle = operations._recycle_path
+
+        def fail_on_source(path):
+            if path == source:
+                raise PermissionError("denied")
+            recycle(path)
+
+        with patch.object(operations, "_recycle_path", side_effect=fail_on_source):
+            self.assertEqual(self.delete(source), 1)
+
+        messages = [call.args[0] for call in self.log_html.call_args_list]
+        self.assertTrue(any("Папка удалена:" in msg and str(nested) in msg for msg in messages))
+        self.assertTrue(any("Ошибка отправки в корзину" in msg for msg in messages))
+        self.assertFalse(any("Папка удалена:" in msg and str(source) + "</div>" in msg
+                             for msg in messages))
 
     def test_preserves_source_with_nonmatching_file_in_subdirectory(self):
         source = self.root / "source"
