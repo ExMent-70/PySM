@@ -8,9 +8,11 @@
 # 1. БЛОК: Импорты
 # ==============================================================================
 import concurrent.futures
+import fnmatch
 import pathlib
 import re
 import shutil
+import stat
 import sys
 import os
 import uuid
@@ -176,6 +178,35 @@ def _scan_batch_rename_directory(directory: pathlib.Path) -> set[str]:
 
 # 4. БЛОК: Публичная функция API для операций с директориями
 # ==============================================================================
+def _recycle_path(path: pathlib.Path) -> None:
+    """Отправляет один объект в корзину Windows без безвозвратного удаления."""
+    if sys.platform != "win32":
+        raise OSError("Отправка в корзину поддерживается только в Windows.")
+    import pythoncom
+    from win32com.shell import shell
+
+    pythoncom.CoInitializeEx(pythoncom.COINIT_APARTMENTTHREADED)
+    try:
+        absolute_path = path.absolute()
+        parent = shell.SHCreateItemFromParsingName(
+            str(absolute_path.parent), None, shell.IID_IShellItem
+        )
+        item = shell.SHCreateItemFromParsingName(
+            str(absolute_path), None, shell.IID_IShellItem
+        )
+        recycle_bin = shell.SHCreateItemFromParsingName(
+            "shell:RecycleBinFolder", None, shell.IID_IShellItem
+        )
+        transfer = parent.BindToHandler(
+            None, shell.BHID_Transfer, shell.IID_ITransferSource
+        )
+        _, recycled_item = transfer.RecycleItem(item, recycle_bin, 0)
+        if recycled_item is None or path.exists():
+            raise OSError(f"Windows не подтвердила отправку в корзину: {path}")
+    finally:
+        pythoncom.CoUninitialize()
+
+
 def perform_directory_operation(
     source_dir_str: str,
     dest_dir_str: str | None,
@@ -186,10 +217,11 @@ def perform_directory_operation(
     include_patterns: list[str],
 ) -> int:
     """
-    Копирует, перемещает содержимое или удаляет исходную директорию целиком.
+    Копирует, перемещает или удаляет файлы исходной директории по маскам.
 
-    В режиме delete папка удаляется безвозвратно вместе со всем содержимым.
-    Параметры назначения, фильтров, конфликтов и потоков игнорируются.
+    В режиме delete подходящие файлы отправляются в корзину рекурсивно.
+    Пустые директории удаляются после файлов, ссылки сохраняются.
+    Маски задают только имя файла.
 
     :return: 0 при успехе, 1 при наличии ошибок.
     """
@@ -204,7 +236,7 @@ def perform_directory_operation(
     icon_warning = icons.WARNING()
 
     if mode == "delete":
-        print("<b>УДАЛЕНИЕ ПАПКИ</b>")
+        print("<b>УДАЛЕНИЕ ФАЙЛОВ ПО МАСКЕ</b>")
         try:
             if not source_dir_str or not source_dir_str.strip():
                 raise ValueError("Путь удаляемой папки не задан.")
@@ -218,14 +250,65 @@ def perform_directory_operation(
                 raise ValueError("Удаление папки-ссылки или точки соединения запрещено.")
             if not source_dir.is_dir():
                 raise NotADirectoryError(f"Исходная папка не найдена: {source_dir}")
-            shutil.rmtree(source_dir)
+            if not include_patterns or any(
+                not isinstance(pattern, str) or not pattern.strip()
+                or pattern in (".", "..") or "/" in pattern or "\\" in pattern
+                or ":" in pattern
+                for pattern in include_patterns
+            ):
+                raise ValueError("Укажите непустые маски имён файлов без путей.")
+
+            def raise_walk_error(error):
+                raise error
+
+            files = []
+            directories = []
+            for directory, subdirs, filenames in os.walk(
+                source_dir, followlinks=False, onerror=raise_walk_error
+            ):
+                directory_path = pathlib.Path(directory)
+                directories.append(directory_path)
+                safe_subdirs = []
+                for name in subdirs:
+                    child = directory_path / name
+                    metadata = child.lstat()
+                    if not stat.S_ISLNK(metadata.st_mode) and not (
+                        getattr(metadata, "st_file_attributes", 0) & 0x400
+                    ):
+                        safe_subdirs.append(name)
+                subdirs[:] = safe_subdirs
+                for name in filenames:
+                    if any(fnmatch.fnmatch(name, pattern) for pattern in include_patterns):
+                        candidate = directory_path / name
+                        metadata = candidate.lstat()
+                        if stat.S_ISREG(metadata.st_mode) and not (
+                            getattr(metadata, "st_file_attributes", 0) & 0x400
+                        ):
+                            files.append(candidate)
+
+            for candidate in files:
+                # Повторно проверяем тип перед удалением найденного файла.
+                metadata = candidate.lstat()
+                if not stat.S_ISREG(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & 0x400:
+                    raise ValueError(f"Файл изменился или является ссылкой: {candidate}")
+                _recycle_path(candidate)
+
+            for directory in reversed(directories):
+                metadata = directory.lstat()
+                if not stat.S_ISDIR(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & 0x400:
+                    raise ValueError(f"Папка изменилась или является ссылкой: {directory}")
+                with os.scandir(directory) as entries:
+                    is_empty = next(entries, None) is None
+                if is_empty:
+                    _recycle_path(directory)
         except Exception as error:
             pysm_context.log_html(
-                f'<div style="{name_style}">{icon_error} Ошибка удаления папки: {error}</div>'
+                f'<div style="{name_style}">{icon_error} Ошибка отправки в корзину: {error}</div>'
             )
             return 1
+        folder_status = "сохранена" if source_dir.exists() else "отправлена в корзину как пустая"
         pysm_context.log_html(
-            f'<div style="{name_style}">{icon_ok} Папка удалена: {source_dir}</div>'
+            f'<div style="{name_style}">{icon_ok} Отправлено в корзину файлов: {len(files)}. Папка {folder_status}: {source_dir}</div>'
         )
         return 0
 

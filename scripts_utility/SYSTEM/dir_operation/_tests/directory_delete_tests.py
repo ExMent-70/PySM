@@ -1,4 +1,4 @@
-"""Проверки удаления папок через API PySM на временных данных."""
+"""Проверки удаления файлов по маске через API PySM на временных данных."""
 import argparse
 import importlib.util
 from pathlib import Path
@@ -15,12 +15,24 @@ spec.loader.exec_module(script)
 
 
 class DirectoryDeleteTests(unittest.TestCase):
-    """Удаление дерева, ограничения и передача параметров из скрипта."""
+    """Фильтрация файлов, ограничения и передача параметров из скрипта."""
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        self.recycle_dir = self.root / "test_recycle_bin"
+        self.recycle_dir.mkdir()
+        self.recycled = []
+
+        def recycle(path):
+            destination = self.recycle_dir / str(len(self.recycled))
+            path.rename(destination)
+            self.recycled.append((path, destination))
+
+        self.recycle_patch = patch.object(operations, "_recycle_path", side_effect=recycle)
+        self.recycle_patch.start()
+        self.addCleanup(self.recycle_patch.stop)
         self.logger = patch.object(operations.pysm_context, "log_html")
         self.logger.start()
         self.addCleanup(self.logger.stop)
@@ -30,14 +42,21 @@ class DirectoryDeleteTests(unittest.TestCase):
             str(source), None, "delete", "skip", 1, False, ["*.jpg"]
         )
 
-    def test_deletes_entire_tree_ignoring_filters(self):
+    def test_deletes_only_matching_files_recursively(self):
         source = self.root / "source"
         (source / "nested" / "empty").mkdir(parents=True)
         (source / "nested" / "keep.txt").write_text("test")
+        (source / "nested" / "remove.jpg").write_text("test")
+        (source / "remove.jpg").write_text("test")
+        (source / "keep.idml").write_text("test")
         sibling = self.root / "sibling.txt"
         sibling.write_text("preserved")
         self.assertEqual(self.delete(source), 0)
-        self.assertFalse(source.exists())
+        self.assertFalse((source / "nested" / "empty").exists())
+        self.assertTrue((source / "nested" / "keep.txt").exists())
+        self.assertTrue((source / "keep.idml").exists())
+        self.assertFalse((source / "nested" / "remove.jpg").exists())
+        self.assertFalse((source / "remove.jpg").exists())
         self.assertEqual(sibling.read_text(), "preserved")
 
     def test_deletes_empty_directory(self):
@@ -46,11 +65,27 @@ class DirectoryDeleteTests(unittest.TestCase):
         self.assertEqual(self.delete(source), 0)
         self.assertFalse(source.exists())
 
+    def test_deletes_source_when_matching_files_are_the_only_files(self):
+        source = self.root / "source"
+        (source / "nested" / "empty").mkdir(parents=True)
+        (source / "nested" / "file.jpg").write_text("test")
+        self.assertEqual(self.delete(source), 0)
+        self.assertFalse(source.exists())
+
+    def test_preserves_source_with_nonmatching_file_in_subdirectory(self):
+        source = self.root / "source"
+        (source / "nested").mkdir(parents=True)
+        (source / "nested" / "keep.txt").write_text("test")
+        (source / "file.jpg").write_text("test")
+        self.assertEqual(self.delete(source), 0)
+        self.assertTrue((source / "nested" / "keep.txt").exists())
+        self.assertTrue(source.is_dir())
+
     def test_rejects_invalid_sources_without_deleting(self):
         file = self.root / "file.txt"
         file.write_text("preserved")
         for source in ("", "   ", self.root / "missing", file, self.root.anchor):
-            with self.subTest(source=source), patch.object(operations.shutil, "rmtree") as remove:
+            with self.subTest(source=source), patch.object(operations, "_recycle_path") as remove:
                 self.assertEqual(self.delete(source), 1)
                 remove.assert_not_called()
         self.assertTrue(file.exists())
@@ -58,14 +93,93 @@ class DirectoryDeleteTests(unittest.TestCase):
     def test_reports_deletion_error(self):
         source = self.root / "source"
         source.mkdir()
-        with patch.object(operations.shutil, "rmtree", side_effect=PermissionError("denied")):
+        (source / "file.jpg").write_text("test")
+        with patch.object(operations, "_recycle_path", side_effect=PermissionError("denied")):
             self.assertEqual(self.delete(source), 1)
         self.assertTrue(source.exists())
+
+    def test_reports_error_removing_empty_directory(self):
+        source = self.root / "source"
+        source.mkdir()
+        with patch.object(operations, "_recycle_path", side_effect=PermissionError("denied")):
+            self.assertEqual(self.delete(source), 1)
+        self.assertTrue(source.exists())
+
+    def test_recycle_failure_never_uses_permanent_delete(self):
+        source = self.root / "source"
+        source.mkdir()
+        file = source / "file.jpg"
+        file.write_text("keep")
+        with patch.object(operations, "_recycle_path", side_effect=OSError("unavailable")), \
+             patch.object(Path, "unlink") as unlink, \
+             patch.object(operations.shutil, "rmtree") as rmtree:
+            self.assertEqual(self.delete(source), 1)
+        unlink.assert_not_called()
+        rmtree.assert_not_called()
+        self.assertEqual(file.read_text(), "keep")
+
+    def test_rejects_empty_and_path_patterns(self):
+        source = self.root / "source"
+        source.mkdir()
+        keep = source / "keep.jpg"
+        keep.write_text("test")
+        for patterns in ([], [""], ["../*.jpg"], ["C:*.jpg"], ["*.jpg", "../*"]):
+            with self.subTest(patterns=patterns):
+                self.assertEqual(operations.perform_directory_operation(
+                    str(source), None, "delete", "skip", 1, False, patterns
+                ), 1)
+                self.assertTrue(keep.exists())
+
+    def test_explicit_idml_mask_preserves_other_files(self):
+        source = self.root / "source"
+        source.mkdir()
+        (source / "folder.idml").mkdir()
+        (source / "file.idml").write_text("idml")
+        (source / "other.indd").write_text("keep")
+        self.assertEqual(operations.perform_directory_operation(
+            str(source), None, "delete", "skip", 1, False, ["*.idml"]
+        ), 0)
+        self.assertTrue(source.is_dir())
+        self.assertFalse((source / "file.idml").exists())
+        self.assertEqual((source / "other.indd").read_text(), "keep")
+        self.assertFalse((source / "folder.idml").exists())
+
+    def test_matching_directory_symlink_does_not_delete_target(self):
+        source = self.root / "source"
+        external = self.root / "external"
+        source.mkdir()
+        external.mkdir()
+        protected = external / "file.jpg"
+        protected.write_text("keep")
+        try:
+            (source / "link").symlink_to(external, target_is_directory=True)
+        except OSError as error:
+            self.skipTest(f"Символические ссылки недоступны: {error}")
+        self.assertEqual(self.delete(source), 0)
+        self.assertEqual(protected.read_text(), "keep")
+
+    def test_nested_reparse_directory_is_not_traversed(self):
+        source = self.root / "source"
+        junction = source / "junction"
+        junction.mkdir(parents=True)
+        protected = junction / "file.jpg"
+        protected.write_text("keep")
+        original_lstat = Path.lstat
+
+        def fake_lstat(path, *args, **kwargs):
+            result = original_lstat(path, *args, **kwargs)
+            if path == junction:
+                return argparse.Namespace(st_mode=result.st_mode, st_file_attributes=0x400)
+            return result
+
+        with patch.object(Path, "lstat", fake_lstat):
+            self.assertEqual(self.delete(source), 0)
+        self.assertEqual(protected.read_text(), "keep")
 
     def test_rejects_reparse_point(self):
         source = self.root / "source"
         source.mkdir()
-        with patch.object(Path, "lstat", return_value=argparse.Namespace(st_file_attributes=0x400)), patch.object(operations.shutil, "rmtree") as remove:
+        with patch.object(Path, "lstat", return_value=argparse.Namespace(st_file_attributes=0x400)), patch.object(operations, "_recycle_path") as remove:
             self.assertEqual(self.delete(source), 1)
             remove.assert_not_called()
 

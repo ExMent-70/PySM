@@ -13,7 +13,7 @@ def get_application_root() -> pathlib.Path:
         # Если запускается как .py скрипт
         return pathlib.Path(__file__).parent.parent.resolve()
 
-APPLICATION_VER = "v2.2026.10.18"
+APPLICATION_VER = "v2.2026.11.05"
 APPLICATION_ROOT_DIR = get_application_root()
 # === Блок 1.1: Константы для файлов (НОВЫЙ) ===
 COLLECTION_EXTENSION = ".pysmc"

@@ -356,14 +356,14 @@ class SetRunnerOrchestrator(QObject):
     def _log_context_checkpoint_skipped(self, reason: str) -> None:
         self.log_message.emit(
             "runner_info",
-            f"<b>Context checkpoint:</b> skipped ({reason})",
+            f"<b>Context checkpoint:</b> skipped ({reason})<br>",
         )
 
     def _log_context_checkpoint_result(self, saved: bool, reason: str) -> None:
         status = "written" if saved else "failed"
         self.log_message.emit(
             "runner_info",
-            f"<b>Context checkpoint:</b> {status} ({reason})",
+            f"<b>Context checkpoint:</b> {status} ({reason})<br>",
         )
 
     @property
@@ -613,8 +613,7 @@ class SetRunnerOrchestrator(QObject):
                     # --- НАЧАЛО ИЗМЕНЕНИЙ ---
                     # Формируем читаемый многострочный нумерованный список
                     macro_msg_lines = [
-                        f"↪ {dynamic_macro_name} (GOSUB).",
-                        "В очередь выполнения добавлены следующие скрипты:",
+                        f"↪ Скрипт <b>{dynamic_macro_name}</b> (GOSUB) добавил в очередь выполнения следующие скрипты:",
                     ]
                     for i, name in enumerate(names, 1):
                         macro_msg_lines.append(f"{i}. {name}")

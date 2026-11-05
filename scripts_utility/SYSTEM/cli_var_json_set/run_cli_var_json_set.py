@@ -98,7 +98,8 @@ def main():
             value_type=config.set_value_type,
         )
 
-        logger.info(format_success(config.set_var_name, result) + "\n")
+        logger.info(format_success(config.set_var_name, result))
+        #logger.info(format_success(config.set_var_name, result) + "\n")
 
     except Exception as e:
         logger.error(format_error(str(e)))
