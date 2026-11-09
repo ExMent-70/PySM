@@ -10,6 +10,7 @@ import pathlib
 import sys
 import json
 import re
+import xml.etree.ElementTree as ET
 from argparse import Namespace
 from dataclasses import dataclass
 from enum import Enum
@@ -163,7 +164,7 @@ def get_config() -> Namespace:
         "--analysis_dir", 
         type=str, 
         required=True, 
-        help="Path to the directory containing info_faces.json."
+        help="Path to the directory containing info_faces.json; may be absent in scan mode."
     )
     parser.add_argument(
         "--image_dir", 
@@ -194,7 +195,8 @@ def get_config() -> Namespace:
         action="store_true",
         help=(
             "Рекурсивно сканировать image_dir и сопоставлять файлы с JSON "
-            "по последней группе цифр в основе имени."
+            "по последней группе цифр в основе имени. При отсутствии JSON "
+            "создаются и обновляются XMP с базовыми метаданными."
         )
     )
     parser.add_argument(
@@ -232,6 +234,29 @@ class MetadataProcessor:
         self.template_content = template_content
         self.landmark_enable = landmark_enable
         self.student_roster = student_roster
+
+    def process_minimal_file(
+        self, xmp_path: pathlib.Path, image_filename: str,
+        session_name: Optional[str], photo_session: Optional[str],
+    ) -> bool:
+        """Обновляет доступные поля, сохраняя имеющиеся данные анализа."""
+        exists = xmp_path.exists()
+        if exists:
+            try:
+                root = ET.parse(xmp_path).getroot()
+                if root.find(".//{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description") is None:
+                    raise ValueError("отсутствует rdf:Description")
+            except (ET.ParseError, OSError, ValueError) as exc:
+                logger.error(f"❌ Существующий XMP не изменён: {xmp_path}: {exc}")
+                return False
+        editor = XmpEditor(xmp_path, self.template_content)
+        if not exists:
+            editor.set_simple_field("photoshop", "Source", "1")
+            editor.set_simple_field("photoshop", "Credit", "1")
+        editor.set_simple_field("photoshop", "Headline", session_name)
+        editor.set_simple_field("photoshop", "Category", photo_session)
+        editor.set_simple_field("GettyImagesGIFT", "OriginalFilename", image_filename)
+        return editor.save()
 
     def process_file(
         self,
@@ -622,7 +647,7 @@ def validate_xmp_tasks(tasks: List[Tuple[pathlib.Path, str, Dict[str, Any], str]
 
 
 def run_xmp_creation(
-    faces_data: Dict[str, Any],
+    faces_data: Optional[Dict[str, Any]],
     landmarks_data_full: Dict[str, Any],
     image_folder_path: pathlib.Path,
     session_name: Optional[str],
@@ -635,7 +660,11 @@ def run_xmp_creation(
     photo_session: Optional[str] = None,
 ):
     logger.debug(f"ℹ️ Целевая папка (корневая): {image_folder_path}")
-    logger.info(f"ℹ️ Сохранение Landmark 2D: {'✅' if landmark_enable else '❌'}")
+    minimal_mode = scan_folder_mode and faces_data is None
+    if minimal_mode:
+        logger.info("ℹ️ Данные анализа и ландмарков недоступны; создаются базовые XMP.")
+    else:
+        logger.info(f"ℹ️ Сохранение Landmark 2D: {'✅' if landmark_enable else '❌'}")
     
     processor = MetadataProcessor(
         template_content, landmark_enable, student_roster
@@ -643,11 +672,14 @@ def run_xmp_creation(
     tasks = list()  # Список кортежей: (путь_к_XMP, оригинальный_ключ_JSON, данные_файла, имя_изображения_для_метаданных)
 
     if scan_folder_mode:
-        logger.info("ℹ️ Режим 2: Рекурсивное сканирование папки и сопоставление по цифрам.")
+        if minimal_mode:
+            logger.info("ℹ️ Режим 2: Рекурсивное сканирование папки без данных анализа.")
+        else:
+            logger.info("ℹ️ Режим 2: Рекурсивное сканирование папки и сопоставление по цифрам.")
         
         # 1. Строим цифровой индекс из JSON
         numeric_index = dict()
-        for json_key, file_data in faces_data.items():
+        for json_key, file_data in (faces_data or {}).items():
             digits = extract_digits(json_key)
             if digits:
                 previous = numeric_index.get(digits)
@@ -671,8 +703,8 @@ def run_xmp_creation(
             ):
                 digits = extract_digits(file_path.name)
                 
-                if digits and digits in numeric_index:
-                    orig_key, file_data = numeric_index[digits]
+                if minimal_mode or (digits and digits in numeric_index):
+                    orig_key, file_data = (str(file_path), {}) if minimal_mode else numeric_index[digits]
                     
                     if xmp_subfolder:
                         xmp_path = file_path.parent / "XMP" / f"{file_path.stem}.xmp"
@@ -696,7 +728,9 @@ def run_xmp_creation(
         return
 
     validate_xmp_tasks(tasks, student_roster)
-    if student_roster is None:
+    if minimal_mode:
+        logger.info("ℹ️ Данные лиц и student_id недоступны.")
+    elif student_roster is None:
         logger.info(
             f"ℹ️ Проверен формат student_id для <b>{len(tasks)}</b> задач; "
             "список учеников не используется."
@@ -714,6 +748,14 @@ def run_xmp_creation(
         futures = dict()
         for xmp_path, orig_key, file_data, real_image_filename in tasks:
             
+            if minimal_mode:
+                future = executor.submit(
+                    processor.process_minimal_file, xmp_path, real_image_filename,
+                    session_name, photo_session,
+                )
+                futures[future] = real_image_filename
+                continue
+
             face_count = file_data.get(JsonKeys.FACE_COUNT.value, len(file_data.get("faces", list())))
             photo_type = PhotoType.PORTRAIT if face_count == 1 else PhotoType.GROUP
             file_landmarks = landmarks_data_full.get(orig_key, dict())
@@ -794,12 +836,14 @@ def main():
     analysis_path = pathlib.Path(config.analysis_dir)
     image_folder = pathlib.Path(config.image_dir)
 
-    if not analysis_path.exists():
+    faces_json_path = analysis_path / FACES_JSON_FILENAME
+    minimal_mode = config.scan_folder_mode and not faces_json_path.exists()
+    if not analysis_path.exists() and not minimal_mode:
         logger.error(f"❌ Папка анализа не найдена: {analysis_path}")
         sys.exit(1)
 
     try:
-        student_roster = load_optional_student_roster(config.student_list_file)
+        student_roster = None if minimal_mode else load_optional_student_roster(config.student_list_file)
     except Exception as exc:
         logger.critical(f"❌ Ошибка списка учеников: {exc}")
         sys.exit(1)
@@ -818,22 +862,25 @@ def main():
         sys.exit(1)
 
     # 1. Загрузка основного JSON
-    faces_json_path = analysis_path / FACES_JSON_FILENAME
     if not faces_json_path.exists():
-        logger.error(f"❌ Файл {FACES_JSON_FILENAME} не найден в {analysis_path}")
-        sys.exit(1)
+        if not minimal_mode:
+            logger.error(f"❌ Файл {FACES_JSON_FILENAME} не найден в {analysis_path}")
+            sys.exit(1)
+        logger.warning(f"⚠️ {FACES_JSON_FILENAME} не найден. Создаются или обновляются XMP с доступными базовыми метаданными.")
 
-    try:
-        with open(faces_json_path, 'r', encoding='utf-8') as f:
-            faces_data = json.load(f)
-        logger.info(f"ℹ️ Загружено <b>{len(faces_data)}</b> записей из {FACES_JSON_FILENAME}")
-    except Exception as e:
-        logger.error(f"❌ Ошибка загрузки {FACES_JSON_FILENAME}: {e}")
-        sys.exit(1)
+    faces_data = None
+    if not minimal_mode:
+        try:
+            with open(faces_json_path, 'r', encoding='utf-8') as f:
+                faces_data = json.load(f)
+            logger.info(f"ℹ️ Загружено <b>{len(faces_data)}</b> записей из {FACES_JSON_FILENAME}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка загрузки {FACES_JSON_FILENAME}: {e}")
+            sys.exit(1)
         
     # 2. Условная загрузка ландмарков
     landmarks_data = dict()
-    if config.landmark_enable:
+    if config.landmark_enable and not minimal_mode:
         landmarks_json_path = analysis_path / LANDMARKS_JSON_FILENAME
         if landmarks_json_path.exists():
             try:

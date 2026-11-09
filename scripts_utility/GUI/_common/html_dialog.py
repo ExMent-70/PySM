@@ -228,7 +228,6 @@ class HtmlMessageDialog(QDialog):
         super().__init__(parent)
         self.choice = "unknown"
         self.setWindowTitle(title)
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.resize(width, height)
 
         layout = QVBoxLayout(self)
@@ -299,6 +298,8 @@ def show_html_message_dialog(
 ) -> str:
     """Show a themed modal HTML dialog and return its stable result name."""
     app = QApplication.instance() or QApplication(sys.argv)
+    from pysm_lib.pysm_dialog_owner import install_dialog_owner
+    install_dialog_owner(app)
     theme_api.apply_theme_to_app(app)
 
     dialog = HtmlMessageDialog(

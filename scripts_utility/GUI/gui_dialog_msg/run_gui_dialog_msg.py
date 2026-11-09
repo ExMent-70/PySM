@@ -46,7 +46,6 @@ from _common import (
 
 # Импортируем PySide6
 try:
-    from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication, QMessageBox
 except ImportError:
     print("Ошибка: для работы этого скрипта требуется PySide6.", file=sys.stderr)
@@ -106,14 +105,14 @@ def main():
 
     # Инициализация приложения
     q_app = QApplication.instance() or QApplication(sys.argv)
+    from pysm_lib.pysm_dialog_owner import install_dialog_owner
+    install_dialog_owner(q_app)
     
     # Применяем тему, если доступна
     if IS_MANAGED_RUN:
         theme_api.apply_theme_to_app(q_app)
     
     msg_box = QMessageBox()
-    # Окно поверх всех окон (важно для диалогов, вызываемых из других процессов)
-    msg_box.setWindowFlag(Qt.WindowStaysOnTopHint)
     msg_box.setWindowTitle(config.dlg_msg_title)
     msg_box.setText(config.dlg_msg_message)
 

@@ -31,8 +31,7 @@ except ImportError:
 
 
 try:
-    from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
+    from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox, QWidget
 except ImportError:
     print("Ошибка: для работы этого скрипта требуется PySide6.", file=sys.stderr)
     print("Пожалуйста, установите его: pip install PySide6", file=sys.stderr)
@@ -262,25 +261,24 @@ def _show_outside_initial_dir_warning(
             f"Выбранный объект:\n{selected_path}"
         ),
     )
-    message_box.setWindowFlag(Qt.WindowStaysOnTopHint, True)
     message_box.exec()
 
 
-def _open_selection_dialog(config: argparse.Namespace, initial_dir: str) -> str:
+def _open_selection_dialog(config: argparse.Namespace, initial_dir: str, parent=None) -> str:
     """Открывает диалог и возвращает допустимый выбранный путь либо пустую строку."""
 
     limit_mode = _normalize_limit_mode(config.dlg_open_limit_to_initial_dir)
     while True:
         if config.dlg_open_type == "file":
             selected_path, _ = QFileDialog.getOpenFileName(
-                parent=None,
+                parent=parent,
                 caption=config.dlg_open_title,
                 dir=initial_dir,
                 filter=config.dlg_open_filter,
             )
         else:
             selected_path = QFileDialog.getExistingDirectory(
-                parent=None,
+                parent=parent,
                 caption=config.dlg_open_title,
                 dir=initial_dir,
             )
@@ -319,6 +317,8 @@ def main() -> None:
         sys.exit(1)
 
     q_app = QApplication.instance() or QApplication(sys.argv)
+    from pysm_lib.pysm_dialog_owner import install_dialog_owner
+    install_dialog_owner(q_app)
 
     try:
         initial_dir, is_configured_initial_dir = _determine_initial_directory(config)
@@ -336,7 +336,10 @@ def main() -> None:
         sys.exit(1)
 
     logger.info(f"<b>{config.dlg_open_title}</b>")
-    selected_path = _open_selection_dialog(config, initial_dir)
+    from pysm_lib.pysm_dialog_owner import attach_to_pysm
+    owner = QWidget()
+    attach_to_pysm(owner)
+    selected_path = _open_selection_dialog(config, initial_dir, owner)
     if not selected_path:
         logger.critical(format_error("Операция отменена пользователем<br>"))
         sys.exit(1)

@@ -219,7 +219,6 @@ class HtmlInputDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.resize(width, height)
 
         layout = QVBoxLayout(self)
@@ -268,6 +267,8 @@ def show_input_dialog(
 ) -> Optional[str]:
     """Show one input attempt and return None when the user cancels."""
     app = QApplication.instance() or QApplication(sys.argv)
+    from pysm_lib.pysm_dialog_owner import install_dialog_owner
+    install_dialog_owner(app)
     theme_api.apply_theme_to_app(app)
 
     dialog = HtmlInputDialog(

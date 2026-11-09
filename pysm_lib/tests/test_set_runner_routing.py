@@ -113,7 +113,7 @@ class DynamicRoutingNameTests(unittest.TestCase):
         first_dynamic_frame = orchestrator._determine_next_script()
 
         self.assertEqual(first_dynamic_frame["set_node"].name, source.name)
-        self.assertIn(f"↪ {source.name} (GOSUB).", messages[-1][1])
+        self.assertIn(f"<b>{source.name}</b> (GOSUB)", messages[-1][1])
 
         orchestrator._handle_script_routing(
             nested_source.instance_id,
@@ -122,7 +122,7 @@ class DynamicRoutingNameTests(unittest.TestCase):
         second_dynamic_frame = orchestrator._determine_next_script()
 
         self.assertEqual(second_dynamic_frame["set_node"].name, nested_source.name)
-        self.assertIn(f"↪ {nested_source.name} (GOSUB).", messages[-1][1])
+        self.assertIn(f"<b>{nested_source.name}</b> (GOSUB)", messages[-1][1])
 
         returned_frame = orchestrator._determine_next_script()
 

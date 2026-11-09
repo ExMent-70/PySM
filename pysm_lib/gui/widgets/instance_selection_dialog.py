@@ -80,7 +80,7 @@ class InstanceSelectionDialog(QDialog):
         locale_manager: LocaleManager,
         theme_manager: ThemeManager,
         current_value: Optional[str] = None,
-        forbidden_instance_id: Optional[str] = None,
+        current_instance_id: Optional[str] = None,
         parent: Optional[QWidget] = None,
     ):
         super().__init__(parent)
@@ -169,27 +169,21 @@ class InstanceSelectionDialog(QDialog):
 
             item = QTreeWidgetItem(parent_item, [display_name])
             item.setData(0, Qt.ItemDataRole.UserRole, entry.instance_id)
-            # Включаем чекбокс
-            if forbidden_instance_id and entry.instance_id == forbidden_instance_id:
-                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled & ~Qt.ItemFlag.ItemIsUserCheckable)
-                item.setToolTip(0, "Нельзя ссылаться на самого себя")
-            else:
-                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                if entry.instance_id in current_ids:
-                    item.setCheckState(0, Qt.CheckState.Checked)
-                    if first_checked_item is None:
-                        first_checked_item = item
-                else:
-                    item.setCheckState(0, Qt.CheckState.Unchecked)
+            if current_instance_id and entry.instance_id == current_instance_id:
+                item.setText(0, self.locale_manager.get(
+                    "dialogs.instance_editor.current_instance", name=display_name
+                ))
+                font = item.font(0)
+                font.setBold(True)
+                item.setFont(0, font)
 
-                tooltip_html = generate_instance_tooltip_html(
-                    script_info=script_info,
-                    instance_entry=entry,
-                    locale_manager=self.locale_manager,
-                    theme_manager=self.theme_manager,
-                    instance_name_resolver=resolve_instance_name,
-                )
-                item.setToolTip(0, tooltip_html)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            if entry.instance_id in current_ids:
+                item.setCheckState(0, Qt.CheckState.Checked)
+                if first_checked_item is None:
+                    first_checked_item = item
+            else:
+                item.setCheckState(0, Qt.CheckState.Unchecked)
 
             icon_to_use = getattr(entry, "icon_name", "INSTANCE_ITEM")
             icon_color = getattr(entry, "icon_color", None)

@@ -114,6 +114,10 @@ def main() -> int:
         return 1
 
     try:
+        from PySide6.QtWidgets import QApplication
+        from pysm_lib.pysm_dialog_owner import install_dialog_owner
+        app = QApplication.instance() or QApplication(sys.argv)
+        install_dialog_owner(app)
         validate_html_layout(
             align=config.html_align,
             margin=config.html_margin,

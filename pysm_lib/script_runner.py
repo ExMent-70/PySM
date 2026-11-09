@@ -104,6 +104,18 @@ class ScriptRunner(QObject):
                 env.insert(key, val)
                 
         env.insert("PY_SCRIPT_MANAGER_ACTIVE", "1")
+        # A script runs in a separate process and cannot receive a QWidget parent.
+        # Pass the native handle so its dialogs can be owned by this PySM window.
+        env.remove("PYSM_PARENT_WINDOW_HWND")
+        if os.name == "nt":
+            from PySide6.QtWidgets import QApplication
+            from .gui.main_window import MainWindow
+
+            app = QApplication.instance()
+            if isinstance(app, QApplication):
+                window = next((w for w in app.topLevelWidgets() if isinstance(w, MainWindow)), None)
+                if window is not None:
+                    env.insert("PYSM_PARENT_WINDOW_HWND", str(int(window.winId())))
         env.insert("PYSM_CONTEXT_MODE", self.context_mode)
         if self.context_file_path:
             env.insert("PYSM_CONTEXT_FILE", self.context_file_path)

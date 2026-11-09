@@ -222,6 +222,7 @@
     "instance_editor": {
 		"title": "Выбор экземпляра скрипта",
         "none_selected": "(не выбрано)",
+        "current_instance": "{name} (текущий экземпляр)",
         "expand_all": "Развернуть всё",
         "collapse_all": "Свернуть всё",
         "clear_selection": "Снять отметки"

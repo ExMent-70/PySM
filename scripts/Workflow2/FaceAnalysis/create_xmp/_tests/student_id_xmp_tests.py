@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from argparse import Namespace
 from pathlib import Path
 import sys
 import tempfile
@@ -18,6 +19,7 @@ for import_path in (SCRIPT_DIR, FACE_ANALYSIS_DIR, REPO_ROOT):
     if str(import_path) not in sys.path:
         sys.path.insert(0, str(import_path))
 
+import run_create_xmp as create_xmp  # noqa: E402
 from run_create_xmp import (  # noqa: E402
     MetadataProcessor,
     PhotoType,
@@ -39,6 +41,116 @@ NS = {
     "Iptc4xmpCore": "http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/",
     "GettyImagesGIFT": "http://xmp.gettyimages.com/gift/1.0/",
 }
+
+
+class MissingAnalysisTests(unittest.TestCase):
+    def test_main_creates_minimal_xmp_without_analysis_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            images = root / "images"
+            images.mkdir()
+            (images / "portrait.jpg").write_bytes(b"")
+            (images / "keep.png").write_bytes(b"")
+            existing = XmpEditor(images / "keep.xmp")
+            existing.set_simple_field("Iptc4xmpCore", "IntellectualGenre", "portrait")
+            existing.set_simple_field("Iptc4xmpCore", "Location", "Garden")
+            existing.set_simple_field("photoshop", "Source", "Original")
+            existing.update_bag("Iptc4xmpCore", "SubjectCode", ["F0_student_id:A7K3-S001"])
+            self.assertTrue(existing.save())
+            (images / "backup").mkdir()
+            (images / "backup" / "ignored.jpg").write_bytes(b"")
+            config = Namespace(
+                analysis_dir=str(root / "missing-analysis"), image_dir=str(images),
+                scan_folder_mode=True, student_list_file=None, landmark_enable=True,
+                all_threads=1, xmp_subfolder=False,
+            )
+            with patch.object(create_xmp, "get_config", return_value=config), \
+                 patch.object(create_xmp, "IS_MANAGED_RUN", True), \
+                 patch.object(create_xmp.pysm_context, "get", side_effect=lambda name: {
+                     "wf_session_name": "School", "wf_photo_session": "Portrait"
+                 }.get(name)):
+                create_xmp.main()
+
+            output = ET.parse(images / "portrait.xmp").getroot()
+            self.assertEqual("School", output.find(".//photoshop:Headline", NS).text)
+            self.assertEqual("Portrait", output.find(".//photoshop:Category", NS).text)
+            self.assertEqual("portrait.jpg", output.find(".//GettyImagesGIFT:OriginalFilename", NS).text)
+            self.assertFalse(output.findtext(".//Iptc4xmpCore:IntellectualGenre", default="", namespaces=NS))
+            self.assertNotIn("PySM_GENRE_", ET.tostring(output, encoding="unicode"))
+            updated = ET.parse(images / "keep.xmp").getroot()
+            self.assertEqual("School", updated.find(".//photoshop:Headline", NS).text)
+            self.assertEqual("Portrait", updated.find(".//photoshop:Category", NS).text)
+            self.assertEqual("keep.png", updated.find(".//GettyImagesGIFT:OriginalFilename", NS).text)
+            self.assertEqual("Original", updated.find(".//photoshop:Source", NS).text)
+            self.assertEqual("portrait", updated.find(".//Iptc4xmpCore:IntellectualGenre", NS).text)
+            self.assertEqual("Garden", updated.find(".//Iptc4xmpCore:Location", NS).text)
+            self.assertEqual(["F0_student_id:A7K3-S001"], bag_values(updated, "Iptc4xmpCore:SubjectCode"))
+            self.assertFalse((images / "backup" / "ignored.xmp").exists())
+
+    def test_malformed_existing_xmp_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "photo.jpg").write_bytes(b"")
+            existing = root / "photo.xmp"
+            existing.write_bytes(b"<broken")
+            with self.assertRaisesRegex(RuntimeError, "Ошибок при сохранении"):
+                run_xmp_creation(None, {}, root, "School", 1, None, False, True, False, None)
+            self.assertEqual(b"<broken", existing.read_bytes())
+
+    def test_missing_analysis_still_errors_in_classic_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = Namespace(analysis_dir=str(root / "missing"), image_dir=str(root / "images"),
+                               scan_folder_mode=False, student_list_file=None)
+            with patch.object(create_xmp, "get_config", return_value=config), \
+                 patch.object(create_xmp, "IS_MANAGED_RUN", True), \
+                 patch.object(create_xmp.pysm_context, "get", return_value=None), \
+                 self.assertRaises(SystemExit) as result:
+                create_xmp.main()
+            self.assertEqual(1, result.exception.code)
+
+    def test_duplicate_image_stems_are_rejected_before_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "photo.jpg").write_bytes(b"")
+            (root / "photo.png").write_bytes(b"")
+            with self.assertRaisesRegex(ValueError, "назначен нескольким"):
+                run_xmp_creation(None, {}, root, None, 1, None, False, True, False, None)
+            self.assertFalse((root / "photo.xmp").exists())
+
+    def test_missing_analysis_respects_xmp_subfolder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            nested = root / "nested"
+            nested.mkdir()
+            (nested / "photo.jpg").write_bytes(b"")
+            run_xmp_creation(None, {}, root, None, 1, None, False, True, True, None)
+            self.assertTrue((nested / "XMP" / "photo.xmp").is_file())
+
+    def test_empty_json_object_does_not_enable_fallback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "photo.jpg").write_bytes(b"")
+            run_xmp_creation({}, {}, root, None, 1, None, False, True, False, None)
+            self.assertFalse((root / "photo.xmp").exists())
+
+    def test_empty_json_file_remains_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "info_faces.json").write_bytes(b"")
+            (root / "photo.jpg").write_bytes(b"")
+            config = Namespace(
+                analysis_dir=str(root), image_dir=str(root), scan_folder_mode=True,
+                student_list_file=None, landmark_enable=False, all_threads=1,
+                xmp_subfolder=False,
+            )
+            with patch.object(create_xmp, "get_config", return_value=config), \
+                 patch.object(create_xmp, "IS_MANAGED_RUN", True), \
+                 patch.object(create_xmp.pysm_context, "get", return_value=None), \
+                 self.assertRaises(SystemExit) as result:
+                create_xmp.main()
+            self.assertEqual(1, result.exception.code)
+            self.assertFalse((root / "photo.xmp").exists())
 LEGACY_GETTY_URI = "http://ns.gettyimages.com/gift/1.0/"
 
 

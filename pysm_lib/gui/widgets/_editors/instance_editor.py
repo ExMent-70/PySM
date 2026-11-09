@@ -42,7 +42,7 @@ class InstanceEditorWidget(BaseEditor):
             locale_manager=self.context.locale_manager,
             theme_manager=self.context.theme_manager,
             current_value=self.current_value,
-            forbidden_instance_id=self.context.current_instance_id,
+            current_instance_id=self.context.current_instance_id,
             parent=self,
         )
         

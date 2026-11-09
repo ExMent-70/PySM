@@ -1017,9 +1017,17 @@ class SetManager:
                     value = arg_value_enabled_model.value
                     
                     if isinstance(value, str):
-                        # Если значение - строка и является старым instance_id
                         if value in id_map:
                             arg_value_enabled_model.value = id_map[value]
+                        elif "," in value:
+                            parts = value.split(",")
+                            for index, part in enumerate(parts):
+                                old_id = part.strip()
+                                if old_id in id_map:
+                                    start = len(part) - len(part.lstrip())
+                                    end = len(part.rstrip())
+                                    parts[index] = part[:start] + id_map[old_id] + part[end:]
+                            arg_value_enabled_model.value = ",".join(parts)
                     elif isinstance(value, list):
                         # Если значение - список, проверяем каждый элемент списка
                         updated_list: List[Union[str, int, float, bool, dict]] = []

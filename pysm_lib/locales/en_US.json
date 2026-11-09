@@ -225,6 +225,7 @@
     "instance_editor": {
         "title": "Select Script Instance",
         "none_selected": "(not selected)",
+        "current_instance": "{name} (current instance)",
         "expand_all": "Expand All",
         "collapse_all": "Collapse All",
         "clear_selection": "Clear Selection"		

@@ -2,11 +2,11 @@
   "description": "Скрипт создает или обновляет XMP-файлы (сайдкары) для изображений\n<div style=\"{theme.tooltip_instance_args_block}\">\nЯвляется связующим звеном между этапом AI-анализа и программами каталогизации. При наличии `*.list` получает ФИО по `student_id` и сохраняет их в стандартных полях. Без списка ФИО пропускаются, а технические ID продолжают записываться в `Iptc4xmpCore:SubjectCode`. Имя сессии записывается в IPTC Headline, имя фотосессии — в IPTC Category.\n</div>",
   "category": "Метаданные",
   "author": "Андрей Пугачев | t.me/pugachev_fotodeti03",
-  "version": "2.2026.09.13",
+  "version": "2.2026.11.07",
   "command_line_args_meta": {
     "analysis_dir": {
       "type": "str",
-      "description": "Полный путь к папке, содержащей JSON-файл результатов AI-анализа изображений",
+      "description": "Путь к папке с info_faces.json. При сканировании изображений отсутствие файла позволяет создать базовые XMP без данных анализа.",
       "required": true,
       "default": "{wf_session_path}/{wf_session_name}/Output/Analysis_{wf_photo_session}"
     },
@@ -38,7 +38,7 @@
     },
     "scan_folder_mode": {
       "type": "bool",
-      "description": "Рекурсивно сканировать изображения и сопоставлять их с info_faces.json по последней цифровой группе имени; служебные папки XMP и backup исключаются",
+      "description": "Рекурсивно сканировать изображения и сопоставлять их с info_faces.json по последней цифровой группе имени. Без файла анализа создавать и обновлять XMP с базовыми метаданными. Папки XMP и backup исключаются.",
       "required": false,
       "default": false
     },

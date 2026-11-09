@@ -33,7 +33,6 @@ class ContextEditorDialog(QDialog):
     def __init__(self, initial_data: Dict[str, Any], mode: str, title: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle(title)
-        self.setWindowFlag(Qt.WindowStaysOnTopHint, True)
         self.mode = mode
         self.setMinimumSize(700, 600)
 
@@ -110,8 +109,7 @@ class ContextEditorDialog(QDialog):
         self.accept()
 
     def _show_validation_error(self, message: str, item_to_focus: QTableWidgetItem):
-        msg_box = QMessageBox(QMessageBox.Icon.Warning, "Ошибка валидации", message)
-        msg_box.setWindowFlag(Qt.WindowStaysOnTopHint, True)
+        msg_box = QMessageBox(QMessageBox.Icon.Warning, "Ошибка валидации", message, parent=self)
         msg_box.exec()
         self.table.setCurrentItem(item_to_focus)
 
@@ -174,6 +172,8 @@ def main():
     # 4.3. Получение данных и запуск диалога
     initial_context = pysm_context.get_all()
     q_app = QApplication.instance() or QApplication(sys.argv)
+    from pysm_lib.pysm_dialog_owner import install_dialog_owner
+    install_dialog_owner(q_app)
     theme_api.apply_theme_to_app(q_app)
     
     dialog = ContextEditorDialog(initial_context, mode_string, config.__title)
