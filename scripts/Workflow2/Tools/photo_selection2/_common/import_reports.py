@@ -82,6 +82,12 @@ class ImportReportMixin:
             f"{escape(selection.source if selection else '—')}</td></tr>"
             "</table>"
         )
+        warnings = self.selection_analysis.warnings(student.student_id, numbers, f"{student.surname} {student.name}")
+        if self.selection_analysis.error or warnings:
+            builder.add_header_boxed("ПРОВЕРКА ВЫБРАННЫХ НОМЕРОВ")
+            messages = [self.selection_analysis.error] if self.selection_analysis.error else warnings
+            color = self._theme_text_color("icon_danger", "#c62828")
+            builder.parts.append("<ul>" + "".join(f"<li><span style='color:{color}'>{escape(message)}</span></li>" for message in messages) + "</ul>")
         builder.add_list_zebra([
             ResourceNode("Файл списка учеников", self.roster.path, "file")
         ])
@@ -200,4 +206,21 @@ class ImportReportMixin:
             parts.append("</ol>")
         else:
             parts.append("<p>Нет.</p>")
+        if self.selection_analysis.error:
+            color = self._theme_text_color("icon_danger", "#c62828")
+            parts.append(f'<p style="color:{color}">' + escape(self.selection_analysis.error) + "</p>")
+        else:
+            details = [(entry, self.selection_analysis.warnings(entry.student_id, entry.selected_numbers,
+                        f"{self.roster.by_id[entry.student_id].surname} {self.roster.by_id[entry.student_id].name}"))
+                       for entry in entries]
+            details = [(entry, warnings) for entry, warnings in details if warnings]
+            if details:
+                parts.append("<h4>Проверка выбранных номеров</h4><ul>")
+                for entry, warnings in details:
+                    name = self.roster.by_id[entry.student_id].display_name
+                    color = self._theme_text_color("icon_danger", "#c62828")
+                    parts.append("<li><b>" + escape(name) + "</b><ul>"
+                                 + "".join(f"<li><span style='color:{color}'>" + escape(message) + "</span></li>" for message in warnings)
+                                 + "</ul></li>")
+                parts.append("</ul>")
         self.import_result.setHtml(self._message_header_html() + "".join(parts))

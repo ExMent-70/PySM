@@ -430,6 +430,25 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(extract_digits("1-TEST3_270363.xmp"), "270363")
         self.assertEqual(extract_digits("without_digits.jpg"), "")
 
+    def test_duplicate_candidate_matching_ignores_image_extension(self):
+        expected = ("PH_SCHOOL_270454.jpg", {"location_name": "portrait"})
+        candidates = [
+            ("SCHOOL_270454.jpg", {"location_name": "base"}),
+            expected,
+        ]
+
+        extensions = (
+            ".psd", ".psb", ".png", ".tif", ".tiff", ".jpg", ".jpeg",
+        )
+        for extension in extensions:
+            with self.subTest(extension=extension):
+                selected = create_xmp._select_scan_candidate(
+                    Path(f"PH_SCHOOL_270454{extension}"),
+                    "270454",
+                    candidates,
+                )
+                self.assertEqual(selected, expected)
+
     def test_unknown_id_and_unassigned_identity_cluster_are_blocking(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -598,25 +617,75 @@ class PreflightTests(unittest.TestCase):
                 "second_location",
             )
 
-    def test_scan_mode_rejects_ambiguous_json_frame_numbers(self):
+    def test_scan_mode_resolves_duplicate_frame_numbers_by_stem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            roster = load_student_roster(write_roster(root))
+            image_filenames = (
+                "ШколаКадеты_11_SCHOOL_270454.psd",
+                "PH_ШколаКадеты_11_SCHOOL_270454.psd",
+            )
+            for filename in image_filenames:
+                (root / filename).write_bytes(b"")
+            faces_data = {
+                "ШколаКадеты_11_SCHOOL_270454.jpg": {
+                    "face_count": 0,
+                    "faces": [],
+                    "location_name": "first_location",
+                },
+                "PH_ШколаКадеты_11_SCHOOL_270454.jpg": {
+                    "face_count": 0,
+                    "faces": [],
+                    "location_name": "second_location",
+                },
+            }
+
+            with patch("run_create_xmp.logger.info"):
+                run_xmp_creation(
+                    faces_data, {}, root, "Session", 1, None,
+                    False, True, False, roster,
+                )
+
+            first = ET.parse(
+                root / Path(image_filenames[0]).with_suffix(".xmp")
+            ).getroot()
+            second = ET.parse(
+                root / Path(image_filenames[1]).with_suffix(".xmp")
+            ).getroot()
+            self.assertEqual(
+                first.find(".//Iptc4xmpCore:Location", NS).text,
+                "first_location",
+            )
+            self.assertEqual(
+                second.find(".//Iptc4xmpCore:Location", NS).text,
+                "second_location",
+            )
+
+    def test_scan_mode_skips_unresolved_duplicate_frame_number(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             roster = load_student_roster(write_roster(root))
             image_path = root / "TEST3_270363.jpg"
             image_path.write_bytes(b"")
+            (root / "TEST3_270364.jpg").write_bytes(b"")
             faces_data = {
                 "IMG_270363.jpg": {"face_count": 0, "faces": []},
                 "COPY_270363.png": {"face_count": 0, "faces": []},
+                "IMG_270364.jpg": {"face_count": 0, "faces": []},
             }
 
-            with patch("run_create_xmp.logger.info"), self.assertRaisesRegex(
-                ValueError, "Неоднозначный номер кадра"
-            ):
+            with patch("run_create_xmp.logger.info"), patch(
+                "run_create_xmp.logger.warning"
+            ) as warning:
                 run_xmp_creation(
                     faces_data, {}, root, "Session", 1, None,
                     False, True, False, roster,
                 )
+
             self.assertFalse((root / "TEST3_270363.xmp").exists())
+            self.assertTrue((root / "TEST3_270364.xmp").exists())
+            self.assertEqual(warning.call_count, 1)
+            self.assertIn("Файл пропущен", warning.call_args.args[0])
 
     def test_scan_mode_ignores_xmp_and_backup_directories(self):
         with tempfile.TemporaryDirectory() as tmp:

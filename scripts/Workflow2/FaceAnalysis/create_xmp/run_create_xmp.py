@@ -557,6 +557,35 @@ def extract_digits(filename: str) -> str:
     return matches[-1] if matches else ""
 
 
+def _select_scan_candidate(
+    file_path: pathlib.Path,
+    digits: str,
+    candidates: List[Tuple[str, Dict[str, Any]]],
+) -> Optional[Tuple[str, Dict[str, Any]]]:
+    """Выбирает запись анализа по номеру и основе имени без расширения."""
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    filename_stem = file_path.stem.casefold()
+    exact_matches = [
+        candidate
+        for candidate in candidates
+        if pathlib.Path(candidate[0]).stem.casefold() == filename_stem
+    ]
+    if len(exact_matches) == 1:
+        return exact_matches[0]
+
+    candidate_names = ", ".join(repr(candidate[0]) for candidate in candidates)
+    logger.warning(
+        f"⚠️ Неоднозначный номер кадра {digits!r} для файла "
+        f"{file_path.name!r}: точное совпадение имени без расширения отсутствует "
+        "или не уникально. Файл пропущен. "
+        f"Кандидаты info_faces.json: {candidate_names}."
+    )
+    return None
+
+
 def _is_in_ignored_scan_directory(
     file_path: pathlib.Path,
     image_folder_path: pathlib.Path,
@@ -678,18 +707,11 @@ def run_xmp_creation(
             logger.info("ℹ️ Режим 2: Рекурсивное сканирование папки и сопоставление по цифрам.")
         
         # 1. Строим цифровой индекс из JSON
-        numeric_index = dict()
+        numeric_index: Dict[str, List[Tuple[str, Dict[str, Any]]]] = {}
         for json_key, file_data in (faces_data or {}).items():
             digits = extract_digits(json_key)
             if digits:
-                previous = numeric_index.get(digits)
-                if previous is not None:
-                    raise ValueError(
-                        "Неоднозначный номер кадра "
-                        f"{digits!r} в info_faces.json: "
-                        f"{previous[0]!r} и {json_key!r}."
-                    )
-                numeric_index[digits] = (json_key, file_data)
+                numeric_index.setdefault(digits, []).append((json_key, file_data))
         
         # 2. Сканируем папку
         valid_extensions = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".psd", ".psb"}
@@ -703,15 +725,24 @@ def run_xmp_creation(
             ):
                 digits = extract_digits(file_path.name)
                 
-                if minimal_mode or (digits and digits in numeric_index):
-                    orig_key, file_data = (str(file_path), {}) if minimal_mode else numeric_index[digits]
-                    
-                    if xmp_subfolder:
-                        xmp_path = file_path.parent / "XMP" / f"{file_path.stem}.xmp"
-                    else:
-                        xmp_path = file_path.parent / f"{file_path.stem}.xmp"
-                        
-                    tasks.append((xmp_path, orig_key, file_data, file_path.name))
+                if minimal_mode:
+                    orig_key, file_data = str(file_path), {}
+                elif digits and digits in numeric_index:
+                    selected = _select_scan_candidate(
+                        file_path, digits, numeric_index[digits]
+                    )
+                    if selected is None:
+                        continue
+                    orig_key, file_data = selected
+                else:
+                    continue
+
+                if xmp_subfolder:
+                    xmp_path = file_path.parent / "XMP" / f"{file_path.stem}.xmp"
+                else:
+                    xmp_path = file_path.parent / f"{file_path.stem}.xmp"
+
+                tasks.append((xmp_path, orig_key, file_data, file_path.name))
                     
     else:
         logger.info("ℹ️ Режим 1: Генерация XMP по списку из JSON.")

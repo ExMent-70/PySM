@@ -442,6 +442,62 @@ class StageTests(unittest.TestCase):
             window._apply_entries([ImportEntry("A7K3-S001", ("901270",)), ImportEntry("A7K3-S001", ("001234",))], "csv")
         self.assertEqual(window.document.students["A7K3-S001"].selected_numbers, ["901256", "901270", "001234"])
 
+    def test_import_warns_without_blocking_missing_or_unrecognized_numbers(self):
+        self.info["IMG_901280.jpg"] = {"filename": "IMG_901280.jpg", "faces": []}
+        self.info["IMG_901256_variant.jpg"] = {
+            "filename": "IMG_901256_variant.jpg", "faces": [{"student_id": "A7K3-S002"}]}
+        write_json(self.analysis / "info_faces.json", self.info)
+        window = self.open_window(ImportWindow)
+        entries = [ImportEntry("A7K3-S001", ("901256", "901270", "901280", "001234")),
+                   ImportEntry("A7K3-S002", ("901256", "901270"))]
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            window._apply_entries(entries, "csv")
+        saved = json.loads(self.selection.read_text(encoding="utf-8"))["students"]
+        self.assertEqual(saved["A7K3-S001"]["selected_numbers"], list(entries[0].selected_numbers))
+        self.assertEqual(saved["A7K3-S002"]["selected_numbers"], list(entries[1].selected_numbers))
+        cell = window.table.item(0, 2)
+        self.assertIn("901280", cell.toolTip())
+        self.assertIn("Иванова Анна", cell.toolTip())
+        self.assertNotIn("A7K3-S001", cell.toolTip())
+        self.assertIn("001234", cell.toolTip())
+        self.assertNotIn("901256", cell.toolTip())
+        self.assertNotIn("901270", cell.toolTip())
+        self.assertNotEqual(cell.background().style(), Qt.BrushStyle.NoBrush)
+        self.app.processEvents()
+        image = window.table.viewport().grab(window.table.visualItemRect(cell)).toImage()
+        color = cell.foreground().color().name()
+        self.assertTrue(any(image.pixelColor(x, y).name() == color
+                            for y in range(image.height()) for x in range(image.width())))
+        self.assertEqual(window.table.item(1, 2).toolTip(), "")
+        report = window.import_result.toPlainText()
+        self.assertIn("901280", report)
+        self.assertIn("001234", report)
+        window._show_student_report(0)
+        self.assertIn("не найден на фотографии", window.import_result.toPlainText())
+        self.assertIn("Иванова Анна не найден", window.import_result.toPlainText())
+        self.assertIn(cell.foreground().color().name(), window.import_result.toHtml())
+        self.assertIn("отсутствует в info_faces.json", window.import_result.toPlainText())
+        self.info["IMG_901280.jpg"]["faces"] = [{"student_id": "A7K3-S001"}]
+        write_json(self.analysis / "info_faces.json", self.info)
+        window._refresh_table()
+        self.assertNotIn("901280", window.table.item(0, 2).toolTip())
+
+    def test_import_unavailable_analysis_is_nonblocking_and_not_misreported(self):
+        path = self.analysis / "info_faces.json"
+        for content in (None, "{broken"):
+            with self.subTest(content=content):
+                if content is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_text(content, encoding="utf-8")
+                window = self.open_window(ImportWindow)
+                with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+                    window._apply_entries([ImportEntry("A7K3-S001", ("001234",))], "csv")
+                self.assertEqual(json.loads(self.selection.read_text())["students"]["A7K3-S001"]["selected_numbers"], ["001234"])
+                self.assertIn("Проверка по info_faces.json недоступна", window.import_result.toPlainText())
+                self.assertNotIn("номер отсутствует", window.import_result.toPlainText())
+                self.assertEqual(window.table.item(0, 2).toolTip(), "")
+
     def test_ai_validation_and_empty_response(self):
         payload = {"matched": [{"student_id": "A7K3-S001", "source_person": "Анна", "selected_numbers": []}], "unresolved": []}
         entries, unresolved = validate_ai_response(payload, self.roster, min_digits=6, max_digits=6)

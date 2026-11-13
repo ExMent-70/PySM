@@ -4,10 +4,11 @@ import copy
 import sys
 from pathlib import Path
 from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QColor, QBrush
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel,
     QMessageBox, QPushButton, QMenu, QSplitter, QTableWidget, QTableWidgetItem,
-    QTextBrowser, QVBoxLayout, QWidget,
+    QTextBrowser, QVBoxLayout, QWidget, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
 )
 
 
@@ -30,9 +31,32 @@ from ..._common.roster import load_roster
 from ..._common.storage import load_document, save_document
 from ..._common.signatures import file_signature
 from ..._common.ui_widgets import CsvMappingDialog, SelectedNumbersDialog
+from .analysis_validation import SelectionAnalysis
+from pysm_lib import theme_api
+
+
+class WarningNumberDelegate(QStyledItemDelegate):
+    """Keep warning text red when the current theme selects the whole row."""
+
+    def paint(self, painter, option, index):
+        foreground = index.data(Qt.ItemDataRole.ForegroundRole)
+        if not foreground or not option.state & QStyle.StateFlag.State_Selected:
+            super().paint(painter, option, index)
+            return
+        background = QStyleOptionViewItem(option)
+        self.initStyleOption(background, index)
+        text = background.text
+        background.text = ""
+        option.widget.style().drawControl(QStyle.ControlElement.CE_ItemViewItem, background, painter, option.widget)
+        painter.save()
+        painter.setClipRect(option.rect)
+        painter.setPen(foreground.color())
+        painter.drawText(option.rect.adjusted(4, 0, -4, 0), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
+        painter.restore()
+
 
 class ImportWindow(ImportReportMixin, WindowBase):
-    """Edit only photo_selection.json; analysis and image folders are unnecessary."""
+    """Edit photo_selection.json and optionally check choices against analysis."""
     WINDOW_STATE_VAR = "win_state.photo_selection04_import"
     HEADERS = ("student_id", "Фамилия Имя", "Выбранные номера", "Количество", "Источник")
 
@@ -57,6 +81,7 @@ class ImportWindow(ImportReportMixin, WindowBase):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
+        self.table.setItemDelegateForColumn(2, WarningNumberDelegate(self.table))
         self.table.setIconSize(QSize(20, 20))
         self.table.cellDoubleClicked.connect(self._on_cell_double_clicked)
         self.table.currentCellChanged.connect(self._on_current_student_changed)
@@ -144,6 +169,7 @@ class ImportWindow(ImportReportMixin, WindowBase):
 
     def _refresh_table(self):
         """Rebuild visible selection rows while keeping the current student."""
+        self.selection_analysis = SelectionAnalysis(Path(self.config.analysis_dir) / "info_faces.json")
         current_row = self.table.currentRow()
         self.table.blockSignals(True)
         self.table.setRowCount(len(self.roster.students))
@@ -161,6 +187,14 @@ class ImportWindow(ImportReportMixin, WindowBase):
             for column, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                if column == 2:
+                    warnings = self.selection_analysis.warnings(student.student_id, numbers, f"{student.surname} {student.name}")
+                    if warnings:
+                        style = theme_api.get_parsed_style("status_error")
+                        item.setBackground(QBrush(QColor(style.get("background-color", "#f8d7da"))))
+                        color = theme_api.get_parsed_style("icon_danger").get("color", "#c62828")
+                        item.setForeground(QBrush(QColor(color)))
+                        item.setToolTip("\n".join(warnings))
                 if column in {0, 3, 4}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 if column == 1 and pysm_icons:
