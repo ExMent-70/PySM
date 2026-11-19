@@ -58,6 +58,31 @@ def save_json_atomic(path: Path, data: Any, indent: int = 2) -> None:
     tmp_path.replace(path)
 
 
+def load_existing_filenames(output_dir: Path) -> Set[str]:
+    """Return names with existing face records, without guessing from file state."""
+    path = output_dir / "info_faces.json"
+    if not path.exists():
+        return set()
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return set(data)
+        if isinstance(data, list):
+            return {item["filename"] for item in data
+                    if isinstance(item, dict) and isinstance(item.get("filename"), str)}
+        raise ValueError("unexpected JSON format")
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"Не удалось прочитать {path}: {exc}") from exc
+
+
+def sync_target_name(filename: str, existing_names: Set[str]) -> str:
+    """Map a Capture One export to an existing original, if one exists."""
+    if filename.startswith("PH_") and filename[3:] in existing_names:
+        return filename[3:]
+    return filename
+
+
 class SmartSyncManager:
     """Управляет точечным обновлением геометрии лиц с использованием биометрического матчинга."""
     
@@ -150,6 +175,7 @@ class SmartSyncManager:
                     data_dict = data
 
                 changed = False
+                changed_filenames: Set[str] = set()
                 for filename, new_meta, new_embs, original_shape in updates:
                     # Быстрый поиск файла за O(1)
                     entry = data_dict.get(filename)
@@ -208,15 +234,17 @@ class SmartSyncManager:
                                 if key in new_face:
                                     old_face[key] = new_face[key]
                                     changed = True
-                                    updated_filenames.add(filename)
+                                    changed_filenames.add(filename)
                         
                         if matches and filepath.name == "info_faces.json" and isinstance(entry, dict) and original_shape is not None:
                             entry["original_shape"] = list(original_shape)
                             changed = True
-                            updated_filenames.add(filename)
+                            changed_filenames.add(filename)
 
                 if changed:
                     save_json_atomic(filepath, data, indent=2)
+                    if filepath.name == "info_faces.json":
+                        updated_filenames.update(changed_filenames)
                     logger.info(f"{icon_save} Координаты в <i>{filepath.name}</i> успешно обновлены.")
 
             except Exception as e:
@@ -341,12 +369,27 @@ def main():
         logger.warning("JPEG-файлы не найдены.")
         sys.exit(0)
 
+    existing_names = set()
+    if cli_config.a_af_mode == 'sync':
+        try:
+            existing_names = load_existing_filenames(output_dir)
+        except RuntimeError as e:
+            logger.error(str(e))
+            sys.exit(1)
+
+    targets = {p.name: sync_target_name(p.name, existing_names) for p in image_files}
+    aliases = {name: target for name, target in targets.items() if name != target}
+    # A selected export is authoritative when both physical versions are present.
+    shadowed_originals = set(aliases.values())
     files_to_process = list()
     modified_files_set = set(list())
     new_state = dict()
     new_state.update(old_state)
 
     for p in image_files:
+        if cli_config.a_af_mode == 'sync' and p.name in shadowed_originals:
+            logger.warning(f"Sync: {p.name} пропущен: присутствует выбранный файл PH_.")
+            continue
         try:
             st = p.stat()
             curr_mtime = st.st_mtime
@@ -354,17 +397,25 @@ def main():
             
             if cli_config.a_af_mode == 'sync':
                 old_info = old_state.get(p.name)
-                if not old_info:
+                if p.name in aliases:
+                    target_state = old_state.get(targets[p.name], {})
+                    if (not old_info or old_info.get("sync_target") != targets[p.name]
+                            or target_state.get("sync_source", p.name) != p.name
+                            or old_info.get("mtime") != curr_mtime or old_info.get("size") != curr_size):
+                        modified_files_set.add(p.name)
+                        files_to_process.append(p)
+                elif not old_info:
                     files_to_process.append(p) 
-                elif old_info.get("mtime") != curr_mtime or old_info.get("size") != curr_size:
+                elif (old_info.get("mtime") != curr_mtime or old_info.get("size") != curr_size
+                      or old_info.get("sync_source", p.name) != p.name):
                     modified_files_set.add(p.name)
                     files_to_process.append(p) 
                 else:
                     pass 
             else:
                 files_to_process.append(p) 
-        except Exception:
-            files_to_process.append(p)
+        except OSError as e:
+            logger.warning(f"Sync: не удалось прочитать свойства файла {p.name}: {e}")
 
     if not files_to_process:
         logger.info(f"{icon_ok} Режим <b>Sync</b>: Изменений в файлах не обнаружено. Анализ не требуется.")
@@ -404,7 +455,7 @@ def main():
                 
                 if result_meta and result_embeddings:
                     if filename in modified_files_set:
-                        updates_buffer.append((filename, result_meta, result_embeddings, original_shape))
+                        updates_buffer.append((targets[filename], result_meta, result_embeddings, original_shape))
                     else:
                         result_writer.add_result(filename, result_meta, result_embeddings, original_shape)
                     
@@ -412,6 +463,8 @@ def main():
                     
                     st = path.stat()
                     new_state[filename] = dict(mtime=st.st_mtime, size=st.st_size)
+                    if filename in aliases:
+                        new_state[filename]["sync_target"] = targets[filename]
                 else:
                     skipped_files.append(filename)
                     if cli_config.a_af_mode == 'sync' and original_shape is not None and filename not in modified_files_set:
@@ -432,12 +485,18 @@ def main():
                     sync_updated_files = sync_manager.apply_updates(updates_buffer)
                 finally:
                     sync_manager.close()
-                failed_sync_files = modified_files_set - sync_updated_files
+                failed_sync_files = {name for name in modified_files_set
+                                     if targets[name] not in sync_updated_files}
                 for filename in failed_sync_files:
                     if filename in old_state:
                         new_state[filename] = old_state[filename]
                     else:
                         new_state.pop(filename, None)
+                # Record which physical file last updated each logical record.
+                for filename in modified_files_set - failed_sync_files:
+                    target = targets[filename]
+                    if filename in aliases or "sync_source" in old_state.get(target, {}):
+                        new_state.setdefault(target, {})["sync_source"] = filename
                 if failed_sync_files:
                     logger.warning(f"{icon_warning} Sync: не удалось безопасно обновить файлов: <b>{len(failed_sync_files)}</b>. Они будут повторно проверены при следующем запуске.")
 
