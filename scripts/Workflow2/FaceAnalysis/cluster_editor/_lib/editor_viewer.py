@@ -30,6 +30,32 @@ def natural_keys(text):
     """Сортировка строк с числами в человеческом порядке."""
     return[int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', text)]
 
+
+def _label_style(entries):
+    """Choose one label width and font size for all recognized faces on a photo."""
+    if not entries:
+        return None
+    max_width = min(width for _, width in entries)
+    probe = QGraphicsTextItem()
+    probe.document().setDocumentMargin(0)
+    font = probe.font()
+    font.setBold(True)
+    labels = {text for text, _ in entries} | {"88"}
+    for size in range(28, 0, -1):
+        font.setPointSize(size)
+        probe.setFont(font)
+        widths = []
+        for label in labels:
+            probe.setPlainText(label)
+            widths.append(probe.boundingRect().width())
+        width = max(widths)
+        padding = max(1.0, width * 0.12)
+        background_width = width + 2 * padding
+        if background_width <= max_width or size == 1:
+            scale = min(1.0, max_width / background_width)
+            return size, scale, background_width * scale
+
+
 class ImageViewer(QDialog):
     """
     Модальное окно для просмотра изображений.
@@ -106,6 +132,7 @@ class ImageViewer(QDialog):
         self.pixmap_item = QGraphicsPixmapItem()
         self.scene.addItem(self.pixmap_item)
         self.view.installEventFilter(self)
+        self.view.viewport().installEventFilter(self)
 
         # Нижняя панель
         self.nav_label = QLabel()
@@ -136,6 +163,9 @@ class ImageViewer(QDialog):
         self.addActions([prev_action, next_action, close_action])
 
     def eventFilter(self, source, event):
+        if source in (self.view, self.view.viewport()) and event.type() == QEvent.Type.Wheel:
+            self._zoom_with_wheel(event)
+            return True
         if source is self.view and event.type() == QEvent.Type.MouseButtonDblClick:
             if self.is_fitted_in_view:
                 self._zoom_to_100_percent()
@@ -144,7 +174,10 @@ class ImageViewer(QDialog):
             return True 
         return super().eventFilter(source, event)
 
-    def _draw_bounding_box(self, bbox: List[float], is_recognized: bool, text: Optional[str] = None, tooltip: str = ""):
+    def _draw_bounding_box(
+        self, bbox: List[float], is_recognized: bool,
+        text: Optional[str] = None, tooltip: str = "", label_style=None,
+    ):
         """Отрисовывает рамку на сцене поверх изображения с поддержкой хинта (tooltip)."""
         if not bbox or len(bbox) != 4:
             return
@@ -168,22 +201,29 @@ class ImageViewer(QDialog):
             
         self.scene.addItem(rect_item)
 
-        if text:
+        if text and w > 0:
             text_item = QGraphicsTextItem(text)
-            text_item.setDefaultTextColor(Qt.GlobalColor.white)
+            # Black remains legible on both the bright green and red frame colors.
+            text_item.setDefaultTextColor(Qt.GlobalColor.black)
+            text_item.document().setDocumentMargin(0)
             
             font = text_item.font()
             font.setBold(True)
-            font.setPointSize(14)
+            size, scale, label_width = label_style or _label_style([(text, w)])
+            font.setPointSize(size)
             text_item.setFont(font)
+            text_rect = text_item.boundingRect()
+            text_item.setScale(scale)
             
-            text_bg = QGraphicsRectItem(text_item.boundingRect())
-            text_bg.setBrush(QBrush(QColor(0, 0, 0, 180))) 
+            text_bg = QGraphicsRectItem(0, 0, label_width, text_rect.height() * scale)
+            text_bg.setBrush(QBrush(color))
             text_bg.setPen(Qt.PenStyle.NoPen)
             
-            pos_y = y1 - text_item.boundingRect().height() if y1 > 30 else y1
-            text_item.setPos(x1, pos_y)
-            text_bg.setPos(x1, pos_y)
+            text_height = text_rect.height() * scale
+            pos_y = y1 - text_height if y1 >= text_height else y1
+            left_edge = rect_item.sceneBoundingRect().left()
+            text_item.setPos(left_edge + (label_width - text_rect.width() * scale) / 2, pos_y)
+            text_bg.setPos(left_edge, pos_y)
             
             # Добавляем хинт к тексту и фону текста, чтобы он работал по всей площади
             if tooltip:
@@ -240,6 +280,20 @@ class ImageViewer(QDialog):
         if self.draw_boxes:
             record = self.data_manager.records.get(current_fname)
             if record:
+                label_entries = []
+                for face in record.faces:
+                    rec_id = face.extra_data.get('matched_portrait_cluster_label')
+                    if rec_id is None:
+                        rec_id = face.cluster_label
+                    if (
+                        rec_id is not None
+                        and str(rec_id) not in ("-1", "trash", "None")
+                        and len(face.bbox) == 4
+                    ):
+                        width = abs(int(face.bbox[2]) - int(face.bbox[0]))
+                        if width:
+                            label_entries.append((str(rec_id), width))
+                label_style = _label_style(label_entries) if self.target_face_index is None else None
                 for i, face in enumerate(record.faces):
                     tooltip_text = (
                         self.data_manager.student_label(face.student_id)
@@ -264,8 +318,9 @@ class ImageViewer(QDialog):
                     self._draw_bounding_box(
                         face.bbox,
                         is_recognized=is_recognized,
-                        text=f"ID: {rec_id}" if is_recognized else None,
+                        text=str(rec_id) if is_recognized else None,
                         tooltip=tooltip_text,
+                        label_style=label_style,
                     )
 
         self.scene.setSceneRect(self.pixmap_item.boundingRect())
@@ -288,9 +343,20 @@ class ImageViewer(QDialog):
         self.is_fitted_in_view = False
 
     def wheelEvent(self, event: QWheelEvent):
+        self._zoom_with_wheel(event)
+
+    def _zoom_with_wheel(self, event: QWheelEvent):
+        """Consume wheel input and scale around the photograph's center."""
+
+        delta = event.angleDelta().y() or event.pixelDelta().y()
+        if not delta or self.pixmap_item.pixmap().isNull():
+            event.accept()
+            return
         self.is_fitted_in_view = False
-        factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
+        factor = 1.15 if delta > 0 else 1 / 1.15
         self.view.scale(factor, factor)
+        self.view.centerOn(self.pixmap_item.sceneBoundingRect().center())
+        event.accept()
 
     def show_previous_image(self):
         if self.current_index > 0:

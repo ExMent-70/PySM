@@ -17,6 +17,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QImage, QPixmap
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 
@@ -139,6 +140,19 @@ class GuiImagePipelineTests(unittest.TestCase):
                 window.face_details_widget.itemAt(second_rect.center()),
                 second_item,
             )
+
+            panel = window.face_details_widget
+            panel.setFocus()
+            self.app.processEvents()
+            self.assertRegex(window.face_info_viewer.toPlainText(), r"Внутренний ID:\s*0")
+            QTest.keyClick(panel, Qt.Key.Key_Right)
+            self.app.processEvents()
+            self.assertIs(panel.currentItem(), second_item)
+            self.assertRegex(window.face_info_viewer.toPlainText(), r"Внутренний ID:\s*1")
+            QTest.mouseClick(panel.viewport(), Qt.MouseButton.LeftButton, pos=first_rect.center())
+            self.app.processEvents()
+            self.assertIs(panel.currentItem(), first_item)
+            self.assertRegex(window.face_info_viewer.toPlainText(), r"Внутренний ID:\s*0")
 
             second_working = root / "Session" / "Output" / "Analysis_Second"
             second_images = second_working / "JPG"

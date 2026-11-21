@@ -266,7 +266,7 @@ class EditorUIBuilder:
             window.face_details_widget = FaceDetailsWidget(window, mode=window.mode)
             if IS_MANAGED_RUN: set_widget_class(window.face_details_widget, "face-panel")
             
-            window.face_details_widget.itemClicked.connect(window._on_face_item_clicked)
+            window.face_details_widget.currentItemChanged.connect(window._on_face_item_clicked)
             window.face_details_widget.itemDoubleClicked.connect(window._on_face_item_double_clicked)
             window.face_details_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
             
